@@ -31,9 +31,7 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-      # Switch to --frozen-lockfile as soon as dependency access is available and
-      # the initial pnpm-lock.yaml can be generated and reviewed.
-      - run: pnpm install --no-frozen-lockfile
+      - run: pnpm install --frozen-lockfile
       - run: pnpm format:check
       - run: pnpm lint
       - run: pnpm typecheck
