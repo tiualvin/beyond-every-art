@@ -1,5 +1,6 @@
 .next
 node_modules
 coverage
+payload-types.ts
 docs/GHOST_TO_PAYLOAD_HANDOFF_WITH_APP_STRATEGY.md
 AGENTS.md

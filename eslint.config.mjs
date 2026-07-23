@@ -8,7 +8,7 @@ export default [
       '.next/**',
       'coverage/**',
       'node_modules/**',
-      'src/payload-types.ts',
+      'payload-types.ts',
     ],
   },
   ...compat.extends('next/core-web-vitals', 'next/typescript'),

@@ -4,6 +4,7 @@ export const Media: CollectionConfig = {
   slug: 'media',
   access: { read: () => true },
   upload: {
+    mimeTypes: ['image/*'],
     imageSizes: [{ name: 'card', width: 768, withoutEnlargement: true }],
   },
   fields: [
