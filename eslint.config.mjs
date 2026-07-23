@@ -2,14 +2,11 @@ import { FlatCompat } from '@eslint/eslintrc'
 
 const compat = new FlatCompat({ baseDirectory: import.meta.dirname })
 
-export default [
+const config = [
   {
-    ignores: [
-      '.next/**',
-      'coverage/**',
-      'node_modules/**',
-      'payload-types.ts',
-    ],
+    ignores: ['.next/**', 'coverage/**', 'node_modules/**', 'payload-types.ts'],
   },
   ...compat.extends('next/core-web-vitals', 'next/typescript'),
 ]
+
+export default config
