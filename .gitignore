@@ -1,0 +1,18 @@
+node_modules/
+.next/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+
+# Private Ghost migration material must never be committed.
+ghost-export/
+ghost-content*.json
+ghost-members*.csv
+complete-site-archive*.zip
+*.dump
+*.sql
+migration-report*.json
