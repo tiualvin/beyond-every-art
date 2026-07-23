@@ -1,0 +1,23 @@
+name: Feature request
+description: Propose migration parity or post-migration functionality.
+title: '[Feature]: '
+labels: [enhancement]
+body:
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        [
+          Required for Ghost parity,
+          Post-migration website enhancement,
+          Future app scope,
+        ]
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal and migration impact
+    validations:
+      required: true

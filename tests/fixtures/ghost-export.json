@@ -1,0 +1,12 @@
+{
+  "db": [
+    {
+      "meta": { "version": "synthetic-test" },
+      "data": {
+        "posts": [{ "id": "post-1", "slug": "sample", "title": "Sample" }],
+        "tags": [{ "id": "tag-1", "slug": "art" }],
+        "users": [{ "id": "user-1", "slug": "editor" }]
+      }
+    }
+  ]
+}
