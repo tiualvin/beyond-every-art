@@ -1,6 +1,5 @@
+import config from '@payload-config'
 import { getPayload, type Payload } from 'payload'
-
-import config from '../payload.config'
 
 /**
  * Development seed. Populates Payload with a small, realistic set of authors,
@@ -12,10 +11,18 @@ import config from '../payload.config'
  */
 
 type IdLike = string | number
+type SeedCollection = 'authors' | 'tags' | 'posts' | 'pages'
+
+// Payload's create/update are strongly typed per collection (and per draft
+// state) once payload-types.ts is generated. This generic upsert intentionally
+// works across several collections, so the option objects are cast to the API's
+// own parameter types — valid whether or not the generated types are present.
+type CreateOptions = Parameters<Payload['create']>[0]
+type UpdateOptions = Parameters<Payload['update']>[0]
 
 async function upsertBySlug(
   payload: Payload,
-  collection: 'authors' | 'tags' | 'posts' | 'pages',
+  collection: SeedCollection,
   slug: string,
   data: Record<string, unknown>,
 ): Promise<IdLike> {
@@ -29,7 +36,12 @@ async function upsertBySlug(
 
   if (existing.docs.length > 0) {
     const id = existing.docs[0].id as IdLike
-    await payload.update({ collection, id, data, overrideAccess: true })
+    await payload.update({
+      collection,
+      id,
+      data,
+      overrideAccess: true,
+    } as unknown as UpdateOptions)
     return id
   }
 
@@ -37,7 +49,7 @@ async function upsertBySlug(
     collection,
     data,
     overrideAccess: true,
-  })
+  } as unknown as CreateOptions)
   return created.id as IdLike
 }
 

@@ -17,3 +17,6 @@ complete-site-archive*.zip
 *.dump
 *.sql
 migration-report*.json
+
+# Payload generated types (run `pnpm generate:types`)
+payload-types.ts
