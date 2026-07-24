@@ -1,4 +1,4 @@
-import { absoluteUrl, pagePath, postPath } from './site'
+import { absoluteUrl, authorPath, pagePath, postPath, tagPath } from './site'
 
 export type SitemapDoc = {
   slug: string
@@ -29,10 +29,14 @@ export function buildSitemapEntries({
   siteUrl,
   posts = [],
   pages = [],
+  tags = [],
+  authors = [],
 }: {
   siteUrl: string
   posts?: readonly SitemapDoc[]
   pages?: readonly SitemapDoc[]
+  tags?: readonly SitemapDoc[]
+  authors?: readonly SitemapDoc[]
 }): SitemapEntry[] {
   const entries: SitemapEntry[] = [
     { url: `${siteUrl}/`, changeFrequency: 'daily', priority: 1 },
@@ -55,6 +59,26 @@ export function buildSitemapEntries({
       lastModified: toIso(page.updatedAt) ?? toIso(page.publishedAt),
       changeFrequency: 'monthly',
       priority: 0.5,
+    })
+  }
+
+  for (const tag of tags) {
+    if (!tag.slug) continue
+    entries.push({
+      url: absoluteUrl(tagPath(tag.slug), siteUrl),
+      lastModified: toIso(tag.updatedAt) ?? toIso(tag.publishedAt),
+      changeFrequency: 'weekly',
+      priority: 0.4,
+    })
+  }
+
+  for (const author of authors) {
+    if (!author.slug) continue
+    entries.push({
+      url: absoluteUrl(authorPath(author.slug), siteUrl),
+      lastModified: toIso(author.updatedAt) ?? toIso(author.publishedAt),
+      changeFrequency: 'monthly',
+      priority: 0.3,
     })
   }
 

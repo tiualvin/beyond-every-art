@@ -27,7 +27,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   try {
     const payload = await getPayloadClient()
-    const [posts, pages] = await Promise.all([
+    const [posts, pages, tags, authors] = await Promise.all([
       payload.find({
         collection: 'posts',
         overrideAccess: true,
@@ -51,12 +51,30 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         where: { _status: { equals: 'published' } },
         select: { slug: true, updatedAt: true, publishedAt: true },
       }),
+      payload.find({
+        collection: 'tags',
+        overrideAccess: true,
+        depth: 0,
+        pagination: false,
+        limit: 0,
+        select: { slug: true, updatedAt: true },
+      }),
+      payload.find({
+        collection: 'authors',
+        overrideAccess: true,
+        depth: 0,
+        pagination: false,
+        limit: 0,
+        select: { slug: true, updatedAt: true },
+      }),
     ])
 
     return buildSitemapEntries({
       siteUrl,
       posts: toDocs(posts.docs as PublishedDoc[]),
       pages: toDocs(pages.docs as PublishedDoc[]),
+      tags: toDocs(tags.docs as PublishedDoc[]),
+      authors: toDocs(authors.docs as PublishedDoc[]),
     })
   } catch {
     // If the database is unavailable (e.g. during a build), still emit a valid

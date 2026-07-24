@@ -291,3 +291,124 @@ img {
   font-size: 0.82rem;
   color: color-mix(in srgb, var(--color-on-dark) 62%, transparent);
 }
+
+/* --- Article ------------------------------------------------------------ */
+
+.article {
+  padding: 3.5rem 0;
+}
+
+.article__inner {
+  max-width: 44rem;
+}
+
+.article__header {
+  margin-bottom: 2.5rem;
+}
+
+.article__header .eyebrow {
+  display: inline-block;
+  margin-bottom: 0.75rem;
+}
+
+.article__header h1 {
+  font-size: clamp(2rem, 5vw, 3.2rem);
+}
+
+.article__dek {
+  font-size: 1.2rem;
+  color: var(--color-muted);
+  margin: 0.75rem 0 1.25rem;
+}
+
+.article__byline {
+  font-size: 0.85rem;
+  color: var(--color-muted);
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-line);
+}
+
+/* Rendered body (preserved legacy HTML). */
+.prose {
+  font-size: 1.1rem;
+  line-height: 1.75;
+}
+
+.prose > * + * {
+  margin-top: 1.4rem;
+}
+
+.prose h2 {
+  font-size: 1.7rem;
+  margin-top: 2.5rem;
+  color: var(--color-burgundy);
+}
+
+.prose h3 {
+  font-size: 1.3rem;
+  margin-top: 2rem;
+}
+
+.prose a {
+  color: var(--color-burgundy);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.prose img {
+  border-radius: var(--radius);
+  margin: 2rem 0;
+}
+
+.prose blockquote {
+  margin: 2rem 0;
+  padding: 0.5rem 0 0.5rem 1.5rem;
+  border-left: 3px solid var(--color-burgundy);
+  font-family: var(--font-serif);
+  font-size: 1.3rem;
+  font-style: italic;
+  color: var(--color-ink);
+}
+
+.prose figcaption {
+  font-size: 0.85rem;
+  color: var(--color-muted);
+}
+
+.article__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 3rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--color-line);
+}
+
+.tag-chip {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  color: var(--color-burgundy);
+}
+
+.tag-chip:hover {
+  background: var(--color-burgundy);
+  color: var(--color-on-dark);
+  text-decoration: none;
+}
+
+/* --- Archive ------------------------------------------------------------ */
+
+.archive__head {
+  margin-bottom: 2.5rem;
+  max-width: 42rem;
+}
+
+.archive__head h1 {
+  font-size: clamp(1.9rem, 4vw, 2.8rem);
+  margin-top: 0.4rem;
+}
