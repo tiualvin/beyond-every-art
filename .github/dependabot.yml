@@ -2,13 +2,39 @@ version: 2
 updates:
   - package-ecosystem: npm
     directory: /
-    schedule: { interval: weekly }
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
     groups:
       payload:
         patterns: ['payload', '@payloadcms/*']
+      react:
+        patterns: ['react', 'react-dom', '@types/react', '@types/react-dom']
+      dev-dependencies:
+        dependency-type: development
+    # Major upgrades (e.g. Next, TypeScript, React) can break the Payload/Next
+    # type layer and are handled deliberately rather than automatically.
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+
   - package-ecosystem: github-actions
     directory: /
-    schedule: { interval: monthly }
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    groups:
+      github-actions:
+        patterns: ['*']
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+
   - package-ecosystem: docker
     directory: /
-    schedule: { interval: monthly }
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']

@@ -6,13 +6,19 @@
 // written first so their new Payload IDs can be substituted into post and page
 // relationships.
 //
-// Media (featured images, inline images) is intentionally NOT uploaded here —
-// that is a separate step. Relationships to uploads are left unset for now; the
-// plan already records every media URL that will need migrating.
+// When a media map is supplied (produced by importMedia), featured/profile
+// images are linked to their uploaded Media documents and legacyHTML is
+// rewritten so inline images point at the migrated assets instead of Ghost.
 
 import type { CollectionSlug, Payload } from 'payload'
 
+import { rewriteMediaUrls, type MediaRef } from './media-rewrite'
 import type { MigrationPlan, PostPlan } from './plan'
+
+export interface RunImportOptions {
+  // ghostURL -> migrated asset. Omit to import content without media links.
+  media?: Map<string, MediaRef>
+}
 
 export interface ImportResult {
   authorsCreated: number
@@ -85,11 +91,22 @@ function resolveRelationships(
   }
 }
 
+/** Payload id of the migrated asset for a given source URL, if any. */
+function mediaId(
+  media: Map<string, MediaRef> | undefined,
+  url: string | undefined,
+): string | undefined {
+  if (!media || !url) return undefined
+  return media.get(url)?.id
+}
+
 /** Run the full content import for a plan. Assumes a live Payload instance. */
 export async function runImport(
   payload: Payload,
   plan: MigrationPlan,
+  options: RunImportOptions = {},
 ): Promise<ImportResult> {
+  const media = options.media
   const result: ImportResult = {
     authorsCreated: 0,
     authorsUpdated: 0,
@@ -107,11 +124,15 @@ export async function runImport(
 
   for (const author of plan.authors) {
     try {
+      const profileImage = mediaId(media, author.profileImageURL)
       const outcome = await upsertByGhostID(
         payload,
         'authors',
         author.ghostID,
-        author.data,
+        {
+          ...author.data,
+          ...(profileImage ? { profileImage } : {}),
+        },
       )
       authorIdByGhostID.set(author.ghostID, outcome.id)
       if (outcome.created) result.authorsCreated++
@@ -123,12 +144,11 @@ export async function runImport(
 
   for (const tag of plan.tags) {
     try {
-      const outcome = await upsertByGhostID(
-        payload,
-        'tags',
-        tag.ghostID,
-        tag.data,
-      )
+      const featuredImage = mediaId(media, tag.featureImageURL)
+      const outcome = await upsertByGhostID(payload, 'tags', tag.ghostID, {
+        ...tag.data,
+        ...(featuredImage ? { featuredImage } : {}),
+      })
       tagIdByGhostID.set(tag.ghostID, outcome.id)
       if (outcome.created) result.tagsCreated++
       else result.tagsUpdated++
@@ -144,10 +164,15 @@ export async function runImport(
         authorIdByGhostID,
         tagIdByGhostID,
       )
+      const featuredImage = mediaId(media, post.featureImageURL)
       const outcome = await upsertByGhostID(payload, 'posts', post.ghostID, {
         ...post.data,
+        legacyHTML: media
+          ? rewriteMediaUrls(post.data.legacyHTML, media)
+          : post.data.legacyHTML,
         authors,
         tags,
+        ...(featuredImage ? { featuredImage } : {}),
         migrationStatus: 'migrated',
         _status: post.status,
       })
@@ -160,8 +185,13 @@ export async function runImport(
 
   for (const page of plan.pages) {
     try {
+      const featuredImage = mediaId(media, page.featureImageURL)
       const outcome = await upsertByGhostID(payload, 'pages', page.ghostID, {
         ...page.data,
+        legacyHTML: media
+          ? rewriteMediaUrls(page.data.legacyHTML, media)
+          : page.data.legacyHTML,
+        ...(featuredImage ? { featuredImage } : {}),
         _status: page.status,
       })
       if (outcome.created) result.pagesCreated++
