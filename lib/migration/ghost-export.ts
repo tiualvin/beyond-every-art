@@ -1,8 +1,10 @@
 // Types and helpers for reading a Ghost "Content & settings" JSON export.
-// The export nests everything under `db[0].data`, with relationships expressed
-// through join tables (`posts_authors`, `posts_tags`) rather than embedded
-// arrays. Fields are intentionally optional because Ghost versions differ and
-// the standard export is not guaranteed to contain every column.
+// Ghost 5.x and earlier nest everything under `db[0].data`; Ghost 6.x (and
+// self-hosted `ghost backup`-style archives) export a flat `{ meta, data }`
+// document with no `db` wrapper. Both shapes are accepted. Relationships are
+// expressed through join tables (`posts_authors`, `posts_tags`) rather than
+// embedded arrays. Fields are intentionally optional because Ghost versions
+// differ and the standard export is not guaranteed to contain every column.
 
 export interface GhostUser {
   id: string
@@ -71,30 +73,35 @@ export interface GhostData {
 }
 
 export interface GhostExport {
-  db: Array<{
+  // Ghost 6.x flat export shape.
+  meta?: { version?: string; exported_on?: number }
+  data?: GhostData
+  // Ghost 5.x and earlier wrapped export shape.
+  db?: Array<{
     data: GhostData
     meta?: { version?: string; exported_on?: number }
   }>
 }
 
 export function parseGhostExport(value: unknown): GhostExport {
-  if (
-    !value ||
-    typeof value !== 'object' ||
-    !Array.isArray((value as GhostExport).db) ||
-    !(value as GhostExport).db[0]?.data
-  ) {
-    throw new Error('Invalid Ghost export: expected db[0].data')
+  if (value && typeof value === 'object') {
+    const candidate = value as GhostExport
+    if (candidate.data && typeof candidate.data === 'object') {
+      return candidate
+    }
+    if (Array.isArray(candidate.db) && candidate.db[0]?.data) {
+      return candidate
+    }
   }
-  return value as GhostExport
+  throw new Error('Invalid Ghost export: expected data or db[0].data')
 }
 
 export function ghostData(ghost: GhostExport): GhostData {
-  return ghost.db[0].data
+  return ghost.data ?? ghost.db![0].data
 }
 
 export function ghostVersion(ghost: GhostExport): string {
-  return ghost.db[0].meta?.version ?? 'unknown'
+  return ghost.meta?.version ?? ghost.db?.[0]?.meta?.version ?? 'unknown'
 }
 
 /** Ghost keeps posts and pages in one table; treat `type`/`page` as the split. */
