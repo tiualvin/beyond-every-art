@@ -1,8 +1,15 @@
 import type { CollectionConfig } from 'payload'
 
+import { editorsAndAdmins, publicRead } from '../access/roles'
+
 export const Media: CollectionConfig = {
   slug: 'media',
-  access: { read: () => true },
+  access: {
+    create: editorsAndAdmins,
+    read: publicRead,
+    update: editorsAndAdmins,
+    delete: editorsAndAdmins,
+  },
   upload: {
     mimeTypes: ['image/*'],
     imageSizes: [{ name: 'card', width: 768, withoutEnlargement: true }],

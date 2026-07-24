@@ -16,6 +16,7 @@
     "format:check": "prettier --check .",
     "payload": "payload",
     "generate:types": "payload generate:types",
+    "bootstrap:admin": "tsx scripts/bootstrap-admin.ts",
     "migrate:ghost": "tsx scripts/migrate-ghost.ts",
     "migrate:validate": "tsx scripts/validate-migration.ts"
   },

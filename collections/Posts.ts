@@ -1,10 +1,31 @@
 import type { CollectionConfig } from 'payload'
 
+import {
+  authenticated,
+  deleteOwnedDrafts,
+  editorsAndAdminsField,
+  ownedPosts,
+  postsRead,
+} from '../access/roles'
+
 export const Posts: CollectionConfig = {
   slug: 'posts',
   admin: { useAsTitle: 'title' },
   access: {
-    read: ({ req }) => (req.user ? true : { _status: { equals: 'published' } }),
+    create: authenticated,
+    read: postsRead,
+    update: ownedPosts,
+    delete: deleteOwnedDrafts,
+  },
+  hooks: {
+    beforeChange: [
+      ({ data, operation, req }) => {
+        if (operation === 'create' && req.user?.role === 'author') {
+          return { ...data, owners: [req.user.id] }
+        }
+        return data
+      },
+    ],
   },
   versions: { drafts: true },
   fields: [
@@ -12,6 +33,20 @@ export const Posts: CollectionConfig = {
     { name: 'slug', type: 'text', required: true, unique: true, index: true },
     { name: 'publishedAt', type: 'date', index: true },
     { name: 'ghostUpdatedAt', type: 'date' },
+    {
+      name: 'owners',
+      type: 'relationship',
+      relationTo: 'users',
+      hasMany: true,
+      admin: {
+        description: 'Private CMS editing ownership; not a public byline.',
+      },
+      access: {
+        read: editorsAndAdminsField,
+        create: editorsAndAdminsField,
+        update: editorsAndAdminsField,
+      },
+    },
     {
       name: 'authors',
       type: 'relationship',

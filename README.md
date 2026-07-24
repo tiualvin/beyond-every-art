@@ -13,6 +13,35 @@ Migration-first Next.js and Payload CMS foundation for moving Beyond Every Art f
 
 Payload Admin is available at <http://localhost:3000/admin>.
 
+## Create the first administrator
+
+Public account creation is disabled. With an empty `users` collection, set the
+three temporary bootstrap variables documented in `.env.example`, then run:
+
+```bash
+pnpm bootstrap:admin
+```
+
+The command creates exactly one administrator and refuses to run once any user
+exists. Remove the bootstrap values from your environment immediately afterward.
+Additional accounts must be created by an administrator in Payload Admin.
+
+## Editorial roles
+
+- Administrators manage accounts, all editorial collections, migration member
+  records, and site-wide globals.
+- Editors manage editorial collections and redirects, but not accounts, member
+  records, or site-wide globals.
+- Authors may create posts, publish posts privately assigned to them, and delete
+  their assigned drafts. They cannot delete published posts or manage pages.
+
+Public author profiles and private CMS accounts are separate. The private
+`owners` field controls post editing; the `authors` field controls public bylines.
+
+Ghost member records are preserved in an administrator-only collection and are
+not CMS login accounts. Keep the original member export encrypted outside Git,
+with its decryption key stored separately.
+
 ## Migration dry run
 
 Only synthetic fixtures belong in Git. Never commit Ghost exports, member CSVs, database dumps, site archives, or credentials.

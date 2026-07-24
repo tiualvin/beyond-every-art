@@ -1,7 +1,10 @@
 import type { GlobalConfig } from 'payload'
 
+import { globalPublicReadAdminUpdate } from '../access/roles'
+
 export const Footer: GlobalConfig = {
   slug: 'footer',
+  access: globalPublicReadAdminUpdate,
   fields: [
     { name: 'copyright', type: 'text' },
     {
