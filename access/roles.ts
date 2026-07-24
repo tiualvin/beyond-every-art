@@ -1,4 +1,4 @@
-import type { Access, FieldAccess, GlobalConfig } from 'payload'
+import type { Access, FieldAccess, GlobalConfig, Where } from 'payload'
 
 export type Role = 'admin' | 'editor' | 'author'
 
@@ -31,12 +31,13 @@ export const postsRead: Access = ({ req }) => {
   if (isEditor(req.user)) return true
   if (!req.user) return { _status: { equals: 'published' } }
 
-  return {
+  const where: Where = {
     or: [
       { _status: { equals: 'published' } },
       { owners: { equals: req.user.id } },
     ],
   }
+  return where
 }
 
 export const ownedPosts: Access = ({ req }) => {
@@ -48,12 +49,14 @@ export const ownedPosts: Access = ({ req }) => {
 export const deleteOwnedDrafts: Access = ({ req }) => {
   if (isEditor(req.user)) return true
   if (!req.user) return false
-  return {
+
+  const where: Where = {
     and: [
       { owners: { equals: req.user.id } },
       { _status: { equals: 'draft' } },
     ],
   }
+  return where
 }
 
 export const globalPublicReadAdminUpdate: GlobalConfig['access'] = {
