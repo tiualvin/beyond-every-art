@@ -1,6 +1,5 @@
+import config from '@payload-config'
 import { getPayload } from 'payload'
-
-import config from '../payload.config'
 
 const requiredEnvironment = [
   'PAYLOAD_BOOTSTRAP_EMAIL',
