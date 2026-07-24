@@ -2229,6 +2229,8 @@ Also required:
 ## Priority 5: Website Enhancements
 
 - Redesign
+- Apply the recorded [Next.js + Payload website visual direction](WEBSITE_VISUAL_DIRECTION.md)
+  as a post-parity design brief
 - Improved search
 - Newsletter system
 - Memberships

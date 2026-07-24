@@ -10,6 +10,11 @@ Before planning or implementing work, read:
 
 That handoff defines the migration requirements, target architecture, data model, SEO constraints, deployment approach, acceptance criteria, and longer-term app strategy.
 
+For post-migration website design work, also read
+[`docs/WEBSITE_VISUAL_DIRECTION.md`](docs/WEBSITE_VISUAL_DIRECTION.md). It records
+the supplied desktop and mobile concepts as a directional brief, not as approval
+to redesign during Phase 1.
+
 ## Current priority
 
 The first priority is a safe, repeatable Ghost migration—not a redesign.
