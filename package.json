@@ -22,7 +22,9 @@
     "migrate:ghost": "tsx scripts/migrate-ghost.ts",
     "migrate:redirects": "tsx scripts/migrate-redirects.ts",
     "migrate:members": "tsx scripts/migrate-members.ts",
-    "migrate:validate": "tsx scripts/validate-migration.ts"
+    "migrate:validate": "tsx scripts/validate-migration.ts",
+    "backup:db": "tsx scripts/backup-database.ts",
+    "restore:db": "tsx scripts/restore-database.ts"
   },
   "dependencies": {
     "@payloadcms/db-postgres": "3.86.0",
