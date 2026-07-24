@@ -1,11 +1,183 @@
 {
   "db": [
     {
-      "meta": { "version": "synthetic-test" },
+      "meta": { "version": "5.0", "exported_on": 1700000000000 },
       "data": {
-        "posts": [{ "id": "post-1", "slug": "sample", "title": "Sample" }],
-        "tags": [{ "id": "tag-1", "slug": "art" }],
-        "users": [{ "id": "user-1", "slug": "editor" }]
+        "users": [
+          {
+            "id": "user-1",
+            "name": "Ada Editor",
+            "slug": "ada",
+            "bio": "Writes about pigments and light.",
+            "website": "https://ada.example.com",
+            "profile_image": "https://old.ghost.example/content/images/ada.jpg"
+          },
+          {
+            "id": "user-2",
+            "name": "Ben Author",
+            "slug": "ben",
+            "bio": null,
+            "website": null,
+            "profile_image": null
+          }
+        ],
+        "tags": [
+          {
+            "id": "tag-1",
+            "name": "Art",
+            "slug": "art",
+            "description": "Everything about art.",
+            "visibility": "public",
+            "meta_title": "Art articles",
+            "meta_description": "Read our art coverage."
+          },
+          {
+            "id": "tag-2",
+            "name": "#internal",
+            "slug": "hash-internal",
+            "description": null,
+            "visibility": "internal"
+          },
+          {
+            "id": "tag-3",
+            "name": "Color",
+            "slug": "color",
+            "description": "Color theory and practice.",
+            "visibility": "public"
+          }
+        ],
+        "posts": [
+          {
+            "id": "post-1",
+            "type": "post",
+            "status": "published",
+            "title": "Understanding Ultramarine",
+            "slug": "understanding-ultramarine",
+            "html": "<p>Ultramarine is a storied pigment.</p><figure><img src=\"https://old.ghost.example/content/images/2023/01/ultramarine.jpg\" alt=\"Ultramarine swatch\" /><figcaption>A swatch</figcaption></figure>",
+            "custom_excerpt": "A short history of the bluest blue.",
+            "feature_image": "https://old.ghost.example/content/images/2023/01/feature.jpg",
+            "featured": 1,
+            "visibility": "public",
+            "created_at": "2023-01-01T09:00:00.000Z",
+            "updated_at": "2023-01-05T09:00:00.000Z",
+            "published_at": "2023-01-02T09:00:00.000Z",
+            "canonical_url": null,
+            "url": "https://old.ghost.example/understanding-ultramarine/"
+          },
+          {
+            "id": "post-2",
+            "type": "post",
+            "status": "draft",
+            "title": "A Work In Progress",
+            "slug": "a-work-in-progress",
+            "html": "<p>Not finished yet.</p>",
+            "custom_excerpt": null,
+            "feature_image": null,
+            "featured": 0,
+            "visibility": "members",
+            "created_at": "2023-02-01T09:00:00.000Z",
+            "updated_at": "2023-02-01T09:00:00.000Z",
+            "published_at": null,
+            "url": "https://old.ghost.example/a-work-in-progress/"
+          },
+          {
+            "id": "post-3",
+            "type": "post",
+            "status": "published",
+            "title": "Reprint of Ultramarine",
+            "slug": "understanding-ultramarine",
+            "html": "<p>Duplicate slug on purpose.</p>",
+            "featured": 0,
+            "visibility": "public",
+            "published_at": "2023-03-02T09:00:00.000Z",
+            "url": "https://old.ghost.example/understanding-ultramarine-2/"
+          },
+          {
+            "id": "post-4",
+            "type": "post",
+            "status": "published",
+            "title": "Orphaned Post",
+            "slug": "orphaned-post",
+            "html": "<p>References an author that is not in the export.</p>",
+            "featured": 0,
+            "visibility": "public",
+            "published_at": "2023-04-02T09:00:00.000Z",
+            "url": "https://old.ghost.example/orphaned-post/"
+          },
+          {
+            "id": "page-1",
+            "type": "page",
+            "status": "published",
+            "title": "About",
+            "slug": "about",
+            "html": "<p>About this publication.</p>",
+            "featured": 0,
+            "visibility": "public",
+            "published_at": "2022-12-01T09:00:00.000Z",
+            "url": "https://old.ghost.example/about/"
+          }
+        ],
+        "posts_meta": [
+          {
+            "id": "meta-1",
+            "post_id": "post-1",
+            "meta_title": "Understanding Ultramarine | Beyond Every Art",
+            "meta_description": "The history and chemistry of ultramarine blue.",
+            "og_image": "https://old.ghost.example/content/images/2023/01/og.jpg"
+          }
+        ],
+        "posts_authors": [
+          {
+            "id": "pa-1",
+            "post_id": "post-1",
+            "author_id": "user-1",
+            "sort_order": 0
+          },
+          {
+            "id": "pa-2",
+            "post_id": "post-2",
+            "author_id": "user-2",
+            "sort_order": 0
+          },
+          {
+            "id": "pa-3",
+            "post_id": "post-3",
+            "author_id": "user-1",
+            "sort_order": 0
+          },
+          {
+            "id": "pa-4",
+            "post_id": "post-4",
+            "author_id": "user-99",
+            "sort_order": 0
+          }
+        ],
+        "posts_tags": [
+          {
+            "id": "pt-1",
+            "post_id": "post-1",
+            "tag_id": "tag-1",
+            "sort_order": 0
+          },
+          {
+            "id": "pt-2",
+            "post_id": "post-1",
+            "tag_id": "tag-3",
+            "sort_order": 1
+          },
+          {
+            "id": "pt-3",
+            "post_id": "post-1",
+            "tag_id": "tag-99",
+            "sort_order": 2
+          },
+          {
+            "id": "pt-4",
+            "post_id": "post-3",
+            "tag_id": "tag-1",
+            "sort_order": 0
+          }
+        ]
       }
     }
   ]
