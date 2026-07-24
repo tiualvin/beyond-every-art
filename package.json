@@ -20,6 +20,8 @@
     "bootstrap:admin": "tsx scripts/bootstrap-admin.ts",
     "seed:dev": "tsx scripts/seed-dev.ts",
     "migrate:ghost": "tsx scripts/migrate-ghost.ts",
+    "migrate:redirects": "tsx scripts/migrate-redirects.ts",
+    "migrate:members": "tsx scripts/migrate-members.ts",
     "migrate:validate": "tsx scripts/validate-migration.ts"
   },
   "dependencies": {

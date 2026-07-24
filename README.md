@@ -50,7 +50,20 @@ Only synthetic fixtures belong in Git. Never commit Ghost exports, member CSVs, 
 pnpm migrate:ghost --dry-run --input tests/fixtures/ghost-export.json
 ```
 
-The non-dry-run importer intentionally exits without writing until the collection import and media adapters are implemented and tested.
+Drop the `--dry-run` flag to write posts, pages, authors, tags, and media into
+Payload. The importer accepts both the Ghost 6.x flat `{ meta, data }` export
+shape and the legacy `db[0].data` shape from older Ghost versions, and is safe
+to rerun (it upserts by `ghostID`).
+
+Redirects and members are migrated separately, since Ghost exports them as
+their own files:
+
+```bash
+pnpm migrate:redirects --dry-run --input ghost-export/redirects.json
+pnpm migrate:members --dry-run --input ghost-export/ghost-members.csv
+```
+
+Both also accept a real run without `--dry-run` and are safe to rerun.
 
 ## Checks
 
