@@ -15,6 +15,24 @@ content, URLs, metadata, media, behavior, and SEO; use this direction for a
 separately scoped enhancement after migration parity and production stability
 are established.
 
+## Concept boards
+
+The direction below is derived from two supplied concept boards, each showing a
+desktop and a mobile composition side by side. They are reference material, not
+licensed production assets (see [Guardrails](#guardrails)).
+
+![Homepage concept — desktop and mobile, showing the cinematic hero, "Our
+perspective", "Featured stories", dark "Explore by topic", and featured-artwork
+sections.](assets/visual-direction-homepage.png)
+
+_Homepage concept (desktop + mobile)._
+
+![Article concept — desktop and mobile, showing the split hero, drop-cap
+introduction, material comparison panel, related-stories rail, and in-context
+newsletter card.](assets/visual-direction-article.png)
+
+_Article concept (desktop + mobile)._
+
 ## Overall character
 
 The site should feel like a refined editorial art journal: authoritative,
@@ -24,6 +42,11 @@ warm, tactile, and spacious rather than like a generic SaaS marketing site.
   dominant neutral and accent colors.
 - Pair expressive, high-contrast serif display typography with a restrained
   sans serif for navigation, labels, metadata, buttons, and utility text.
+- Adopt a consistent eyebrow/kicker label system as a recurring motif: small,
+  uppercase, letter-spaced sans labels that sit above section and article
+  titles (for example a section eyebrow or an article category). Render them in
+  burgundy on light surfaces and in a light tint on dark surfaces, always as
+  real text rather than baked into imagery.
 - Favor generous whitespace, fine rules, strong editorial hierarchy, and
   art-led photography or close material studies.
 - Use subtle texture and dramatic dark imagery where it supports the content,
@@ -37,8 +60,10 @@ warm, tactile, and spacious rather than like a generic SaaS marketing site.
   primary navigation across the desktop header, and a high-emphasis burgundy
   consultation call to action on the right.
 - The concept navigation includes About, Art & Stories, Services, Collections,
-  Journal, and Contact. Final labels and destinations must follow the validated
-  content inventory and preserved URLs rather than inventing routes.
+  Journal, and Contact, with Art & Stories and Services shown as expandable
+  (dropdown) items. Final labels, destinations, and which items expand must
+  follow the validated content inventory and preserved URLs rather than
+  inventing routes; any dropdown must be keyboard operable.
 - Mobile reduces the header to the brand, search, and menu controls with clear
   touch targets.
 - The desktop footer is a dark, structured multi-column area preceded by a
@@ -55,12 +80,14 @@ rhythm:
    action.
 2. A light "Our perspective" section that combines a large serif statement
    with concise explanatory copy and an About/Story action.
-3. A "Featured stories" section with image-led article cards and visible
-   taxonomy labels.
+3. A "Featured stories" section introduced by a centered eyebrow and a centered
+   serif subhead, with image-led article cards that each carry a visible
+   taxonomy label.
 4. A dark "Explore by topic" section using richly photographed topic cards,
    balanced by a larger contextual art/interior image on desktop.
-5. A featured artwork or collection callout with artwork metadata and a direct
-   details action.
+5. A featured artwork or collection callout whose metadata reads as a compact,
+   separator-delimited row (for example medium, dimensions, and year) alongside
+   a direct details action.
 6. Newsletter and footer areas that close the page with a strong burgundy-to-
    black transition.
 
@@ -74,10 +101,13 @@ without autoplay.
 
 The article concept prioritizes long-form reading and art scholarship:
 
-- Desktop opens with a split hero: title, dek, author, reading time, and date on
-  one side, with a large featured image on the other.
-- Mobile presents the title and metadata first, followed by the featured image
-  and article introduction.
+- Desktop opens with a split hero: a category eyebrow above the title, then the
+  title, dek, and a byline row (author, reading time, and date) on one side,
+  with a large featured image on the other.
+- The byline may pair the author with an avatar and role; treat these as
+  optional metadata that degrades gracefully when absent.
+- Mobile presents the category label, title, and metadata first, followed by the
+  featured image and article introduction.
 - The reading column uses an editorial serif for headings and comfortable body
   measure, with strong hierarchy for sections, captions, quotations, and
   comparison graphics.
