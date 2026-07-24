@@ -49,4 +49,17 @@ describe('buildSitemapEntries', () => {
     const good = entries.find((e) => e.url.includes('good'))
     expect(good?.lastModified).toBeUndefined()
   })
+
+  it('builds trailing-slash tag and author archive URLs', () => {
+    const entries = buildSitemapEntries({
+      siteUrl,
+      tags: [{ slug: 'materials' }],
+      authors: [{ slug: 'livia-calderon' }],
+    })
+    expect(entries.map((e) => e.url)).toEqual([
+      'https://beyondeveryart.com/',
+      'https://beyondeveryart.com/tag/materials/',
+      'https://beyondeveryart.com/author/livia-calderon/',
+    ])
+  })
 })

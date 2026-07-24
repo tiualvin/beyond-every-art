@@ -159,12 +159,22 @@ async function seed(): Promise<void> {
     },
   ]
 
+  const bodyFor = (excerpt: string): string =>
+    [
+      `<p>${excerpt}</p>`,
+      '<p>For centuries, artists have chosen their materials as deliberately as their subjects. The choice shapes not only how a work looks the day it is made, but how it ages across generations.</p>',
+      '<h2>Why the difference matters</h2>',
+      '<p>Composition drives behavior. Two materials that appear identical on the palette can diverge sharply in opacity, handling, drying, and permanence — and those differences quietly define the finished work.</p>',
+      '<blockquote>The material is never neutral. It carries its own history into every mark.</blockquote>',
+      '<p>Understanding these properties helps artists, conservators, and collectors make more confident, lasting choices.</p>',
+    ].join('')
+
   for (const post of posts) {
     await upsertBySlug(payload, 'posts', post.slug, {
       title: post.title,
       slug: post.slug,
       excerpt: post.excerpt,
-      legacyHTML: `<p>${post.excerpt}</p>`,
+      legacyHTML: bodyFor(post.excerpt),
       authors: [livia],
       tags: [post.tag],
       featured: post.featured,

@@ -140,3 +140,212 @@ export async function getRecentPosts(limit = 6): Promise<PostCard[]> {
     return []
   }
 }
+
+// --- Detail + archive types --------------------------------------------
+
+export type TagRef = { name: string; slug: string }
+
+export type PostDetail = {
+  slug: string
+  title: string
+  excerpt: string
+  bodyHtml: string
+  publishedAt: string | null
+  updatedAt: string | null
+  authors: AuthorSummary[]
+  tags: TagRef[]
+  metaTitle: string | null
+  metaDescription: string | null
+  canonicalURL: string | null
+}
+
+export type PageDetail = {
+  slug: string
+  title: string
+  bodyHtml: string
+  publishedAt: string | null
+  updatedAt: string | null
+  metaTitle: string | null
+  metaDescription: string | null
+  canonicalURL: string | null
+}
+
+export type Archive = {
+  name: string
+  slug: string
+  description: string
+  posts: PostCard[]
+}
+
+export type SlugRef = { slug: string; updatedAt: string | null }
+
+type RawContentDoc = {
+  slug?: string
+  title?: string
+  excerpt?: string
+  legacyHTML?: string
+  publishedAt?: string
+  updatedAt?: string
+  authors?: Array<RawAuthor | string | number>
+  tags?: Array<(RawTag & { slug?: string }) | string | number>
+  metaTitle?: string
+  metaDescription?: string
+  canonicalURL?: string
+}
+
+function toTagRefs(tags: RawContentDoc['tags']): TagRef[] {
+  if (!tags) return []
+  return tags
+    .filter(
+      (t): t is RawTag & { slug?: string } =>
+        typeof t === 'object' && t !== null,
+    )
+    .map((t) => ({ name: t.name ?? '', slug: t.slug ?? '' }))
+    .filter((t) => t.name && t.slug)
+}
+
+/** A single published, public post by slug, or null. */
+export async function getPostBySlug(slug: string): Promise<PostDetail | null> {
+  try {
+    const payload = await getPayloadClient()
+    const result = await payload.find({
+      collection: 'posts',
+      overrideAccess: true,
+      depth: 1,
+      limit: 1,
+      where: { and: [{ slug: { equals: slug } }, publishedPublic] },
+    })
+    const doc = result.docs[0] as RawContentDoc | undefined
+    if (!doc?.slug) return null
+    return {
+      slug: doc.slug,
+      title: doc.title ?? doc.slug,
+      excerpt: doc.excerpt ?? '',
+      bodyHtml: doc.legacyHTML ?? '',
+      publishedAt: doc.publishedAt ?? null,
+      updatedAt: doc.updatedAt ?? null,
+      authors: toAuthorSummaries(doc.authors),
+      tags: toTagRefs(doc.tags),
+      metaTitle: doc.metaTitle ?? null,
+      metaDescription: doc.metaDescription ?? null,
+      canonicalURL: doc.canonicalURL ?? null,
+    }
+  } catch {
+    return null
+  }
+}
+
+/** A single published page by slug, or null. */
+export async function getPageBySlug(slug: string): Promise<PageDetail | null> {
+  try {
+    const payload = await getPayloadClient()
+    const result = await payload.find({
+      collection: 'pages',
+      overrideAccess: true,
+      depth: 0,
+      limit: 1,
+      where: {
+        and: [{ slug: { equals: slug } }, { _status: { equals: 'published' } }],
+      },
+    })
+    const doc = result.docs[0] as RawContentDoc | undefined
+    if (!doc?.slug) return null
+    return {
+      slug: doc.slug,
+      title: doc.title ?? doc.slug,
+      bodyHtml: doc.legacyHTML ?? '',
+      publishedAt: doc.publishedAt ?? null,
+      updatedAt: doc.updatedAt ?? null,
+      metaTitle: doc.metaTitle ?? null,
+      metaDescription: doc.metaDescription ?? null,
+      canonicalURL: doc.canonicalURL ?? null,
+    }
+  } catch {
+    return null
+  }
+}
+
+async function getArchive(
+  collection: 'tags' | 'authors',
+  slug: string,
+  relationField: 'tags' | 'authors',
+): Promise<Archive | null> {
+  try {
+    const payload = await getPayloadClient()
+    const owner = await payload.find({
+      collection,
+      overrideAccess: true,
+      depth: 0,
+      limit: 1,
+      where: { slug: { equals: slug } },
+    })
+    const doc = owner.docs[0] as
+      | {
+          id?: string | number
+          name?: string
+          description?: string
+          bio?: string
+        }
+      | undefined
+    if (!doc?.id) return null
+
+    const posts = await payload.find({
+      collection: 'posts',
+      overrideAccess: true,
+      depth: 1,
+      limit: 100,
+      sort: '-publishedAt',
+      where: { and: [{ [relationField]: { in: [doc.id] } }, publishedPublic] },
+    })
+
+    return {
+      name: doc.name ?? slug,
+      slug,
+      description: doc.description ?? doc.bio ?? '',
+      posts: (posts.docs as RawPost[])
+        .map(toPostCard)
+        .filter((p): p is PostCard => p !== null),
+    }
+  } catch {
+    return null
+  }
+}
+
+/** Posts filed under a tag, plus the tag's own metadata. */
+export function getPostsByTag(slug: string): Promise<Archive | null> {
+  return getArchive('tags', slug, 'tags')
+}
+
+/** Posts written by an author, plus the author's own metadata. */
+export function getPostsByAuthor(slug: string): Promise<Archive | null> {
+  return getArchive('authors', slug, 'authors')
+}
+
+async function getSlugRefs(collection: 'tags' | 'authors'): Promise<SlugRef[]> {
+  try {
+    const payload = await getPayloadClient()
+    const result = await payload.find({
+      collection,
+      overrideAccess: true,
+      depth: 0,
+      pagination: false,
+      limit: 0,
+      select: { slug: true, updatedAt: true },
+    })
+    return (result.docs as Array<{ slug?: string; updatedAt?: string }>)
+      .filter((d): d is { slug: string; updatedAt?: string } => Boolean(d.slug))
+      .map((d) => ({ slug: d.slug, updatedAt: d.updatedAt ?? null }))
+  } catch {
+    return []
+  }
+}
+
+/** All tag slugs (for the sitemap). */
+export function getTagSlugs(): Promise<SlugRef[]> {
+  return getSlugRefs('tags')
+}
+
+/** All author slugs (for the sitemap). */
+export function getAuthorSlugs(): Promise<SlugRef[]> {
+  return getSlugRefs('authors')
+}
