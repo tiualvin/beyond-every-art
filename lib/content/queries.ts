@@ -204,8 +204,15 @@ function toTagRefs(tags: RawContentDoc['tags']): TagRef[] {
     .filter((t) => t.name && t.slug)
 }
 
-/** A single published, public post by slug, or null. */
-export async function getPostBySlug(slug: string): Promise<PostDetail | null> {
+/**
+ * A post by slug. By default only a published, public post is returned; pass
+ * `draft: true` (gated behind the /api/preview route) to fetch the latest
+ * draft or private version regardless of status or visibility.
+ */
+export async function getPostBySlug(
+  slug: string,
+  options: { draft?: boolean } = {},
+): Promise<PostDetail | null> {
   try {
     const payload = await getPayloadClient()
     const result = await payload.find({
@@ -213,7 +220,10 @@ export async function getPostBySlug(slug: string): Promise<PostDetail | null> {
       overrideAccess: true,
       depth: 1,
       limit: 1,
-      where: { and: [{ slug: { equals: slug } }, publishedPublic] },
+      draft: options.draft,
+      where: options.draft
+        ? { slug: { equals: slug } }
+        : { and: [{ slug: { equals: slug } }, publishedPublic] },
     })
     const doc = result.docs[0] as RawContentDoc | undefined
     if (!doc?.slug) return null
@@ -235,8 +245,15 @@ export async function getPostBySlug(slug: string): Promise<PostDetail | null> {
   }
 }
 
-/** A single published page by slug, or null. */
-export async function getPageBySlug(slug: string): Promise<PageDetail | null> {
+/**
+ * A page by slug. By default only a published page is returned; pass
+ * `draft: true` (gated behind the /api/preview route) to fetch the latest
+ * draft version regardless of status.
+ */
+export async function getPageBySlug(
+  slug: string,
+  options: { draft?: boolean } = {},
+): Promise<PageDetail | null> {
   try {
     const payload = await getPayloadClient()
     const result = await payload.find({
@@ -244,9 +261,15 @@ export async function getPageBySlug(slug: string): Promise<PageDetail | null> {
       overrideAccess: true,
       depth: 0,
       limit: 1,
-      where: {
-        and: [{ slug: { equals: slug } }, { _status: { equals: 'published' } }],
-      },
+      draft: options.draft,
+      where: options.draft
+        ? { slug: { equals: slug } }
+        : {
+            and: [
+              { slug: { equals: slug } },
+              { _status: { equals: 'published' } },
+            ],
+          },
     })
     const doc = result.docs[0] as RawContentDoc | undefined
     if (!doc?.slug) return null

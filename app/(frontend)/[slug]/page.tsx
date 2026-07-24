@@ -1,4 +1,6 @@
 import type { Metadata } from 'next'
+import { draftMode } from 'next/headers'
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { cache } from 'react'
 
@@ -24,13 +26,15 @@ type Resolved =
   | { kind: 'none' }
 
 // Resolve once per request; generateMetadata and the page component share it.
-const resolve = cache(async (slug: string): Promise<Resolved> => {
-  const post = await getPostBySlug(slug)
-  if (post) return { kind: 'post', post }
-  const page = await getPageBySlug(slug)
-  if (page) return { kind: 'page', page }
-  return { kind: 'none' }
-})
+const resolve = cache(
+  async (slug: string, draft: boolean): Promise<Resolved> => {
+    const post = await getPostBySlug(slug, { draft })
+    if (post) return { kind: 'post', post }
+    const page = await getPageBySlug(slug, { draft })
+    if (page) return { kind: 'page', page }
+    return { kind: 'none' }
+  },
+)
 
 export async function generateMetadata({
   params,
@@ -38,7 +42,8 @@ export async function generateMetadata({
   params: Promise<Params>
 }): Promise<Metadata> {
   const { slug } = await params
-  const resolved = await resolve(slug)
+  const { isEnabled: draft } = await draftMode()
+  const resolved = await resolve(slug, draft)
   const siteUrl = getSiteUrl()
 
   if (resolved.kind === 'none') return { title: 'Not found' }
@@ -82,7 +87,8 @@ export default async function SlugPage({
   params: Promise<Params>
 }) {
   const { slug } = await params
-  const resolved = await resolve(slug)
+  const { isEnabled: draft } = await draftMode()
+  const resolved = await resolve(slug, draft)
 
   if (resolved.kind === 'none') notFound()
 
@@ -90,6 +96,7 @@ export default async function SlugPage({
     const { page } = resolved
     return (
       <main>
+        {draft && <DraftBanner />}
         <article className="article">
           <div className="container article__inner">
             <header className="article__header">
@@ -133,7 +140,27 @@ export default async function SlugPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: jsonLd }}
       />
+      {draft && <DraftBanner />}
       <Article post={post} />
     </>
+  )
+}
+
+function DraftBanner() {
+  return (
+    <div
+      style={{
+        background: '#111',
+        color: '#fff',
+        padding: '0.5rem 1rem',
+        fontSize: '0.875rem',
+        textAlign: 'center',
+      }}
+    >
+      Draft preview —{' '}
+      <Link href="/api/preview/exit" style={{ color: '#fff' }}>
+        exit preview
+      </Link>
+    </div>
   )
 }

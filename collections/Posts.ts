@@ -10,7 +10,11 @@ import {
 
 export const Posts: CollectionConfig = {
   slug: 'posts',
-  admin: { useAsTitle: 'title' },
+  admin: {
+    useAsTitle: 'title',
+    preview: (doc) =>
+      `/api/preview?secret=${process.env.PAYLOAD_PREVIEW_SECRET ?? ''}&collection=posts&slug=${doc?.slug ?? ''}`,
+  },
   access: {
     create: authenticated,
     read: postsRead,

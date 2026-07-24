@@ -4,7 +4,11 @@ import { editorsAndAdmins, publishedOrEditors } from '../access/roles'
 
 export const Pages: CollectionConfig = {
   slug: 'pages',
-  admin: { useAsTitle: 'title' },
+  admin: {
+    useAsTitle: 'title',
+    preview: (doc) =>
+      `/api/preview?secret=${process.env.PAYLOAD_PREVIEW_SECRET ?? ''}&collection=pages&slug=${doc?.slug ?? ''}`,
+  },
   access: {
     create: editorsAndAdmins,
     read: publishedOrEditors,
