@@ -412,3 +412,23 @@ img {
   font-size: clamp(1.9rem, 4vw, 2.8rem);
   margin-top: 0.4rem;
 }
+
+/* --- Forms (search, newsletter signup) ----------------------------------- */
+
+.search-form {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 1.5rem;
+  max-width: 32rem;
+}
+
+.search-form__input {
+  flex: 1;
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-ink);
+}

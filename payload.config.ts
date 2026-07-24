@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url'
 import { Authors } from './collections/Authors'
 import { Media } from './collections/Media'
 import { Members } from './collections/Members'
+import { NewsletterSignups } from './collections/NewsletterSignups'
 import { Pages } from './collections/Pages'
 import { Posts } from './collections/Posts'
 import { Redirects } from './collections/Redirects'
@@ -24,7 +25,17 @@ const useR2 = Boolean(process.env.S3_BUCKET && process.env.S3_ENDPOINT)
 
 export default buildConfig({
   admin: { user: Users.slug, importMap: { baseDir: path.resolve(dirname) } },
-  collections: [Users, Authors, Tags, Media, Posts, Pages, Redirects, Members],
+  collections: [
+    Users,
+    Authors,
+    Tags,
+    Media,
+    Posts,
+    Pages,
+    Redirects,
+    Members,
+    NewsletterSignups,
+  ],
   db: postgresAdapter({ pool: { connectionString: process.env.DATABASE_URI } }),
   editor: lexicalEditor(),
   globals: [SiteSettings, Header, Footer],

@@ -141,6 +141,41 @@ export async function getRecentPosts(limit = 6): Promise<PostCard[]> {
   }
 }
 
+/** Published, public posts whose title or excerpt matches the query text. */
+export async function searchPosts(
+  query: string,
+  limit = 20,
+): Promise<PostCard[]> {
+  const term = query.trim()
+  if (!term) return []
+  try {
+    const payload = await getPayloadClient()
+    const result = await payload.find({
+      collection: 'posts',
+      overrideAccess: true,
+      depth: 1,
+      limit,
+      sort: '-publishedAt',
+      where: {
+        and: [
+          publishedPublic,
+          {
+            or: [
+              { title: { contains: term } },
+              { excerpt: { contains: term } },
+            ],
+          },
+        ],
+      },
+    })
+    return (result.docs as RawPost[])
+      .map(toPostCard)
+      .filter((p): p is PostCard => p !== null)
+  } catch {
+    return []
+  }
+}
+
 // --- Detail + archive types --------------------------------------------
 
 export type TagRef = { name: string; slug: string }

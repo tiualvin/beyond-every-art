@@ -34,3 +34,9 @@ export const authorPath = (slug: string): string => `/author/${slug}/`
 
 /** Path of the RSS feed route (Ghost served this at `/rss/`). */
 export const FEED_PATH = '/rss'
+
+/** Path of the search page. */
+export const SEARCH_PATH = '/search/'
+
+/** Path of the newsletter signup page. */
+export const NEWSLETTER_PATH = '/newsletter/'
