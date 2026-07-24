@@ -1,8 +1,16 @@
 import type { CollectionConfig } from 'payload'
 
+import { editorsAndAdmins } from '../access/roles'
+
 export const Redirects: CollectionConfig = {
   slug: 'redirects',
   admin: { useAsTitle: 'source' },
+  access: {
+    create: editorsAndAdmins,
+    read: editorsAndAdmins,
+    update: editorsAndAdmins,
+    delete: editorsAndAdmins,
+  },
   fields: [
     { name: 'source', type: 'text', required: true, unique: true },
     { name: 'destination', type: 'text', required: true },

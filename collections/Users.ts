@@ -1,14 +1,22 @@
 import type { CollectionConfig } from 'payload'
 
+import { adminField, adminOnly, isAdmin, isEditor } from '../access/roles'
+
 export const Users: CollectionConfig = {
   slug: 'users',
   auth: true,
   admin: { useAsTitle: 'email' },
   access: {
-    create: ({ req }) => !req.user,
-    read: ({ req }) => Boolean(req.user),
-    update: ({ req }) => Boolean(req.user),
-    delete: ({ req }) => req.user?.role === 'admin',
+    create: adminOnly,
+    read: ({ req }) => {
+      if (isEditor(req.user)) return true
+      return req.user ? { id: { equals: req.user.id } } : false
+    },
+    update: ({ req }) => {
+      if (isAdmin(req.user)) return true
+      return req.user ? { id: { equals: req.user.id } } : false
+    },
+    delete: adminOnly,
   },
   fields: [
     { name: 'name', type: 'text', required: true },
@@ -18,6 +26,7 @@ export const Users: CollectionConfig = {
       defaultValue: 'author',
       options: ['admin', 'editor', 'author'],
       required: true,
+      access: { create: adminField, update: adminField },
     },
     { name: 'bio', type: 'textarea' },
     { name: 'website', type: 'text' },

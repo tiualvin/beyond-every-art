@@ -1,10 +1,15 @@
 import type { CollectionConfig } from 'payload'
 
+import { editorsAndAdmins, publishedOrEditors } from '../access/roles'
+
 export const Pages: CollectionConfig = {
   slug: 'pages',
   admin: { useAsTitle: 'title' },
   access: {
-    read: ({ req }) => (req.user ? true : { _status: { equals: 'published' } }),
+    create: editorsAndAdmins,
+    read: publishedOrEditors,
+    update: editorsAndAdmins,
+    delete: editorsAndAdmins,
   },
   versions: { drafts: true },
   fields: [

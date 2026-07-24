@@ -1,9 +1,16 @@
 import type { CollectionConfig } from 'payload'
 
+import { editorsAndAdmins, publicRead } from '../access/roles'
+
 export const Tags: CollectionConfig = {
   slug: 'tags',
   admin: { useAsTitle: 'name' },
-  access: { read: () => true },
+  access: {
+    create: editorsAndAdmins,
+    read: publicRead,
+    update: editorsAndAdmins,
+    delete: editorsAndAdmins,
+  },
   fields: [
     { name: 'name', type: 'text', required: true },
     { name: 'slug', type: 'text', required: true, unique: true, index: true },
