@@ -23,6 +23,7 @@
     "migrate:redirects": "tsx scripts/migrate-redirects.ts",
     "migrate:members": "tsx scripts/migrate-members.ts",
     "migrate:validate": "tsx scripts/validate-migration.ts",
+    "reconcile:billing": "tsx scripts/reconcile-billing.ts",
     "backup:db": "tsx scripts/backup-database.ts",
     "restore:db": "tsx scripts/restore-database.ts"
   },

@@ -75,7 +75,14 @@ export const config = {
   // Run on page-like requests only; skip Next internals, the Payload admin and
   // API, the redirects data endpoint itself, generated SEO files, and any path
   // that looks like a static asset (contains a dot).
+  //
+  // `webhooks` is excluded for a reason that fails silently otherwise: billing
+  // providers call /webhooks/* with a signed body and no credentials. With
+  // STAGING_BASIC_AUTH set, the gate above would answer every one of them with
+  // a 401 — Stripe retries for about three days and can then disable the
+  // endpoint — and every call would also trigger a redirect-map fetch it has no
+  // use for. The endpoints authenticate themselves by signature instead.
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|admin|api|redirects-map|sitemap.xml|robots.txt|rss|.*\\..*).*)',
+    '/((?!_next/static|_next/image|favicon.ico|admin|api|webhooks|redirects-map|sitemap.xml|robots.txt|rss|.*\\..*).*)',
   ],
 }
