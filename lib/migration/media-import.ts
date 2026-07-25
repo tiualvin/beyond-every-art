@@ -19,13 +19,63 @@ export interface MediaImportOptions {
   ghostBaseUrl?: string
   // Injectable fetch, primarily for testing.
   fetchImpl?: typeof fetch
+  // Per-attempt download timeout in milliseconds.
+  timeoutMs?: number
+  // Extra attempts after the first for a failed download.
+  retries?: number
 }
+
+const DEFAULT_TIMEOUT_MS = 30_000
+const DEFAULT_RETRIES = 2
 
 export interface MediaImportResult {
   media: Map<string, MediaRef>
   imported: number
   reused: number
   failed: Array<{ url: string; reason: string }>
+}
+
+/**
+ * Download one asset, retrying a few times with a short backoff.
+ *
+ * A cutover import walks every image on the site in one pass, so a single
+ * unresponsive origin must not stall the run: each attempt is bounded by
+ * `timeoutMs`, and transient failures (a flaky connection, a 5xx from the old
+ * Ghost host) get another try before the URL is reported as failed.
+ */
+async function downloadWithRetry(
+  fetchImpl: typeof fetch,
+  url: string,
+  timeoutMs: number,
+  retries: number,
+): Promise<Response> {
+  let lastError: unknown
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const response = await fetchImpl(url, {
+        signal: AbortSignal.timeout(timeoutMs),
+      })
+      // Client errors (404, 410) will not change on a retry; fail immediately
+      // so a broken URL is reported rather than retried three times.
+      if (!response.ok && response.status < 500) {
+        throw new Error(`HTTP ${response.status} for ${url}`)
+      }
+      if (response.ok) return response
+      lastError = new Error(`HTTP ${response.status} for ${url}`)
+    } catch (error) {
+      lastError = error
+      // A bad URL or a definite HTTP error is not worth retrying.
+      if (error instanceof Error && /^HTTP [45]\d\d /.test(error.message)) {
+        throw error
+      }
+    }
+    if (attempt < retries) {
+      await new Promise((wait) => setTimeout(wait, 500 * (attempt + 1)))
+    }
+  }
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(`Failed to download ${url}`)
 }
 
 function resolveUrl(url: string, ghostBaseUrl?: string): string {
@@ -43,6 +93,8 @@ export async function importMedia(
   options: MediaImportOptions = {},
 ): Promise<MediaImportResult> {
   const fetchImpl = options.fetchImpl ?? fetch
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
+  const retries = options.retries ?? DEFAULT_RETRIES
   const media = new Map<string, MediaRef>()
   const result: MediaImportResult = {
     media,
@@ -69,10 +121,12 @@ export async function importMedia(
       }
 
       const resolved = resolveUrl(url, options.ghostBaseUrl)
-      const response = await fetchImpl(resolved)
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status} for ${resolved}`)
-      }
+      const response = await downloadWithRetry(
+        fetchImpl,
+        resolved,
+        timeoutMs,
+        retries,
+      )
       const data = Buffer.from(await response.arrayBuffer())
       const name = deriveMediaFilename(url)
       const created = await payload.create({

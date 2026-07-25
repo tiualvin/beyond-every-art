@@ -56,15 +56,20 @@ describe('role checks', () => {
   })
 
   it('exposes published content while retaining owner draft access', async () => {
-    expect(await postsRead({ req: { user: null } } as never)).toEqual({
-      _status: { equals: 'published' },
-    })
-    expect(await postsRead({ req: { user: author } } as never)).toEqual({
-      or: [
+    // Members-only and paid posts stay gated: published alone is not enough.
+    const publiclyReadable = {
+      and: [
         { _status: { equals: 'published' } },
-        { owners: { equals: author.id } },
+        { visibility: { equals: 'public' } },
       ],
+    }
+    expect(await postsRead({ req: { user: null } } as never)).toEqual(
+      publiclyReadable,
+    )
+    expect(await postsRead({ req: { user: author } } as never)).toEqual({
+      or: [publiclyReadable, { owners: { equals: author.id } }],
     })
+    expect(await postsRead({ req: { user: editor } } as never)).toBe(true)
     expect(
       await publishedOrEditors({ req: { user: author } } as never),
     ).toEqual({ _status: { equals: 'published' } })

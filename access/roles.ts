@@ -27,15 +27,28 @@ export const publicRead: Access = () => true
 export const publishedOrEditors: Access = ({ req }) =>
   isEditor(req.user) ? true : { _status: { equals: 'published' } }
 
+/**
+ * Posts a request may read through the API.
+ *
+ * Ghost gated `members` and `paid` posts behind a subscription, so migrated
+ * posts that carry those visibilities must not become public just because they
+ * are published: the frontend, feed, and sitemap all query for
+ * `visibility: public`, and this keeps the REST and GraphQL APIs in step.
+ * Editors see everything; an author additionally sees their own posts.
+ */
 export const postsRead: Access = ({ req }) => {
   if (isEditor(req.user)) return true
-  if (!req.user) return { _status: { equals: 'published' } }
+
+  const publiclyReadable: Where = {
+    and: [
+      { _status: { equals: 'published' } },
+      { visibility: { equals: 'public' } },
+    ],
+  }
+  if (!req.user) return publiclyReadable
 
   const where: Where = {
-    or: [
-      { _status: { equals: 'published' } },
-      { owners: { equals: req.user.id } },
-    ],
+    or: [publiclyReadable, { owners: { equals: req.user.id } }],
   }
   return where
 }

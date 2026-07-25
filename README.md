@@ -42,6 +42,11 @@ Ghost member records are preserved in an administrator-only collection and are
 not CMS login accounts. Keep the original member export encrypted outside Git,
 with its decryption key stored separately.
 
+Posts migrated with Ghost's `members` or `paid` visibility stay gated: the
+frontend, feed, and sitemap only publish `visibility: public` posts, and the
+REST and GraphQL APIs apply the same rule for anonymous readers. Phase 1 does
+not rebuild subscriber access, so those posts remain visible to staff only.
+
 ## Migration dry run
 
 Only synthetic fixtures belong in Git. Never commit Ghost exports, member CSVs, database dumps, site archives, or credentials.
