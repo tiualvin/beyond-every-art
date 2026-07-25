@@ -87,8 +87,10 @@ Ghost is what has been listening for renewals, cancellations, and failed
 payments. Nothing takes over automatically, so subscription state silently stops
 tracking reality from the moment Ghost is switched off.
 
-- [ ] Decide before cancelling Ghost: either take over the Stripe webhooks, or
-      accept that subscription state is frozen at export time until the account
-      work in [`ACCOUNT_MODEL.md`](ACCOUNT_MODEL.md) is built.
-- [ ] Confirm the final members export preserved `stripeCustomerID` and
-      `stripeSubscriptionID` — reconciliation later depends on them.
+- [ ] Stripe webhook endpoint created in our own Stripe account and verified
+      (see [`SUBSCRIPTION_WEBHOOKS.md`](SUBSCRIPTION_WEBHOOKS.md#taking-over-from-ghost)).
+- [ ] Existing subscriptions backfilled and matched to members by
+      `stripeCustomerID` / `stripeSubscriptionID`.
+- [ ] Stripe's active subscriptions reconciled against the members the export
+      marked as paying; every difference explained **before** Ghost is cancelled.
+- [ ] Only then: remove Ghost's Stripe connection.

@@ -1,0 +1,178 @@
+# Subscription Webhooks
+
+How the server learns that someone's subscription started, renewed, lapsed, or
+was refunded — from Stripe (website), the App Store, and Google Play.
+
+The account model this feeds is in [`ACCOUNT_MODEL.md`](ACCOUNT_MODEL.md): every
+source below resolves to one `subscriptionStatus` on one account record.
+
+**Stripe is the urgent one.** Ghost currently receives Stripe's webhooks for the
+existing paying members. When Ghost is switched off, nothing does — see
+[Taking over from Ghost](#taking-over-from-ghost). The App Store and Play
+sections apply when the apps ship.
+
+External specifics below (retry schedules, deadlines, free-tier limits) were
+accurate when written and are exactly the kind of detail providers change.
+Confirm against the provider's own documentation before implementing.
+
+## Principles that apply to all three
+
+1. **The server decides, never the device.** A client can say "I just bought
+   this"; only a verified provider event or an API lookup can make it true.
+2. **A notification is a hint, not state.** Treat every webhook as "something
+   changed for this subscription" and read the current state back from the
+   provider's API. This is mandatory on Google Play, strongly advised on Apple,
+   and the safest habit on Stripe.
+3. **Be idempotent, keyed on the provider's event ID.** All three deliver
+   at least once, which means duplicates are normal, not exceptional.
+   **Write the idempotency record and the account change in the same database
+   transaction** — a crash between them leaves work done but not recorded, and
+   the retry then does it twice.
+4. **Assume events arrive out of order and late.** Never apply an older event on
+   top of newer state. Compare the event's timestamp against what you last
+   stored, or re-fetch and overwrite with the provider's current answer.
+5. **Verify authenticity before parsing.** Each provider has its own mechanism;
+   an unverified endpoint means anyone who learns the URL can grant themselves
+   a subscription.
+6. **Answer fast, work afterwards.** Verify, persist the raw event, return the
+   success code, then process. Slow handlers get recorded as failures and
+   retried, which multiplies the load exactly when things are already wrong.
+7. **Keep the raw payloads.** Store what arrived, not only your interpretation.
+   Replay is the cheapest way to recover from a bug in the handler.
+8. **Run a reconciliation sweep anyway.** A daily job that re-reads state for
+   every known subscriber catches whatever the webhooks missed while the server
+   was down or misbehaving. Webhooks are an optimisation over polling, not a
+   guarantee.
+9. **Separate sandbox from production** — different endpoints, different
+   secrets, different credentials. Test events must never touch real accounts.
+
+## Stripe (website)
+
+**Verify the signature against the raw request body.** Stripe signs each request
+with the endpoint's secret; the check fails if the body has already been parsed
+into JSON, so the route needs the raw bytes. The signature includes a timestamp
+with a five-minute default tolerance — keep it, or a captured request stays
+replayable forever.
+
+**Retries.** Stripe retries failed deliveries with exponential backoff for up to
+about three days in live mode (fewer attempts over a few hours in a sandbox).
+Endpoints that keep failing can be disabled, so failures need alerting rather
+than silence.
+
+**Events worth subscribing to** — subscribe narrowly, not to everything:
+
+| Event                                       | Why                               |
+| ------------------------------------------- | --------------------------------- |
+| `customer.subscription.created`             | Access begins                     |
+| `customer.subscription.updated`             | Plan, status, or period changed   |
+| `customer.subscription.deleted`             | Access ends                       |
+| `invoice.paid`                              | Renewal succeeded                 |
+| `invoice.payment_failed`                    | Dunning starts; access may lapse  |
+| `charge.refunded`, `charge.dispute.created` | Revoke access                     |
+| `checkout.session.completed`                | Link a new purchase to an account |
+
+Rather than trusting the payload's snapshot, re-fetch the subscription by ID and
+write the current `status` and `current_period_end` onto the account. That makes
+out-of-order delivery harmless.
+
+### Taking over from Ghost
+
+Ghost owns this integration today. Before Ghost is cancelled:
+
+1. Create your own webhook endpoint in **your** Stripe account (the
+   subscriptions live there already — Ghost connected to it, it did not own it).
+2. Backfill: list active subscriptions through the Stripe API and match them to
+   accounts using the `stripeCustomerID` and `stripeSubscriptionID` preserved on
+   every archived member (`collections/Members.ts`).
+3. Verify the two sets agree — Stripe's active subscriptions against members the
+   export marked as paying — and investigate any difference before switching
+   off Ghost, not after.
+4. Only then remove Ghost's Stripe connection.
+
+Skipping the backfill means renewals keep charging customers while your
+records slowly stop reflecting who is actually paying.
+
+## Apple App Store
+
+Use **App Store Server Notifications V2** (V1 is deprecated).
+
+- **Verify the signed payload.** Notifications arrive as a JWS; validate the
+  certificate chain up to Apple's root before trusting anything inside. Apple
+  publishes server libraries that do this — use one rather than hand-rolling
+  JWT verification.
+- **Respond 200** (any 2xx up to 206). Apple retries up to five times — roughly
+  1, 12, 24, 48, and 72 hours after the previous attempt — when it does not get
+  one. Sandbox notifications are **not** retried at all, so a missed sandbox
+  event is simply gone.
+- **`originalTransactionId` is the subscription's identity.** Every renewal
+  carries it; store it on the account and key all lookups on it.
+- **Set `appAccountToken` at purchase time** — a UUID identifying your account,
+  which then rides along through renewals, upgrades, and cross-grades. It is
+  what links an Apple purchase back to a person in your database. Requiring
+  sign-in before purchase is what makes it available.
+- **Read state from the App Store Server API.** `Get All Subscription Statuses`
+  is the authority; the notification only says something happened.
+- **Handle `REFUND` and `REVOKE` by removing access.** Apple can refund without
+  asking you, and a refunded subscriber who keeps access is money lost twice.
+- **Recover gaps with `Get Notification History`** after any outage, instead of
+  waiting for retries that may already be exhausted.
+- **Separate sandbox and production endpoints**, and expect sandbox timing to be
+  compressed and occasionally unreliable.
+
+## Google Play
+
+Notifications arrive as **Real-time developer notifications** published to a
+Cloud Pub/Sub topic you own.
+
+- **The golden rule: the notification carries no state.** It tells you which
+  `purchaseToken` changed and what kind of change it was. You must then call
+  `purchases.subscriptionsv2.get` in the Play Developer API for the real answer.
+- **Acknowledge purchases within three days.** An unacknowledged purchase is
+  automatically refunded and revoked by Google. Acknowledge immediately after
+  granting access — this is the single most expensive mistake to get wrong.
+- **`purchaseToken` is the key, and it changes.** Upgrades, downgrades, and
+  resubscribes issue a new token carrying a `linkedPurchaseToken` pointing at
+  the old one. Follow that link or one person becomes two subscriptions.
+- **Set `obfuscatedExternalAccountId` at purchase** so the purchase can be tied
+  back to your account, the Play equivalent of Apple's `appAccountToken`.
+- **Deduplicate on the Pub/Sub `messageId`.** Delivery is at least once and
+  ordering is not guaranteed.
+- **Watch for voided purchases.** Refunds and chargebacks arrive as their own
+  notifications, and there is a voided-purchases API for backfilling any missed.
+- Handle the full lifecycle, not just purchase and renewal: grace period, on
+  hold, paused, restarted, revoked, expired. Grace period and account hold in
+  particular mean "still a subscriber, payment is being retried" — cutting
+  access there produces angry, still-paying customers.
+
+## If RevenueCat fronts the stores
+
+The plan in [`ACCOUNT_MODEL.md`](ACCOUNT_MODEL.md) is RevenueCat for the App
+Store and Play, Stripe direct. In that shape:
+
+- RevenueCat absorbs the JWS verification, Play acknowledgement, token linking,
+  restore handling, and both stores' lifecycle vocabulary.
+- Your server consumes **one** RevenueCat webhook instead of two provider
+  integrations. Authenticate it with the shared secret RevenueCat sends in the
+  `Authorization` header, compared in constant time, and deduplicate on the
+  event's `id`. Return 200; anything else counts as a failure.
+- You still own Stripe, and you still own the merged flag. RevenueCat is an
+  input to your account record, never a replacement for it.
+- Use the **Payload account ID** as the RevenueCat app user ID, never the email.
+
+Even with RevenueCat in place, the store rules above still bind your app: the
+acknowledgement deadline, "Restore Purchases", and sign-in before purchase are
+requirements on the product, not just the backend.
+
+## Testing
+
+- **Stripe**: the Stripe CLI forwards live-mode-shaped events to a local
+  endpoint and can trigger specific event types on demand.
+- **Apple**: the App Store Server API has a _Request a Test Notification_
+  endpoint; use sandbox subscriptions for lifecycle timing (which is heavily
+  accelerated).
+- **Google Play**: publish a test notification to your Pub/Sub topic from the
+  Play Console, and use license testers for real purchase flows without charges.
+- **RevenueCat**: sends a `TEST` event from the dashboard.
+
+Cover, at minimum: a duplicate delivery, an out-of-order pair, an unverified or
+tampered payload, and a refund. Those four are where real implementations break.

@@ -10,7 +10,8 @@ the Phase 1 data model stays compatible with it.
 
 The one item with a real deadline is
 [taking over Stripe's webhooks](#stripe-webhooks-at-ghost-shutdown), which must
-happen when Ghost is switched off.
+happen before Ghost is switched off. Implementation guidance for all three
+billing sources is in [`SUBSCRIPTION_WEBHOOKS.md`](SUBSCRIPTION_WEBHOOKS.md).
 
 ## The goal
 
@@ -139,13 +140,21 @@ off, but Ghost is what has been listening for renewals, cancellations, and
 failed payments. Once it is gone, nothing is — paying subscribers will drift out
 of sync with whatever access they are granted, silently.
 
-The migration preserves `stripeCustomerID` and `stripeSubscriptionID` on every
-archived member (see `collections/Members.ts`), which is what makes
-reconciliation possible. Before Ghost is cancelled, either take over the Stripe
-webhooks or accept that subscription state is frozen at export time until
-Phase 2 does.
+**Decision: we take the webhooks over.** Subscription state is not allowed to
+freeze at export time — a paying subscriber whose renewal, cancellation, or
+failed payment goes unrecorded is either being charged for access they lost or
+keeping access they stopped paying for, and neither is discoverable after the
+fact without a manual Stripe audit.
 
-This is tracked in the [cutover runbook](CUTOVER_RUNBOOK.md).
+The migration preserves `stripeCustomerID` and `stripeSubscriptionID` on every
+archived member (see `collections/Members.ts`), which is what makes the handover
+possible: existing subscriptions can be matched to accounts by those IDs rather
+than re-derived.
+
+The steps, including the backfill and the reconciliation check that must happen
+before Ghost is cancelled, are in
+[`SUBSCRIPTION_WEBHOOKS.md`](SUBSCRIPTION_WEBHOOKS.md#taking-over-from-ghost),
+and the deadline is tracked in the [cutover runbook](CUTOVER_RUNBOOK.md).
 
 ## What Phase 1 must not do
 
@@ -153,6 +162,10 @@ This is tracked in the [cutover runbook](CUTOVER_RUNBOOK.md).
 - Do not add app or subscription fields to `members`; it is an archive.
 - Do not build `accounts`, entitlements, or a paywall before the reader app work
   is actually scheduled.
+
+The Stripe webhook handover is the exception: it is billing continuity for
+subscribers who already exist, not app work, and it is due before Ghost is
+switched off.
 
 Phase 1's obligations are already met: member records, their Stripe
 identifiers, and each post's `visibility` (`public`, `members`, `paid`) are all
