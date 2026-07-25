@@ -72,6 +72,17 @@ records, draft/published drift, lost feature images, changed slugs or dates):
 pnpm migrate:validate --input ghost-export/ghost-content.json
 ```
 
+CI runs both halves against a throwaway Postgres service on every push, using
+two synthetic fixtures:
+
+- `tests/fixtures/ghost-export.json` carries deliberate conflicts (duplicate
+  slugs, missing authors and tags) and is only ever dry-run, so the conflict
+  reporting stays covered.
+- `tests/fixtures/ghost-export-clean.json` is conflict-free and is imported for
+  real (twice, to prove reruns are safe) and then validated, so the importer and
+  the validator have to agree end to end. Media import is skipped there: the
+  fixture's asset URLs are synthetic and cannot be downloaded.
+
 ## Staging and launch
 
 Protect a pre-launch staging deployment from indexing and public access:
@@ -82,7 +93,11 @@ Protect a pre-launch staging deployment from indexing and public access:
   Auth.
 
 `/health` returns a JSON liveness + database readiness probe for the reverse
-proxy, container healthcheck, and uptime monitoring. Follow
+proxy, container healthcheck, and uptime monitoring. The app also writes
+structured JSON log lines for the two failures that matter during cutover:
+`{"event":"request_error"}` for server errors and `{"event":"not_found"}` for a
+post, page, tag, or author URL that no longer resolves (asset and scanner
+probes are filtered out). Follow
 [`docs/MIGRATION_REHEARSAL.md`](docs/MIGRATION_REHEARSAL.md) and
 [`docs/CUTOVER_RUNBOOK.md`](docs/CUTOVER_RUNBOOK.md) for the rehearsal and
 production switch.

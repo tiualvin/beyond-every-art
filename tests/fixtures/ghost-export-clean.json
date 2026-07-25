@@ -1,0 +1,169 @@
+{
+  "meta": { "version": "6.0", "exported_on": 1700000000000 },
+  "data": {
+    "users": [
+      {
+        "id": "clean-user-1",
+        "name": "Mira Critic",
+        "slug": "mira",
+        "bio": "Reviews exhibitions and artist books.",
+        "website": "https://mira.example.com",
+        "profile_image": null
+      },
+      {
+        "id": "clean-user-2",
+        "name": "Ola Curator",
+        "slug": "ola",
+        "bio": null,
+        "website": null,
+        "profile_image": null
+      }
+    ],
+    "tags": [
+      {
+        "id": "clean-tag-1",
+        "name": "Exhibitions",
+        "slug": "exhibitions",
+        "description": "Gallery and museum shows.",
+        "visibility": "public",
+        "meta_title": "Exhibition coverage",
+        "meta_description": "Reviews and previews of current shows.",
+        "feature_image": null
+      },
+      {
+        "id": "clean-tag-2",
+        "name": "Studio Visits",
+        "slug": "studio-visits",
+        "description": "Conversations in the studio.",
+        "visibility": "public",
+        "feature_image": null
+      }
+    ],
+    "posts": [
+      {
+        "id": "clean-post-1",
+        "type": "post",
+        "status": "published",
+        "title": "Light And Space At The Old Gallery",
+        "slug": "light-and-space-at-the-old-gallery",
+        "html": "<p>The show opens with a single corridor of light.</p><figure><img src=\"https://old.ghost.example/content/images/2024/02/corridor.jpg\" alt=\"A lit corridor\" /><figcaption>The entrance corridor</figcaption></figure>",
+        "custom_excerpt": "A quiet show about how a room holds light.",
+        "feature_image": null,
+        "featured": 1,
+        "visibility": "public",
+        "created_at": "2024-02-01T09:00:00.000Z",
+        "updated_at": "2024-02-03T09:00:00.000Z",
+        "published_at": "2024-02-02T09:00:00.000Z",
+        "canonical_url": null,
+        "url": "https://old.ghost.example/light-and-space-at-the-old-gallery/"
+      },
+      {
+        "id": "clean-post-2",
+        "type": "post",
+        "status": "draft",
+        "title": "Notes From The Studio",
+        "slug": "notes-from-the-studio",
+        "html": "<p>Working notes, not yet published.</p>",
+        "custom_excerpt": null,
+        "feature_image": null,
+        "featured": 0,
+        "visibility": "members",
+        "created_at": "2024-03-01T09:00:00.000Z",
+        "updated_at": "2024-03-01T09:00:00.000Z",
+        "published_at": null,
+        "canonical_url": null,
+        "url": "https://old.ghost.example/notes-from-the-studio/"
+      },
+      {
+        "id": "clean-post-3",
+        "type": "post",
+        "status": "published",
+        "title": "An Archive Of Blue",
+        "slug": "an-archive-of-blue",
+        "html": "<p>Cataloguing a decade of blue.</p>",
+        "custom_excerpt": null,
+        "feature_image": null,
+        "featured": 0,
+        "visibility": "public",
+        "created_at": "2024-04-01T09:00:00.000Z",
+        "updated_at": "2024-04-04T09:00:00.000Z",
+        "published_at": "2024-04-02T09:00:00.000Z",
+        "canonical_url": "https://syndication.example.com/an-archive-of-blue",
+        "url": "https://old.ghost.example/an-archive-of-blue/"
+      },
+      {
+        "id": "clean-page-1",
+        "type": "page",
+        "status": "published",
+        "title": "Contact",
+        "slug": "contact",
+        "html": "<p>Write to the editors.</p>",
+        "feature_image": null,
+        "featured": 0,
+        "visibility": "public",
+        "created_at": "2024-01-01T09:00:00.000Z",
+        "updated_at": "2024-01-01T09:00:00.000Z",
+        "published_at": "2024-01-01T09:00:00.000Z",
+        "canonical_url": null,
+        "url": "https://old.ghost.example/contact/"
+      },
+      {
+        "id": "clean-page-2",
+        "type": "page",
+        "status": "draft",
+        "title": "Press Kit",
+        "slug": "press-kit",
+        "html": "<p>Coming soon.</p>",
+        "feature_image": null,
+        "featured": 0,
+        "visibility": "public",
+        "created_at": "2024-01-05T09:00:00.000Z",
+        "updated_at": "2024-01-05T09:00:00.000Z",
+        "published_at": null,
+        "canonical_url": null,
+        "url": "https://old.ghost.example/press-kit/"
+      }
+    ],
+    "posts_meta": [
+      {
+        "post_id": "clean-post-1",
+        "meta_title": "Light And Space At The Old Gallery | Beyond Every Art",
+        "meta_description": "A quiet show about how a room holds light.",
+        "og_image": null,
+        "twitter_image": null
+      },
+      {
+        "post_id": "clean-page-1",
+        "meta_title": "Contact | Beyond Every Art",
+        "meta_description": "How to reach the editors."
+      }
+    ],
+    "posts_authors": [
+      {
+        "post_id": "clean-post-1",
+        "author_id": "clean-user-1",
+        "sort_order": 0
+      },
+      {
+        "post_id": "clean-post-2",
+        "author_id": "clean-user-1",
+        "sort_order": 0
+      },
+      {
+        "post_id": "clean-post-3",
+        "author_id": "clean-user-2",
+        "sort_order": 0
+      },
+      {
+        "post_id": "clean-post-3",
+        "author_id": "clean-user-1",
+        "sort_order": 1
+      }
+    ],
+    "posts_tags": [
+      { "post_id": "clean-post-1", "tag_id": "clean-tag-1", "sort_order": 0 },
+      { "post_id": "clean-post-1", "tag_id": "clean-tag-2", "sort_order": 1 },
+      { "post_id": "clean-post-3", "tag_id": "clean-tag-2", "sort_order": 0 }
+    ]
+  }
+}

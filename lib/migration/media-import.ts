@@ -63,7 +63,7 @@ export async function importMedia(
       const current = existing.docs[0] as
         { id: string | number; url?: string | null } | undefined
       if (current) {
-        media.set(url, { id: String(current.id), url: current.url ?? url })
+        media.set(url, { id: current.id, url: current.url ?? url })
         result.reused++
         continue
       }
@@ -92,7 +92,7 @@ export async function importMedia(
         overrideAccess: true,
       })
       const doc = created as { id: string | number; url?: string | null }
-      media.set(url, { id: String(doc.id), url: doc.url ?? url })
+      media.set(url, { id: doc.id, url: doc.url ?? url })
       result.imported++
     } catch (error) {
       result.failed.push({

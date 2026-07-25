@@ -34,8 +34,14 @@ export interface ImportResult {
 
 type UpsertData = Record<string, unknown>
 
+// Payload document ids are integers on the Postgres adapter and strings on
+// others. Keep whatever the database returned: relationship fields are
+// validated against the collection's real id type, so coercing to a string
+// makes every relationship on Postgres fail validation.
+type DocID = string | number
+
 interface UpsertOutcome {
-  id: string
+  id: DocID
   created: boolean
 }
 
@@ -57,7 +63,7 @@ async function upsertByGhostID(
     overrideAccess: true,
   })
 
-  const current = existing.docs[0] as { id: string | number } | undefined
+  const current = existing.docs[0] as { id: DocID } | undefined
   if (current) {
     await payload.update({
       collection,
@@ -65,7 +71,7 @@ async function upsertByGhostID(
       data: data as never,
       overrideAccess: true,
     })
-    return { id: String(current.id), created: false }
+    return { id: current.id, created: false }
   }
 
   const created = await payload.create({
@@ -73,21 +79,21 @@ async function upsertByGhostID(
     data: data as never,
     overrideAccess: true,
   })
-  return { id: String((created as { id: string | number }).id), created: true }
+  return { id: (created as { id: DocID }).id, created: true }
 }
 
 function resolveRelationships(
   item: PostPlan,
-  authorIdByGhostID: Map<string, string>,
-  tagIdByGhostID: Map<string, string>,
-): { authors: string[]; tags: string[] } {
+  authorIdByGhostID: Map<string, DocID>,
+  tagIdByGhostID: Map<string, DocID>,
+): { authors: DocID[]; tags: DocID[] } {
   return {
     authors: item.authorGhostIDs
       .map((ghostID) => authorIdByGhostID.get(ghostID))
-      .filter((id): id is string => Boolean(id)),
+      .filter((id): id is DocID => id !== undefined),
     tags: item.tagGhostIDs
       .map((ghostID) => tagIdByGhostID.get(ghostID))
-      .filter((id): id is string => Boolean(id)),
+      .filter((id): id is DocID => id !== undefined),
   }
 }
 
@@ -95,7 +101,7 @@ function resolveRelationships(
 function mediaId(
   media: Map<string, MediaRef> | undefined,
   url: string | undefined,
-): string | undefined {
+): DocID | undefined {
   if (!media || !url) return undefined
   return media.get(url)?.id
 }
@@ -119,8 +125,8 @@ export async function runImport(
     errors: [],
   }
 
-  const authorIdByGhostID = new Map<string, string>()
-  const tagIdByGhostID = new Map<string, string>()
+  const authorIdByGhostID = new Map<string, DocID>()
+  const tagIdByGhostID = new Map<string, DocID>()
 
   for (const author of plan.authors) {
     try {

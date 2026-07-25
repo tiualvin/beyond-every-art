@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { cache } from 'react'
 
 import { getPostsByTag } from '@/lib/content/queries'
+import { logMissingRoute } from '@/lib/observability/missing-route'
 import { absoluteUrl, getSiteUrl, tagPath } from '@/lib/seo/site'
 
 import { PostList } from '../../components/post-list'
@@ -33,7 +34,10 @@ export async function generateMetadata({
 export default async function TagPage({ params }: { params: Promise<Params> }) {
   const { slug } = await params
   const archive = await resolve(slug)
-  if (!archive) notFound()
+  if (!archive) {
+    await logMissingRoute(tagPath(slug))
+    notFound()
+  }
 
   return (
     <main>

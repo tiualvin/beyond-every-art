@@ -11,6 +11,7 @@ import {
   type PageDetail,
   type PostDetail,
 } from '@/lib/content/queries'
+import { logMissingRoute } from '@/lib/observability/missing-route'
 import { buildArticleJsonLd, serializeJsonLd } from '@/lib/seo/jsonld'
 import { absoluteUrl, getSiteUrl, pagePath, postPath } from '@/lib/seo/site'
 
@@ -90,7 +91,10 @@ export default async function SlugPage({
   const { isEnabled: draft } = await draftMode()
   const resolved = await resolve(slug, draft)
 
-  if (resolved.kind === 'none') notFound()
+  if (resolved.kind === 'none') {
+    await logMissingRoute(postPath(slug))
+    notFound()
+  }
 
   if (resolved.kind === 'page') {
     const { page } = resolved
