@@ -46,6 +46,93 @@ Confirm against the provider's own documentation before implementing.
 9. **Separate sandbox from production** — different endpoints, different
    secrets, different credentials. Test events must never touch real accounts.
 
+## Where the endpoints live in this repo
+
+Nothing below is built yet; this is where it goes when it is.
+
+### Paths
+
+| Endpoint               | Route file                         |
+| ---------------------- | ---------------------------------- |
+| `/webhooks/stripe`     | `app/webhooks/stripe/route.ts`     |
+| `/webhooks/revenuecat` | `app/webhooks/revenuecat/route.ts` |
+
+**Not under `/api`.** Payload owns that prefix through its catch-all at
+`app/(payload)/api/[...slug]/route.ts`. Top-level route handlers are how this
+app already exposes its own endpoints — see `app/health/route.ts` and
+`app/redirects-map/route.ts` — and keeping webhooks there avoids arguing with
+Payload's router.
+
+### Middleware must be told to skip them
+
+This is the trap. `middleware.ts` currently excludes Next internals, `admin`,
+`api`, `redirects-map`, the SEO files, and anything containing a dot. A new
+`/webhooks/...` path matches none of those exclusions, so middleware would run
+on every provider call. Two consequences, both silent:
+
+- With `STAGING_BASIC_AUTH` set, every webhook gets a `401`. Stripe would retry
+  for three days and then disable the endpoint; Apple would exhaust five
+  attempts and drop the notification.
+- Each call triggers a redirect-map fetch before doing anything useful.
+
+Add `webhooks` to the matcher's exclusion list in the same change that adds the
+first route. Do not rely on the in-handler exemption that `/health` uses —
+excluding the path outright is what you want here.
+
+### Route handler shape
+
+- `export const dynamic = 'force-dynamic'` (as `app/health/route.ts` does) and
+  the Node runtime — signature verification needs `node:crypto`.
+- Read the body with `await request.text()`. Never `request.json()` before the
+  signature has been checked: parsing and re-serialising changes the bytes the
+  signature covers.
+- Verify, persist the raw event, return the success status, then process.
+
+### Code layout
+
+Follow the split the repo already uses for the backup pipeline (pure logic in
+`lib/`, I/O at the edges, a CLI for operational work):
+
+| Piece                                                   | Where                          |
+| ------------------------------------------------------- | ------------------------------ |
+| Signature verification, provider status → account state | `lib/billing/*.ts` (pure)      |
+| Unit tests for the above                                | `tests/billing/*.test.ts`      |
+| HTTP entry points                                       | `app/webhooks/*/route.ts`      |
+| Backfill and daily reconciliation                       | `scripts/reconcile-billing.ts` |
+
+The reconciliation script should take `--dry-run` and be safe to rerun, like
+`scripts/backup-database.ts` and the migration scripts.
+
+Idempotency wants a store: a small admin-only collection keyed by provider plus
+event ID, holding the raw payload, with a unique index on that key. The
+uniqueness constraint then does the deduplication for you — the same trick the
+migration uses with `ghostID`.
+
+### Dependencies
+
+This repo deliberately avoids new packages: R2 is a hand-rolled SigV4 client
+(`lib/backup/s3.ts`) and email is a fetch-based Resend adapter
+(`lib/email/resend.ts`). Stripe fits that pattern — signature verification is an
+HMAC-SHA256 over `${timestamp}.${rawBody}` compared in constant time, and the
+REST calls the backfill needs are plain `fetch`.
+
+Pulling in the official Stripe SDK is still a defensible exception when money is
+involved. Decide once, write down which way and why, and keep the two webhook
+handlers consistent.
+
+### Configuration and operations
+
+- New environment variables when built: `STRIPE_SECRET_KEY`,
+  `STRIPE_WEBHOOK_SECRET`, `REVENUECAT_WEBHOOK_SECRET`. Add them to
+  `.env.example` as empty placeholders; never commit values.
+- Caddy needs no change — it already proxies everything to the app — but the
+  endpoints must be publicly reachable over HTTPS, which means they cannot be
+  tested from behind the staging Basic Auth gate.
+- Emit one JSON line per rejected or failed event, matching the existing
+  `request_error` and `not_found` shapes in `instrumentation.ts`, so failures
+  are visible in `docker compose logs app` rather than only in a provider
+  dashboard.
+
 ## Stripe (website)
 
 **Verify the signature against the raw request body.** Stripe signs each request
