@@ -46,6 +46,9 @@ Posts migrated with Ghost's `members` or `paid` visibility stay gated: the
 frontend, feed, and sitemap only publish `visibility: public` posts, and the
 REST and GraphQL APIs apply the same rule for anonymous readers. Phase 1 does
 not rebuild subscriber access, so those posts remain visible to staff only.
+[`docs/ACCOUNT_MODEL.md`](docs/ACCOUNT_MODEL.md) records how reader accounts and
+subscriptions are meant to work when that is built, and the one Stripe item that
+must be settled before Ghost is cancelled.
 
 ## Migration dry run
 

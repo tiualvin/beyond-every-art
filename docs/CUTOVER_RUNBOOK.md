@@ -79,3 +79,16 @@ pipeline ([`BACKUP_AND_RESTORE.md`](BACKUP_AND_RESTORE.md)).
 Only after the new site has run cleanly in production, the crawl comparison is
 verified, backups have been tested, and the acceptance criteria in the handoff
 doc are met. Retain a final Ghost export and database backup off-site first.
+
+### Paid subscriptions in Stripe
+
+Existing website subscriptions keep billing in Stripe after Ghost is gone, but
+Ghost is what has been listening for renewals, cancellations, and failed
+payments. Nothing takes over automatically, so subscription state silently stops
+tracking reality from the moment Ghost is switched off.
+
+- [ ] Decide before cancelling Ghost: either take over the Stripe webhooks, or
+      accept that subscription state is frozen at export time until the account
+      work in [`ACCOUNT_MODEL.md`](ACCOUNT_MODEL.md) is built.
+- [ ] Confirm the final members export preserved `stripeCustomerID` and
+      `stripeSubscriptionID` — reconciliation later depends on them.
