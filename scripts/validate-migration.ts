@@ -148,7 +148,14 @@ async function main() {
   if (!clean) process.exitCode = 1
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error)
-  process.exit(1)
-})
+main()
+  .then(() => {
+    // On a real run Payload holds an open Postgres pool, so the event loop
+    // never drains on its own. Exit explicitly with the code set above, or CI
+    // (and any cutover runbook step) would hang after the report is written.
+    process.exit(typeof process.exitCode === 'number' ? process.exitCode : 0)
+  })
+  .catch((error) => {
+    console.error(error instanceof Error ? error.message : error)
+    process.exit(1)
+  })

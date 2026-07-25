@@ -36,5 +36,32 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      # Conflict fixture: duplicate slugs and missing authors/tags must still be
+      # detected and reported, which is a dry-run-only expectation.
       - run: pnpm migrate:ghost --dry-run --input tests/fixtures/ghost-export.json
+      # End-to-end migration check against the CI database. The importer writes
+      # a conflict-free export for real, then the validator re-reads Payload and
+      # must agree that every post, page, tag, and author landed with its slug,
+      # draft state, and publication date intact. Running it twice also proves
+      # the import is safe to rerun (it upserts by ghostID).
+      #
+      # Media is skipped: the fixture's asset URLs are synthetic and would need
+      # outbound downloads to resolve.
+      - name: Import the Ghost fixture into the CI database
+        run: |
+          pnpm migrate:ghost --skip-media --input tests/fixtures/ghost-export-clean.json
+          pnpm migrate:ghost --skip-media --input tests/fixtures/ghost-export-clean.json
+      - name: Validate the import against the Ghost fixture
+        run: |
+          pnpm migrate:validate --input tests/fixtures/ghost-export-clean.json
+          jq -e '.ok == true' validation-report.json > /dev/null
       - run: pnpm build
+
+  backup-image:
+    # Build-only smoke test: the backup image ships separately from the app
+    # image, so a broken Dockerfile would otherwise surface at deploy time.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the backup image
+        run: docker build --file docker/backup/Dockerfile --tag beyond-every-art-backup:ci .

@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { cache } from 'react'
 
 import { getPostsByAuthor } from '@/lib/content/queries'
+import { logMissingRoute } from '@/lib/observability/missing-route'
 import { absoluteUrl, authorPath, getSiteUrl } from '@/lib/seo/site'
 
 import { PostList } from '../../components/post-list'
@@ -37,7 +38,10 @@ export default async function AuthorPage({
 }) {
   const { slug } = await params
   const archive = await resolve(slug)
-  if (!archive) notFound()
+  if (!archive) {
+    await logMissingRoute(authorPath(slug))
+    notFound()
+  }
 
   return (
     <main>

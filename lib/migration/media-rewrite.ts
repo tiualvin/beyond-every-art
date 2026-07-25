@@ -5,9 +5,13 @@
 // asset instead of the old Ghost domain — the handoff is explicit that
 // production content must not hotlink back to Ghost.
 
-/** A migrated media asset: its Payload document id and public URL. */
+/**
+ * A migrated media asset: its Payload document id and public URL. The id keeps
+ * the type the database returned (integers on Postgres) so it stays valid when
+ * assigned to an upload relationship.
+ */
 export interface MediaRef {
-  id: string
+  id: string | number
   url: string
 }
 

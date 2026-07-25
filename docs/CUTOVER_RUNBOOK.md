@@ -41,7 +41,9 @@ on cutover day.
    a handful of redirects, `/sitemap.xml`, `/rss`, `/robots.txt`, `/health`.
 8. **Change DNS** to the new server. Watch propagation.
 9. Monitor logs and error output (`docker compose logs -f app caddy`) and the
-   `request_error` log lines emitted by instrumentation.
+   `request_error` (500) and `not_found` (404) JSON log lines emitted by the
+   app. Filter them with, for example,
+   `docker compose logs app | grep '"event":"not_found"'`.
 10. Keep **Ghost active as a fallback**. Do not cancel it yet.
 
 ## Immediately after cutover
@@ -56,7 +58,7 @@ on cutover day.
 
 Watch, via logs / Search Console / uptime monitor / `/health`:
 
-- 404 errors (add redirects for any important misses)
+- 404 errors (`not_found` log lines; add redirects for any important misses)
 - 500 errors (`request_error` log lines)
 - Missing images / broken links
 - Search Console coverage and sitemap processing
