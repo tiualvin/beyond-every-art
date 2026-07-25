@@ -49,7 +49,16 @@ function parseArgs(argv: string[]): Cli {
   }
 }
 
-/** Run pg_dump (plain SQL) and return the gzip-compressed dump as a Buffer. */
+/**
+ * Run pg_dump (plain SQL) and return the gzip-compressed dump as a Buffer.
+ *
+ * A backup is only usable if pg_dump ran to completion, so the archive is
+ * returned only once *both* the process exited 0 and gzip finished flushing.
+ * Resolving on whichever event happens to land first would let a dump that
+ * failed part-way through (a dropped connection, a permission error on a later
+ * table) be uploaded as a healthy backup — and then count towards retention,
+ * pruning a good one.
+ */
 function dumpAndGzip(databaseUri: string): Promise<Buffer> {
   return new Promise((resolvePromise, reject) => {
     const dump = spawn('pg_dump', [
@@ -62,6 +71,12 @@ function dumpAndGzip(databaseUri: string): Promise<Buffer> {
     const gzip = createGzip()
     const chunks: Buffer[] = []
     let stderr = ''
+    let dumpSucceeded = false
+    let gzipFinished = false
+
+    const settle = () => {
+      if (dumpSucceeded && gzipFinished) resolvePromise(Buffer.concat(chunks))
+    }
 
     dump.on('error', (error) =>
       reject(new Error(`Failed to start pg_dump: ${error.message}`)),
@@ -72,12 +87,18 @@ function dumpAndGzip(databaseUri: string): Promise<Buffer> {
     dump.on('close', (code) => {
       if (code !== 0) {
         reject(new Error(`pg_dump exited with code ${code}\n${stderr.trim()}`))
+        return
       }
+      dumpSucceeded = true
+      settle()
     })
 
     gzip.on('data', (chunk: Buffer) => chunks.push(chunk))
     gzip.on('error', reject)
-    gzip.on('end', () => resolvePromise(Buffer.concat(chunks)))
+    gzip.on('end', () => {
+      gzipFinished = true
+      settle()
+    })
 
     dump.stdout.pipe(gzip)
   })
