@@ -18,10 +18,12 @@ import { Users } from './collections/Users'
 import { Footer } from './globals/Footer'
 import { Header } from './globals/Header'
 import { SiteSettings } from './globals/SiteSettings'
+import { resendAdapter } from './lib/email/resend'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
 const useR2 = Boolean(process.env.S3_BUCKET && process.env.S3_ENDPOINT)
+const email = resendAdapter()
 
 export default buildConfig({
   admin: { user: Users.slug, importMap: { baseDir: path.resolve(dirname) } },
@@ -38,6 +40,9 @@ export default buildConfig({
   ],
   db: postgresAdapter({ pool: { connectionString: process.env.DATABASE_URI } }),
   editor: lexicalEditor(),
+  // Transactional email (admin password reset, verification). Omitted when
+  // RESEND_API_KEY / EMAIL_FROM_ADDRESS are unset so local dev and CI still boot.
+  ...(email ? { email } : {}),
   globals: [SiteSettings, Header, Footer],
   plugins: useR2
     ? [

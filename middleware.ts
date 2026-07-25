@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
+import { isAuthorized, parseBasicAuth } from '@/lib/seo/indexing'
 import {
   buildRedirectMap,
   matchRedirect,
@@ -35,6 +36,23 @@ async function loadRedirectMap(
 }
 
 export async function middleware(request: NextRequest): Promise<NextResponse> {
+  // Optional HTTP Basic Auth gate for staging deployments. The /health probe
+  // stays open so container healthchecks and uptime monitors can reach it.
+  if (request.nextUrl.pathname !== '/health') {
+    const credentials = parseBasicAuth(process.env)
+    if (
+      credentials &&
+      !isAuthorized(request.headers.get('authorization'), credentials)
+    ) {
+      return new NextResponse('Authentication required', {
+        status: 401,
+        headers: {
+          'WWW-Authenticate': 'Basic realm="Staging", charset="UTF-8"',
+        },
+      })
+    }
+  }
+
   let map: Map<string, ResolvedRedirect>
   try {
     map = await loadRedirectMap(request.nextUrl.origin)
