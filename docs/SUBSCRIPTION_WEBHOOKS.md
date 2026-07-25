@@ -48,7 +48,9 @@ Confirm against the provider's own documentation before implementing.
 
 ## Where the endpoints live in this repo
 
-Nothing below is built yet; this is where it goes when it is.
+The Stripe half is built: `app/webhooks/stripe/route.ts`, the pure logic in
+`lib/billing/`, the `billing-events` collection, and `pnpm reconcile:billing`.
+RevenueCat is not, and the layout below is where it goes when it is.
 
 ### Paths
 
@@ -65,9 +67,9 @@ Payload's router.
 
 ### Middleware must be told to skip them
 
-This is the trap. `middleware.ts` currently excludes Next internals, `admin`,
-`api`, `redirects-map`, the SEO files, and anything containing a dot. A new
-`/webhooks/...` path matches none of those exclusions, so middleware would run
+This is the trap. `middleware.ts` excludes Next internals, `admin`, `api`,
+`redirects-map`, the SEO files, and anything containing a dot — and, since the
+Stripe endpoint landed, `webhooks`. Without that last exclusion middleware runs
 on every provider call. Two consequences, both silent:
 
 - With `STAGING_BASIC_AUTH` set, every webhook gets a `401`. Stripe would retry
@@ -75,9 +77,9 @@ on every provider call. Two consequences, both silent:
   attempts and drop the notification.
 - Each call triggers a redirect-map fetch before doing anything useful.
 
-Add `webhooks` to the matcher's exclusion list in the same change that adds the
-first route. Do not rely on the in-handler exemption that `/health` uses —
-excluding the path outright is what you want here.
+Any further webhook route must live under that same `/webhooks` prefix, so the
+one exclusion keeps covering it. Do not rely on the in-handler exemption that
+`/health` uses — excluding the path outright is what you want here.
 
 ### Route handler shape
 
@@ -106,7 +108,8 @@ The reconciliation script should take `--dry-run` and be safe to rerun, like
 Idempotency wants a store: a small admin-only collection keyed by provider plus
 event ID, holding the raw payload, with a unique index on that key. The
 uniqueness constraint then does the deduplication for you — the same trick the
-migration uses with `ghostID`.
+migration uses with `ghostID`. That is `collections/BillingEvents.ts`
+(`billing-events`), and RevenueCat should share it rather than add its own.
 
 ### Dependencies
 
@@ -120,11 +123,20 @@ Pulling in the official Stripe SDK is still a defensible exception when money is
 involved. Decide once, write down which way and why, and keep the two webhook
 handlers consistent.
 
+**Decided: no SDK.** The Stripe takeover is `node:crypto` for verification
+(`lib/billing/stripe-signature.ts`) and `fetch` for the two reads it needs —
+retrieve one subscription, list the ones that grant access
+(`lib/billing/stripe-api.ts`). That is the entire surface we use, the
+verification algorithm is fully covered by unit tests rather than trusted, and
+it keeps the dependency count where the rest of the repo has kept it. RevenueCat
+should follow the same approach; revisit only if we start writing to Stripe
+(checkout sessions, the customer portal), where the SDK earns its weight.
+
 ### Configuration and operations
 
-- New environment variables when built: `STRIPE_SECRET_KEY`,
-  `STRIPE_WEBHOOK_SECRET`, `REVENUECAT_WEBHOOK_SECRET`. Add them to
-  `.env.example` as empty placeholders; never commit values.
+- Environment variables: `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` exist
+  as empty placeholders in `.env.example`; `REVENUECAT_WEBHOOK_SECRET` joins
+  them when that endpoint is built. Never commit values.
 - Caddy needs no change — it already proxies everything to the app — but the
   endpoints must be publicly reachable over HTTPS, which means they cannot be
   tested from behind the staging Basic Auth gate.

@@ -67,6 +67,8 @@ Watch, via logs / Search Console / uptime monitor / `/health`:
 - Form submissions and email delivery
 - Database storage, R2 usage, CPU/memory
 - Nightly backup completion (`docker compose logs backup`)
+- Rejected or unresolved billing webhooks (`webhook_rejected`,
+  `webhook_unresolved` log lines), once the Stripe takeover below is live
 
 ## Rollback
 
@@ -87,10 +89,36 @@ Ghost is what has been listening for renewals, cancellations, and failed
 payments. Nothing takes over automatically, so subscription state silently stops
 tracking reality from the moment Ghost is switched off.
 
-- [ ] Stripe webhook endpoint created in our own Stripe account and verified
-      (see [`SUBSCRIPTION_WEBHOOKS.md`](SUBSCRIPTION_WEBHOOKS.md#taking-over-from-ghost)).
-- [ ] Existing subscriptions backfilled and matched to members by
-      `stripeCustomerID` / `stripeSubscriptionID`.
-- [ ] Stripe's active subscriptions reconciled against the members the export
-      marked as paying; every difference explained **before** Ghost is cancelled.
+The endpoint and the reconciliation script exist (`POST /webhooks/stripe` and
+`pnpm reconcile:billing`); what follows is the operational handover. Work
+through it **before** cancelling Ghost — a difference found afterwards cannot be
+explained without a manual Stripe audit.
+
+- [ ] `STRIPE_WEBHOOK_SECRET` and `STRIPE_SECRET_KEY` set in the production
+      environment file. Without the first, the endpoint refuses every request;
+      without the second, events are stored but their current state is read only
+      by the reconciliation sweep.
+- [ ] Webhook endpoint created in **our** Stripe account, pointing at
+      `https://<domain>/webhooks/stripe`, subscribed to the events listed in
+      [`SUBSCRIPTION_WEBHOOKS.md`](SUBSCRIPTION_WEBHOOKS.md#stripe-website).
+- [ ] Endpoint verified end to end: send a test event from the Stripe dashboard
+      (or `stripe trigger` via the CLI), confirm a `2xx` in Stripe's delivery
+      log and a matching row in the `billing-events` collection.
+      Remember the endpoint must be publicly reachable over HTTPS — it cannot be
+      verified while `STAGING_BASIC_AUTH` gates the deployment, even though
+      middleware itself skips `/webhooks`.
+- [ ] Backfill dry run: `pnpm reconcile:billing --dry-run`. It lists Stripe's
+      active, trialing, and past-due subscriptions and matches them to members
+      by `stripeCustomerID` / `stripeSubscriptionID`.
+- [ ] Every difference in that report explained (`differences` is empty, or each
+      entry has a written answer). It exits non-zero while any remain.
+- [ ] Backfill for real: `pnpm reconcile:billing`, which records what Stripe
+      currently says for each subscription.
+- [ ] Daily reconciliation scheduled (cron or the `backup` container's
+      scheduler) with alerting on a non-zero exit — webhooks are an optimisation
+      over polling, not a guarantee.
 - [ ] Only then: remove Ghost's Stripe connection.
+
+Watch the app logs for `webhook_rejected` and `webhook_unresolved` JSON lines in
+the days around the switch:
+`docker compose logs app | grep '"event":"webhook_'`.

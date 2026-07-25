@@ -7,6 +7,7 @@ import sharp from 'sharp'
 import { fileURLToPath } from 'node:url'
 
 import { Authors } from './collections/Authors'
+import { BillingEvents } from './collections/BillingEvents'
 import { Media } from './collections/Media'
 import { Members } from './collections/Members'
 import { NewsletterSignups } from './collections/NewsletterSignups'
@@ -37,6 +38,7 @@ export default buildConfig({
     Redirects,
     Members,
     NewsletterSignups,
+    BillingEvents,
   ],
   db: postgresAdapter({ pool: { connectionString: process.env.DATABASE_URI } }),
   editor: lexicalEditor(),
