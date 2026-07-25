@@ -65,6 +65,28 @@ pnpm migrate:members --dry-run --input ghost-export/ghost-members.csv
 
 Both also accept a real run without `--dry-run` and are safe to rerun.
 
+After importing, validate that Payload matches the Ghost export (missing
+records, draft/published drift, lost feature images, changed slugs or dates):
+
+```bash
+pnpm migrate:validate --input ghost-export/ghost-content.json
+```
+
+## Staging and launch
+
+Protect a pre-launch staging deployment from indexing and public access:
+
+- `NEXT_PUBLIC_NOINDEX=1` — `robots.txt` disallows all and pages emit a
+  `noindex` meta tag.
+- `STAGING_BASIC_AUTH=user:password` — gates the whole site behind HTTP Basic
+  Auth.
+
+`/health` returns a JSON liveness + database readiness probe for the reverse
+proxy, container healthcheck, and uptime monitoring. Follow
+[`docs/MIGRATION_REHEARSAL.md`](docs/MIGRATION_REHEARSAL.md) and
+[`docs/CUTOVER_RUNBOOK.md`](docs/CUTOVER_RUNBOOK.md) for the rehearsal and
+production switch.
+
 ## Database backups
 
 Nightly PostgreSQL backups are dumped, gzipped, and uploaded to Cloudflare R2,

@@ -1,0 +1,94 @@
+# Migration Rehearsal
+
+A full dress rehearsal on staging, run before the real cutover. The goal is to
+surface every problem while the live Ghost site is still authoritative and
+nothing is at risk. Record every issue found; do not schedule the cutover until
+a rehearsal completes cleanly.
+
+Related runbooks: [`CUTOVER_RUNBOOK.md`](CUTOVER_RUNBOOK.md),
+[`BACKUP_AND_RESTORE.md`](BACKUP_AND_RESTORE.md),
+[`SEO_AND_REDIRECTS.md`](SEO_AND_REDIRECTS.md).
+
+## 0. Prepare the staging environment
+
+- Deploy the stack to a staging host with `SITE_ADDRESS=staging.<domain>`.
+- Set `NEXT_PUBLIC_NOINDEX=1` and `STAGING_BASIC_AUTH=user:password` so the
+  rehearsal site is neither indexed nor publicly reachable.
+- Point staging at a **staging database** and a **staging R2 bucket/prefix**,
+  never production storage.
+- Set the R2 (`S3_*`), email (`RESEND_*`), and `NEXT_PUBLIC_SITE_URL` variables.
+
+## 1. Obtain the Ghost exports
+
+From the live Ghost admin / server (see the handoff doc's "Required Ghost
+Exports"):
+
+- Content + settings JSON export
+- `redirects.json` (or `.yaml`)
+- Members CSV
+- The complete media archive (`content/images`)
+
+Keep all of these **out of Git** (`.gitignore` already blocks them).
+
+## 2. Bootstrap and import
+
+```bash
+pnpm bootstrap:admin                       # one administrator, then unset the vars
+pnpm migrate:ghost    --dry-run --input ghost-export/ghost-content.json
+pnpm migrate:ghost              --input ghost-export/ghost-content.json
+pnpm migrate:redirects          --input ghost-export/redirects.json
+pnpm migrate:members            --input ghost-export/ghost-members.csv
+```
+
+Review each importer's JSON report for conflicts before the non-dry run.
+
+## 3. Validate the import
+
+```bash
+pnpm migrate:validate --input ghost-export/ghost-content.json
+```
+
+This exits non-zero and lists discrepancies if any post, page, tag, or author is
+missing, a draft flipped to published, a feature image was lost, or a slug or
+publication date changed. Fix the root cause and re-run until it reports
+`"ok": true`.
+
+## 4. Manual verification checklist
+
+- [ ] **Content counts** match the Ghost admin (posts, pages, tags, authors).
+- [ ] **Recent posts** render correctly, including embeds and captions.
+- [ ] **Drafts** are still drafts and are not publicly reachable.
+- [ ] **Media** loads from R2 (not the old Ghost domain) with alt text intact.
+- [ ] **URLs** preserve the original slugs and trailing-slash structure.
+- [ ] **Redirects** resolve (spot-check several from `redirects.json`).
+- [ ] **Canonical URLs**, meta titles, and descriptions are preserved.
+- [ ] **Sitemap** (`/sitemap.xml`), **RSS** (`/rss`), and **robots** are correct.
+- [ ] **Payload admin** loads and editing works.
+- [ ] **Draft preview** works from the admin Preview button.
+- [ ] **Forms** (search, newsletter signup) submit successfully.
+- [ ] **Email** delivery works (trigger an admin password reset; confirm receipt).
+- [ ] **Health** endpoint (`/health`) returns `status: ok`.
+
+## 5. Backups and restore
+
+```bash
+pnpm backup:db                       # produce a backup to staging R2
+pnpm restore:db --latest --dry-run   # verify it decompresses
+# Restore into a scratch DB and confirm counts (see BACKUP_AND_RESTORE.md).
+```
+
+- [ ] A backup uploads to R2.
+- [ ] A restore into a scratch database reproduces the content.
+
+## 6. Crawl comparison
+
+- Crawl the live Ghost site and the staging site (e.g. with a site crawler).
+- Diff the URL lists. Every important indexed Ghost URL must return 200 on the
+  new site or a valid 301 redirect — no unexpected 404s.
+- Record any gap as a redirect to add before cutover.
+
+## 7. Record and sign off
+
+Log every problem found, its fix, and re-verification. The rehearsal is complete
+only when steps 3–6 pass with no outstanding issues. Then proceed to the
+[cutover runbook](CUTOVER_RUNBOOK.md).
