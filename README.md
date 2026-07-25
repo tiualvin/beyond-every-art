@@ -65,6 +65,21 @@ pnpm migrate:members --dry-run --input ghost-export/ghost-members.csv
 
 Both also accept a real run without `--dry-run` and are safe to rerun.
 
+## Database backups
+
+Nightly PostgreSQL backups are dumped, gzipped, and uploaded to Cloudflare R2,
+with old backups pruned to a retention count. In production the `backup` service
+in `docker-compose.yml` runs them on a schedule. On demand:
+
+```bash
+pnpm backup:db --dry-run          # show the plan, write nothing
+pnpm backup:db                    # dump, upload, prune
+pnpm restore:db --latest --dry-run  # verify the newest backup
+```
+
+See [`docs/BACKUP_AND_RESTORE.md`](docs/BACKUP_AND_RESTORE.md) for the full
+restore procedure and recovery checklist.
+
 ## Checks
 
 ```bash
