@@ -35,6 +35,16 @@ export const authorPath = (slug: string): string => `/author/${slug}/`
 /** Path of the RSS feed route (Ghost served this at `/rss/`). */
 export const FEED_PATH = '/rss'
 
+/**
+ * Path of the journal archive — every published public post, newest first.
+ *
+ * No trailing slash. The content paths above keep theirs because they preserve
+ * Ghost's permalinks; this route is new, has no pre-migration URL to protect,
+ * and `/journal` is the URL Next.js actually serves, so navigation, canonical
+ * tags, pagination, and the sitemap all agree without a redirect hop.
+ */
+export const JOURNAL_PATH = '/journal'
+
 /** Path of the search page. */
 export const SEARCH_PATH = '/search/'
 

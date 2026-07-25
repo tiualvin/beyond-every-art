@@ -55,7 +55,11 @@ export default async function FrontendLayout({
   return (
     <html lang="en" className={`${playfair.variable} ${inter.variable}`}>
       <body>
-        <SiteHeader siteTitle={settings.title} links={header.links} />
+        <SiteHeader
+          siteTitle={settings.title}
+          links={header.links}
+          cta={header.cta}
+        />
         {children}
         <SiteFooter
           siteTitle={settings.title}

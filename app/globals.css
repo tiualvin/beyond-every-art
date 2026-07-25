@@ -128,6 +128,8 @@ img {
 /* --- Site header -------------------------------------------------------- */
 
 .site-header {
+  /* Positioning context for the mobile navigation panel. */
+  position: relative;
   border-bottom: 1px solid var(--color-line);
   background: var(--color-surface);
 }
@@ -168,9 +170,105 @@ img {
   text-decoration: none;
 }
 
+/* Mobile navigation. Both the toggle and the panel are hidden above the
+   breakpoint, so exactly one navigation is ever exposed to assistive
+   technology, whatever state the disclosure was left in. */
+
+.nav-toggle,
+.mobile-nav {
+  display: none;
+}
+
+.nav-toggle {
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 44px;
+  padding: 0.5rem 0.8rem;
+  background: none;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+}
+
+.nav-toggle:hover {
+  border-color: var(--color-burgundy);
+  color: var(--color-burgundy);
+}
+
+.nav-toggle__bars {
+  display: grid;
+  gap: 3px;
+  width: 18px;
+}
+
+.nav-toggle__bars span {
+  height: 2px;
+  background: currentColor;
+}
+
 @media (max-width: 800px) {
-  .site-nav {
+  .site-header__inner {
+    gap: 1rem;
+  }
+
+  .site-nav,
+  .site-header__cta {
     display: none;
+  }
+
+  .nav-toggle {
+    display: inline-flex;
+  }
+
+  .mobile-nav {
+    display: flex;
+    flex-direction: column;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 20;
+    max-height: min(70vh, 30rem);
+    overflow-y: auto;
+    padding: 0 1.5rem 1.5rem;
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-line);
+    box-shadow: 0 14px 28px -20px rgb(20 17 16 / 65%);
+  }
+
+  .mobile-nav[hidden] {
+    display: none;
+  }
+
+  .mobile-nav a {
+    padding: 0.9rem 0;
+    border-top: 1px solid var(--color-line);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-ink);
+  }
+
+  .mobile-nav a:hover {
+    color: var(--color-burgundy);
+    text-decoration: none;
+  }
+
+  /* Outranks the `.mobile-nav a` rule above, which would otherwise strip the
+     button back to a plain list row. */
+  .mobile-nav a.mobile-nav__cta {
+    margin-top: 1.25rem;
+    padding: 0.9rem 1.3rem;
+    border: 0;
+    color: var(--color-on-dark);
+    text-align: center;
   }
 }
 
@@ -229,14 +327,26 @@ img {
   gap: 0.6rem;
 }
 
+/* The thumbnail frame. `display: block` matters: as an inline box it would
+   ignore aspect-ratio and paint nothing. The gradient is the placeholder for a
+   story with no featured image, and sits behind the image when there is one. */
 .story-card__thumb {
+  display: block;
+  position: relative;
   aspect-ratio: 3 / 2;
+  overflow: hidden;
   background: linear-gradient(
     135deg,
     var(--color-burgundy-deep),
     var(--color-dark)
   );
   border-radius: var(--radius);
+}
+
+/* Cards are a uniform grid, so thumbnails crop to the frame. Articles render
+   the same image at its own ratio instead. */
+.story-card__image {
+  object-fit: cover;
 }
 
 .story-card h3 {
@@ -328,6 +438,43 @@ img {
   border-top: 1px solid var(--color-line);
 }
 
+.article__figure {
+  margin: 0 0 2.5rem;
+}
+
+.article__figure img {
+  width: 100%;
+  border-radius: var(--radius);
+}
+
+/* Fallback frame for a media record that stores no intrinsic dimensions: the
+   image fills a fixed editorial ratio so the page still reserves its space. */
+.article__figure-fill {
+  display: block;
+  position: relative;
+  aspect-ratio: 3 / 2;
+  overflow: hidden;
+  border-radius: var(--radius);
+}
+
+.article__figure-fill img {
+  object-fit: cover;
+}
+
+.article__figure figcaption {
+  margin-top: 0.7rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+
+.article__figure-credit {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+}
+
 /* Rendered body (preserved legacy HTML). */
 .prose {
   font-size: 1.1rem;
@@ -411,6 +558,32 @@ img {
 .archive__head h1 {
   font-size: clamp(1.9rem, 4vw, 2.8rem);
   margin-top: 0.4rem;
+}
+
+/* Three slots so the status stays centered even when only one link exists. */
+.pagination {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 3.5rem;
+  padding-top: 1.75rem;
+  border-top: 1px solid var(--color-line);
+}
+
+/* The links are inline-block, so without this they stretch to fill their track. */
+.pagination > :first-child {
+  justify-self: start;
+}
+
+.pagination > :last-child {
+  justify-self: end;
+}
+
+.pagination__status {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--color-muted);
 }
 
 /* --- Forms (search, newsletter signup) ----------------------------------- */

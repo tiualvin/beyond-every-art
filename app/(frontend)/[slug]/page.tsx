@@ -65,6 +65,11 @@ export async function generateMetadata({
   const canonical =
     post.canonicalURL || absoluteUrl(postPath(post.slug), siteUrl)
   const description = post.metaDescription || post.excerpt || undefined
+  // Ghost emitted og:image for every post with a featured image; sharing cards
+  // stay intact after the migration only if this one does too.
+  const images = post.image
+    ? [{ url: absoluteUrl(post.image.url, siteUrl), alt: post.image.alt }]
+    : undefined
   return {
     title: post.metaTitle || post.title,
     description,
@@ -77,8 +82,14 @@ export async function generateMetadata({
       publishedTime: post.publishedAt ?? undefined,
       modifiedTime: post.updatedAt ?? undefined,
       authors: post.authors.map((a) => a.name),
+      images,
     },
-    twitter: { card: 'summary_large_image', title: post.title, description },
+    twitter: {
+      card: 'summary_large_image',
+      title: post.title,
+      description,
+      images,
+    },
   }
 }
 
@@ -133,6 +144,7 @@ export default async function SlugPage({
       datePublished: post.publishedAt,
       dateModified: post.updatedAt,
       authors: post.authors.map((a) => a.name),
+      image: post.image ? absoluteUrl(post.image.url, siteUrl) : null,
       siteName: settings.title,
       siteUrl,
     }),

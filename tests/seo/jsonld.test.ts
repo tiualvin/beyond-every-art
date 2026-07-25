@@ -42,11 +42,22 @@ describe('buildArticleJsonLd', () => {
     ])
   })
 
+  it('includes the featured image as a list', () => {
+    const data = buildArticleJsonLd({
+      ...base,
+      image: 'https://beyondeveryart.com/api/media/file/lead-white.jpg',
+    })
+    expect(data.image).toEqual([
+      'https://beyondeveryart.com/api/media/file/lead-white.jpg',
+    ])
+  })
+
   it('omits optional fields and the author array when empty', () => {
-    const data = buildArticleJsonLd({ ...base, authors: [] })
+    const data = buildArticleJsonLd({ ...base, authors: [], image: null })
     expect(data).not.toHaveProperty('description')
     expect(data).not.toHaveProperty('datePublished')
     expect(data).not.toHaveProperty('author')
+    expect(data).not.toHaveProperty('image')
   })
 })
 
