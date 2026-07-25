@@ -14,5 +14,17 @@ export const Header: GlobalConfig = {
         { name: 'url', type: 'text', required: true },
       ],
     },
+    {
+      name: 'cta',
+      type: 'group',
+      admin: {
+        description:
+          'High-emphasis button at the end of the masthead. Set both fields to show it.',
+      },
+      fields: [
+        { name: 'label', type: 'text' },
+        { name: 'url', type: 'text' },
+      ],
+    },
   ],
 }

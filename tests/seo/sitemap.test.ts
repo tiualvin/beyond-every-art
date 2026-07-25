@@ -5,13 +5,20 @@ import { buildSitemapEntries } from '../../lib/seo/sitemap'
 describe('buildSitemapEntries', () => {
   const siteUrl = 'https://beyondeveryart.com'
 
-  it('always includes the homepage first', () => {
+  it('always includes the homepage and the journal archive first', () => {
     const entries = buildSitemapEntries({ siteUrl })
-    expect(entries[0]).toEqual({
-      url: 'https://beyondeveryart.com/',
-      changeFrequency: 'daily',
-      priority: 1,
-    })
+    expect(entries).toEqual([
+      {
+        url: 'https://beyondeveryart.com/',
+        changeFrequency: 'daily',
+        priority: 1,
+      },
+      {
+        url: 'https://beyondeveryart.com/journal',
+        changeFrequency: 'daily',
+        priority: 0.8,
+      },
+    ])
   })
 
   it('builds trailing-slash URLs for posts and pages with last-modified dates', () => {
@@ -45,7 +52,7 @@ describe('buildSitemapEntries', () => {
         { slug: 'good', updatedAt: 'not-a-date' },
       ],
     })
-    expect(entries).toHaveLength(2) // homepage + 'good'
+    expect(entries).toHaveLength(3) // homepage + journal + 'good'
     const good = entries.find((e) => e.url.includes('good'))
     expect(good?.lastModified).toBeUndefined()
   })
@@ -58,6 +65,7 @@ describe('buildSitemapEntries', () => {
     })
     expect(entries.map((e) => e.url)).toEqual([
       'https://beyondeveryart.com/',
+      'https://beyondeveryart.com/journal',
       'https://beyondeveryart.com/tag/materials/',
       'https://beyondeveryart.com/author/livia-calderon/',
     ])

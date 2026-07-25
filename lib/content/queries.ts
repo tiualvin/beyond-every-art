@@ -1,5 +1,7 @@
 import type { Where } from 'payload'
 
+import { toMediaImage, type MediaImage } from '@/lib/content/media'
+import { ARCHIVE_PAGE_SIZE } from '@/lib/content/pagination'
 import { getPayloadClient } from '@/lib/payload'
 
 export type NavLink = { label: string; url: string }
@@ -20,6 +22,7 @@ export type PostCard = {
   featured: boolean
   authors: AuthorSummary[]
   tag: string | null
+  image: MediaImage | null
 }
 
 const DEFAULT_SETTINGS: SiteSettings = {
@@ -45,6 +48,7 @@ type RawPost = {
   featured?: boolean
   authors?: Array<RawAuthor | string | number>
   tags?: Array<RawTag | string | number>
+  featuredImage?: unknown
 }
 
 function toAuthorSummaries(authors: RawPost['authors']): AuthorSummary[] {
@@ -73,6 +77,7 @@ function toPostCard(doc: RawPost): PostCard | null {
     featured: Boolean(doc.featured),
     authors: toAuthorSummaries(doc.authors),
     tag: firstTagName(doc.tags),
+    image: toMediaImage(doc.featuredImage),
   }
 }
 
@@ -94,31 +99,88 @@ export async function getSiteSettings(): Promise<SiteSettings> {
   }
 }
 
-async function getGlobalLinks(
-  slug: 'header' | 'footer',
-): Promise<{ links: NavLink[]; copyright?: string }> {
+function toNavLink(value: Partial<NavLink> | undefined | null): NavLink | null {
+  const label = value?.label?.trim()
+  const url = value?.url?.trim()
+  return label && url ? { label, url } : null
+}
+
+async function getGlobalLinks(slug: 'header' | 'footer'): Promise<{
+  links: NavLink[]
+  cta: NavLink | null
+  copyright?: string
+}> {
   try {
     const payload = await getPayloadClient()
     const data = (await payload.findGlobal({
       slug,
       overrideAccess: true,
       depth: 0,
-    })) as { links?: NavLink[]; copyright?: string }
+    })) as { links?: NavLink[]; cta?: Partial<NavLink>; copyright?: string }
     return {
-      links: (data.links ?? []).filter((l) => l.label && l.url),
+      links: (data.links ?? [])
+        .map(toNavLink)
+        .filter((l): l is NavLink => l !== null),
+      cta: toNavLink(data.cta),
       copyright: data.copyright,
     }
   } catch {
-    return { links: [] }
+    return { links: [], cta: null }
   }
 }
 
-export function getHeader(): Promise<{ links: NavLink[] }> {
+export function getHeader(): Promise<{
+  links: NavLink[]
+  cta: NavLink | null
+}> {
   return getGlobalLinks('header')
 }
 
 export function getFooter(): Promise<{ links: NavLink[]; copyright?: string }> {
   return getGlobalLinks('footer')
+}
+
+export type PostPage = {
+  posts: PostCard[]
+  page: number
+  totalPages: number
+  totalPosts: number
+}
+
+const EMPTY_POST_PAGE: PostPage = {
+  posts: [],
+  page: 1,
+  totalPages: 1,
+  totalPosts: 0,
+}
+
+/** One page of published public posts, newest first, for the journal archive. */
+export async function getPublishedPosts({
+  page = 1,
+  limit = ARCHIVE_PAGE_SIZE,
+}: { page?: number; limit?: number } = {}): Promise<PostPage> {
+  try {
+    const payload = await getPayloadClient()
+    const result = await payload.find({
+      collection: 'posts',
+      overrideAccess: true,
+      depth: 1,
+      page,
+      limit,
+      sort: '-publishedAt',
+      where: publishedPublic,
+    })
+    return {
+      posts: (result.docs as RawPost[])
+        .map(toPostCard)
+        .filter((p): p is PostCard => p !== null),
+      page: result.page ?? page,
+      totalPages: Math.max(1, result.totalPages ?? 1),
+      totalPosts: result.totalDocs ?? 0,
+    }
+  } catch {
+    return EMPTY_POST_PAGE
+  }
 }
 
 /** Most recent published public posts, newest first. */
@@ -189,6 +251,7 @@ export type PostDetail = {
   updatedAt: string | null
   authors: AuthorSummary[]
   tags: TagRef[]
+  image: MediaImage | null
   metaTitle: string | null
   metaDescription: string | null
   canonicalURL: string | null
@@ -223,6 +286,7 @@ type RawContentDoc = {
   updatedAt?: string
   authors?: Array<RawAuthor | string | number>
   tags?: Array<(RawTag & { slug?: string }) | string | number>
+  featuredImage?: unknown
   metaTitle?: string
   metaDescription?: string
   canonicalURL?: string
@@ -271,6 +335,7 @@ export async function getPostBySlug(
       updatedAt: doc.updatedAt ?? null,
       authors: toAuthorSummaries(doc.authors),
       tags: toTagRefs(doc.tags),
+      image: toMediaImage(doc.featuredImage),
       metaTitle: doc.metaTitle ?? null,
       metaDescription: doc.metaDescription ?? null,
       canonicalURL: doc.canonicalURL ?? null,

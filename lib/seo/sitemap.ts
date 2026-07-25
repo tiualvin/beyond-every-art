@@ -1,4 +1,11 @@
-import { absoluteUrl, authorPath, pagePath, postPath, tagPath } from './site'
+import {
+  absoluteUrl,
+  authorPath,
+  JOURNAL_PATH,
+  pagePath,
+  postPath,
+  tagPath,
+} from './site'
 
 export type SitemapDoc = {
   slug: string
@@ -21,9 +28,9 @@ function toIso(value: string | Date | null | undefined): string | undefined {
 }
 
 /**
- * Builds sitemap entries for the homepage plus published posts and pages. Pure
- * so it can be unit tested; the route pulls the documents from Payload and hands
- * them here for URL construction.
+ * Builds sitemap entries for the homepage and journal archive, plus published
+ * posts and pages. Pure so it can be unit tested; the route pulls the documents
+ * from Payload and hands them here for URL construction.
  */
 export function buildSitemapEntries({
   siteUrl,
@@ -40,6 +47,13 @@ export function buildSitemapEntries({
 }): SitemapEntry[] {
   const entries: SitemapEntry[] = [
     { url: `${siteUrl}/`, changeFrequency: 'daily', priority: 1 },
+    // The archive is a route rather than a document, so it has no lastModified
+    // of its own. Only page one is listed; deeper pages are reachable from it.
+    {
+      url: absoluteUrl(JOURNAL_PATH, siteUrl),
+      changeFrequency: 'daily',
+      priority: 0.8,
+    },
   ]
 
   for (const post of posts) {

@@ -5,6 +5,8 @@ export type ArticleJsonLdInput = {
   datePublished?: string | null
   dateModified?: string | null
   authors?: string[]
+  /** Absolute URL of the featured image, when the post has one. */
+  image?: string | null
   siteName: string
   siteUrl: string
 }
@@ -32,6 +34,9 @@ export function buildArticleJsonLd(
   if (input.description) jsonLd.description = input.description
   if (input.datePublished) jsonLd.datePublished = input.datePublished
   if (input.dateModified) jsonLd.dateModified = input.dateModified
+  // schema.org accepts a single URL, but Google's Article guidance asks for a
+  // list, and a list of one stays valid for both.
+  if (input.image) jsonLd.image = [input.image]
 
   const authors = (input.authors ?? []).filter(Boolean)
   if (authors.length > 0) {

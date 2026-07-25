@@ -1,11 +1,13 @@
 import config from '@payload-config'
 import { getPayload, type Payload } from 'payload'
+import sharp from 'sharp'
 
 /**
  * Development seed. Populates Payload with a small, realistic set of authors,
- * tags, posts, a page, and the site globals so the frontend can be built and
- * previewed without a real Ghost export. Safe to re-run: every record is
- * upserted on its slug (or global slug), so running it twice does not duplicate.
+ * tags, media, posts, a page, and the site globals so the frontend can be built
+ * and previewed without a real Ghost export. Safe to re-run: every record is
+ * upserted on its slug (or file name, or global slug), so running it twice does
+ * not duplicate.
  *
  * Usage: pnpm seed:dev
  */
@@ -53,6 +55,84 @@ async function upsertBySlug(
   return created.id as IdLike
 }
 
+type SeedImage = {
+  filename: string
+  alt: string
+  caption?: string
+  credit?: string
+  width: number
+  height: number
+  from: string
+  to: string
+  accent: string
+}
+
+/**
+ * Draws a placeholder "material study" as an SVG and encodes it as a JPEG.
+ *
+ * The seed has to produce real image bytes, because a featured image only
+ * exercises the frontend if Payload actually stores an upload: the URL, the
+ * intrinsic width and height, and the generated `card` size all come from the
+ * upload pipeline. Generating them here keeps the repository free of binary
+ * assets and of any question about who owns the artwork — these are obviously
+ * synthetic, and no real photograph is licensed for a development seed.
+ */
+async function renderPlaceholderImage(image: SeedImage): Promise<Buffer> {
+  const { width: w, height: h, from, to, accent } = image
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+  <defs>
+    <linearGradient id="ground" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="${from}"/>
+      <stop offset="1" stop-color="${to}"/>
+    </linearGradient>
+    <radialGradient id="glaze" cx="0.32" cy="0.24" r="0.78">
+      <stop offset="0" stop-color="${accent}" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="${accent}" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="${w}" height="${h}" fill="url(#ground)"/>
+  <rect width="${w}" height="${h}" fill="url(#glaze)"/>
+  <circle cx="${w * 0.68}" cy="${h * 0.62}" r="${Math.min(w, h) * 0.3}" fill="${accent}" opacity="0.16"/>
+  <rect x="${w * 0.08}" y="${h * 0.58}" width="${w * 0.46}" height="${h * 0.3}" fill="${accent}" opacity="0.1"/>
+  <rect x="0" y="${h * 0.5}" width="${w}" height="${Math.max(2, h * 0.004)}" fill="${accent}" opacity="0.35"/>
+</svg>`
+
+  return sharp(Buffer.from(svg)).jpeg({ quality: 82 }).toBuffer()
+}
+
+/** Uploads a placeholder image once; a re-run reuses the stored file. */
+async function upsertMedia(
+  payload: Payload,
+  image: SeedImage,
+): Promise<IdLike> {
+  const existing = await payload.find({
+    collection: 'media',
+    where: { filename: { equals: image.filename } },
+    limit: 1,
+    depth: 0,
+    overrideAccess: true,
+  })
+  if (existing.docs.length > 0) return existing.docs[0].id as IdLike
+
+  const data = await renderPlaceholderImage(image)
+  const created = await payload.create({
+    collection: 'media',
+    overrideAccess: true,
+    data: {
+      alt: image.alt,
+      caption: image.caption,
+      credit: image.credit,
+    },
+    file: {
+      data,
+      mimetype: 'image/jpeg',
+      name: image.filename,
+      size: data.byteLength,
+    },
+  })
+  return created.id as IdLike
+}
+
 async function seed(): Promise<void> {
   const payload = await getPayload({ config })
 
@@ -67,17 +147,20 @@ async function seed(): Promise<void> {
     },
   })
 
+  // Every destination below is a route this seed actually produces. Menus that
+  // point at pages nobody has written yet ship 404s in the site chrome, which
+  // is exactly the state the seed is supposed to let you check.
   await payload.updateGlobal({
     slug: 'header',
     overrideAccess: true,
     data: {
       links: [
         { label: 'About', url: '/about' },
-        { label: 'Art & Stories', url: '/tag/materials' },
+        { label: 'Materials', url: '/tag/materials' },
         { label: 'Journal', url: '/journal' },
-        { label: 'Collections', url: '/collections' },
-        { label: 'Contact', url: '/contact' },
+        { label: 'Search', url: '/search' },
       ],
+      cta: { label: 'Newsletter', url: '/newsletter' },
     },
   })
 
@@ -89,7 +172,7 @@ async function seed(): Promise<void> {
       links: [
         { label: 'About', url: '/about' },
         { label: 'Journal', url: '/journal' },
-        { label: 'Contact', url: '/contact' },
+        { label: 'Newsletter', url: '/newsletter' },
         { label: 'RSS', url: '/rss' },
       ],
     },
@@ -124,12 +207,53 @@ async function seed(): Promise<void> {
     ghostID: 'seed-tag-practice',
   })
 
+  // --- Media -----------------------------------------------------------
+  // Deliberately varied aspect ratios: cards crop every thumbnail to the same
+  // frame, while an article renders the image at its own ratio, and only a
+  // portrait next to a panorama shows whether both are behaving.
+  const imageWhites = await upsertMedia(payload, {
+    filename: 'seed-lead-and-titanium-white.jpg',
+    alt: 'Two ground white pigments side by side under raking light',
+    caption:
+      'Lead white, left, beside titanium white ground to the same fineness.',
+    credit: 'Placeholder image generated by pnpm seed:dev',
+    width: 1600,
+    height: 1067,
+    from: '#8a7f72',
+    to: '#221c18',
+    accent: '#f6f2eb',
+  })
+  const imagePigments = await upsertMedia(payload, {
+    filename: 'seed-pigment-cabinet.jpg',
+    alt: 'A tall cabinet of pigment jars arranged from ochre to deep blue',
+    caption: 'A working pigment cabinet, ordered by hue rather than by date.',
+    width: 1400,
+    height: 1750,
+    from: '#6d1f2c',
+    to: '#141110',
+    accent: '#e0a24a',
+  })
+  const imageLight = await upsertMedia(payload, {
+    filename: 'seed-raking-light-study.jpg',
+    // Deliberately unhelpful: `Media.alt` is required, so a Ghost image with no
+    // alt attribute arrives carrying its own file name. This one reproduces
+    // that migrated shape, and the frontend should render it as decorative
+    // rather than reading a file name out loud.
+    alt: 'seed-raking-light-study.jpg',
+    width: 1920,
+    height: 1080,
+    from: '#2b2f3a',
+    to: '#0d0c0b',
+    accent: '#cbb994',
+  })
+
   // --- Posts -----------------------------------------------------------
   const posts: Array<{
     slug: string
     title: string
     excerpt: string
     tag: IdLike
+    featuredImage: IdLike | null
     featured: boolean
     publishedAt: string
   }> = [
@@ -139,6 +263,7 @@ async function seed(): Promise<void> {
       excerpt:
         'Two whites, similar in appearance but worlds apart in composition, performance, and history.',
       tag: tagMaterials,
+      featuredImage: imageWhites,
       featured: true,
       publishedAt: '2025-05-20T09:00:00.000Z',
     },
@@ -148,6 +273,7 @@ async function seed(): Promise<void> {
       excerpt:
         'How the pigments on an artist’s palette encode centuries of chemistry, trade, and discovery.',
       tag: tagMaterials,
+      featuredImage: imagePigments,
       featured: true,
       publishedAt: '2025-04-11T09:00:00.000Z',
     },
@@ -157,15 +283,19 @@ async function seed(): Promise<void> {
       excerpt:
         'Reading the deliberate choreography of light that gives Renaissance painting its depth.',
       tag: tagHistory,
+      featuredImage: imageLight,
       featured: true,
       publishedAt: '2025-03-02T09:00:00.000Z',
     },
     {
+      // Left without a featured image on purpose, so the card placeholder and
+      // the image-less article layout stay visible in the seeded site.
       slug: 'building-texture-from-surface-to-soul',
       title: 'Building Texture: From Surface to Soul',
       excerpt:
         'Impasto, glazing, and the tactile decisions that turn a flat surface into a felt experience.',
       tag: tagPractice,
+      featuredImage: null,
       featured: false,
       publishedAt: '2025-01-18T09:00:00.000Z',
     },
@@ -189,6 +319,7 @@ async function seed(): Promise<void> {
       legacyHTML: bodyFor(post.excerpt),
       authors: [livia],
       tags: [post.tag],
+      featuredImage: post.featuredImage,
       featured: post.featured,
       visibility: 'public',
       publishedAt: post.publishedAt,
@@ -209,7 +340,7 @@ async function seed(): Promise<void> {
   })
 
   payload.logger.info(
-    `Seed complete: ${posts.length} posts, 3 tags, 1 author, 1 page, 3 globals.`,
+    `Seed complete: ${posts.length} posts, 3 images, 3 tags, 1 author, 1 page, 3 globals.`,
   )
 }
 
