@@ -21,6 +21,14 @@ pages, the full-screen reader, PDF processing worker, interactive hotspots,
 transcripts, and first-party analytics. None of it is built, and it must not
 displace migration or cutover work.
 
+[`docs/INSERTABLE_CONTENT_MODULES.md`](docs/INSERTABLE_CONTENT_MODULES.md)
+records the evaluated architecture for Ghost-style insertable blocks, reusable
+snippets, signup modules, carousels, and affiliate product recommendations. It
+refines—and maps itself back to—the handoff's "Reusable Content Blocks"
+catalogue. None of it is built, and it must not displace migration or cutover
+work. Read it before adding any Lexical block, block registry, or content
+module.
+
 [`docs/AUTONOMOUS_WORKSTREAMS.md`](docs/AUTONOMOUS_WORKSTREAMS.md) defines the
 sequencing, shared invariants, ownership boundaries, and verification gates for
 the repository's launch-readiness automation workstreams.

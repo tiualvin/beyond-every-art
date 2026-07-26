@@ -73,7 +73,24 @@ export const Posts: CollectionConfig = {
     { name: 'featuredImage', type: 'upload', relationTo: 'media' },
     { name: 'excerpt', type: 'textarea' },
     { name: 'content', type: 'richText' },
-    { name: 'legacyHTML', type: 'code', admin: { language: 'html' } },
+    {
+      name: 'legacyHTML',
+      type: 'code',
+      admin: { language: 'html' },
+      // `toBodyHtml` hands this straight to `dangerouslySetInnerHTML`, so
+      // whoever can write it can execute script on the public site. Post
+      // `create` is open to any authenticated user and `update` to the post's
+      // owner, which would put stored XSS within reach of the `author` role.
+      // Writing raw HTML is an editorial trust decision, so it takes editor
+      // rights. `read` stays open on purpose: the field holds the body every
+      // migrated document renders from, so a read rule here would blank those
+      // bodies on any path that respects field access while protecting nothing
+      // — the markup is public the moment the page is published.
+      access: {
+        create: editorsAndAdminsField,
+        update: editorsAndAdminsField,
+      },
+    },
     { name: 'metaTitle', type: 'text' },
     { name: 'metaDescription', type: 'textarea' },
     { name: 'canonicalURL', type: 'text' },

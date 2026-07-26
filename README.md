@@ -13,6 +13,12 @@ Migration-first Next.js and Payload CMS foundation for moving Beyond Every Art f
 
 Payload Admin is available at <http://localhost:3000/admin>.
 
+The evaluated architecture for Ghost-style insertable blocks, reusable
+snippets, signup modules, carousels, and affiliate product recommendations is
+documented in
+[`docs/INSERTABLE_CONTENT_MODULES.md`](docs/INSERTABLE_CONTENT_MODULES.md).
+It is a post-migration evolution plan, not part of the cutover scope.
+
 ## Create the first administrator
 
 Public account creation is disabled. With an empty `users` collection, set the
