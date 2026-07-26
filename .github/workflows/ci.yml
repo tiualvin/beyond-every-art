@@ -37,6 +37,13 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      # The comparator CLI only invokes `main()` when it is the entry module, so
+      # that `parseArgs` stays unit-testable. `--help` is handled inside
+      # `main()`, which makes it a cheap proof that the guard still lets a real
+      # invocation through. Without it a broken guard would exit 0 silently and
+      # look like a clean rehearsal run.
+      - name: Smoke test the migration comparator entry point
+        run: pnpm migration:compare --help | grep -q -- '--target-max-pages'
       # Conflict fixture: duplicate slugs and missing authors/tags must still be
       # detected and reported, which is a dry-run-only expectation.
       - run: pnpm migrate:ghost --dry-run --input tests/fixtures/ghost-export.json
@@ -93,6 +100,11 @@ jobs:
       - run: pnpm seed:dev
       - run: pnpm seed:e2e
       - run: pnpm build
+      # Assemble the standalone output exactly as the runtime image does. The
+      # standalone bundle ships `server.js` and its traced dependencies but not
+      # `.next/static`, which the Dockerfile copies in beside it. Without this
+      # the smoke suite would serve a build missing every static asset.
+      - run: cp -r .next/static .next/standalone/.next/static
       - run: pnpm test:e2e
       - uses: actions/upload-artifact@v4
         if: failure()

@@ -3,9 +3,25 @@ import { defineConfig, devices } from '@playwright/test'
 const localOrigin = 'http://127.0.0.1:3000'
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || localOrigin
 const startsLocalServer = !process.env.PLAYWRIGHT_BASE_URL
-const serverCommand = process.env.CI
-  ? 'pnpm start --hostname 127.0.0.1 --port 3000'
-  : 'pnpm exec next dev --hostname 127.0.0.1 --port 3000'
+
+/**
+ * CI serves the exact artifact the production image runs: `node server.js` from
+ * the standalone bundle, the same entry point as the Dockerfile's
+ * `CMD ["node", "server.js"]`. `next start` is unsupported with
+ * `output: 'standalone'` and Next.js warns about it, so using it here would
+ * leave the shipped server untested. The standalone server takes its address
+ * from HOSTNAME/PORT rather than CLI flags.
+ *
+ * Local runs keep the dev server for fast iteration.
+ */
+const productionServer = {
+  command: 'node .next/standalone/server.js',
+  env: { HOSTNAME: '127.0.0.1', NODE_ENV: 'production', PORT: '3000' },
+}
+const developmentServer = {
+  command: 'pnpm exec next dev --hostname 127.0.0.1 --port 3000',
+  env: {},
+}
 
 export default defineConfig({
   testDir: './e2e',
@@ -39,7 +55,7 @@ export default defineConfig({
   ],
   webServer: startsLocalServer
     ? {
-        command: serverCommand,
+        ...(process.env.CI ? productionServer : developmentServer),
         url: `${localOrigin}/health`,
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,

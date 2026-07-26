@@ -29,10 +29,13 @@ pnpm exec playwright install chromium
 
 `pnpm test:e2e` runs the browser suite without seeding. CI uses this after
 running `pnpm seed:dev`, `pnpm seed:e2e`, and `pnpm build` against its throwaway
-Postgres service. With `CI=true`, Playwright starts `next start`, so the required
-browser job exercises the production build rather than Next.js development
-mode. This separation keeps the browser command usable against an already
-prepared environment and makes data setup visible in CI logs.
+Postgres service. With `CI=true`, Playwright starts the standalone server
+(`node .next/standalone/server.js`) — the same entry point the runtime image
+runs — so the required browser job exercises the artifact that actually ships
+rather than Next.js development mode. CI copies `.next/static` into the
+standalone bundle first, exactly as the Dockerfile does. This separation keeps
+the browser command usable against an already prepared environment and makes
+data setup visible in CI logs.
 
 ## External environment
 
