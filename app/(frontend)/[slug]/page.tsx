@@ -1,5 +1,4 @@
 import type { Metadata } from 'next'
-import { draftMode } from 'next/headers'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { cache } from 'react'
@@ -12,6 +11,7 @@ import {
   type PostDetail,
 } from '@/lib/content/queries'
 import { logMissingRoute } from '@/lib/observability/missing-route'
+import { getPreviewMode } from '@/lib/preview/mode'
 import { buildArticleJsonLd, serializeJsonLd } from '@/lib/seo/jsonld'
 import { absoluteUrl, getSiteUrl, pagePath, postPath } from '@/lib/seo/site'
 
@@ -43,7 +43,9 @@ export async function generateMetadata({
   params: Promise<Params>
 }): Promise<Metadata> {
   const { slug } = await params
-  const { isEnabled: draft } = await draftMode()
+  // The same gated check the page body uses, so a draft's title and
+  // description cannot leak through metadata to a request that may not read it.
+  const { draft } = await getPreviewMode()
   const resolved = await resolve(slug, draft)
   const siteUrl = getSiteUrl()
 
@@ -99,8 +101,12 @@ export default async function SlugPage({
   params: Promise<Params>
 }) {
   const { slug } = await params
-  const { isEnabled: draft } = await draftMode()
+  const { draft, live } = await getPreviewMode()
   const resolved = await resolve(slug, draft)
+
+  // Inside the Live Preview iframe the admin already frames the document, so
+  // the banner would only steal space from the page being judged.
+  const showBanner = draft && !live
 
   if (resolved.kind === 'none') {
     await logMissingRoute(postPath(slug))
@@ -111,7 +117,7 @@ export default async function SlugPage({
     const { page } = resolved
     return (
       <main>
-        {draft && <DraftBanner />}
+        {showBanner && <DraftBanner />}
         <article className="article">
           <div className="container article__inner">
             <header className="article__header">
@@ -156,7 +162,7 @@ export default async function SlugPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: jsonLd }}
       />
-      {draft && <DraftBanner />}
+      {showBanner && <DraftBanner />}
       <Article post={post} />
     </>
   )

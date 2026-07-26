@@ -37,8 +37,9 @@ export function Article({ post }: { post: PostDetail }) {
           {post.image && <FeaturedFigure image={post.image} />}
 
           {post.bodyHtml ? (
-            // legacyHTML is first-party editorial content migrated from Ghost,
-            // authored by trusted editors — rendered as the preserved body.
+            // First-party editorial content: either HTML built from the
+            // Lexical body by `toBodyHtml`, or the preserved Ghost markup it
+            // falls back to. Both are authored by trusted editors.
             <div
               className="prose"
               dangerouslySetInnerHTML={{ __html: post.bodyHtml }}

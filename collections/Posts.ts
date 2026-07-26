@@ -7,14 +7,14 @@ import {
   ownedPosts,
   postsRead,
 } from '../access/roles'
+import { buildPreviewUrl } from '../lib/preview/live-preview'
 import { validateRootContentSlug } from '../lib/seo/reserved-slugs'
 
 export const Posts: CollectionConfig = {
   slug: 'posts',
   admin: {
     useAsTitle: 'title',
-    preview: (doc) =>
-      `/api/preview?secret=${process.env.PAYLOAD_PREVIEW_SECRET ?? ''}&collection=posts&slug=${doc?.slug ?? ''}`,
+    preview: (doc) => buildPreviewUrl({ collection: 'posts', slug: doc?.slug }),
   },
   access: {
     create: authenticated,
@@ -32,7 +32,11 @@ export const Posts: CollectionConfig = {
       },
     ],
   },
-  versions: { drafts: true },
+  // Autosave is what makes Live Preview live: the iframe re-renders on save,
+  // so without it the preview only moves when an editor remembers to press a
+  // button. `maxPerDoc` is the counterweight — autosave writes a version per
+  // typing pause, and untrimmed version tables land in every database backup.
+  versions: { drafts: { autosave: { interval: 800 } }, maxPerDoc: 50 },
   fields: [
     { name: 'title', type: 'text', required: true },
     {

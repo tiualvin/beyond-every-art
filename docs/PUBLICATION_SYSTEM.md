@@ -119,10 +119,11 @@ existing routes are wired:
    matcher deliberately.
 
 4. **Draft preview.** `app/(payload)/api/preview/route.ts` only accepts
-   `collection=posts` and `collection=pages`. Add `publications` to its
-   `COLLECTIONS` set and map it to `publicationPath(slug)` so editors can
-   preview an unpublished issue with the existing `PAYLOAD_PREVIEW_SECRET`
-   flow.
+   `collection=posts` and `collection=pages`. Add `publications` to
+   `PREVIEW_COLLECTIONS` in `lib/preview/live-preview.ts` and map it to
+   `publicationPath(slug)` so editors can preview an unpublished issue through
+   the existing session-authorized flow described in
+   [`LIVE_PREVIEW.md`](LIVE_PREVIEW.md).
 
 ## Design direction
 

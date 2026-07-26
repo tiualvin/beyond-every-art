@@ -2,10 +2,12 @@ import type { Metadata } from 'next'
 import { Inter, Playfair_Display } from 'next/font/google'
 
 import { getFooter, getHeader, getSiteSettings } from '@/lib/content/queries'
+import { getPreviewMode } from '@/lib/preview/mode'
 import { isNoindex } from '@/lib/seo/indexing'
 import { getSiteUrl } from '@/lib/seo/site'
 
 import { Analytics } from './components/analytics'
+import { LivePreviewListener } from './components/live-preview-listener'
 import { SiteFooter } from './components/site-footer'
 import { SiteHeader } from './components/site-header'
 import '../globals.css'
@@ -43,10 +45,11 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function FrontendLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const [settings, header, footer] = await Promise.all([
+  const [settings, header, footer, preview] = await Promise.all([
     getSiteSettings(),
     getHeader(),
     getFooter(),
+    getPreviewMode(),
   ])
 
   const gaId = process.env.NEXT_PUBLIC_GA_ID
@@ -67,6 +70,8 @@ export default async function FrontendLayout({
           copyright={footer.copyright}
         />
         {analyticsEnabled && <Analytics gaId={gaId!} />}
+        {/* Preview-only, so no live-preview JavaScript reaches readers. */}
+        {preview.live && <LivePreviewListener serverURL={getSiteUrl()} />}
       </body>
     </html>
   )
