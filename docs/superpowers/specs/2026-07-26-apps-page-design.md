@@ -41,8 +41,8 @@ export const Apps: CollectionConfig = {
   fields: [
     { name: 'name', type: 'text', required: true },
     { name: 'slug', type: 'text', required: true, unique: true, index: true },
-    { name: 'tagline', type: 'text' },        // "A quiet place to color."
-    { name: 'summary', type: 'textarea' },     // short card description
+    { name: 'tagline', type: 'text' }, // "A quiet place to color."
+    { name: 'summary', type: 'textarea' }, // short card description
     { name: 'description', type: 'richText' }, // full pitch on the detail page
     {
       name: 'status',
@@ -58,9 +58,13 @@ export const Apps: CollectionConfig = {
       options: ['ios', 'android', 'web'],
     },
     { name: 'heroImage', type: 'upload', relationTo: 'media' },
-    { name: 'screenshots', type: 'array', fields: [
-      { name: 'image', type: 'upload', relationTo: 'media', required: true },
-    ] },
+    {
+      name: 'screenshots',
+      type: 'array',
+      fields: [
+        { name: 'image', type: 'upload', relationTo: 'media', required: true },
+      ],
+    },
     { name: 'appStoreURL', type: 'text' },
     { name: 'playStoreURL', type: 'text' },
     { name: 'order', type: 'number', defaultValue: 0 },
@@ -98,7 +102,13 @@ export const AppWaitlist: CollectionConfig = {
   },
   fields: [
     { name: 'email', type: 'email', required: true, index: true },
-    { name: 'app', type: 'relationship', relationTo: 'apps', required: true, index: true },
+    {
+      name: 'app',
+      type: 'relationship',
+      relationTo: 'apps',
+      required: true,
+      index: true,
+    },
     { name: 'source', type: 'text' },
   ],
 }
