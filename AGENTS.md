@@ -15,6 +15,12 @@ For post-migration website design work, also read
 the supplied desktop and mobile concepts as a directional brief, not as approval
 to redesign during Phase 1.
 
+[`docs/PUBLICATION_SYSTEM.md`](docs/PUBLICATION_SYSTEM.md) records the planned
+self-hosted digital publication system—the `/publication` archive, issue landing
+pages, the full-screen reader, PDF processing worker, interactive hotspots,
+transcripts, and first-party analytics. None of it is built, and it must not
+displace migration or cutover work.
+
 ## Current priority
 
 The first priority is a safe, repeatable Ghost migration—not a redesign.
