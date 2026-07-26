@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildPreviewUrl,
   isPreviewCollection,
+  isPreviewRole,
   previewTargetPath,
 } from '../../lib/preview/live-preview'
 
@@ -20,6 +21,29 @@ describe('isPreviewCollection', () => {
     expect(isPreviewCollection('')).toBe(false)
     expect(isPreviewCollection(null)).toBe(false)
     expect(isPreviewCollection(undefined)).toBe(false)
+  })
+})
+
+describe('isPreviewRole', () => {
+  it('admits the editorial roles', () => {
+    expect(isPreviewRole({ role: 'admin' })).toBe(true)
+    expect(isPreviewRole({ role: 'editor' })).toBe(true)
+    expect(isPreviewRole({ role: 'author' })).toBe(true)
+  })
+
+  it('refuses anyone without an editorial role', () => {
+    // Members authenticate against their own collection and have no editorial
+    // standing; an unauthenticated request has no user at all.
+    expect(isPreviewRole({ role: 'member' })).toBe(false)
+    expect(isPreviewRole({ email: 'reader@example.test' })).toBe(false)
+    expect(isPreviewRole({ role: '' })).toBe(false)
+    expect(isPreviewRole(null)).toBe(false)
+    expect(isPreviewRole(undefined)).toBe(false)
+  })
+
+  it('refuses a role that is not a string', () => {
+    expect(isPreviewRole({ role: ['admin'] })).toBe(false)
+    expect(isPreviewRole({ role: true })).toBe(false)
   })
 })
 

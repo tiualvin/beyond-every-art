@@ -24,6 +24,21 @@ export function isPreviewCollection(
   return PREVIEW_COLLECTIONS.includes(value as PreviewCollection)
 }
 
+/** Roles allowed to see unpublished content on the public site. */
+const PREVIEW_ROLES = new Set(['admin', 'author', 'editor'])
+
+/**
+ * Whether an authenticated user may preview drafts.
+ *
+ * Members are deliberately excluded. They authenticate against a different
+ * collection and have no editorial standing, so a member session must never
+ * open unpublished work.
+ */
+export function isPreviewRole(user: unknown): boolean {
+  const role = (user as { role?: unknown } | null | undefined)?.role
+  return typeof role === 'string' && PREVIEW_ROLES.has(role)
+}
+
 /** Where a previewable document lives on the public site. */
 export function previewTargetPath(
   collection: PreviewCollection,

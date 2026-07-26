@@ -19,6 +19,7 @@ banner and its exit link.
 | Admin config: breakpoints, collections, iframe URL | [`payload.config.ts`](../payload.config.ts)                                                                       |
 | "Preview" button URLs, drafts autosave             | [`collections/Posts.ts`](../collections/Posts.ts), [`collections/Pages.ts`](../collections/Pages.ts)              |
 | Authorization, draft mode, redirect                | [`app/(payload)/api/preview/route.ts`](<../app/(payload)/api/preview/route.ts>)                                   |
+| Session check, used at both hops                   | [`lib/preview/session.ts`](../lib/preview/session.ts)                                                             |
 | Draft/live request mode                            | [`lib/preview/mode.ts`](../lib/preview/mode.ts)                                                                   |
 | Refresh-on-save listener                           | [`app/(frontend)/components/live-preview-listener.tsx`](<../app/(frontend)/components/live-preview-listener.tsx>) |
 
@@ -50,13 +51,26 @@ already-published document now produces a draft that must be republished, and
 starting a new document creates it in the collection as soon as anything is
 typed — abandoned drafts stay behind rather than evaporating.
 
-**Session authorization instead of a secret in the URL.** The admin and the site
-are one Next.js application on one origin, so the browser sends the Payload
-session cookie with both the iframe request and the Preview button. The route
-authorizes against that and requires an `admin`, `editor`, or `author` role.
-`PAYLOAD_PREVIEW_SECRET` still works as a fallback for links built outside the
-admin, but nothing generates URLs containing it any more — it no longer leaks
-into browser history, referrers, or a screenshot of the edit view.
+**Session authorization, checked twice.** The admin and the site are one
+Next.js application on one origin, so the browser sends the Payload session
+cookie with both the iframe request and the Preview button. `/api/preview`
+requires an `admin`, `editor`, or `author` role before turning draft mode on,
+and `getPreviewMode` requires it again on every render.
+
+The second check is the point. Draft mode is a bare cookie with no identity
+attached, so on its own it is a durable key to every unpublished document —
+including the `members` and `paid` posts that stay staff-only until subscriber
+access is rebuilt. Copied from a shared browser, or simply kept after an account
+is removed, it would keep working. Treating it as an intent to preview rather
+than as permission means a request without a live editorial session falls back
+to exactly what a reader sees, which for an unpublished document is a 404. The
+check is memoized per request, and public traffic carries no draft cookie so it
+never pays for it.
+
+`PAYLOAD_PREVIEW_SECRET` is retired. A secret in the URL could only ever
+authorize the first hop, which is the hop that was never the problem, and it
+leaked into browser history, referrers, and screenshots of the edit view. There
+is now no shared value to configure or rotate.
 
 **The redirect target is rebuilt, never echoed.** `/api/preview` composes the
 destination from the collection and slug through `previewTargetPath`, so no
@@ -87,13 +101,18 @@ unpublished post:
 - An unauthenticated `/api/preview` request is refused with 401, an unknown
   collection with 400, and an anonymous reader still gets a 404 on the draft's
   public URL.
+- A draft-mode cookie taken from a real preview session and replayed without
+  the session behind it renders nothing privileged: 404 on the unpublished post
+  and on a `paid` post, with no draft title, body, or listener in the HTML.
+- A stale `PAYLOAD_PREVIEW_SECRET` in the environment no longer opens a preview
+  session.
 - An autosaved edit is what the preview renders on the next refresh.
 - Exiting preview clears both the draft-mode and live-preview cookies.
 - The admin's live-preview view returns the iframe URL with `live=1` and no
   secret anywhere in its HTML.
 
 Unit tests cover the URL builder, including the `null` that hides the button for
-a document with no slug yet, and the collection allowlist.
+a document with no slug yet, the collection allowlist, and the role gate.
 
 ## Not built
 
@@ -109,10 +128,11 @@ a document with no slug yet, and the collection allowlist.
 
 ## Open
 
-- Draft mode is still a bare cookie, and the draft queries in
-  `lib/content/queries.ts` use `overrideAccess: true`. `/api/preview` now gates
-  who can _obtain_ that cookie, but anyone holding one can read every draft.
-  Checking the session at render time as well would close it.
+- The draft queries in `lib/content/queries.ts` still run with
+  `overrideAccess: true`. That is now gated by the render-time session check
+  rather than by the cookie alone, but it means an `author` previews with an
+  editor's reach instead of their own, seeing drafts they could not open in the
+  admin. Narrowing it to the requesting user's access is the remaining step.
 - Whether autosave's abandoned-draft behaviour needs a periodic cleanup once
   real editors are working in the CMS.
 - [`AGENTS.md`](../AGENTS.md) puts a safe migration first, and this is editor

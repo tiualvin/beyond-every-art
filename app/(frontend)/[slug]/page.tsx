@@ -1,5 +1,4 @@
 import type { Metadata } from 'next'
-import { draftMode } from 'next/headers'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { cache } from 'react'
@@ -44,7 +43,9 @@ export async function generateMetadata({
   params: Promise<Params>
 }): Promise<Metadata> {
   const { slug } = await params
-  const { isEnabled: draft } = await draftMode()
+  // The same gated check the page body uses, so a draft's title and
+  // description cannot leak through metadata to a request that may not read it.
+  const { draft } = await getPreviewMode()
   const resolved = await resolve(slug, draft)
   const siteUrl = getSiteUrl()
 
