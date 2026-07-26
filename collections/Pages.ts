@@ -1,14 +1,14 @@
 import type { CollectionConfig } from 'payload'
 
 import { editorsAndAdmins, publishedOrEditors } from '../access/roles'
+import { buildPreviewUrl } from '../lib/preview/live-preview'
 import { validateRootContentSlug } from '../lib/seo/reserved-slugs'
 
 export const Pages: CollectionConfig = {
   slug: 'pages',
   admin: {
     useAsTitle: 'title',
-    preview: (doc) =>
-      `/api/preview?secret=${process.env.PAYLOAD_PREVIEW_SECRET ?? ''}&collection=pages&slug=${doc?.slug ?? ''}`,
+    preview: (doc) => buildPreviewUrl({ collection: 'pages', slug: doc?.slug }),
   },
   access: {
     create: editorsAndAdmins,
@@ -16,7 +16,9 @@ export const Pages: CollectionConfig = {
     update: editorsAndAdmins,
     delete: editorsAndAdmins,
   },
-  versions: { drafts: true },
+  // See the note in Posts.ts: autosave drives Live Preview, maxPerDoc keeps the
+  // version table it fills from growing without bound.
+  versions: { drafts: { autosave: { interval: 800 } }, maxPerDoc: 50 },
   fields: [
     { name: 'title', type: 'text', required: true },
     {

@@ -1,202 +1,120 @@
-# Payload Live Preview — scope
+# Payload Live Preview
 
-## Status and intent
+## What this is
 
-This document scopes adding **Payload Live Preview** to the backend. Nothing
-here is built yet; it is a plan, not a runbook.
+Editors open a post or page in Payload Admin and switch to the **Live Preview**
+tab. The real frontend renders in an iframe beside the editor, at mobile,
+tablet, or desktop widths, and re-renders as they work — no leaving the editor,
+no losing their place.
 
-The repository already has _click-through draft preview_: the admin "Preview"
-button opens `/api/preview`, which checks a shared secret, enables Next.js draft
-mode, and redirects to the document's public URL
-(`app/(payload)/api/preview/route.ts`, wired from `admin.preview` in
-[`collections/Posts.ts`](../collections/Posts.ts) and
-[`collections/Pages.ts`](../collections/Pages.ts)). That satisfies the handoff's
-"draft preview works" acceptance item.
+This is built and verified. The older click-through preview still exists
+alongside it: the "Preview" button opens the draft in a new tab, with the draft
+banner and its exit link.
 
-Live Preview is a different feature: an iframe of the real frontend rendered
-**inside** the edit view, with device breakpoints, updating as the document
-changes without the editor leaving the editor.
+## How it is wired
 
-## The prerequisite that decided everything — done
+| Piece                                              | File                                                                                                              |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Preview URL builder (shared, pure)                 | [`lib/preview/live-preview.ts`](../lib/preview/live-preview.ts)                                                   |
+| Admin config: breakpoints, collections, iframe URL | [`payload.config.ts`](../payload.config.ts)                                                                       |
+| "Preview" button URLs, drafts autosave             | [`collections/Posts.ts`](../collections/Posts.ts), [`collections/Pages.ts`](../collections/Pages.ts)              |
+| Authorization, draft mode, redirect                | [`app/(payload)/api/preview/route.ts`](<../app/(payload)/api/preview/route.ts>)                                   |
+| Draft/live request mode                            | [`lib/preview/mode.ts`](../lib/preview/mode.ts)                                                                   |
+| Refresh-on-save listener                           | [`app/(frontend)/components/live-preview-listener.tsx`](<../app/(frontend)/components/live-preview-listener.tsx>) |
 
-`getPostBySlug` / `getPageBySlug` used to build `bodyHtml` from **`legacyHTML`**
-alone, so the Lexical `content` field was stored and never rendered. Live
-preview shipped against that frontend would have reflected changes to title,
-excerpt, featured image, tags, authors, and meta fields — and **nothing an
-editor typed into the rich-text editor**.
+The flow: the admin points the iframe at `/api/preview?collection=…&slug=…&live=1`,
+that route authorizes the request and turns on Next.js draft mode, and the
+browser lands on the document's real URL, which renders the latest draft. On
+every save the admin posts a message to the iframe and the listener calls
+`router.refresh()`, so the preview is the same server render a reader would get
+— relationships resolved, images sized — not a client-side approximation.
 
-That is now fixed. [`lib/content/richtext.ts`](../lib/content/richtext.ts)
-converts the Lexical body to HTML and falls back to the preserved Ghost markup,
-and both content routes render the result:
+## Decisions taken
 
-- Rich text wins whenever an editor has written any; `isEmptyRichText` ignores
-  the empty paragraph an untouched editor still serializes.
-- Migrated documents arrive with `legacyHTML` set and `content` empty, so they
-  render exactly as before.
-- `getPageBySlug` moved to `depth: 1` so images embedded in a page body arrive
-  populated instead of as bare IDs.
+**Server-rendered refresh, not client-side streaming.** Payload also offers
+`useLivePreview`, which streams the in-memory document to the page on every
+keystroke. It would have meant rebuilding the article as a client component fed
+by a second, isomorphic version of the mapping in `lib/content/queries.ts`, and
+its document arrives with relationships unpopulated — no authors, tags, or
+media. `RefreshRouteOnSave` keeps one rendering path at the cost of roughly one
+autosave interval of latency.
 
-Verified against a real Payload + Postgres instance, not only unit tests: a
-migrated post rendered its Ghost body unchanged, a post with rich text rendered
-the rich text and dropped the stale legacy copy, and a page rendered its rich
-text.
+**Autosave at 800ms, capped at 50 versions per document.** Autosave is what
+makes the preview live; without it the iframe only moves when someone remembers
+to press a button. The cap is the counterweight: a version per typing pause
+would otherwise grow `_posts_v` and `_pages_v` without bound, and those tables
+land in every backup the schedule takes.
 
-## Mechanism: which live-preview mode
+Two consequences worth knowing before editors are trained on this. Editing an
+already-published document now produces a draft that must be republished, and
+starting a new document creates it in the collection as soon as anything is
+typed — abandoned drafts stay behind rather than evaporating.
 
-Payload offers two frontend integrations. The choice constrains the backend
-config, so decide it before writing any of it.
+**Session authorization instead of a secret in the URL.** The admin and the site
+are one Next.js application on one origin, so the browser sends the Payload
+session cookie with both the iframe request and the Preview button. The route
+authorizes against that and requires an `admin`, `editor`, or `author` role.
+`PAYLOAD_PREVIEW_SECRET` still works as a fallback for links built outside the
+admin, but nothing generates URLs containing it any more — it no longer leaks
+into browser history, referrers, or a screenshot of the edit view.
 
-|                   | `RefreshRouteOnSave` (server-rendered)                               | `useLivePreview` (client-rendered)                                        |
-| ----------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| How               | Admin posts a message on save; the frontend calls `router.refresh()` | Admin posts the whole in-memory document; the frontend re-renders from it |
-| Latency           | One autosave interval (~1s)                                          | Instant, per keystroke                                                    |
-| Requires autosave | Yes                                                                  | No                                                                        |
-| Rendering         | Current server components stay as they are                           | Article rendering must become a client component fed by a shared mapper   |
-| Relationships     | Resolved by Payload as today (`depth: 1` — authors, tags, media)     | Arrives unpopulated; needs client-side resolution or graceful degradation |
-| Fit here          | Direct                                                               | Requires reworking `queries.ts` DTO mapping into an isomorphic mapper     |
+**The redirect target is rebuilt, never echoed.** `/api/preview` composes the
+destination from the collection and slug through `previewTargetPath`, so no
+query parameter can turn it into an open redirect.
 
-**Recommendation: `RefreshRouteOnSave` + drafts autosave.** The article surface
-depends on relationship-resolved data (`authors`, `tags`, `featuredImage`) and
-on `next/image` sizing; a client-side document stream gives none of that
-without a second data path. A ~1s refresh is an acceptable trade for keeping one
-rendering path.
+## Constraints to preserve
 
-Consequence to accept explicitly: enabling autosave changes editing semantics.
-Every keystroke pause writes a draft version, and editing an already-published
-document produces a draft that must be republished. It also grows `_posts_v` /
-`_pages_v` continuously, so `versions.maxPerDoc` must be set at the same time —
-untrimmed version tables inflate every `pg_dump` the backup schedule takes.
+- **Same origin.** No CSP or `X-Frame-Options` header is set in
+  [`next.config.ts`](../next.config.ts) or the [`Caddyfile`](../Caddyfile), and
+  the draft-mode cookie is `SameSite=Lax`, so the iframe works with nothing
+  extra. Any future security-header work must keep `frame-ancestors 'self'`.
+  Moving the admin to its own hostname would break both the cookie and the
+  postMessage origin check, and would need `SameSite=None; Secure`.
+- **`NEXT_PUBLIC_SITE_URL` must be the origin the admin is served from.** It is
+  the iframe's origin and the only origin whose save messages the listener
+  trusts.
+- The listener is mounted only when a live-preview session is active, so no
+  live-preview JavaScript reaches public readers.
 
-## Phase 1 — backend (the requested scope)
+## Verified
 
-### 1. `lib/preview/live-preview.ts` (new, pure, unit-tested)
+Against a real Payload and PostgreSQL instance, with a seeded admin and an
+unpublished post:
 
-Single source of truth for preview URLs, used by `admin.preview` _and_
-`admin.livePreview` so the two cannot drift.
+- Live preview renders the draft, hides the draft banner, and loads the
+  listener; the plain Preview button renders the draft, shows the banner, and
+  does not load the listener.
+- An unauthenticated `/api/preview` request is refused with 401, an unknown
+  collection with 400, and an anonymous reader still gets a 404 on the draft's
+  public URL.
+- An autosaved edit is what the preview renders on the next refresh.
+- Exiting preview clears both the draft-mode and live-preview cookies.
+- The admin's live-preview view returns the iframe URL with `live=1` and no
+  secret anywhere in its HTML.
 
-- `buildPreviewPath({ collection, slug })` → `postPath` / `pagePath` from
-  [`lib/seo/site.ts`](../lib/seo/site.ts).
-- `buildPreviewUrl({ collection, data, live })` → absolute URL onto
-  `/api/preview`, via `getSiteUrl()`.
-- Returns `null` when the document has no slug (new/unsaved). Payload hides the
-  live-preview tab on `null`, which avoids an iframe pointed at `/undefined/`.
-- Carries `live=1` for the live-preview variant so the frontend can suppress the
-  draft banner and exit link inside the iframe.
+Unit tests cover the URL builder, including the `null` that hides the button for
+a document with no slug yet, and the collection allowlist.
 
-### 2. `payload.config.ts` — `admin.livePreview`
+## Not built
 
-Root-level rather than per-collection, so breakpoints are defined once:
+- Live preview for globals (`Header`, `Footer`, `SiteSettings`) and for
+  `Media`, `Authors`, `Tags`, `Redirects`.
+- Client-side `useLivePreview` and the isomorphic mapper it would need.
+- A Playwright spec driving the admin's live-preview tab. The behaviour above
+  was verified by request against a live instance, not through the browser.
+- Preview of publication-system surfaces, which are gated behind cutover by
+  [`PUBLICATION_SYSTEM.md`](PUBLICATION_SYSTEM.md).
+- Member-gated rendering, so `members` and `paid` posts preview as staff see
+  them rather than as a subscriber would.
 
-- `collections: ['posts', 'pages']`
-- `url: ({ data, collectionConfig }) => buildPreviewUrl(...)`
-- `breakpoints`: mobile 375×667, tablet 768×1024, desktop 1440×900 — matching
-  the widths [`docs/WEBSITE_VISUAL_DIRECTION.md`](WEBSITE_VISUAL_DIRECTION.md)
-  and the Playwright projects already use.
+## Open
 
-Globals (`Header`, `Footer`, `SiteSettings`) are **out of scope** for v1.
-
-### 3. `app/(payload)/api/preview/route.ts` — authorization and path safety
-
-The route is currently secret-only. Live preview loads it in an iframe on every
-document open, so it needs two changes:
-
-- **Authorize by Payload session first.** The admin and the site are the same
-  Next application on one origin, so the iframe request carries the Payload
-  session cookie. Verify it with `payload.auth({ headers })` and require an
-  `admin`/`editor`/`author` role; fall back to the shared secret for the
-  existing manual Preview button. Two wins: the secret stops being pasted into
-  URLs, browser history, and referrers, and preview keeps working when
-  `PAYLOAD_PREVIEW_SECRET` is unset.
-- **Validate the redirect target.** If the route starts accepting an explicit
-  `path`, it must be rebuilt from `collection` + `slug` through the helper
-  above, never echoed from the query string. Do not add an open redirect to the
-  admin's attack surface.
-
-Related, and worth fixing while the file is open: draft mode today is a bare
-cookie, and the draft queries use `overrideAccess: true`. Anyone holding that
-cookie can read every draft — including `visibility: members` and `paid` posts
-that Phase 1 deliberately keeps staff-only. Session-gating the route is the
-cheap half of the fix; the thorough half is checking the session again at render
-time rather than trusting the cookie alone.
-
-### 4. Collections — autosave
-
-In `Posts.ts` and `Pages.ts`:
-`versions: { drafts: { autosave: { interval: 800 } }, maxPerDoc: 50 }`.
-
-Needs `pnpm generate:types` and a schema check against Postgres before it lands.
-
-### 5. Frame and cookie constraints (verify, mostly no code)
-
-- **Same origin.** Admin at `/admin`, frontend at `/`, one Next app — the
-  draft-mode cookie's default `SameSite=Lax` is sent in the iframe, and no CSP
-  or `X-Frame-Options` header is set anywhere in
-  [`next.config.ts`](../next.config.ts) or the [`Caddyfile`](../Caddyfile). Live
-  preview works with nothing extra. This is a standing invariant, not a
-  coincidence: any future security-header work must keep `frame-ancestors
-'self'`, and splitting the admin onto its own hostname would require
-  `SameSite=None; Secure` cookies and a CSP allowance.
-- **`NEXT_PUBLIC_SITE_URL` must match the origin the admin is served from**, or
-  the iframe is cross-origin and the draft cookie silently stops applying.
-  Worth a line in `.env.example`.
-- **`STAGING_BASIC_AUTH`**: the iframe inherits the browser's credentials for
-  the same origin, so the staging gate does not break live preview. `middleware.ts`
-  already excludes `/api` and `admin` from redirect matching.
-- **Slug edits**: Payload recomputes `url` from the changed document and reloads
-  the iframe, so renaming a slug mid-edit follows the document instead of 404ing
-  on the old path — provided the URL builder is a pure function of `data`.
-
-## Phase 2 — frontend (required for the feature to do anything)
-
-- Add `@payloadcms/live-preview-react@3.86.0` (pin to the Payload version, as
-  every other `@payloadcms/*` dependency is pinned).
-- Mount `RefreshRouteOnSave` in `app/(frontend)/layout.tsx`, rendered only when
-  `draftMode().isEnabled`, so no live-preview JavaScript reaches public readers.
-- Suppress `DraftBanner` and the exit-preview link when `live=1` — inside the
-  iframe they are chrome the editor did not ask for.
-- `app/(frontend)/[slug]/page.tsx` is already `force-dynamic`, so each refresh
-  re-queries. No caching work needed for the article route.
-
-## Phase 3 — verification
-
-- **Unit** (`tests/preview/live-preview.test.ts`): URL builder — post vs page
-  paths, `null` on missing slug, absolute origin, `live` flag, and that no
-  secret appears in the live-preview URL.
-- **Unit**: the preview route's authorization branches — valid session, no
-  session with valid secret, no session and no secret, unknown collection.
-- **E2E** (`e2e/live-preview.spec.ts`): seed a draft post, log in as the seeded
-  admin, open the edit view, switch to the Live Preview tab, assert the iframe
-  renders the draft title, edit the title, assert the iframe updates after
-  autosave. Reuses `e2e/seed.ts` and `e2e/fixtures.ts`.
-- **Manual**: confirm in production-like Docker + Caddy that the draft cookie
-  survives the reverse proxy over HTTPS.
-
-## Effort and sequencing
-
-| Step | Scope                                                                        | Size |
-| ---- | ---------------------------------------------------------------------------- | ---- |
-| 0    | Render Lexical `content` with `legacyHTML` fallback — **done**               | M    |
-| 1    | URL builder, `admin.livePreview`, preview-route auth + path safety, autosave | M    |
-| 2    | `RefreshRouteOnSave`, banner suppression, dependency                         | S    |
-| 3    | Unit + E2E coverage                                                          | S–M  |
-
-Phase 1 can land alone: it is inert until Phase 2 mounts the listener, and it
-improves the existing preview route's security on its own.
-
-## Out of scope
-
-- Live preview for globals, `Media`, `Authors`, `Tags`, `Redirects`.
-- Client-side `useLivePreview` and the isomorphic document mapper it needs.
-- Preview of publication-system surfaces — those collections do not exist and
-  are gated behind cutover by [`PUBLICATION_SYSTEM.md`](PUBLICATION_SYSTEM.md).
-- Rebuilding member-gated rendering so `members`/`paid` posts preview as a
-  subscriber sees them.
-
-## Open decisions
-
-1. Autosave interval and `maxPerDoc`, given backup size and the version-table
-   growth it causes.
-2. Keep `PAYLOAD_PREVIEW_SECRET` as a fallback, or move preview entirely onto
-   the Payload session and retire the variable?
-3. Does this belong before cutover at all? It is editor tooling, not migration
-   fidelity — [`AGENTS.md`](../AGENTS.md) puts a safe migration first.
+- Draft mode is still a bare cookie, and the draft queries in
+  `lib/content/queries.ts` use `overrideAccess: true`. `/api/preview` now gates
+  who can _obtain_ that cookie, but anyone holding one can read every draft.
+  Checking the session at render time as well would close it.
+- Whether autosave's abandoned-draft behaviour needs a periodic cleanup once
+  real editors are working in the CMS.
+- [`AGENTS.md`](../AGENTS.md) puts a safe migration first, and this is editor
+  tooling rather than migration fidelity. It is inert for readers, but it is not
+  cutover work.

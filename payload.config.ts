@@ -20,6 +20,10 @@ import { Footer } from './globals/Footer'
 import { Header } from './globals/Header'
 import { SiteSettings } from './globals/SiteSettings'
 import { resendAdapter } from './lib/email/resend'
+import {
+  buildPreviewUrl,
+  PREVIEW_COLLECTIONS,
+} from './lib/preview/live-preview'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -27,7 +31,27 @@ const useR2 = Boolean(process.env.S3_BUCKET && process.env.S3_ENDPOINT)
 const email = resendAdapter()
 
 export default buildConfig({
-  admin: { user: Users.slug, importMap: { baseDir: path.resolve(dirname) } },
+  admin: {
+    user: Users.slug,
+    importMap: { baseDir: path.resolve(dirname) },
+    // Live Preview renders the real frontend in an iframe beside the editor.
+    // Breakpoints match the widths the visual direction and the Playwright
+    // projects already use, so what an editor checks is what is tested.
+    livePreview: {
+      breakpoints: [
+        { name: 'mobile', label: 'Mobile', width: 375, height: 667 },
+        { name: 'tablet', label: 'Tablet', width: 768, height: 1024 },
+        { name: 'desktop', label: 'Desktop', width: 1440, height: 900 },
+      ],
+      collections: [...PREVIEW_COLLECTIONS],
+      url: ({ collectionConfig, data }) =>
+        buildPreviewUrl({
+          collection: collectionConfig?.slug,
+          slug: data?.slug,
+          live: true,
+        }),
+    },
+  },
   collections: [
     Users,
     Authors,
