@@ -919,8 +919,11 @@ AI-assisted text descriptions, and AI-assisted table-of-contents generation.
 
 ## Open questions to settle before building
 
-1. **Reserved slugs.** Confirm no migrated post or page uses the slug
-   `publication`, and decide where the reserved-slug guard lives.
+1. **Reserved slugs — framework resolved.** `lib/seo/reserved-slugs.ts` owns the
+   shared root-route policy; Posts and Pages enforce it, and migration planning
+   reports collisions without silently renaming content. The real migration
+   report must still confirm that no source document uses `publication` before
+   the route is launched.
 2. **Bucket layout.** One R2 bucket with a `publications/` prefix, or a separate
    bucket from editorial media and database backups? Backups already reuse the
    `S3_*` credentials with an optional `BACKUP_S3_BUCKET` override; publication

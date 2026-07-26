@@ -1,6 +1,7 @@
 import type { CollectionConfig } from 'payload'
 
 import { editorsAndAdmins, publishedOrEditors } from '../access/roles'
+import { validateRootContentSlug } from '../lib/seo/reserved-slugs'
 
 export const Pages: CollectionConfig = {
   slug: 'pages',
@@ -18,7 +19,14 @@ export const Pages: CollectionConfig = {
   versions: { drafts: true },
   fields: [
     { name: 'title', type: 'text', required: true },
-    { name: 'slug', type: 'text', required: true, unique: true, index: true },
+    {
+      name: 'slug',
+      type: 'text',
+      required: true,
+      unique: true,
+      index: true,
+      validate: validateRootContentSlug,
+    },
     { name: 'publishedAt', type: 'date' },
     { name: 'content', type: 'richText' },
     { name: 'legacyHTML', type: 'code', admin: { language: 'html' } },

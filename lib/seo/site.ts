@@ -45,6 +45,15 @@ export const FEED_PATH = '/rss'
  */
 export const JOURNAL_PATH = '/journal'
 
+/** New publication routes deliberately follow the no-trailing-slash style. */
+export const PUBLICATION_PATH = '/publication'
+export const publicationPath = (slug: string): string =>
+  `${PUBLICATION_PATH}/${slug}`
+export const publicationReadPath = (slug: string): string =>
+  `${publicationPath(slug)}/read`
+export const publicationTranscriptPath = (slug: string): string =>
+  `${publicationPath(slug)}/transcript`
+
 /** Path of the search page. */
 export const SEARCH_PATH = '/search/'
 

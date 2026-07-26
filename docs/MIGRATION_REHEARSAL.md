@@ -82,9 +82,23 @@ pnpm restore:db --latest --dry-run   # verify it decompresses
 
 ## 6. Crawl comparison
 
-- Crawl the live Ghost site and the staging site (e.g. with a site crawler).
-- Diff the URL lists. Every important indexed Ghost URL must return 200 on the
-  new site or a valid 301 redirect — no unexpected 404s.
+- Run the repository's bounded comparison crawler (see
+  [`MIGRATION_WEBSITE_COMPARATOR.md`](MIGRATION_WEBSITE_COMPARATOR.md)):
+
+  ```bash
+  pnpm migration:compare \
+    --source https://beyondeveryart.com \
+    --target https://staging.example.com \
+    --target-basic-auth-env STAGING_CRAWL_BASIC_AUTH \
+    --allow-target-noindex
+  ```
+
+- Review both generated reports. Every important indexed Ghost URL must return
+  200 on the new site or a valid permanent redirect — no unexpected 404s,
+  changed canonicals, lost metadata/images, or old-origin media hotlinks.
+- Supplement the automated evidence with a browser crawler or Search Console
+  export when available; important URLs not linked from the source homepage
+  should be supplied as explicit `--seed` values.
 - Record any gap as a redirect to add before cutover.
 
 ## 7. Record and sign off

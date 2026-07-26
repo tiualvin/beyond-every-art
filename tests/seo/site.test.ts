@@ -6,6 +6,10 @@ import {
   getSiteUrl,
   pagePath,
   postPath,
+  PUBLICATION_PATH,
+  publicationPath,
+  publicationReadPath,
+  publicationTranscriptPath,
   tagPath,
 } from '../../lib/seo/site'
 
@@ -43,6 +47,17 @@ describe('path builders', () => {
     expect(pagePath('about')).toBe('/about/')
     expect(tagPath('materials')).toBe('/tag/materials/')
     expect(authorPath('livia')).toBe('/author/livia/')
+  })
+
+  it('builds publication routes without trailing slashes', () => {
+    expect(PUBLICATION_PATH).toBe('/publication')
+    expect(publicationPath('spring-2025')).toBe('/publication/spring-2025')
+    expect(publicationReadPath('spring-2025')).toBe(
+      '/publication/spring-2025/read',
+    )
+    expect(publicationTranscriptPath('spring-2025')).toBe(
+      '/publication/spring-2025/transcript',
+    )
   })
 })
 

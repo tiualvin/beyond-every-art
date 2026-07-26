@@ -5,3 +5,4 @@ payload-types.ts
 pnpm-lock.yaml
 docs/GHOST_TO_PAYLOAD_HANDOFF_WITH_APP_STRATEGY.md
 AGENTS.md
+/.claude/

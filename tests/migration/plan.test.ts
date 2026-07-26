@@ -94,8 +94,26 @@ describe('buildMigrationPlan', () => {
 
   it('reports duplicate slugs, missing authors, and missing tags', () => {
     expect(plan.conflicts.duplicateSlugs).toEqual(['understanding-ultramarine'])
+    expect(plan.conflicts.reservedSlugs).toEqual([])
     expect(plan.conflicts.missingAuthors).toEqual(['user-99'])
     expect(plan.conflicts.missingTags).toEqual(['tag-99'])
+  })
+
+  it('reports content that would be shadowed by an application route', () => {
+    const raw = JSON.parse(
+      readFileSync(resolve('tests/fixtures/ghost-export.json'), 'utf8'),
+    )
+    raw.db[0].data.posts[0].slug = 'publication'
+
+    const reservedPlan = buildMigrationPlan(parseGhostExport(raw))
+
+    expect(reservedPlan.conflicts.reservedSlugs).toEqual([
+      {
+        collection: 'posts',
+        ghostID: 'post-1',
+        slug: 'publication',
+      },
+    ])
   })
 })
 
@@ -109,6 +127,7 @@ describe('summarizePlan', () => {
       pages: 1,
       drafts: 1,
       duplicateSlugs: ['understanding-ultramarine'],
+      reservedSlugs: [],
       missingAuthors: ['user-99'],
       missingTags: ['tag-99'],
     })
