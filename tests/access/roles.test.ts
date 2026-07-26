@@ -1,5 +1,7 @@
+import type { FieldAccess } from 'payload'
 import { describe, expect, it } from 'vitest'
 
+import { Posts } from '../../collections/Posts'
 import {
   deleteOwnedDrafts,
   isAdmin,
@@ -73,5 +75,25 @@ describe('role checks', () => {
     expect(
       await publishedOrEditors({ req: { user: author } } as never),
     ).toEqual({ _status: { equals: 'published' } })
+  })
+
+  it('keeps raw legacy HTML out of author hands', async () => {
+    // The field is rendered with `dangerouslySetInnerHTML`, and an author can
+    // create and update their own posts, so an unrestricted field here is
+    // stored XSS reachable by the least privileged CMS role.
+    const legacyHTML = Posts.fields.find(
+      (field) => 'name' in field && field.name === 'legacyHTML',
+    )
+    const access = (legacyHTML as { access?: Record<string, FieldAccess> })
+      ?.access
+
+    expect(access?.create).toBeDefined()
+    expect(access?.update).toBeDefined()
+
+    for (const check of [access!.create!, access!.update!]) {
+      expect(await check({ req: { user: author } } as never)).toBe(false)
+      expect(await check({ req: { user: editor } } as never)).toBe(true)
+      expect(await check({ req: { user: admin } } as never)).toBe(true)
+    }
   })
 })

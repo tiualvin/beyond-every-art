@@ -73,7 +73,23 @@ export const Posts: CollectionConfig = {
     { name: 'featuredImage', type: 'upload', relationTo: 'media' },
     { name: 'excerpt', type: 'textarea' },
     { name: 'content', type: 'richText' },
-    { name: 'legacyHTML', type: 'code', admin: { language: 'html' } },
+    {
+      name: 'legacyHTML',
+      type: 'code',
+      admin: { language: 'html' },
+      // `toBodyHtml` hands this straight to `dangerouslySetInnerHTML`, so
+      // whoever can write it can execute script on the public site. Post
+      // `create` is open to any authenticated user and `update` to the post's
+      // owner, which would put stored XSS within reach of the `author` role.
+      // Writing raw HTML is an editorial trust decision, so it takes editor
+      // rights. `read` stays open: the frontend, the Ghost importer, and the
+      // seed scripts all query with `overrideAccess`, so restricting it would
+      // protect nothing and risks blanking migrated bodies.
+      access: {
+        create: editorsAndAdminsField,
+        update: editorsAndAdminsField,
+      },
+    },
     { name: 'metaTitle', type: 'text' },
     { name: 'metaDescription', type: 'textarea' },
     { name: 'canonicalURL', type: 'text' },
