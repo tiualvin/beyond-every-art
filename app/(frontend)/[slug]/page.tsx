@@ -27,15 +27,14 @@ type Resolved =
   | { kind: 'none' }
 
 // Resolve once per request; generateMetadata and the page component share it.
-const resolve = cache(
-  async (slug: string, draft: boolean): Promise<Resolved> => {
-    const post = await getPostBySlug(slug, { draft })
-    if (post) return { kind: 'post', post }
-    const page = await getPageBySlug(slug, { draft })
-    if (page) return { kind: 'page', page }
-    return { kind: 'none' }
-  },
-)
+const resolve = cache(async (slug: string): Promise<Resolved> => {
+  const { draft, user } = await getPreviewMode()
+  const post = await getPostBySlug(slug, { draft, user })
+  if (post) return { kind: 'post', post }
+  const page = await getPageBySlug(slug, { draft, user })
+  if (page) return { kind: 'page', page }
+  return { kind: 'none' }
+})
 
 export async function generateMetadata({
   params,
@@ -45,8 +44,7 @@ export async function generateMetadata({
   const { slug } = await params
   // The same gated check the page body uses, so a draft's title and
   // description cannot leak through metadata to a request that may not read it.
-  const { draft } = await getPreviewMode()
-  const resolved = await resolve(slug, draft)
+  const resolved = await resolve(slug)
   const siteUrl = getSiteUrl()
 
   if (resolved.kind === 'none') return { title: 'Not found' }
@@ -102,7 +100,7 @@ export default async function SlugPage({
 }) {
   const { slug } = await params
   const { draft, live } = await getPreviewMode()
-  const resolved = await resolve(slug, draft)
+  const resolved = await resolve(slug)
 
   // Inside the Live Preview iframe the admin already frames the document, so
   // the banner would only steal space from the page being judged.

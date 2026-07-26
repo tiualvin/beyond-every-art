@@ -1,6 +1,11 @@
 import { getPayloadClient } from '../payload'
 import { isPreviewRole } from './live-preview'
 
+export type PreviewUser = {
+  id: string | number
+  role?: string | null
+}
+
 /**
  * Whether a request carries a Payload admin session allowed to see drafts.
  *
@@ -11,15 +16,21 @@ import { isPreviewRole } from './live-preview'
  * every unpublished document, including the `members` and `paid` posts that
  * stay staff-only until subscriber access is rebuilt.
  */
-export async function hasPreviewSession(
+export async function getPreviewUser(
   requestHeaders: Headers,
-): Promise<boolean> {
+): Promise<PreviewUser | null> {
   try {
     const payload = await getPayloadClient()
     const { user } = await payload.auth({ headers: requestHeaders })
-    return isPreviewRole(user)
+    return isPreviewRole(user) ? user : null
   } catch {
     // A database or configuration failure must not read as a valid session.
-    return false
+    return null
   }
+}
+
+export async function hasPreviewSession(
+  requestHeaders: Headers,
+): Promise<boolean> {
+  return Boolean(await getPreviewUser(requestHeaders))
 }
