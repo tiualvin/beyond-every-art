@@ -82,7 +82,13 @@ export const config = {
   // a 401 — Stripe retries for about three days and can then disable the
   // endpoint — and every call would also trigger a redirect-map fetch it has no
   // use for. The endpoints authenticate themselves by signature instead.
+  //
+  // `csp-report` is excluded for the same shape of reason. Browsers post
+  // violation reports with no credentials, so on a staging deployment the Basic
+  // Auth gate would answer every report with a 401 — and staging, where the
+  // policy is tuned before enforcement, is precisely where the reports need to
+  // arrive. Each report would also pull the redirect map for nothing.
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|admin|api|webhooks|redirects-map|sitemap.xml|robots.txt|rss|.*\\..*).*)',
+    '/((?!_next/static|_next/image|favicon.ico|admin|api|webhooks|csp-report|redirects-map|sitemap.xml|robots.txt|rss|.*\\..*).*)',
   ],
 }

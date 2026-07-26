@@ -122,6 +122,15 @@ probes are filtered out). Follow
 [`docs/CUTOVER_RUNBOOK.md`](docs/CUTOVER_RUNBOOK.md) for the rehearsal and
 production switch.
 
+A Content-Security-Policy ships in **report-only** mode by default: the browser
+reports what it would have blocked and blocks nothing, writing one
+`{"event":"csp_violation"}` line per violation. Read those with
+`docker compose logs app | grep csp_violation`, fill in `CSP_FRAME_SRC` from
+what they show, and only then set `CSP_MODE=enforce`.
+[`docs/CONTENT_SECURITY_POLICY.md`](docs/CONTENT_SECURITY_POLICY.md) has the
+directive rationale, the rollout phases, and what this policy does and does not
+protect against.
+
 Merges to `main` deploy the exact commit that passed CI. Deployments to the VPS
 are serialized, wait for Compose health checks, and verify `/health` from inside
 the app container, so pre-DNS deployments do not depend on a public hostname or
