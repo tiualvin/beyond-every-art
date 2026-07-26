@@ -360,9 +360,12 @@ passes it to `dangerouslySetInnerHTML` in `app/(frontend)/components/article.tsx
 and `app/(frontend)/[slug]/page.tsx`. That is stored XSS reachable by the lowest
 privileged CMS role. The field now carries `create`/`update` field access
 restricted to editors and admins, matching the trust level its rendering
-assumes. Field `read` is deliberately untouched: every frontend query, the Ghost
-importer, and both seed scripts use `overrideAccess: true`, so restricting reads
-would have gained nothing and risked blanking migrated bodies.
+assumes. Field `read` is deliberately untouched: this field holds the body every
+migrated document renders from, so a read rule would blank those bodies on any
+path that respects field access while protecting nothing — the markup is public
+the moment the page is published. That distinction is about to matter more than
+it did: #45 moves draft preview to `overrideAccess: false`, so field-level read
+rules will apply in preview but not in published rendering.
 
 **2. There is no Content-Security-Policy header.** `dangerouslySetInnerHTML` on
 trusted-but-unsanitized migrated markup has no second line of defence. A

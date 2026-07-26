@@ -82,9 +82,10 @@ export const Posts: CollectionConfig = {
       // `create` is open to any authenticated user and `update` to the post's
       // owner, which would put stored XSS within reach of the `author` role.
       // Writing raw HTML is an editorial trust decision, so it takes editor
-      // rights. `read` stays open: the frontend, the Ghost importer, and the
-      // seed scripts all query with `overrideAccess`, so restricting it would
-      // protect nothing and risks blanking migrated bodies.
+      // rights. `read` stays open on purpose: the field holds the body every
+      // migrated document renders from, so a read rule here would blank those
+      // bodies on any path that respects field access while protecting nothing
+      // — the markup is public the moment the page is published.
       access: {
         create: editorsAndAdminsField,
         update: editorsAndAdminsField,
