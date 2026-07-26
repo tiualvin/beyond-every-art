@@ -119,6 +119,11 @@ async function main() {
 
 function buildWarnings(conflicts: {
   duplicateSlugs: string[]
+  reservedSlugs: Array<{
+    collection: 'posts' | 'pages'
+    ghostID: string
+    slug: string
+  }>
   missingAuthors: string[]
   missingTags: string[]
 }): string[] {
@@ -126,6 +131,13 @@ function buildWarnings(conflicts: {
   if (conflicts.duplicateSlugs.length > 0) {
     warnings.push(
       `Duplicate slugs must be reconciled before import: ${conflicts.duplicateSlugs.join(', ')}`,
+    )
+  }
+  if (conflicts.reservedSlugs.length > 0) {
+    warnings.push(
+      `Content uses application-reserved root slugs and needs an explicit replacement slug plus redirect before import: ${conflicts.reservedSlugs
+        .map((item) => `${item.collection}:${item.ghostID} (${item.slug})`)
+        .join(', ')}`,
     )
   }
   if (conflicts.missingAuthors.length > 0) {

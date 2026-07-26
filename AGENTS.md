@@ -21,6 +21,10 @@ pages, the full-screen reader, PDF processing worker, interactive hotspots,
 transcripts, and first-party analytics. None of it is built, and it must not
 displace migration or cutover work.
 
+[`docs/AUTONOMOUS_WORKSTREAMS.md`](docs/AUTONOMOUS_WORKSTREAMS.md) defines the
+sequencing, shared invariants, ownership boundaries, and verification gates for
+the repository's launch-readiness automation workstreams.
+
 ## Current priority
 
 The first priority is a safe, repeatable Ghost migration—not a redesign.

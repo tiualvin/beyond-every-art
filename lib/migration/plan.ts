@@ -14,6 +14,7 @@ import {
   type GhostPost,
 } from './ghost-export'
 import { collectMediaUrls } from './media'
+import { isReservedRootSlug } from '../seo/reserved-slugs'
 
 export type ContentStatus = 'draft' | 'published'
 export type Visibility = 'public' | 'members' | 'paid'
@@ -90,6 +91,13 @@ export interface MigrationConflicts {
   // Slugs that repeat within a single target collection (Payload enforces
   // uniqueness, so these must be reconciled before a real import).
   duplicateSlugs: string[]
+  // Root slugs already owned by application routes. Importing one would make
+  // the migrated document unreachable even if Payload accepted the record.
+  reservedSlugs: Array<{
+    collection: 'posts' | 'pages'
+    ghostID: string
+    slug: string
+  }>
   // Ghost author IDs referenced by posts but absent from the users export.
   missingAuthors: string[]
   // Ghost tag IDs referenced by posts but absent from the tags export.
@@ -270,6 +278,22 @@ export function buildMigrationPlan(ghost: GhostExport): MigrationPlan {
     ...collectDuplicates(posts.map((post) => post.slug)),
     ...collectDuplicates(pages.map((page) => page.slug)),
   ]
+  const reservedSlugs: MigrationConflicts['reservedSlugs'] = [
+    ...posts
+      .filter((post) => isReservedRootSlug(post.slug))
+      .map((post) => ({
+        collection: 'posts' as const,
+        ghostID: post.ghostID,
+        slug: post.slug,
+      })),
+    ...pages
+      .filter((page) => isReservedRootSlug(page.slug))
+      .map((page) => ({
+        collection: 'pages' as const,
+        ghostID: page.ghostID,
+        slug: page.slug,
+      })),
+  ]
 
   return {
     version: ghostVersion(ghost),
@@ -280,6 +304,7 @@ export function buildMigrationPlan(ghost: GhostExport): MigrationPlan {
     media: [...media],
     conflicts: {
       duplicateSlugs,
+      reservedSlugs,
       missingAuthors: [...missingAuthors],
       missingTags: [...missingTags],
     },
@@ -299,6 +324,7 @@ export function summarizePlan(plan: MigrationPlan) {
     ).length,
     media: plan.media.length,
     duplicateSlugs: plan.conflicts.duplicateSlugs,
+    reservedSlugs: plan.conflicts.reservedSlugs,
     missingAuthors: plan.conflicts.missingAuthors,
     missingTags: plan.conflicts.missingTags,
   }

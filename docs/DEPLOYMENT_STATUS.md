@@ -16,11 +16,21 @@ Related: [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md),
   `postgres`, `app`, `caddy`, and `backup` services run via
   `docker compose up -d`.
 - **Automatic deploy on merge to `main`** (`.github/workflows/ci.yml`,
-  `deploy` job): after `checks`, `backup-image`, and `app-image` all pass, it
-  SSHes into the VPS, runs `git reset --hard origin/main`, then
-  `docker compose up -d --build`. Requires four repo secrets: `VPS_HOST`,
-  `VPS_USER`, `VPS_SSH_KEY`, `VPS_DEPLOY_PATH` — all set and confirmed
-  working end-to-end (a real merge triggered a real deploy successfully).
+  `deploy` job): after `checks`, `browser-smoke`, `backup-image`, and
+  `app-image` all pass, it
+  SSHes into the VPS, checks out the exact commit those jobs tested, then runs
+  `docker compose up -d --build --wait`. Production deploys are serialized and
+  an in-progress deploy is not cancelled midway through a build or container
+  replacement; a slower workflow for an older commit also refuses to roll back
+  a newer commit that has already deployed. The workflow has bounded
+  connection/job timeouts, verifies the internal app `/health` endpoint from
+  inside the app container (so no public hostname or working TLS is required),
+  prints container state and recent logs on failure, and removes its temporary
+  SSH key even after a failed step.
+  Requires four repo secrets: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`,
+  `VPS_DEPLOY_PATH` — all set and confirmed working end-to-end (a real merge
+  triggered a real deploy successfully before these safety checks were added;
+  the next merge should confirm the strengthened path on the VPS).
   - Along the way: the `VPS_SSH_KEY` secret got corrupted by a manual
     copy/paste through an SSH password prompt (fixed by piping the key
     file directly into `gh secret set` instead); and the Dockerfile had a
@@ -63,12 +73,17 @@ Related: [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md),
      login is confirmed working for every account that needs access.
    - The deploy SSH user (`VPS_USER`) is currently `root`. Consider a
      dedicated low-privilege deploy user in the `docker` group instead.
-6. **Docker image/layer cleanup.** Nothing prunes old images or layers on
-   the VPS. Since every deploy rebuilds in place on the same host, disk
-   usage will grow over time — worth a periodic `docker image prune -f`
-   (e.g. via the `backup` container's existing scheduler) before it becomes
-   a problem.
-7. **Lower priority / only if needed later:**
+6. **Docker image/layer cleanup (operator action).** Nothing automatically
+   prunes old images or layers on the VPS. That is intentional: an unattended
+   prune can remove rollback material and consume I/O at the worst time.
+   Periodically inspect `docker system df`, then have an operator review and
+   remove only confirmed-unused images/layers during a maintenance window.
+7. **GitHub branch protection (operator action).** Configure the `main` branch
+   in repository settings to require the `checks`, `browser-smoke`,
+   `backup-image`, and `app-image` jobs and disallow bypasses appropriate to
+   the team. The workflow does not mutate repository protection rules or infer
+   who should have bypass authority.
+8. **Lower priority / only if needed later:**
    - Move the image build off the production VPS (build in CI, push to a
      registry, VPS just pulls) if frequent merges start causing noticeable
      CPU contention with live traffic during the ~2–3 minute build window.

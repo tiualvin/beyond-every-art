@@ -8,6 +8,7 @@ permissions:
 jobs:
   checks:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:16-alpine
@@ -36,6 +37,13 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      # The comparator CLI only invokes `main()` when it is the entry module, so
+      # that `parseArgs` stays unit-testable. `--help` is handled inside
+      # `main()`, which makes it a cheap proof that the guard still lets a real
+      # invocation through. Without it a broken guard would exit 0 silently and
+      # look like a clean rehearsal run.
+      - name: Smoke test the migration comparator entry point
+        run: pnpm migration:compare --help | grep -q -- '--target-max-pages'
       # Conflict fixture: duplicate slugs and missing authors/tags must still be
       # detected and reported, which is a dry-run-only expectation.
       - run: pnpm migrate:ghost --dry-run --input tests/fixtures/ghost-export.json
@@ -57,10 +65,61 @@ jobs:
           jq -e '.ok == true' validation-report.json > /dev/null
       - run: pnpm build
 
+  browser-smoke:
+    # Browser-level launch checks against a seeded, disposable PostgreSQL
+    # database. This catches route, metadata, privacy, redirect, and responsive
+    # navigation regressions that unit tests and a production build cannot.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: beyond_every_art
+          POSTGRES_PASSWORD: payload
+          POSTGRES_USER: payload
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U payload -d beyond_every_art"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      CI: 'true'
+      DATABASE_URI: postgresql://payload:payload@localhost:5432/beyond_every_art
+      NEXT_PUBLIC_SERVER_URL: http://127.0.0.1:3000
+      PAYLOAD_SECRET: synthetic-ci-secret-that-is-not-used-in-production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { run_install: false }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm seed:dev
+      - run: pnpm seed:e2e
+      - run: pnpm build
+      # Assemble the standalone output exactly as the runtime image does. The
+      # standalone bundle ships `server.js` and its traced dependencies but not
+      # `.next/static`, which the Dockerfile copies in beside it. Without this
+      # the smoke suite would serve a build missing every static asset.
+      - run: cp -r .next/static .next/standalone/.next/static
+      - run: pnpm test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+
   backup-image:
     # Build-only smoke test: the backup image ships separately from the app
     # image, so a broken Dockerfile would otherwise surface at deploy time.
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: Build the backup image
@@ -74,6 +133,7 @@ jobs:
     # otherwise only surface when the deploy job runs `docker compose build`
     # against the VPS.
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: Build the app image
@@ -82,23 +142,108 @@ jobs:
   deploy:
     # Only after all builds are proven good, and only for real pushes to main
     # (not pull requests, and not the `work` branch CI also runs on).
-    needs: [checks, backup-image, app-image]
+    needs: [checks, browser-smoke, backup-image, app-image]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
+    timeout-minutes: 25
+    # Never let two deploys mutate the same checkout/Compose project at once.
+    # A running production deploy is allowed to finish instead of being
+    # cancelled halfway through a build or container replacement.
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
     steps:
       - name: Configure SSH
+        env:
+          DEPLOY_KEY: ${{ runner.temp }}/deploy-ssh/deploy_key
+          KNOWN_HOSTS: ${{ runner.temp }}/deploy-ssh/known_hosts
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
-      - name: Pull latest main and rebuild on the VPS
+          install -d -m 700 "$(dirname "$DEPLOY_KEY")"
+          umask 077
+          printf '%s\n' "$VPS_SSH_KEY" > "$DEPLOY_KEY"
+          ssh-keyscan -T 10 -H "$VPS_HOST" > "$KNOWN_HOSTS"
+      - name: Deploy the tested commit and verify readiness
+        env:
+          DEPLOY_KEY: ${{ runner.temp }}/deploy-ssh/deploy_key
+          DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
+          DEPLOY_SHA: ${{ github.sha }}
+          KNOWN_HOSTS: ${{ runner.temp }}/deploy-ssh/known_hosts
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
         run: |
-          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes \
-            "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" '
-              set -e
-              cd "${{ secrets.VPS_DEPLOY_PATH }}"
-              git fetch origin main
-              git reset --hard origin/main
-              docker compose up -d --build
-            '
+          printf -v remote_path '%q' "$DEPLOY_PATH"
+          printf -v remote_sha '%q' "$DEPLOY_SHA"
+          timeout --signal=TERM 20m ssh \
+            -i "$DEPLOY_KEY" \
+            -o BatchMode=yes \
+            -o ConnectTimeout=10 \
+            -o ConnectionAttempts=3 \
+            -o IdentitiesOnly=yes \
+            -o ServerAliveInterval=15 \
+            -o ServerAliveCountMax=4 \
+            -o UserKnownHostsFile="$KNOWN_HOSTS" \
+            "$VPS_USER@$VPS_HOST" \
+            "DEPLOY_PATH=$remote_path DEPLOY_SHA=$remote_sha sh -s" <<'REMOTE'
+          set -eu
+          cd "$DEPLOY_PATH"
+
+          deployment_diagnostics() {
+            status=$?
+            trap - EXIT
+            if [ "$status" -ne 0 ]; then
+              echo "Deployment failed; current container state:" >&2
+              docker compose ps --all >&2 || true
+              echo "Recent service logs:" >&2
+              docker compose logs --no-color --tail=100 \
+                app postgres caddy backup >&2 || true
+            fi
+            exit "$status"
+          }
+          trap deployment_diagnostics EXIT
+
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          git merge-base --is-ancestor "$DEPLOY_SHA" origin/main
+          current_sha=$(git rev-parse HEAD)
+          if git merge-base --is-ancestor "$DEPLOY_SHA" "$current_sha"; then
+            echo "Skipping $DEPLOY_SHA; $current_sha is already deployed and is at least as new."
+            exit 0
+          fi
+          if ! git merge-base --is-ancestor "$current_sha" "$DEPLOY_SHA"; then
+            echo "Refusing a non-fast-forward deployment from $current_sha to $DEPLOY_SHA." >&2
+            exit 1
+          fi
+          git reset --hard "$DEPLOY_SHA"
+          echo "Deploying tested commit $(git rev-parse HEAD)"
+
+          docker compose up -d --build --wait --wait-timeout 180
+          docker compose ps --all
+          docker compose exec -T app node -e '
+            fetch("http://127.0.0.1:3000/health", {
+              signal: AbortSignal.timeout(10000),
+            })
+              .then(async (response) => {
+                const body = await response.text()
+                if (!response.ok) {
+                  throw new Error(`health returned ${response.status}: ${body}`)
+                }
+                console.log(`Verified internal app health: ${body}`)
+              })
+              .catch((error) => {
+                console.error(error)
+                process.exit(1)
+              })
+          '
+          trap - EXIT
+          REMOTE
+      - name: Remove the SSH key
+        if: always()
+        env:
+          DEPLOY_KEY: ${{ runner.temp }}/deploy-ssh/deploy_key
+          KNOWN_HOSTS: ${{ runner.temp }}/deploy-ssh/known_hosts
+        run: |
+          if [ -f "$DEPLOY_KEY" ]; then
+            shred --remove "$DEPLOY_KEY" || rm -f "$DEPLOY_KEY"
+          fi
+          rm -f "$KNOWN_HOSTS"

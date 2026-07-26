@@ -35,6 +35,23 @@ updates:
     schedule:
       interval: monthly
     open-pull-requests-limit: 3
+    groups:
+      docker-images:
+        patterns: ['*']
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+
+  # Dependabot does not recursively discover Dockerfiles below `directory`, so
+  # the separately built backup image needs its own update entry.
+  - package-ecosystem: docker
+    directory: /docker/backup
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    groups:
+      backup-image:
+        patterns: ['*']
     ignore:
       - dependency-name: '*'
         update-types: ['version-update:semver-major']

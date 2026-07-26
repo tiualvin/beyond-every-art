@@ -7,6 +7,7 @@ import {
   ownedPosts,
   postsRead,
 } from '../access/roles'
+import { validateRootContentSlug } from '../lib/seo/reserved-slugs'
 
 export const Posts: CollectionConfig = {
   slug: 'posts',
@@ -34,7 +35,14 @@ export const Posts: CollectionConfig = {
   versions: { drafts: true },
   fields: [
     { name: 'title', type: 'text', required: true },
-    { name: 'slug', type: 'text', required: true, unique: true, index: true },
+    {
+      name: 'slug',
+      type: 'text',
+      required: true,
+      unique: true,
+      index: true,
+      validate: validateRootContentSlug,
+    },
     { name: 'publishedAt', type: 'date', index: true },
     { name: 'ghostUpdatedAt', type: 'date' },
     {

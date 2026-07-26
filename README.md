@@ -80,6 +80,12 @@ records, draft/published drift, lost feature images, changed slugs or dates):
 pnpm migrate:validate --input ghost-export/ghost-content.json
 ```
 
+During the staging rehearsal, compare the live Ghost surface with the migrated
+site using `pnpm migration:compare`. It records redirects, canonicals, metadata,
+robots directives, images, links, and per-URL status evidence without reading
+private exports. See
+[`docs/MIGRATION_WEBSITE_COMPARATOR.md`](docs/MIGRATION_WEBSITE_COMPARATOR.md).
+
 CI runs both halves against a throwaway Postgres service on every push, using
 two synthetic fixtures:
 
@@ -110,6 +116,12 @@ probes are filtered out). Follow
 [`docs/CUTOVER_RUNBOOK.md`](docs/CUTOVER_RUNBOOK.md) for the rehearsal and
 production switch.
 
+Merges to `main` deploy the exact commit that passed CI. Deployments to the VPS
+are serialized, wait for Compose health checks, and verify `/health` from inside
+the app container, so pre-DNS deployments do not depend on a public hostname or
+TLS certificate. See [`docs/DEPLOYMENT_STATUS.md`](docs/DEPLOYMENT_STATUS.md)
+for the current operator actions and deployment caveats.
+
 ## Database backups
 
 Nightly PostgreSQL backups are dumped, gzipped, and uploaded to Cloudflare R2,
@@ -132,6 +144,11 @@ pnpm format:check
 pnpm lint
 pnpm typecheck
 pnpm test
+pnpm test:e2e:local # with a disposable local PostgreSQL database
 pnpm build
 docker compose config
 ```
+
+The Playwright launch-smoke suite and its database safety boundary are
+documented in [`e2e/README.md`](e2e/README.md). CI runs the suite against a
+fresh PostgreSQL service before production deployment.
