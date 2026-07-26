@@ -21,6 +21,63 @@ function semanticUrl(value: string | null): string | null {
   }
 }
 
+function normalizedRobotsDirective(directive: string): string {
+  const separator = directive.indexOf(':')
+  if (separator < 0) return directive
+  const name = directive.slice(0, separator)
+  const value = directive.slice(separator + 1)
+  if (name !== 'sitemap') return directive
+  return `sitemap:${semanticUrl(value) ?? value}`
+}
+
+function comparableRobots(
+  directives: string[],
+  allowTargetNoindex: boolean,
+): string[] {
+  const intentionalStagingDirectives = new Set([
+    'follow',
+    'index',
+    'nofollow',
+    'noindex',
+    'disallow:',
+    'disallow:/',
+  ])
+  return directives
+    .map(normalizedRobotsDirective)
+    .filter(
+      (directive) =>
+        !allowTargetNoindex || !intentionalStagingDirectives.has(directive),
+    )
+    .sort()
+}
+
+function redirectSignature(hop: PageEvidence['redirects'][number]): string {
+  return `${semanticUrl(hop.url)}\0${hop.status}\0${semanticUrl(hop.nextUrl)}`
+}
+
+function newlyIntroducedTemporaryRedirect(
+  source: PageEvidence,
+  target: PageEvidence,
+): PageEvidence['redirects'][number] | undefined {
+  const preservedSourceRedirects = new Map<string, number>()
+  for (const hop of source.redirects) {
+    if (![302, 303, 307].includes(hop.status)) continue
+    const signature = redirectSignature(hop)
+    preservedSourceRedirects.set(
+      signature,
+      (preservedSourceRedirects.get(signature) ?? 0) + 1,
+    )
+  }
+  for (const hop of target.redirects) {
+    if (![302, 303, 307].includes(hop.status)) continue
+    const signature = redirectSignature(hop)
+    const preservedCount = preservedSourceRedirects.get(signature) ?? 0
+    if (preservedCount === 0) return hop
+    preservedSourceRedirects.set(signature, preservedCount - 1)
+  }
+  return undefined
+}
+
 function isSuccess(status: number | null): boolean {
   return status !== null && status >= 200 && status < 300
 }
@@ -159,9 +216,7 @@ function comparePage(
     )
   }
 
-  const temporaryRedirect = target.redirects.find((hop) =>
-    [302, 303, 307].includes(hop.status),
-  )
+  const temporaryRedirect = newlyIntroducedTemporaryRedirect(source, target)
   if (temporaryRedirect) {
     addIssue(
       issues,
@@ -202,13 +257,14 @@ function comparePage(
     semanticUrl(target.canonical),
     'error',
   )
-  const indexingDirectives = new Set(['follow', 'index', 'nofollow', 'noindex'])
-  const sourceRobots = options.allowTargetNoindex
-    ? source.robots.filter((directive) => !indexingDirectives.has(directive))
-    : source.robots
-  const targetRobots = options.allowTargetNoindex
-    ? target.robots.filter((directive) => !indexingDirectives.has(directive))
-    : target.robots
+  const sourceRobots = comparableRobots(
+    source.robots,
+    options.allowTargetNoindex ?? false,
+  )
+  const targetRobots = comparableRobots(
+    target.robots,
+    options.allowTargetNoindex ?? false,
+  )
   compareField(
     issues,
     path,
@@ -270,11 +326,13 @@ function comparePage(
       'Source page has images but target page has none',
     )
   }
+  // alt="" is valid for decorative images; only a missing attribute regresses
+  // accessibility evidence.
   const sourceMissingAlt = source.images.filter(
-    (image) => image.alt === null || image.alt === '',
+    (image) => image.alt === null,
   ).length
   const targetMissingAlt = target.images.filter(
-    (image) => image.alt === null || image.alt === '',
+    (image) => image.alt === null,
   ).length
   if (targetMissingAlt > sourceMissingAlt) {
     addIssue(

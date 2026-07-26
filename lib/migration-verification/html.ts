@@ -26,14 +26,29 @@ function decodeEntities(value: string): string {
     /&(#x[\da-f]+|#\d+|[a-z]+);/gi,
     (entity, key: string) => {
       if (key.startsWith('#x') || key.startsWith('#X')) {
-        return String.fromCodePoint(Number.parseInt(key.slice(2), 16))
+        return decodeNumericEntity(entity, key.slice(2), 16)
       }
       if (key.startsWith('#')) {
-        return String.fromCodePoint(Number.parseInt(key.slice(1), 10))
+        return decodeNumericEntity(entity, key.slice(1), 10)
       }
       return NAMED_ENTITIES[key.toLowerCase()] ?? entity
     },
   )
+}
+
+function decodeNumericEntity(
+  entity: string,
+  value: string,
+  radix: number,
+): string {
+  const codePoint = Number.parseInt(value, radix)
+  const isUnicodeScalar =
+    Number.isInteger(codePoint) &&
+    codePoint > 0 &&
+    codePoint <= 0x10ffff &&
+    (codePoint < 0xd800 || codePoint > 0xdfff)
+
+  return isUnicodeScalar ? String.fromCodePoint(codePoint) : entity
 }
 
 function textContent(value: string): string {
@@ -112,8 +127,12 @@ export function extractHtmlEvidence(
   maxEvidence: number,
 ): HtmlEvidence {
   const cleanHtml = html.replace(/<!--[\s\S]*?-->/g, '')
+  const evidenceHtml = cleanHtml.replace(
+    /<(script|style|noscript|template)\b[^>]*>[\s\S]*?<\/\1\s*>/gi,
+    ' ',
+  )
   let base = documentUrl
-  const baseMatch = /<base\b([^>]*)>/i.exec(cleanHtml)
+  const baseMatch = /<base\b([^>]*)>/i.exec(evidenceHtml)
   if (baseMatch) {
     base =
       resolvedHttpUrl(attributes(baseMatch[1]).href ?? '', documentUrl) ?? base
@@ -123,7 +142,7 @@ export function extractHtmlEvidence(
   const robots = new Set<string>()
   const metaExpression = /<meta\b([^>]*)>/gi
   let metaMatch: RegExpExecArray | null
-  while ((metaMatch = metaExpression.exec(cleanHtml))) {
+  while ((metaMatch = metaExpression.exec(evidenceHtml))) {
     const attrs = attributes(metaMatch[1])
     const name = attrs.name?.toLowerCase()
     if (name === 'description' && metaDescription === null) {
@@ -139,7 +158,7 @@ export function extractHtmlEvidence(
   let canonical: string | null = null
   const linkTagExpression = /<link\b([^>]*)>/gi
   let linkTagMatch: RegExpExecArray | null
-  while ((linkTagMatch = linkTagExpression.exec(cleanHtml))) {
+  while ((linkTagMatch = linkTagExpression.exec(evidenceHtml))) {
     const attrs = attributes(linkTagMatch[1])
     const rel = (attrs.rel ?? '').toLowerCase().split(/\s+/)
     if (rel.includes('canonical') && canonical === null) {
@@ -152,7 +171,7 @@ export function extractHtmlEvidence(
   const anchorExpression = /<a\b([^>]*)>/gi
   let anchorMatch: RegExpExecArray | null
   let evidenceTruncated = false
-  while ((anchorMatch = anchorExpression.exec(cleanHtml))) {
+  while ((anchorMatch = anchorExpression.exec(evidenceHtml))) {
     const attrs = attributes(anchorMatch[1])
     const url = resolvedHttpUrl(attrs.href ?? '', base)
     if (!url) continue
@@ -179,7 +198,7 @@ export function extractHtmlEvidence(
   const imageKeys = new Set<string>()
   const imageExpression = /<img\b([^>]*)>/gi
   let imageMatch: RegExpExecArray | null
-  while ((imageMatch = imageExpression.exec(cleanHtml))) {
+  while ((imageMatch = imageExpression.exec(evidenceHtml))) {
     const attrs = attributes(imageMatch[1])
     const url = resolvedHttpUrl(attrs.src ?? attrs['data-src'] ?? '', base)
     if (!url) continue
@@ -210,11 +229,11 @@ export function extractHtmlEvidence(
   }
 
   return {
-    title: firstText(cleanHtml, 'title'),
+    title: firstText(evidenceHtml, 'title'),
     metaDescription,
     canonical,
     robots: [...robots].sort(),
-    h1: allText(cleanHtml, 'h1'),
+    h1: allText(evidenceHtml, 'h1'),
     jsonLdTypes: [...jsonLdTypes].sort(),
     links,
     images,

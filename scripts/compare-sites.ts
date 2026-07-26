@@ -8,6 +8,7 @@
 
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 import {
   basicAuthorizationFromEnvironment,
@@ -15,6 +16,7 @@ import {
   crawlSite,
   DEFAULT_CRAWL_SEEDS,
   renderHumanReport,
+  targetDiscoveryPageBudget,
   type CrawlOptions,
   type IssueSeverity,
 } from '../lib/migration-verification'
@@ -26,6 +28,7 @@ interface CliOptions {
   target: string
   seeds: string[]
   crawl: Partial<CrawlOptions>
+  targetMaxPages?: number
   jsonPath: string
   reportPath: string
   failOn: FailOn
@@ -63,25 +66,26 @@ function integerValue(argv: string[], flag: string): number | undefined {
   return parsed
 }
 
-function parseArgs(argv: string[]): CliOptions {
+export function parseArgs(argv: string[]): CliOptions {
   if (argv.includes('--help')) {
     process.stdout.write(`Usage:
   pnpm migration:compare --source <origin> --target <origin> [options]
 
 Options:
   --seed <path>             Repeatable additional crawl seed
-  --max-pages <n>           Page cap per origin (default: 500, max: 10000)
+  --max-pages <n>           Source page cap (default: 500, max: 10000)
+  --target-max-pages <n>    Target cap (default: 2x source, max: 10000)
   --concurrency <n>         Concurrent requests (default: 4, max: 32)
   --timeout-ms <n>          Per-response timeout (default: 10000)
   --max-redirects <n>       Redirect cap per URL (default: 8)
   --max-response-bytes <n>  HTML response cap (default: 2000000)
   --max-evidence <n>        Link/image cap per page (default: 500)
-  --json <path>             JSON output (default: migration-site-comparison.json)
-  --report <path>           Text output (default: migration-site-comparison.txt)
+  --json <path>             JSON output (default: .migration-reports/site-comparison.json)
+  --report <path>           Text output (default: .migration-reports/site-comparison.txt)
   --fail-on <error|warning|never> (default: error)
   --source-basic-auth-env <name>  Read source user:password from this env var
   --target-basic-auth-env <name>  Read target user:password from this env var
-  --allow-target-noindex    Ignore only index/follow polarity on gated staging
+  --allow-target-noindex    Ignore gated-staging index/root-Disallow polarity
 
 Only exact-origin HTTP(S) pages are fetched. Query strings, fragments,
 credentials in URLs/CLI values, cookies, tokens, and private exports are not supported.
@@ -117,8 +121,11 @@ Basic auth is accepted only by naming an environment variable.
     target,
     seeds: [...new Set([...DEFAULT_CRAWL_SEEDS, ...valuesFor(argv, '--seed')])],
     crawl,
-    jsonPath: oneValue(argv, '--json') ?? 'migration-site-comparison.json',
-    reportPath: oneValue(argv, '--report') ?? 'migration-site-comparison.txt',
+    targetMaxPages: integerValue(argv, '--target-max-pages'),
+    jsonPath:
+      oneValue(argv, '--json') ?? '.migration-reports/site-comparison.json',
+    reportPath:
+      oneValue(argv, '--report') ?? '.migration-reports/site-comparison.txt',
     failOn: failOn as FailOn,
     sourceBasicAuthEnv: oneValue(argv, '--source-basic-auth-env'),
     targetBasicAuthEnv: oneValue(argv, '--target-basic-auth-env'),
@@ -155,7 +162,13 @@ async function main(): Promise<void> {
   const target = await crawlSite(
     options.target,
     targetSeeds,
-    options.crawl,
+    {
+      ...options.crawl,
+      maxPages: targetDiscoveryPageBudget(
+        source.options.maxPages,
+        options.targetMaxPages,
+      ),
+    },
     fetch,
     { authorization: targetAuthorization },
   )
@@ -182,7 +195,12 @@ async function main(): Promise<void> {
   if (shouldFail) process.exitCode = 1
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error)
-  process.exit(1)
-})
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(resolve(process.argv[1])).href
+) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : error)
+    process.exit(1)
+  })
+}

@@ -39,10 +39,21 @@ function validateOrigin(value: string): URL {
   if (url.username || url.password) {
     throw new Error('Origins must not contain credentials')
   }
-  url.pathname = '/'
-  url.search = ''
-  url.hash = ''
+  if (url.pathname !== '/' || url.search || url.hash) {
+    throw new Error('Origins must not contain a path, query, or fragment')
+  }
   return url
+}
+
+/**
+ * Give target-only link discovery room after every source URL is seeded while
+ * retaining the crawler's hard upper bound. An explicit value always wins.
+ */
+export function targetDiscoveryPageBudget(
+  sourceMaxPages: number,
+  explicitTargetMaxPages?: number,
+): number {
+  return explicitTargetMaxPages ?? Math.min(sourceMaxPages * 2, 10_000)
 }
 
 function validateOptions(options: CrawlOptions): void {

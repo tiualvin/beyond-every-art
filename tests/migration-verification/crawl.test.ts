@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   crawlSite,
+  targetDiscoveryPageBudget,
   type FetchImplementation,
 } from '../../lib/migration-verification/crawl'
 
@@ -126,6 +127,24 @@ describe('crawlSite', () => {
     await expect(
       crawlSite('https://example.com', ['https://other.example/']),
     ).rejects.toThrow('outside crawl origin')
+  })
+
+  it('rejects origin values that would silently widen crawl scope', async () => {
+    await expect(crawlSite('https://example.com/subtree')).rejects.toThrow(
+      'must not contain a path, query, or fragment',
+    )
+    await expect(crawlSite('https://example.com/?preview=1')).rejects.toThrow(
+      'must not contain a path, query, or fragment',
+    )
+    await expect(crawlSite('https://example.com/#section')).rejects.toThrow(
+      'must not contain a path, query, or fragment',
+    )
+  })
+
+  it('reserves a separate bounded budget for target-only discovery', () => {
+    expect(targetDiscoveryPageBudget(500)).toBe(1_000)
+    expect(targetDiscoveryPageBudget(7_000)).toBe(10_000)
+    expect(targetDiscoveryPageBudget(500, 750)).toBe(750)
   })
 
   it('sends in-memory authorization without persisting it in evidence', async () => {

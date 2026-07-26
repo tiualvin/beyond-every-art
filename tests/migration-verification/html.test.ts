@@ -62,4 +62,61 @@ describe('extractHtmlEvidence', () => {
     expect(evidence.images).toHaveLength(1)
     expect(evidence.evidenceTruncated).toBe(true)
   })
+
+  it('preserves invalid numeric entities without failing extraction', () => {
+    const evidence = extractHtmlEvidence(
+      `<h1>Valid &#x1f600; invalid &#x110000; &#9999999; &#xD800; &#0; &#xnope;</h1>
+       <img src="/work.jpg" alt="Valid &#128512; invalid &#1114112;">`,
+      new URL('https://example.com/article/'),
+      'https://example.com',
+      10,
+    )
+
+    expect(evidence.h1).toEqual([
+      'Valid 😀 invalid &#x110000; &#9999999; &#xD800; &#0; &#xnope;',
+    ])
+    expect(evidence.images).toEqual([
+      {
+        src: 'https://example.com/work.jpg',
+        internal: true,
+        alt: 'Valid 😀 invalid &#1114112;',
+      },
+    ])
+  })
+
+  it('ignores evidence in non-rendered bodies while retaining JSON-LD', () => {
+    const evidence = extractHtmlEvidence(
+      `<script type="application/ld+json">
+         {"@type":"Article","example":"<h1>Script heading</h1><a href='/script'>link</a><img src='/script.jpg'>"}
+       </script>
+       <script><a href="/inline-script">script link</a></script>
+       <style><h1>Style heading</h1><img src="/style.jpg"></style>
+       <noscript><a href="/noscript">noscript link</a></noscript>
+       <template><h1>Template heading</h1><img src="/template.jpg"></template>
+       <h1>Visible heading</h1>
+       <a href="/visible">Visible link</a>
+       <img src="/visible.jpg" alt="Visible image">`,
+      new URL('https://example.com/article/'),
+      'https://example.com',
+      10,
+    )
+
+    expect(evidence.jsonLdTypes).toEqual(['Article'])
+    expect(evidence.h1).toEqual(['Visible heading'])
+    expect(evidence.links).toEqual([
+      {
+        href: 'https://example.com/visible',
+        internal: true,
+        path: '/visible',
+        rel: [],
+      },
+    ])
+    expect(evidence.images).toEqual([
+      {
+        src: 'https://example.com/visible.jpg',
+        internal: true,
+        alt: 'Visible image',
+      },
+    ])
+  })
 })

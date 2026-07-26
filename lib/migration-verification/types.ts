@@ -89,8 +89,9 @@ export interface ComparisonReport {
 
 export interface ComparisonOptions {
   /**
-   * Staging intentionally emits noindex/nofollow. When enabled, compare all
-   * other robots directives but ignore only indexing polarity on both sides.
+   * Staging intentionally emits noindex/nofollow and may disallow root
+   * crawling. When enabled, compare all other robots directives while ignoring
+   * only this intentional indexing/crawl polarity on both sides.
    */
   allowTargetNoindex?: boolean
 }

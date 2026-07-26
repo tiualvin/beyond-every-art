@@ -23,7 +23,7 @@ complete-site-archive*.zip
 *.dump
 *.sql
 migration-report*.json
-migration-site-comparison.*
+/.migration-reports/
 validation-report*.json
 members-report*.json
 reconciliation-report*.json

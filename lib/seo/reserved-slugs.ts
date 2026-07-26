@@ -10,6 +10,7 @@
 export const RESERVED_ROOT_SLUGS = [
   'admin',
   'api',
+  'author',
   'health',
   'journal',
   'newsletter',
@@ -19,6 +20,7 @@ export const RESERVED_ROOT_SLUGS = [
   'rss',
   'search',
   'sitemap.xml',
+  'tag',
   'webhooks',
 ] as const
 
