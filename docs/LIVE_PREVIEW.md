@@ -2,10 +2,15 @@
 
 ## What this is
 
-Editors open a post or page in Payload Admin and switch to the **Live Preview**
-tab. The real frontend renders in an iframe beside the editor, at mobile,
-tablet, or desktop widths, and re-renders as they work — no leaving the editor,
-no losing their place.
+Editors open a post or page in Payload Admin and press the **Live Preview**
+toggle in the document toolbar. The real frontend renders in an iframe beside
+the editor, at mobile, tablet, or desktop widths, and re-renders as they work —
+no leaving the editor, no losing their place. Payload remembers the toggle per
+user, so it stays open once an editor has turned it on.
+
+There is no separate live-preview URL in this version of Payload; it is a state
+of the edit view, not a sub-route. See
+[`assets/live-preview/`](assets/live-preview/README.md) for what it looks like.
 
 This is built and verified. The older click-through preview still exists
 alongside it: the "Preview" button opens the draft in a new tab, with the draft
@@ -108,8 +113,11 @@ unpublished post:
   session.
 - An autosaved edit is what the preview renders on the next refresh.
 - Exiting preview clears both the draft-mode and live-preview cookies.
-- The admin's live-preview view returns the iframe URL with `live=1` and no
-  secret anywhere in its HTML.
+
+Driven through Chromium against the same instance: logging into the admin,
+opening a post, and pressing the Live Preview toggle renders the real site in
+the iframe. Typing a new title, with no save button pressed, changed the
+headline inside the iframe, and rewriting the excerpt changed the dek.
 
 Unit tests cover the URL builder, including the `null` that hides the button for
 a document with no slug yet, the collection allowlist, and the role gate.
@@ -119,8 +127,8 @@ a document with no slug yet, the collection allowlist, and the role gate.
 - Live preview for globals (`Header`, `Footer`, `SiteSettings`) and for
   `Media`, `Authors`, `Tags`, `Redirects`.
 - Client-side `useLivePreview` and the isomorphic mapper it would need.
-- A Playwright spec driving the admin's live-preview tab. The behaviour above
-  was verified by request against a live instance, not through the browser.
+- A Playwright spec in `e2e/`. The browser run above was a one-off against a
+  seeded instance, not a committed regression test.
 - Preview of publication-system surfaces, which are gated behind cutover by
   [`PUBLICATION_SYSTEM.md`](PUBLICATION_SYSTEM.md).
 - Member-gated rendering, so `members` and `paid` posts preview as staff see
