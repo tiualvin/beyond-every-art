@@ -2,6 +2,7 @@ import type { Where } from 'payload'
 
 import { toMediaImage, type MediaImage } from '@/lib/content/media'
 import { ARCHIVE_PAGE_SIZE } from '@/lib/content/pagination'
+import { toBodyHtml } from '@/lib/content/richtext'
 import { getPayloadClient } from '@/lib/payload'
 
 export type NavLink = { label: string; url: string }
@@ -281,6 +282,7 @@ type RawContentDoc = {
   slug?: string
   title?: string
   excerpt?: string
+  content?: unknown
   legacyHTML?: string
   publishedAt?: string
   updatedAt?: string
@@ -330,7 +332,7 @@ export async function getPostBySlug(
       slug: doc.slug,
       title: doc.title ?? doc.slug,
       excerpt: doc.excerpt ?? '',
-      bodyHtml: doc.legacyHTML ?? '',
+      bodyHtml: toBodyHtml(doc),
       publishedAt: doc.publishedAt ?? null,
       updatedAt: doc.updatedAt ?? null,
       authors: toAuthorSummaries(doc.authors),
@@ -359,7 +361,9 @@ export async function getPageBySlug(
     const result = await payload.find({
       collection: 'pages',
       overrideAccess: true,
-      depth: 0,
+      // Depth 1 so images embedded in the rich-text body arrive as media
+      // documents rather than bare IDs; the converter drops unpopulated ones.
+      depth: 1,
       limit: 1,
       draft: options.draft,
       where: options.draft
@@ -376,7 +380,7 @@ export async function getPageBySlug(
     return {
       slug: doc.slug,
       title: doc.title ?? doc.slug,
-      bodyHtml: doc.legacyHTML ?? '',
+      bodyHtml: toBodyHtml(doc),
       publishedAt: doc.publishedAt ?? null,
       updatedAt: doc.updatedAt ?? null,
       metaTitle: doc.metaTitle ?? null,

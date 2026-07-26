@@ -17,32 +17,29 @@ Live Preview is a different feature: an iframe of the real frontend rendered
 **inside** the edit view, with device breakpoints, updating as the document
 changes without the editor leaving the editor.
 
-## The prerequisite that decides everything
+## The prerequisite that decided everything — done
 
-`getPostBySlug` / `getPageBySlug` build `bodyHtml` from the **`legacyHTML`**
-field, and `Article` renders that string
-([`lib/content/queries.ts`](../lib/content/queries.ts),
-[`app/(frontend)/components/article.tsx`](<../app/(frontend)/components/article.tsx>)).
-The Lexical `content` field is stored but never rendered.
+`getPostBySlug` / `getPageBySlug` used to build `bodyHtml` from **`legacyHTML`**
+alone, so the Lexical `content` field was stored and never rendered. Live
+preview shipped against that frontend would have reflected changes to title,
+excerpt, featured image, tags, authors, and meta fields — and **nothing an
+editor typed into the rich-text editor**.
 
-So live preview shipped against today's frontend would reflect changes to
-title, excerpt, featured image, tags, authors, meta fields, and the raw
-`legacyHTML` code field — and **nothing an editor types into the rich-text
-editor**. That is the opposite of what the feature is for.
+That is now fixed. [`lib/content/richtext.ts`](../lib/content/richtext.ts)
+converts the Lexical body to HTML and falls back to the preserved Ghost markup,
+and both content routes render the result:
 
-Two honest options:
+- Rich text wins whenever an editor has written any; `isEmptyRichText` ignores
+  the empty paragraph an untouched editor still serializes.
+- Migrated documents arrive with `legacyHTML` set and `content` empty, so they
+  render exactly as before.
+- `getPageBySlug` moved to `depth: 1` so images embedded in a page body arrive
+  populated instead of as bare IDs.
 
-1. **Render `content` first** (recommended). Add the Lexical → React renderer
-   (`RichText` from `@payloadcms/richtext-lexical/react`), with `legacyHTML` as
-   the fallback for migrated posts that have no converted rich text yet. This is
-   independent, useful work — the migration's rich-text conversion is otherwise
-   unverifiable — and it is what makes live preview worth building.
-2. **Ship live preview against `legacyHTML` only**, and document the limitation.
-   Defensible only if editors are expected to keep working in `legacyHTML`
-   through cutover.
-
-Everything below assumes option 1 is sequenced first, but the backend work in
-Phase 1 is valid either way.
+Verified against a real Payload + Postgres instance, not only unit tests: a
+migrated post rendered its Ghost body unchanged, a post with rich text rendered
+the rich text and dropped the stale legacy copy, and a page rendered its rich
+text.
 
 ## Mechanism: which live-preview mode
 
@@ -178,7 +175,7 @@ Needs `pnpm generate:types` and a schema check against Postgres before it lands.
 
 | Step | Scope                                                                        | Size |
 | ---- | ---------------------------------------------------------------------------- | ---- |
-| 0    | Render Lexical `content` with `legacyHTML` fallback (prerequisite)           | M    |
+| 0    | Render Lexical `content` with `legacyHTML` fallback — **done**               | M    |
 | 1    | URL builder, `admin.livePreview`, preview-route auth + path safety, autosave | M    |
 | 2    | `RefreshRouteOnSave`, banner suppression, dependency                         | S    |
 | 3    | Unit + E2E coverage                                                          | S–M  |
@@ -197,10 +194,9 @@ improves the existing preview route's security on its own.
 
 ## Open decisions
 
-1. Prerequisite Lexical rendering first, or live preview against `legacyHTML`?
-2. Autosave interval and `maxPerDoc`, given backup size and the version-table
+1. Autosave interval and `maxPerDoc`, given backup size and the version-table
    growth it causes.
-3. Keep `PAYLOAD_PREVIEW_SECRET` as a fallback, or move preview entirely onto
+2. Keep `PAYLOAD_PREVIEW_SECRET` as a fallback, or move preview entirely onto
    the Payload session and retire the variable?
-4. Does this belong before cutover at all? It is editor tooling, not migration
+3. Does this belong before cutover at all? It is editor tooling, not migration
    fidelity — [`AGENTS.md`](../AGENTS.md) puts a safe migration first.
