@@ -66,10 +66,23 @@ jobs:
       - name: Build the backup image
         run: docker build --file docker/backup/Dockerfile --tag beyond-every-art-backup:ci .
 
+  app-image:
+    # Build-only smoke test for the main app image. `pnpm build` in `checks`
+    # only proves the Next.js build succeeds outside a container; it does not
+    # exercise the Dockerfile itself, so a broken multi-stage COPY (e.g.
+    # referencing a directory that does not exist in this repo) would
+    # otherwise only surface when the deploy job runs `docker compose build`
+    # against the VPS.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the app image
+        run: docker build --tag beyond-every-art-app:ci .
+
   deploy:
-    # Only after both builds are proven good, and only for real pushes to main
+    # Only after all builds are proven good, and only for real pushes to main
     # (not pull requests, and not the `work` branch CI also runs on).
-    needs: [checks, backup-image]
+    needs: [checks, backup-image, app-image]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
