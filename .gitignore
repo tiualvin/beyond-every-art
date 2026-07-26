@@ -2,6 +2,8 @@ node_modules/
 .next/
 dist/
 coverage/
+playwright-report/
+test-results/
 # Local media uploads. Production stores media in Cloudflare R2; without the
 # S3_* variables Payload falls back to writing files here.
 /media/

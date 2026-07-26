@@ -35,7 +35,10 @@ test('draft and private posts do not leak into public discovery endpoints', asyn
 test('legacy URLs return the seeded permanent redirect', async ({
   request,
 }) => {
-  const response = await request.get(fixtures.redirect.source, {
+  // Avoid Next.js' trailing-slash normalization redirect so this assertion
+  // exercises the seeded redirect handled by middleware directly.
+  const source = fixtures.redirect.source.replace(/\/$/, '')
+  const response = await request.get(source, {
     maxRedirects: 0,
   })
 

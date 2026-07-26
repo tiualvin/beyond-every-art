@@ -6,9 +6,9 @@ validator or a full crawl comparison.
 
 ## Local run
 
-The default run owns a local Next.js dev server on `127.0.0.1:3000` but does not
-own PostgreSQL. Start the repository's Postgres service, provide the normal
-local `DATABASE_URI` and `PAYLOAD_SECRET`, then run:
+The default local run owns a Next.js development server on `127.0.0.1:3000` but
+does not own PostgreSQL. Start the repository's Postgres service, provide the
+normal local `DATABASE_URI` and `PAYLOAD_SECRET`, then run:
 
 ```bash
 pnpm test:e2e:local
@@ -28,8 +28,10 @@ pnpm exec playwright install chromium
 ```
 
 `pnpm test:e2e` runs the browser suite without seeding. CI uses this after
-running `pnpm seed:dev` and `pnpm seed:e2e` against its throwaway Postgres
-service. This separation keeps the browser command usable against an already
+running `pnpm seed:dev`, `pnpm seed:e2e`, and `pnpm build` against its throwaway
+Postgres service. With `CI=true`, Playwright starts `next start`, so the required
+browser job exercises the production build rather than Next.js development
+mode. This separation keeps the browser command usable against an already
 prepared environment and makes data setup visible in CI logs.
 
 ## External environment
@@ -40,10 +42,11 @@ against production. The suite assumes the exact synthetic fixture slugs in
 `fixtures.ts` exist, so it is intended for local/CI or a disposable rehearsal
 database rather than the live editorial database.
 
-Artifacts are written below the ignored `.next/` directory:
+Artifacts are written outside Next.js's owned `.next/` directory so a build or
+server restart cannot remove evidence before CI uploads it:
 
-- `.next/playwright-report`
-- `.next/playwright-results`
+- `playwright-report/`
+- `test-results/`
 
 The suite covers public route rendering, search and newsletter submission,
 metadata plus JSON-LD, robots/sitemap/RSS, health readiness, mobile navigation

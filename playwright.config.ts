@@ -3,10 +3,13 @@ import { defineConfig, devices } from '@playwright/test'
 const localOrigin = 'http://127.0.0.1:3000'
 const baseURL = process.env.PLAYWRIGHT_BASE_URL || localOrigin
 const startsLocalServer = !process.env.PLAYWRIGHT_BASE_URL
+const serverCommand = process.env.CI
+  ? 'pnpm start --hostname 127.0.0.1 --port 3000'
+  : 'pnpm exec next dev --hostname 127.0.0.1 --port 3000'
 
 export default defineConfig({
   testDir: './e2e',
-  outputDir: '.next/playwright-results',
+  outputDir: 'test-results',
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
@@ -14,11 +17,11 @@ export default defineConfig({
   reporter: process.env.CI
     ? [
         ['github'],
-        ['html', { open: 'never', outputFolder: '.next/playwright-report' }],
+        ['html', { open: 'never', outputFolder: 'playwright-report' }],
       ]
     : [
         ['list'],
-        ['html', { open: 'never', outputFolder: '.next/playwright-report' }],
+        ['html', { open: 'never', outputFolder: 'playwright-report' }],
       ],
   use: {
     baseURL,
@@ -36,7 +39,7 @@ export default defineConfig({
   ],
   webServer: startsLocalServer
     ? {
-        command: 'pnpm exec next dev --hostname 127.0.0.1 --port 3000',
+        command: serverCommand,
         url: `${localOrigin}/health`,
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,
