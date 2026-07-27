@@ -56,11 +56,14 @@ already-published document now produces a draft that must be republished, and
 starting a new document creates it in the collection as soon as anything is
 typed — abandoned drafts stay behind rather than evaporating.
 
-**Session authorization, checked twice.** The admin and the site are one
+**Session authorization and collection access.** The admin and the site are one
 Next.js application on one origin, so the browser sends the Payload session
 cookie with both the iframe request and the Preview button. `/api/preview`
 requires an `admin`, `editor`, or `author` role before turning draft mode on,
-and `getPreviewMode` requires it again on every render.
+and `getPreviewMode` requires it again on every render. The authenticated user
+is then passed to Payload's Local API with `overrideAccess: false`, so the same
+collection policy applies in the preview as in Admin: authors can preview only
+posts they own and cannot preview page drafts.
 
 The second check is the point. Draft mode is a bare cookie with no identity
 attached, so on its own it is a durable key to every unpublished document —
@@ -136,11 +139,6 @@ a document with no slug yet, the collection allowlist, and the role gate.
 
 ## Open
 
-- The draft queries in `lib/content/queries.ts` still run with
-  `overrideAccess: true`. That is now gated by the render-time session check
-  rather than by the cookie alone, but it means an `author` previews with an
-  editor's reach instead of their own, seeing drafts they could not open in the
-  admin. Narrowing it to the requesting user's access is the remaining step.
 - Whether autosave's abandoned-draft behaviour needs a periodic cleanup once
   real editors are working in the CMS.
 - [`AGENTS.md`](../AGENTS.md) puts a safe migration first, and this is editor
