@@ -4,6 +4,7 @@ import { toMediaImage, type MediaImage } from '@/lib/content/media'
 import { ARCHIVE_PAGE_SIZE } from '@/lib/content/pagination'
 import { toBodyHtml } from '@/lib/content/richtext'
 import { getPayloadClient } from '@/lib/payload'
+import type { PreviewUser } from '@/lib/preview/session'
 
 export type NavLink = { label: string; url: string }
 
@@ -312,13 +313,16 @@ function toTagRefs(tags: RawContentDoc['tags']): TagRef[] {
  */
 export async function getPostBySlug(
   slug: string,
-  options: { draft?: boolean } = {},
+  options: { draft?: boolean; user?: PreviewUser | null } = {},
 ): Promise<PostDetail | null> {
   try {
     const payload = await getPayloadClient()
     const result = await payload.find({
       collection: 'posts',
-      overrideAccess: true,
+      // Draft reads must retain the authenticated editor's collection access.
+      // In particular, an author may preview only posts they own.
+      overrideAccess: !options.draft,
+      user: options.draft ? (options.user ?? undefined) : undefined,
       depth: 1,
       limit: 1,
       draft: options.draft,
@@ -354,13 +358,16 @@ export async function getPostBySlug(
  */
 export async function getPageBySlug(
   slug: string,
-  options: { draft?: boolean } = {},
+  options: { draft?: boolean; user?: PreviewUser | null } = {},
 ): Promise<PageDetail | null> {
   try {
     const payload = await getPayloadClient()
     const result = await payload.find({
       collection: 'pages',
-      overrideAccess: true,
+      // Authors cannot manage pages; Payload's access policy therefore keeps
+      // their preview sessions from using a page URL to read page drafts.
+      overrideAccess: !options.draft,
+      user: options.draft ? (options.user ?? undefined) : undefined,
       // Depth 1 so images embedded in the rich-text body arrive as media
       // documents rather than bare IDs; the converter drops unpopulated ones.
       depth: 1,

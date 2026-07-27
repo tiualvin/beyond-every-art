@@ -2,16 +2,18 @@ import { cookies, draftMode, headers } from 'next/headers'
 import { cache } from 'react'
 
 import { LIVE_PREVIEW_COOKIE } from './live-preview'
-import { hasPreviewSession } from './session'
+import { getPreviewUser, type PreviewUser } from './session'
 
 export type PreviewMode = {
   /** Draft mode is on and the reader is entitled to it, so drafts render. */
   draft: boolean
   /** The page is being rendered inside the admin's Live Preview iframe. */
   live: boolean
+  /** Authenticated Payload user whose collection access applies to drafts. */
+  user: PreviewUser | null
 }
 
-const PUBLIC: PreviewMode = { draft: false, live: false }
+const PUBLIC: PreviewMode = { draft: false, live: false, user: null }
 
 /**
  * How the current request should be rendered.
@@ -36,10 +38,12 @@ export const getPreviewMode = cache(async (): Promise<PreviewMode> => {
   if (!draft.isEnabled) return PUBLIC
 
   const [jar, requestHeaders] = await Promise.all([cookies(), headers()])
-  if (!(await hasPreviewSession(requestHeaders))) return PUBLIC
+  const user = await getPreviewUser(requestHeaders)
+  if (!user) return PUBLIC
 
   return {
     draft: true,
     live: jar.get(LIVE_PREVIEW_COOKIE)?.value === '1',
+    user,
   }
 })
