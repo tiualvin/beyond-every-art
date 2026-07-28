@@ -159,6 +159,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build the app image
         run: docker build --tag beyond-every-art-app:ci .
+      # The migrator stage is not a dependency of the runtime image, so the
+      # build above never touches it. Without this, a broken migrator stage
+      # would surface for the first time during a deploy — at the step that now
+      # runs before containers are replaced, which is the worst place to
+      # discover it.
+      - name: Build the migration image
+        run: docker build --target migrator --tag beyond-every-art-migrator:ci .
 
   deploy:
     # Only after all builds are proven good, and only for real pushes to main
