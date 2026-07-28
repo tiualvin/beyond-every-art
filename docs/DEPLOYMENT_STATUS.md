@@ -48,6 +48,15 @@ Related: [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md),
 
 ## Not done yet
 
+0. **One-time migration baseline (operator action, before the next deploy).**
+   Schema migrations now exist and automatic push is off. The VPS database was
+   built by push, so it must be told the initial migration is already applied
+   before the first deploy that carries this change — otherwise that migration
+   tries to `CREATE TABLE` over live tables and the deploy fails. Take a backup,
+   then run the baseline commands in
+   [`DATABASE_MIGRATIONS.md`](DATABASE_MIGRATIONS.md). The script refuses
+   anything that is not a pre-migrations database, and is safe to rerun.
+
 1. **DNS + TLS.** No domain points at the VPS yet, and `SITE_ADDRESS` /
    `NEXT_PUBLIC_SITE_URL` / `NEXT_PUBLIC_SERVER_URL` /
    `PAYLOAD_PUBLIC_SERVER_URL` in the VPS's `.env` are still placeholders.

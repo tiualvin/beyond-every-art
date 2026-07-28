@@ -11,9 +11,11 @@
 - **What it would buy:** drafting posts and pages, reading and editing existing
   content, managing tags, authors, redirects, and site globals from Claude Code
   or Codex, through the same role-based access control the admin panel uses.
-- **Blocking prerequisite:** the plugin adds a `payload-mcp-api-keys`
-  collection, and this repository still has no Payload schema-migration
-  workflow. See [Blocking prerequisite](#blocking-prerequisite-schema-migrations).
+- **Blocking prerequisite, now resolved:** the plugin adds a
+  `payload-mcp-api-keys` collection, which had nowhere to land. The schema
+  migration workflow this needed is now in place — see
+  [`docs/DATABASE_MIGRATIONS.md`](DATABASE_MIGRATIONS.md) and
+  [Blocking prerequisite](#blocking-prerequisite-schema-migrations--resolved).
 - **Second prerequisite:** `Posts.ghostID` and `Pages.ghostID` are
   `required: true`, so no agent — and no human — can create a genuinely new
   article without inventing a migration identifier. See
@@ -156,22 +158,23 @@ The recommendation therefore is: **bind the first key to an `editor`, not an
 
 ## Findings
 
-### Blocking prerequisite: schema migrations
+### Blocking prerequisite: schema migrations — resolved
 
-Installing the plugin adds a `payload-mcp-api-keys` table. This repository has
-no `migrations/` directory, no `payload migrate` script in `package.json`, and
-no migration step in the [`Dockerfile`](../Dockerfile) or
-[`docker-compose.yml`](../docker-compose.yml) — the production container runs
-`node server.js` and nothing else. The Postgres adapter only pushes schema
-automatically outside production, so today there is no defined mechanism for a
-new table to reach the production database.
+Installing the plugin adds a `payload-mcp-api-keys` table, and when this
+evaluation was written there was no mechanism for a new table to reach the
+production database: no `migrations/` directory, no migrate script, and a
+production container that runs `node server.js` and nothing else.
 
-This is the same gap already recorded in
-[`docs/INSERTABLE_CONTENT_MODULES.md`](INSERTABLE_CONTENT_MODULES.md). It is not
-caused by MCP and it is not MCP's to fix, but MCP cannot ship past a development
-machine until it is fixed. Establishing the migration workflow is the first
-piece of work, and it is worth doing on its own merits before any further schema
-change lands.
+That gap — the same one recorded in
+[`docs/INSERTABLE_CONTENT_MODULES.md`](INSERTABLE_CONTENT_MODULES.md) — has since
+been closed. `push` is off in every environment, the schema is committed as SQL
+under `migrations/`, the deploy applies pending migrations before it replaces
+containers, and CI fails when a schema change arrives without one. See
+[`docs/DATABASE_MIGRATIONS.md`](DATABASE_MIGRATIONS.md).
+
+One operator action remains before any schema change deploys: the existing VPS
+database was built by push and has to be baselined once, which is recorded as
+item 0 in [`DEPLOYMENT_STATUS.md`](DEPLOYMENT_STATUS.md).
 
 ### Finding 2: `ghostID` blocks authoring new articles
 
@@ -265,18 +268,23 @@ and an editor-bound key is permitted to make it. Publication is an editorial
 decision that should stay with a human.
 
 Recommended: enable `create` and `update` but set `delete: false` for `posts`
-and `pages` in the plugin config, and add an `overrideResponse` or a collection
-hook that refuses `_status: 'published'` transitions from `req.payloadAPI ===
-'MCP'`. An agent drafts; a person presses publish in the admin panel, where Live
-Preview shows them what they are publishing.
+and `pages` in the plugin config, and add a collection hook that refuses
+`_status: 'published'` transitions from `req.payloadAPI === 'MCP'`. An agent
+drafts; a person presses publish in the admin panel, where Live Preview shows
+them what they are publishing.
+
+Decided otherwise in part — see [Decisions taken](#decisions-taken): the refusal
+is conditional on role, so an admin-bound key may publish while the editor key
+may not.
 
 ## Recommended shape
 
 ### Phase 0 — prerequisites (not MCP work)
 
-1. Establish the Payload migration workflow: a `migrations/` directory, a
-   `payload migrate` script, and a migration step in the container start
-   command. Nothing else can ship until this exists.
+1. ~~Establish the Payload migration workflow.~~ Done — see
+   [`DATABASE_MIGRATIONS.md`](DATABASE_MIGRATIONS.md). The remaining operator
+   step is baselining the existing VPS database, item 0 in
+   [`DEPLOYMENT_STATUS.md`](DEPLOYMENT_STATUS.md).
 2. Decide the `ghostID` relaxation and sequence it after the final Ghost import.
 
 ### Phase 1 — local, read and draft only
@@ -365,14 +373,34 @@ safer default is to leave client config out of the repository entirely.
   rule stands: future clients get secured network APIs, never administrative
   credentials.
 
-## Open questions
+## Decisions taken
 
-1. Which role should the first key bind to — `editor` as recommended, or
-   `admin` for globals and redirects work in the same session?
-2. Should agent-initiated publishing be blocked outright, or allowed for a
-   trusted admin key?
-3. Does the MCP endpoint ever need to be reachable from outside the VPS, or is
-   local-only against a development database sufficient?
+1. **Key role: `editor`.** The first key binds to an editor user. Admin-bound
+   keys are a later, separate decision.
+2. **Publishing: draft-only for the editor key, permitted for a trusted admin
+   key.** So the guard in [Finding 7](#finding-7-publishing-authority) is not a
+   blanket refusal of `_status: 'published'` from MCP; it is conditional on the
+   key's user being an admin. Implement it as a `beforeChange` hook that
+   rejects a draft→published transition when `req.payloadAPI === 'MCP'` and
+   `req.user.role !== 'admin'`, so the check lives with the collection rather
+   than with the plugin config. Note the consequence honestly: whoever holds the
+   admin key can publish to the live site through an agent, and the containment
+   for prompt injection then rests on that key not being used for
+   read-then-write work over untrusted content.
+3. **Exposure: deployed, restricted at the reverse proxy.** The endpoint is
+   reachable on the VPS rather than local-only. Hetzner is already the host —
+   [`DEPLOYMENT_STATUS.md`](DEPLOYMENT_STATUS.md) records the VPS as provisioned
+   there with Docker Compose, Caddy, and a working deploy on merge to `main`, so
+   nothing about the hosting needs to change. What has to be added is the
+   restriction in [Finding 4](#finding-4-the-endpoint-is-not-behind-the-staging-gate):
+   `/api/mcp` gated in the [`Caddyfile`](../Caddyfile) by source IP, mTLS, or a
+   tunnel, because `middleware.ts` excludes `/api` and `STAGING_BASIC_AUTH` will
+   not cover it. Until that gate exists, keep the plugin disabled in production
+   and work against a local database.
+
+Still open: the `ghostID` relaxation in
+[Finding 2](#finding-2-ghostid-blocks-authoring-new-articles), which cannot be
+decided until the final Ghost import is done.
 
 ## References
 

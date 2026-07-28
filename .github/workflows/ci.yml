@@ -33,6 +33,24 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Automatic schema push is off in every environment, so the CI database
+      # is built the same way production's is: by replaying the committed
+      # migrations. Everything below that touches PostgreSQL depends on this.
+      - run: pnpm migrate:db
+      # Guard the workflow that push used to hide. A field added to a
+      # collection without a matching migration leaves CI and production
+      # disagreeing about the schema, and the only symptom is a query failing
+      # after deploy. `--skip-empty` writes nothing when the config and the
+      # migrations already agree, so a new file here means one is missing.
+      - name: Fail if a schema change has no migration
+        run: |
+          pnpm migrate:db:create ci_drift_check --skip-empty
+          if [ -n "$(git status --porcelain migrations)" ]; then
+            echo "::error::A collection or global changed without a migration." \
+              "Run 'pnpm migrate:db:create <name>' and commit the result."
+            git status --porcelain migrations
+            exit 1
+          fi
       - run: pnpm format:check
       - run: pnpm lint
       - run: pnpm typecheck
@@ -97,6 +115,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
+      # Schema push is off, so the seeds have no tables to write into until the
+      # committed migrations have built them.
+      - run: pnpm migrate:db
       - run: pnpm seed:dev
       - run: pnpm seed:e2e
       - run: pnpm build
@@ -216,6 +237,14 @@ jobs:
           fi
           git reset --hard "$DEPLOY_SHA"
           echo "Deploying tested commit $(git rev-parse HEAD)"
+
+          # Schema migrations run to completion before any container is
+          # replaced. A migration that fails then leaves the previous release
+          # serving an unchanged database, instead of starting a new release
+          # against a schema it does not match. `run` starts the postgres
+          # dependency and waits for its health check on its own.
+          docker compose build migrate
+          docker compose run --rm migrate
 
           docker compose up -d --build --wait --wait-timeout 180
           docker compose ps --all

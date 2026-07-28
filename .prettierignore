@@ -3,6 +3,9 @@ node_modules
 coverage
 payload-types.ts
 pnpm-lock.yaml
+# Payload writes these; reformatting generated SQL and schema snapshots would
+# make every migration a diff against the tool that produced it.
+/migrations/
 docs/GHOST_TO_PAYLOAD_HANDOFF_WITH_APP_STRATEGY.md
 AGENTS.md
 /.claude/

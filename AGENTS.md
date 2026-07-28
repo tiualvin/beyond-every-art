@@ -76,6 +76,15 @@ Use Payload's Local API for same-application server work where appropriate. Futu
 - Do not rebuild every Ghost membership or newsletter feature during Phase 1 unless it is required for parity.
 - Do not introduce mobile-app scope in a way that delays or destabilizes the website migration.
 
+## Schema changes
+
+Automatic schema push is disabled. Every change to a collection, global, or
+field needs a generated migration committed with it
+(`pnpm migrate:db:create <name>`), and CI fails when one is missing. Read
+[`docs/DATABASE_MIGRATIONS.md`](docs/DATABASE_MIGRATIONS.md) before changing
+schema. Schema commands are `migrate:db*`; the unprefixed `migrate:*` scripts
+are the Ghost content migration and are unrelated.
+
 ## Security and repository hygiene
 
 Never commit:

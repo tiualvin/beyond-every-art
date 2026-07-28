@@ -8,6 +8,9 @@ const config = [
       '.claude/**',
       '.next/**',
       'coverage/**',
+      // Payload generates these, including the unused `payload`/`req` handler
+      // arguments its template always emits. `pnpm typecheck` still covers them.
+      'migrations/**',
       'node_modules/**',
       'payload-types.ts',
     ],
