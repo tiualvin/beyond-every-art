@@ -20,6 +20,7 @@ import { Footer } from './globals/Footer'
 import { Header } from './globals/Header'
 import { SiteSettings } from './globals/SiteSettings'
 import { resendAdapter } from './lib/email/resend'
+import { mcp } from './lib/mcp/plugin'
 import {
   buildPreviewUrl,
   PREVIEW_COLLECTIONS,
@@ -81,22 +82,28 @@ export default buildConfig({
   // RESEND_API_KEY / EMAIL_FROM_ADDRESS are unset so local dev and CI still boot.
   ...(email ? { email } : {}),
   globals: [SiteSettings, Header, Footer],
-  plugins: useR2
-    ? [
-        s3Storage({
-          bucket: process.env.S3_BUCKET!,
-          collections: { media: true },
-          config: {
-            credentials: {
-              accessKeyId: process.env.S3_ACCESS_KEY_ID!,
-              secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
+  plugins: [
+    // Always registered: the plugin keeps its API-key collection when disabled,
+    // so the database schema does not change with MCP_ENABLED. Whether the
+    // endpoint is mounted is decided inside.
+    mcp(),
+    ...(useR2
+      ? [
+          s3Storage({
+            bucket: process.env.S3_BUCKET!,
+            collections: { media: true },
+            config: {
+              credentials: {
+                accessKeyId: process.env.S3_ACCESS_KEY_ID!,
+                secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
+              },
+              endpoint: process.env.S3_ENDPOINT,
+              region: process.env.S3_REGION || 'auto',
             },
-            endpoint: process.env.S3_ENDPOINT,
-            region: process.env.S3_REGION || 'auto',
-          },
-        }),
-      ]
-    : [],
+          }),
+        ]
+      : []),
+  ],
   secret: process.env.PAYLOAD_SECRET || '',
   sharp,
   typescript: { outputFile: path.resolve(dirname, 'payload-types.ts') },

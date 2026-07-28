@@ -1,6 +1,8 @@
 import type { CollectionConfig } from 'payload'
 
 import { editorsAndAdmins, publishedOrEditors } from '../access/roles'
+import { recordMcpWrite } from '../lib/mcp/audit'
+import { refuseMcpPublish } from '../lib/mcp/publish-guard'
 import { buildPreviewUrl } from '../lib/preview/live-preview'
 import { validateRootContentSlug } from '../lib/seo/reserved-slugs'
 
@@ -15,6 +17,10 @@ export const Pages: CollectionConfig = {
     read: publishedOrEditors,
     update: editorsAndAdmins,
     delete: editorsAndAdmins,
+  },
+  hooks: {
+    beforeChange: [refuseMcpPublish],
+    afterChange: [recordMcpWrite],
   },
   // See the note in Posts.ts: autosave drives Live Preview, maxPerDoc keeps the
   // version table it fills from growing without bound.

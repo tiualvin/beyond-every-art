@@ -33,12 +33,13 @@ module.
 sequencing, shared invariants, ownership boundaries, and verification gates for
 the repository's launch-readiness automation workstreams.
 
-[`docs/MCP_SERVER.md`](docs/MCP_SERVER.md) evaluates exposing Payload to Claude
-Code and Codex over the Model Context Protocol, so articles can be drafted and
-parts of the backend operated from an agent. Nothing is installed, it depends on
-a schema-migration workflow the repository does not yet have, and it must not
-displace migration or cutover work. Read it before adding `@payloadcms/plugin-mcp`,
-an MCP endpoint, or any agent-facing write path into Payload.
+[`docs/MCP_SERVER.md`](docs/MCP_SERVER.md) covers the MCP server that exposes a
+narrow slice of Payload to Claude and Codex for drafting articles. It is off
+unless `MCP_ENABLED=1`, reaches no member, billing, or account data, and cannot
+publish unless the key belongs to an administrator. Read it before widening the
+collection allowlist, adding an MCP tool, or changing any agent-facing write
+path into Payload — and keep the plugin allowlist and the custom tools in step,
+so the allowlist never understates the real surface.
 
 ## Current priority
 

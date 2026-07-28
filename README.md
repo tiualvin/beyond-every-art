@@ -143,6 +143,21 @@ the app container, so pre-DNS deployments do not depend on a public hostname or
 TLS certificate. See [`docs/DEPLOYMENT_STATUS.md`](docs/DEPLOYMENT_STATUS.md)
 for the current operator actions and deployment caveats.
 
+## Drafting from Claude or Codex
+
+An MCP server exposes a narrow slice of Payload to Claude Code, Codex, and the
+Claude mobile app: draft an article from Markdown, read it back, revise it. It
+is off unless `MCP_ENABLED=1`, exposes no member, billing, or account data, and
+cannot publish unless the key belongs to an administrator.
+
+```bash
+MCP_ENABLED=1 pnpm dev    # serves POST /api/mcp
+```
+
+Create keys in Payload Admin under **MCP → API Keys**, bound to an editor user.
+[`docs/MCP_SERVER.md`](docs/MCP_SERVER.md) covers the tools, the three access
+gates, what is logged, client setup, and why ChatGPT is not supported yet.
+
 ## Database backups
 
 Nightly PostgreSQL backups are dumped, gzipped, and uploaded to Cloudflare R2,

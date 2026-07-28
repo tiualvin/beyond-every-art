@@ -32,3 +32,7 @@ reconciliation-report*.json
 
 # Payload generated types (run `pnpm generate:types`)
 payload-types.ts
+
+# Payload rewrites the admin import map on every dev boot. The tracked
+# `importMap.ts` is what the admin page imports; this generated sibling is not.
+app/(payload)/admin/importMap.js

@@ -59,6 +59,9 @@ services:
     environment:
       # Set to your domain (e.g. beyondeveryart.com) for automatic HTTPS.
       SITE_ADDRESS: ${SITE_ADDRESS:-localhost}
+      # Staff hostname serving Payload Admin and the MCP endpoint, e.g.
+      # cms.beyondeveryart.com. See the Caddyfile.
+      CMS_ADDRESS: ${CMS_ADDRESS:-cms.localhost}
     ports:
       - '80:80'
       - '443:443'

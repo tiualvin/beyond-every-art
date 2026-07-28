@@ -7,6 +7,8 @@ import {
   ownedPosts,
   postsRead,
 } from '../access/roles'
+import { recordMcpWrite } from '../lib/mcp/audit'
+import { refuseMcpPublish } from '../lib/mcp/publish-guard'
 import { buildPreviewUrl } from '../lib/preview/live-preview'
 import { validateRootContentSlug } from '../lib/seo/reserved-slugs'
 
@@ -25,12 +27,17 @@ export const Posts: CollectionConfig = {
   hooks: {
     beforeChange: [
       ({ data, operation, req }) => {
-        if (operation === 'create' && req.user?.role === 'author') {
-          return { ...data, owners: [req.user.id] }
+        // `req.user` is a union now that the MCP plugin adds its own auth
+        // collection; only a `users` document carries a role.
+        const role = (req.user as { role?: string } | null | undefined)?.role
+        if (operation === 'create' && role === 'author') {
+          return { ...data, owners: [req.user!.id] }
         }
         return data
       },
+      refuseMcpPublish,
     ],
+    afterChange: [recordMcpWrite],
   },
   // Autosave is what makes Live Preview live: the iframe re-renders on save,
   // so without it the preview only moves when an editor remembers to press a

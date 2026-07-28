@@ -1,4 +1,34 @@
+# Public site.
 {$SITE_ADDRESS:localhost} {
+  encode zstd gzip
+
+  # The MCP endpoint is staff tooling, not part of the website. It is served
+  # only on the CMS hostname below, so the address readers and search engines
+  # use never exposes a write endpoint at all.
+  handle /api/mcp* {
+    respond "Not found" 404
+  }
+
+  handle {
+    reverse_proxy app:3000
+  }
+}
+
+# CMS and staff tooling: Payload Admin and the MCP endpoint.
+#
+# A separate hostname so the VPS can hold a real certificate — and a working
+# MCP endpoint — while the apex domain still points at the live Ghost site.
+# Point a DNS A record for this name at the VPS and set CMS_ADDRESS; until you
+# do, Caddy fails to issue a certificate for it and logs so, which is expected
+# and does not affect the site above.
+#
+# Mobile connectors reach this from Anthropic's or OpenAI's servers, not from
+# the phone, so it cannot be restricted by source IP, client certificate, or a
+# tunnel: the bearer key is the credential. What stands behind it — keys scoped
+# per key in the admin panel, acting as a real Payload user under normal access
+# control, unable to publish unless that user is an administrator, and rate
+# limited in the application because Caddy's standard build has none.
+{$CMS_ADDRESS:cms.localhost} {
   encode zstd gzip
   reverse_proxy app:3000
 }

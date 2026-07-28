@@ -57,6 +57,15 @@ Related: [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md),
    [`DATABASE_MIGRATIONS.md`](DATABASE_MIGRATIONS.md). The script refuses
    anything that is not a pre-migrations database, and is safe to rerun.
 
+0.5. **CMS subdomain, for MCP from mobile (operator action).** Point a DNS A
+record for `cms.beyondeveryart.com` at the VPS and set `CMS_ADDRESS` in the
+VPS `.env`. Caddy then issues a certificate for it and serves Payload Admin
+and `POST /api/mcp` there, while the apex keeps pointing at the live Ghost
+site — the public hostname returns 404 for `/api/mcp` by design. Then set
+`MCP_ENABLED=1`, create an editor-bound key in Payload Admin under
+MCP → API Keys, and add it to the Claude connector. See
+[`MCP_SERVER.md`](MCP_SERVER.md).
+
 1. **DNS + TLS.** No domain points at the VPS yet, and `SITE_ADDRESS` /
    `NEXT_PUBLIC_SITE_URL` / `NEXT_PUBLIC_SERVER_URL` /
    `PAYLOAD_PUBLIC_SERVER_URL` in the VPS's `.env` are still placeholders.
