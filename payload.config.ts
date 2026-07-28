@@ -20,6 +20,7 @@ import { Footer } from './globals/Footer'
 import { Header } from './globals/Header'
 import { SiteSettings } from './globals/SiteSettings'
 import { resendAdapter } from './lib/email/resend'
+import { mcp } from './lib/mcp/plugin'
 import {
   buildPreviewUrl,
   PREVIEW_COLLECTIONS,
@@ -64,28 +65,45 @@ export default buildConfig({
     NewsletterSignups,
     BillingEvents,
   ],
-  db: postgresAdapter({ pool: { connectionString: process.env.DATABASE_URI } }),
+  // Schema changes ship as reviewed SQL in `migrations/`, never as an implicit
+  // push. `push` defaults to on outside production, which would let a developer
+  // machine and CI silently reshape their own databases from the config while
+  // production — where push is off — waited for a migration nobody wrote. That
+  // divergence is invisible until a deploy fails against real data, so the
+  // safer trade is to make every environment take the same path: generate a
+  // migration with `pnpm migrate:db:create`, review the SQL, commit it.
+  db: postgresAdapter({
+    migrationDir: path.resolve(dirname, 'migrations'),
+    pool: { connectionString: process.env.DATABASE_URI },
+    push: false,
+  }),
   editor: lexicalEditor(),
   // Transactional email (admin password reset, verification). Omitted when
   // RESEND_API_KEY / EMAIL_FROM_ADDRESS are unset so local dev and CI still boot.
   ...(email ? { email } : {}),
   globals: [SiteSettings, Header, Footer],
-  plugins: useR2
-    ? [
-        s3Storage({
-          bucket: process.env.S3_BUCKET!,
-          collections: { media: true },
-          config: {
-            credentials: {
-              accessKeyId: process.env.S3_ACCESS_KEY_ID!,
-              secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
+  plugins: [
+    // Always registered: the plugin keeps its API-key collection when disabled,
+    // so the database schema does not change with MCP_ENABLED. Whether the
+    // endpoint is mounted is decided inside.
+    mcp(),
+    ...(useR2
+      ? [
+          s3Storage({
+            bucket: process.env.S3_BUCKET!,
+            collections: { media: true },
+            config: {
+              credentials: {
+                accessKeyId: process.env.S3_ACCESS_KEY_ID!,
+                secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
+              },
+              endpoint: process.env.S3_ENDPOINT,
+              region: process.env.S3_REGION || 'auto',
             },
-            endpoint: process.env.S3_ENDPOINT,
-            region: process.env.S3_REGION || 'auto',
-          },
-        }),
-      ]
-    : [],
+          }),
+        ]
+      : []),
+  ],
   secret: process.env.PAYLOAD_SECRET || '',
   sharp,
   typescript: { outputFile: path.resolve(dirname, 'payload-types.ts') },

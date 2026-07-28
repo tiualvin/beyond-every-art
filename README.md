@@ -9,7 +9,13 @@ Migration-first Next.js and Payload CMS foundation for moving Beyond Every Art f
 3. Start PostgreSQL: `docker compose up -d postgres`.
 4. Install dependencies: `pnpm install` (commit the generated `pnpm-lock.yaml`).
 5. Generate Payload types: `pnpm generate:types`.
-6. Start the application: `pnpm dev`.
+6. Build the database schema: `pnpm migrate:db`.
+7. Start the application: `pnpm dev`.
+
+Step 6 is not optional. Automatic schema push is off in every environment, so a
+new database has no tables until the committed migrations have run. Schema
+changes need a migration committed alongside them, and CI fails without one —
+see [`docs/DATABASE_MIGRATIONS.md`](docs/DATABASE_MIGRATIONS.md).
 
 Payload Admin is available at <http://localhost:3000/admin>.
 
@@ -137,6 +143,21 @@ the app container, so pre-DNS deployments do not depend on a public hostname or
 TLS certificate. See [`docs/DEPLOYMENT_STATUS.md`](docs/DEPLOYMENT_STATUS.md)
 for the current operator actions and deployment caveats.
 
+## Drafting from Claude or Codex
+
+An MCP server exposes a narrow slice of Payload to Claude Code, Codex, and the
+Claude mobile app: draft an article from Markdown, read it back, revise it. It
+is off unless `MCP_ENABLED=1`, exposes no member, billing, or account data, and
+cannot publish unless the key belongs to an administrator.
+
+```bash
+MCP_ENABLED=1 pnpm dev    # serves POST /api/mcp
+```
+
+Create keys in Payload Admin under **MCP → API Keys**, bound to an editor user.
+[`docs/MCP_SERVER.md`](docs/MCP_SERVER.md) covers the tools, the three access
+gates, what is logged, client setup, and why ChatGPT is not supported yet.
+
 ## Database backups
 
 Nightly PostgreSQL backups are dumped, gzipped, and uploaded to Cloudflare R2,
@@ -158,6 +179,7 @@ restore procedure and recovery checklist.
 pnpm format:check
 pnpm lint
 pnpm typecheck
+pnpm migrate:db      # against a local PostgreSQL; the checks below need a schema
 pnpm test
 pnpm test:e2e:local # with a disposable local PostgreSQL database
 pnpm build

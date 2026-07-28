@@ -33,6 +33,14 @@ module.
 sequencing, shared invariants, ownership boundaries, and verification gates for
 the repository's launch-readiness automation workstreams.
 
+[`docs/MCP_SERVER.md`](docs/MCP_SERVER.md) covers the MCP server that exposes a
+narrow slice of Payload to Claude and Codex for drafting articles. It is off
+unless `MCP_ENABLED=1`, reaches no member, billing, or account data, and cannot
+publish unless the key belongs to an administrator. Read it before widening the
+collection allowlist, adding an MCP tool, or changing any agent-facing write
+path into Payload — and keep the plugin allowlist and the custom tools in step,
+so the allowlist never understates the real surface.
+
 ## Current priority
 
 The first priority is a safe, repeatable Ghost migration—not a redesign.
@@ -68,6 +76,15 @@ Use Payload's Local API for same-application server work where appropriate. Futu
 - Do not hotlink production media to the old Ghost domain after migration.
 - Do not rebuild every Ghost membership or newsletter feature during Phase 1 unless it is required for parity.
 - Do not introduce mobile-app scope in a way that delays or destabilizes the website migration.
+
+## Schema changes
+
+Automatic schema push is disabled. Every change to a collection, global, or
+field needs a generated migration committed with it
+(`pnpm migrate:db:create <name>`), and CI fails when one is missing. Read
+[`docs/DATABASE_MIGRATIONS.md`](docs/DATABASE_MIGRATIONS.md) before changing
+schema. Schema commands are `migrate:db*`; the unprefixed `migrate:*` scripts
+are the Ghost content migration and are unrelated.
 
 ## Security and repository hygiene
 

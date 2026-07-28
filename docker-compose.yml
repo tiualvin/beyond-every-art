@@ -59,6 +59,9 @@ services:
     environment:
       # Set to your domain (e.g. beyondeveryart.com) for automatic HTTPS.
       SITE_ADDRESS: ${SITE_ADDRESS:-localhost}
+      # Staff hostname serving Payload Admin and the MCP endpoint, e.g.
+      # cms.beyondeveryart.com. See the Caddyfile.
+      CMS_ADDRESS: ${CMS_ADDRESS:-cms.localhost}
     ports:
       - '80:80'
       - '443:443'
@@ -66,6 +69,30 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+
+  # Applies pending schema migrations, then exits. Deliberately behind a
+  # profile so `docker compose up` never starts it: the deploy waits on
+  # container health with `--wait`, and a service that exits by design does not
+  # fit that model. It is run explicitly instead, before the containers are
+  # replaced, so a failed migration stops a deploy rather than half-completing
+  # one:
+  #
+  #   docker compose build migrate && docker compose run --rm migrate
+  migrate:
+    build:
+      context: .
+      target: migrator
+    profiles: ['migrate']
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URI: ${DATABASE_URI:-postgresql://payload:payload@postgres:5432/beyond_every_art}
+      PAYLOAD_SECRET: ${PAYLOAD_SECRET:-development-only-change-me}
+    restart: 'no'
 
   backup:
     build:

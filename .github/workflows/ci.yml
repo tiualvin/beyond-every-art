@@ -33,10 +33,36 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # These four run first, and the order is load-bearing. `payload-types.ts`
+      # is generated and gitignored, and any Payload CLI command that boots the
+      # config writes it — so a step below that touches Payload would leave the
+      # workspace with types a clean checkout does not have, and `typecheck`
+      # would start passing on code that cannot build. That exact failure got
+      # through once: a cast that only compiled against the generated types
+      # passed here and broke the Docker build. Keep anything that boots Payload
+      # underneath this block.
       - run: pnpm format:check
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      # Automatic schema push is off in every environment, so the CI database
+      # is built the same way production's is: by replaying the committed
+      # migrations. Everything below that touches PostgreSQL depends on this.
+      - run: pnpm migrate:db
+      # Guard the workflow that push used to hide. A field added to a
+      # collection without a matching migration leaves CI and production
+      # disagreeing about the schema, and the only symptom is a query failing
+      # after deploy. `--skip-empty` writes nothing when the config and the
+      # migrations already agree, so a new file here means one is missing.
+      - name: Fail if a schema change has no migration
+        run: |
+          pnpm migrate:db:create ci_drift_check --skip-empty
+          if [ -n "$(git status --porcelain migrations)" ]; then
+            echo "::error::A collection or global changed without a migration." \
+              "Run 'pnpm migrate:db:create <name>' and commit the result."
+            git status --porcelain migrations
+            exit 1
+          fi
       # The comparator CLI only invokes `main()` when it is the entry module, so
       # that `parseArgs` stays unit-testable. `--help` is handled inside
       # `main()`, which makes it a cheap proof that the guard still lets a real
@@ -97,6 +123,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
+      # Schema push is off, so the seeds have no tables to write into until the
+      # committed migrations have built them.
+      - run: pnpm migrate:db
       - run: pnpm seed:dev
       - run: pnpm seed:e2e
       - run: pnpm build
@@ -138,6 +167,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build the app image
         run: docker build --tag beyond-every-art-app:ci .
+      # The migrator stage is not a dependency of the runtime image, so the
+      # build above never touches it. Without this, a broken migrator stage
+      # would surface for the first time during a deploy — at the step that now
+      # runs before containers are replaced, which is the worst place to
+      # discover it.
+      - name: Build the migration image
+        run: docker build --target migrator --tag beyond-every-art-migrator:ci .
 
   deploy:
     # Only after all builds are proven good, and only for real pushes to main
@@ -216,6 +252,14 @@ jobs:
           fi
           git reset --hard "$DEPLOY_SHA"
           echo "Deploying tested commit $(git rev-parse HEAD)"
+
+          # Schema migrations run to completion before any container is
+          # replaced. A migration that fails then leaves the previous release
+          # serving an unchanged database, instead of starting a new release
+          # against a schema it does not match. `run` starts the postgres
+          # dependency and waits for its health check on its own.
+          docker compose build migrate
+          docker compose run --rm migrate
 
           docker compose up -d --build --wait --wait-timeout 180
           docker compose ps --all
