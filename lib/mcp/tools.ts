@@ -67,8 +67,16 @@ async function idsForSlugs(
     where: { slug: { in: slugs } },
   })
 
+  // Read the slug through `unknown`. `payload-types.ts` is generated and
+  // gitignored, so a clean checkout — the Docker build, and CI before anything
+  // boots Payload — types these documents as `JsonObject & TypeWithID`, which a
+  // direct cast to `{ slug: string }` does not overlap with. Nothing else in
+  // this repository imports the generated types, and this must not either.
   const found = new Map(
-    docs.map((doc) => [(doc as { slug: string }).slug, doc.id]),
+    docs.map((doc) => [
+      String((doc as unknown as { slug?: unknown }).slug),
+      doc.id,
+    ]),
   )
   const missing = slugs.filter((slug) => !found.has(slug))
   if (missing.length) {

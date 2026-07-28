@@ -33,6 +33,18 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # These four run first, and the order is load-bearing. `payload-types.ts`
+      # is generated and gitignored, and any Payload CLI command that boots the
+      # config writes it — so a step below that touches Payload would leave the
+      # workspace with types a clean checkout does not have, and `typecheck`
+      # would start passing on code that cannot build. That exact failure got
+      # through once: a cast that only compiled against the generated types
+      # passed here and broke the Docker build. Keep anything that boots Payload
+      # underneath this block.
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
       # Automatic schema push is off in every environment, so the CI database
       # is built the same way production's is: by replaying the committed
       # migrations. Everything below that touches PostgreSQL depends on this.
@@ -51,10 +63,6 @@ jobs:
             git status --porcelain migrations
             exit 1
           fi
-      - run: pnpm format:check
-      - run: pnpm lint
-      - run: pnpm typecheck
-      - run: pnpm test
       # The comparator CLI only invokes `main()` when it is the entry module, so
       # that `parseArgs` stays unit-testable. `--help` is handled inside
       # `main()`, which makes it a cheap proof that the guard still lets a real

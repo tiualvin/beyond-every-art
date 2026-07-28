@@ -54,6 +54,14 @@ CI runs `pnpm migrate:db:create ci_drift_check --skip-empty` on every push and
 fails if it produces a file — that means a schema change arrived without its
 migration.
 
+One side effect worth knowing: any Payload CLI command that boots the config,
+`migrate:db:create` included, rewrites the generated and gitignored
+`payload-types.ts`. That is why the CI job runs `format:check`, `lint`,
+`typecheck`, and `test` **before** it touches Payload — otherwise those steps
+would see generated types a clean checkout does not have, and `typecheck` would
+pass on code the Docker build cannot compile. Keep new steps that boot Payload
+below that block.
+
 ## Local setup
 
 ```bash
