@@ -33,6 +33,13 @@ module.
 sequencing, shared invariants, ownership boundaries, and verification gates for
 the repository's launch-readiness automation workstreams.
 
+[`docs/MCP_SERVER.md`](docs/MCP_SERVER.md) evaluates exposing Payload to Claude
+Code and Codex over the Model Context Protocol, so articles can be drafted and
+parts of the backend operated from an agent. Nothing is installed, it depends on
+a schema-migration workflow the repository does not yet have, and it must not
+displace migration or cutover work. Read it before adding `@payloadcms/plugin-mcp`,
+an MCP endpoint, or any agent-facing write path into Payload.
+
 ## Current priority
 
 The first priority is a safe, repeatable Ghost migration—not a redesign.
