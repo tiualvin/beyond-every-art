@@ -6,7 +6,10 @@ export function NewsletterBand() {
       <div className="container newsletter-band__inner">
         <div>
           <h2>Stay close to the work</h2>
-          <p>New stories on materials, technique, and meaning — delivered when they&rsquo;re ready.</p>
+          <p>
+            New stories on materials, technique, and meaning — delivered when
+            they&rsquo;re ready.
+          </p>
         </div>
         <form className="newsletter-band__form" action={subscribeToNewsletter}>
           <input
