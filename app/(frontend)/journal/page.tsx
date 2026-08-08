@@ -11,7 +11,9 @@ import {
 import { getPublishedPosts, getSiteSettings } from '@/lib/content/queries'
 import { absoluteUrl, getSiteUrl, JOURNAL_PATH } from '@/lib/seo/site'
 
-import { PostList } from '../components/post-list'
+import { FadeIn } from '../components/motion/fade-in'
+import { StaggerChildren, StaggerItem } from '../components/motion/stagger'
+import { StoryCard } from '../components/story-card'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,8 +32,6 @@ export async function generateMetadata({
     resolve(requested),
   ])
 
-  // Every page of the archive is its own canonical URL; pointing them all at
-  // page one would ask search engines to drop the deeper pages entirely.
   const canonical = absoluteUrl(
     archivePagePath(JOURNAL_PATH, archive.page),
     getSiteUrl(),
@@ -54,8 +54,6 @@ export default async function JournalPage({
   const requested = parsePageParam((await searchParams).page)
   const archive = await resolve(requested)
 
-  // A page past the end has no content to show and should not be indexed as an
-  // empty archive, so it 404s rather than rendering "no stories here yet".
   if (requested > 1 && requested > archive.totalPages) notFound()
 
   const pagination = buildPagination({
@@ -68,16 +66,24 @@ export default async function JournalPage({
     <main>
       <section className="section">
         <div className="container">
-          <div className="archive__head">
-            <p className="eyebrow">Journal</p>
-            <h1>Every story, newest first</h1>
-            <p className="muted" style={{ maxWidth: '40rem' }}>
-              The full archive of writing on materials, art history, and
-              creative practice.
-            </p>
-          </div>
+          <FadeIn>
+            <div className="archive__head">
+              <p className="eyebrow">Journal</p>
+              <h1>Every story, newest first</h1>
+              <p className="muted" style={{ maxWidth: '40rem' }}>
+                The full archive of writing on materials, art history, and
+                creative practice.
+              </p>
+            </div>
+          </FadeIn>
 
-          <PostList posts={archive.posts} />
+          <StaggerChildren className="card-grid">
+            {archive.posts.map((post) => (
+              <StaggerItem key={post.id}>
+                <StoryCard post={post} />
+              </StaggerItem>
+            ))}
+          </StaggerChildren>
 
           {pagination.totalPages > 1 && (
             <nav className="pagination" aria-label="Journal pages">

@@ -3,7 +3,9 @@ import type { Metadata } from 'next'
 import { searchPosts } from '@/lib/content/queries'
 import { absoluteUrl, getSiteUrl, SEARCH_PATH } from '@/lib/seo/site'
 
-import { PostList } from '../components/post-list'
+import { FadeIn } from '../components/motion/fade-in'
+import { StaggerChildren, StaggerItem } from '../components/motion/stagger'
+import { StoryCard } from '../components/story-card'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,8 +22,6 @@ export async function generateMetadata({
   return {
     title: query ? `Search: ${query}` : 'Search',
     alternates: { canonical },
-    // Query-specific results are excluded from indexing to avoid thin,
-    // duplicate-content pages; the bare search page itself stays indexable.
     robots: query ? { index: false, follow: true } : undefined,
   }
 }
@@ -39,25 +39,37 @@ export default async function SearchPage({
     <main>
       <section className="section">
         <div className="container">
-          <div className="archive__head">
-            <p className="eyebrow">Search</p>
-            <h1>Search Beyond Every Art</h1>
-            <form className="search-form" action={SEARCH_PATH} role="search">
-              <input
-                className="search-form__input"
-                type="search"
-                name="q"
-                defaultValue={query}
-                placeholder="Search articles"
-                aria-label="Search articles"
-              />
-              <button className="button button--primary" type="submit">
-                Search
-              </button>
-            </form>
-          </div>
+          <FadeIn>
+            <div className="archive__head">
+              <p className="eyebrow">Search</p>
+              <h1>Search Beyond Every Art</h1>
+              <form className="search-form" action={SEARCH_PATH} role="search">
+                <input
+                  className="search-form__input"
+                  type="search"
+                  name="q"
+                  defaultValue={query}
+                  placeholder="Search articles"
+                  aria-label="Search articles"
+                />
+                <button className="button button--primary" type="submit">
+                  Search
+                </button>
+              </form>
+            </div>
+          </FadeIn>
           {query ? (
-            <PostList posts={posts} />
+            posts.length > 0 ? (
+              <StaggerChildren className="card-grid">
+                {posts.map((post) => (
+                  <StaggerItem key={post.id}>
+                    <StoryCard post={post} />
+                  </StaggerItem>
+                ))}
+              </StaggerChildren>
+            ) : (
+              <p className="muted">No articles found for &ldquo;{query}&rdquo;.</p>
+            )
           ) : (
             <p className="muted">Enter a search term to find articles.</p>
           )}

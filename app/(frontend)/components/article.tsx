@@ -6,8 +6,10 @@ import type { PostDetail } from '@/lib/content/queries'
 import { formatDate } from '@/lib/format'
 import { tagPath } from '@/lib/seo/site'
 
-// `.article__inner` is capped at 44rem, so the featured image never renders
-// wider than that outside of the full-bleed phone case.
+import { FadeIn } from './motion/fade-in'
+import { Reveal } from './motion/reveal'
+import { StaggerChildren, StaggerItem } from './motion/stagger'
+
 const FIGURE_SIZES = '(max-width: 47rem) 100vw, 44rem'
 
 export function Article({ post }: { post: PostDetail }) {
@@ -25,21 +27,34 @@ export function Article({ post }: { post: PostDetail }) {
         <div className="container article__inner">
           <header className="article__header">
             {primaryTag && (
-              <Link href={tagPath(primaryTag.slug)} className="eyebrow">
-                {primaryTag.name}
-              </Link>
+              <FadeIn delay={0}>
+                <Link href={tagPath(primaryTag.slug)} className="eyebrow">
+                  {primaryTag.name}
+                </Link>
+              </FadeIn>
             )}
-            <h1>{post.title}</h1>
-            {post.excerpt && <p className="article__dek">{post.excerpt}</p>}
-            {byline && <p className="article__byline">{byline}</p>}
+            <FadeIn delay={0.08}>
+              <h1>{post.title}</h1>
+            </FadeIn>
+            {post.excerpt && (
+              <FadeIn delay={0.15}>
+                <p className="article__dek">{post.excerpt}</p>
+              </FadeIn>
+            )}
+            {byline && (
+              <FadeIn delay={0.2}>
+                <p className="article__byline">{byline}</p>
+              </FadeIn>
+            )}
           </header>
 
-          {post.image && <FeaturedFigure image={post.image} />}
+          {post.image && (
+            <FadeIn delay={0.25}>
+              <FeaturedFigure image={post.image} />
+            </FadeIn>
+          )}
 
           {post.bodyHtml ? (
-            // First-party editorial content: either HTML built from the
-            // Lexical body by `toBodyHtml`, or the preserved Ghost markup it
-            // falls back to. Both are authored by trusted editors.
             <div
               className="prose"
               dangerouslySetInnerHTML={{ __html: post.bodyHtml }}
@@ -49,17 +64,24 @@ export function Article({ post }: { post: PostDetail }) {
           )}
 
           {post.tags.length > 0 && (
-            <footer className="article__tags">
-              {post.tags.map((tag) => (
-                <Link
-                  key={tag.slug}
-                  href={tagPath(tag.slug)}
-                  className="tag-chip"
+            <Reveal>
+              <footer className="article__tags">
+                <StaggerChildren
+                  className="article__tags-inner"
                 >
-                  {tag.name}
-                </Link>
-              ))}
-            </footer>
+                  {post.tags.map((tag) => (
+                    <StaggerItem key={tag.slug}>
+                      <Link
+                        href={tagPath(tag.slug)}
+                        className="tag-chip"
+                      >
+                        {tag.name}
+                      </Link>
+                    </StaggerItem>
+                  ))}
+                </StaggerChildren>
+              </footer>
+            </Reveal>
           )}
         </div>
       </article>
@@ -67,12 +89,6 @@ export function Article({ post }: { post: PostDetail }) {
   )
 }
 
-/**
- * The featured image at its own aspect ratio — an art journal must not crop
- * artwork to a house shape. A record with no stored dimensions cannot reserve
- * intrinsic space, so it falls back to a fixed editorial ratio instead of
- * collapsing to nothing.
- */
 function FeaturedFigure({ image }: { image: MediaImage }) {
   const meta = [image.caption, image.credit].filter(Boolean)
 

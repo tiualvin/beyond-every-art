@@ -6,7 +6,9 @@ import { getPostsByTag } from '@/lib/content/queries'
 import { logMissingRoute } from '@/lib/observability/missing-route'
 import { absoluteUrl, getSiteUrl, tagPath } from '@/lib/seo/site'
 
-import { PostList } from '../../components/post-list'
+import { FadeIn } from '../../components/motion/fade-in'
+import { StaggerChildren, StaggerItem } from '../../components/motion/stagger'
+import { StoryCard } from '../../components/story-card'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,16 +45,24 @@ export default async function TagPage({ params }: { params: Promise<Params> }) {
     <main>
       <section className="section">
         <div className="container">
-          <div className="archive__head">
-            <p className="eyebrow">Tag</p>
-            <h1>{archive.name}</h1>
-            {archive.description && (
-              <p className="muted" style={{ maxWidth: '40rem' }}>
-                {archive.description}
-              </p>
-            )}
-          </div>
-          <PostList posts={archive.posts} />
+          <FadeIn>
+            <div className="archive__head">
+              <p className="eyebrow">Tag</p>
+              <h1>{archive.name}</h1>
+              {archive.description && (
+                <p className="muted" style={{ maxWidth: '40rem' }}>
+                  {archive.description}
+                </p>
+              )}
+            </div>
+          </FadeIn>
+          <StaggerChildren className="card-grid">
+            {archive.posts.map((post) => (
+              <StaggerItem key={post.id}>
+                <StoryCard post={post} />
+              </StaggerItem>
+            ))}
+          </StaggerChildren>
         </div>
       </section>
     </main>
