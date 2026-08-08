@@ -66,15 +66,10 @@ export function Article({ post }: { post: PostDetail }) {
           {post.tags.length > 0 && (
             <Reveal>
               <footer className="article__tags">
-                <StaggerChildren
-                  className="article__tags-inner"
-                >
+                <StaggerChildren className="article__tags-inner">
                   {post.tags.map((tag) => (
                     <StaggerItem key={tag.slug}>
-                      <Link
-                        href={tagPath(tag.slug)}
-                        className="tag-chip"
-                      >
+                      <Link href={tagPath(tag.slug)} className="tag-chip">
                         {tag.name}
                       </Link>
                     </StaggerItem>

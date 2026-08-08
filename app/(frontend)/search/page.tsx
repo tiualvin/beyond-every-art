@@ -68,7 +68,9 @@ export default async function SearchPage({
                 ))}
               </StaggerChildren>
             ) : (
-              <p className="muted">No articles found for &ldquo;{query}&rdquo;.</p>
+              <p className="muted">
+                No articles found for &ldquo;{query}&rdquo;.
+              </p>
             )
           ) : (
             <p className="muted">Enter a search term to find articles.</p>

@@ -736,7 +736,11 @@ img {
   text-decoration: underline;
   text-underline-offset: 3px;
   text-decoration-thickness: 1px;
-  text-decoration-color: color-mix(in srgb, var(--color-burgundy) 40%, transparent);
+  text-decoration-color: color-mix(
+    in srgb,
+    var(--color-burgundy) 40%,
+    transparent
+  );
 }
 
 @media (prefers-reduced-motion: no-preference) {
