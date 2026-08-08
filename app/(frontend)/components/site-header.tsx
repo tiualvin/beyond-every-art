@@ -4,11 +4,8 @@ import type { NavLink } from '@/lib/content/queries'
 import { JOURNAL_PATH, NEWSLETTER_PATH, SEARCH_PATH } from '@/lib/seo/site'
 
 import { MobileNav } from './mobile-nav'
+import { ScrollHeader } from './motion/scroll-header'
 
-// Navigation is editorial and belongs in the Header global. These exist only so
-// that a site whose header has not been configured yet still has a working menu,
-// so every entry must be a route this application always serves — a hardcoded
-// link to a page that may not exist ships a 404 in the masthead.
 const FALLBACK_NAV: NavLink[] = [
   { label: 'Journal', url: JOURNAL_PATH },
   { label: 'Search', url: SEARCH_PATH },
@@ -29,26 +26,28 @@ export function SiteHeader({
   const action = cta ?? FALLBACK_CTA
 
   return (
-    <header className="site-header">
-      <div className="container site-header__inner">
-        <Link href="/" className="brand">
-          {siteTitle}
-        </Link>
-        <nav className="site-nav" aria-label="Primary">
-          {nav.map((link) => (
-            <Link key={`${link.label}-${link.url}`} href={link.url}>
-              {link.label}
-            </Link>
-          ))}
-        </nav>
-        <Link
-          href={action.url}
-          className="button button--primary site-header__cta"
-        >
-          {action.label}
-        </Link>
-        <MobileNav links={nav} cta={action} />
-      </div>
-    </header>
+    <ScrollHeader>
+      <header className="site-header">
+        <div className="container site-header__inner">
+          <Link href="/" className="brand">
+            {siteTitle}
+          </Link>
+          <nav className="site-nav" aria-label="Primary">
+            {nav.map((link) => (
+              <Link key={`${link.label}-${link.url}`} href={link.url}>
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+          <Link
+            href={action.url}
+            className="button button--primary site-header__cta"
+          >
+            {action.label}
+          </Link>
+          <MobileNav links={nav} cta={action} />
+        </div>
+      </header>
+    </ScrollHeader>
   )
 }

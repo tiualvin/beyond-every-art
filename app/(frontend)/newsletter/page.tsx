@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 
 import { absoluteUrl, getSiteUrl, NEWSLETTER_PATH } from '@/lib/seo/site'
 
+import { FadeIn } from '../components/motion/fade-in'
+
 import { subscribeToNewsletter } from './actions'
 
 export const dynamic = 'force-dynamic'
@@ -31,32 +33,36 @@ export default async function NewsletterPage({
     <main>
       <section className="section">
         <div className="container">
-          <div className="archive__head">
-            <p className="eyebrow">Newsletter</p>
-            <h1>Stay in the loop</h1>
-            <p className="muted" style={{ maxWidth: '40rem' }}>
-              New articles, color stories, and creative prompts — no spam,
-              unsubscribe anytime.
-            </p>
-            <form className="search-form" action={subscribeToNewsletter}>
-              <input
-                className="search-form__input"
-                type="email"
-                name="email"
-                required
-                placeholder="you@example.com"
-                aria-label="Email address"
-              />
-              <button className="button button--primary" type="submit">
-                Subscribe
-              </button>
-            </form>
-            {message && (
-              <p className="muted" role="status">
-                {message}
+          <FadeIn>
+            <div className="archive__head">
+              <p className="eyebrow">Newsletter</p>
+              <h1>Stay in the loop</h1>
+              <p className="muted" style={{ maxWidth: '40rem' }}>
+                New articles, color stories, and creative prompts — no spam,
+                unsubscribe anytime.
               </p>
-            )}
-          </div>
+              <form className="search-form" action={subscribeToNewsletter}>
+                <input
+                  className="search-form__input"
+                  type="email"
+                  name="email"
+                  required
+                  placeholder="you@example.com"
+                  aria-label="Email address"
+                />
+                <button className="button button--primary" type="submit">
+                  Subscribe
+                </button>
+              </form>
+              {message && (
+                <FadeIn direction="none" delay={0.1}>
+                  <p className="muted" role="status">
+                    {message}
+                  </p>
+                </FadeIn>
+              )}
+            </div>
+          </FadeIn>
         </div>
       </section>
     </main>

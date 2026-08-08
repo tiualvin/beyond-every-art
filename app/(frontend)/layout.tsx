@@ -8,6 +8,7 @@ import { getSiteUrl } from '@/lib/seo/site'
 
 import { Analytics } from './components/analytics'
 import { LivePreviewListener } from './components/live-preview-listener'
+import { NewsletterBand } from './components/newsletter-band'
 import { SiteFooter } from './components/site-footer'
 import { SiteHeader } from './components/site-header'
 import '../globals.css'
@@ -37,7 +38,6 @@ export async function generateMetadata(): Promise<Metadata> {
       canonical: '/',
       types: { 'application/rss+xml': '/rss' },
     },
-    // Belt-and-suspenders with robots.ts: emit a noindex meta tag on staging.
     ...(isNoindex() ? { robots: { index: false, follow: false } } : {}),
   }
 }
@@ -64,13 +64,13 @@ export default async function FrontendLayout({
           cta={header.cta}
         />
         {children}
+        <NewsletterBand />
         <SiteFooter
           siteTitle={settings.title}
           links={footer.links}
           copyright={footer.copyright}
         />
         {analyticsEnabled && <Analytics gaId={gaId!} />}
-        {/* Preview-only, so no live-preview JavaScript reaches readers. */}
         {preview.live && <LivePreviewListener serverURL={getSiteUrl()} />}
       </body>
     </html>
