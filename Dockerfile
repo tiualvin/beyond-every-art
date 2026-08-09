@@ -23,6 +23,11 @@ RUN pnpm build
 
 FROM node:20-alpine AS runner
 ENV NODE_ENV=production
+# Docker sets HOSTNAME to the container ID by default, and Next's standalone
+# server binds to it instead of all interfaces, so loopback (used by the
+# Compose healthcheck and the deploy workflow's internal health check) can
+# never reach it. Override it explicitly so the server binds to 0.0.0.0.
+ENV HOSTNAME="0.0.0.0"
 WORKDIR /app
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
