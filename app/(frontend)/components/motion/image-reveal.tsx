@@ -16,7 +16,9 @@ export function ImageReveal({
   return (
     <motion.div
       className={className}
-      initial={reduced ? false : { clipPath: 'inset(8% 8% 8% 8%)', opacity: 0.6 }}
+      initial={
+        reduced ? false : { clipPath: 'inset(8% 8% 8% 8%)', opacity: 0.6 }
+      }
       whileInView={{ clipPath: 'inset(0% 0% 0% 0%)', opacity: 1 }}
       viewport={{ once: true, amount: 0.2 }}
       transition={{ ...editorial, duration: 0.7 }}

@@ -132,7 +132,10 @@ export default async function HomePage() {
                 )}
                 <div className="lead-story__text">
                   {lead.tag && <p className="eyebrow">{lead.tag}</p>}
-                  <p className="eyebrow" style={{ color: 'var(--color-muted)' }}>
+                  <p
+                    className="eyebrow"
+                    style={{ color: 'var(--color-muted)' }}
+                  >
                     Latest
                   </p>
                   <h2 className="lead-story__title">
