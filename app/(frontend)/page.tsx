@@ -177,10 +177,10 @@ export default async function HomePage() {
             <StaggerChildren className="card-grid--magazine">
               {firstFeatured && (
                 <StaggerItem className="card-grid__feature">
-                  <StoryCard post={firstFeatured} variant="feature" />
+                  <StoryCard post={firstFeatured} variant="horizontal" />
                 </StaggerItem>
               )}
-              <div className="card-grid__side">
+              <div className="card-grid__columns">
                 {otherFeatured.map((post) => (
                   <StaggerItem key={post.id}>
                     <StoryCard post={post} />

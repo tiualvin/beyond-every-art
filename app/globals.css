@@ -594,7 +594,7 @@ img {
   }
 }
 
-/* --- Magazine card grid ------------------------------------------------- */
+/* --- Magazine card grid (editorial spread) ------------------------------ */
 
 .card-grid {
   display: grid;
@@ -603,32 +603,97 @@ img {
 }
 
 .card-grid--magazine {
-  display: grid;
-  grid-template-columns: 1.4fr 1fr;
-  gap: 2rem;
-}
-
-.card-grid__feature .story-card__thumb {
-  aspect-ratio: 3 / 4;
-}
-
-.card-grid__feature .story-card h3 {
-  font-size: clamp(1.3rem, 2.5vw, 1.6rem);
-}
-
-.card-grid__side {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+}
+
+.card-grid__feature {
+  margin-bottom: 2.5rem;
+  padding-bottom: 2.5rem;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.card-grid__columns {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+}
+
+.card-grid__columns > * {
+  position: relative;
+}
+
+.card-grid__columns > * + *::before {
+  content: '';
+  position: absolute;
+  left: -0.75rem;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--color-line);
 }
 
 @media (max-width: 800px) {
-  .card-grid--magazine {
-    grid-template-columns: 1fr;
+  .card-grid__feature {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.5rem;
   }
 
-  .card-grid__feature .story-card__thumb {
+  .card-grid__columns {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .card-grid__columns > * {
+    padding: 1.25rem 0;
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .card-grid__columns > *:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .card-grid__columns > * + *::before {
+    display: none;
+  }
+}
+
+/* --- Story card (horizontal variant) ------------------------------------ */
+
+.story-card--horizontal {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 2rem;
+  align-items: center;
+}
+
+.story-card--horizontal .story-card__thumb {
+  aspect-ratio: 4 / 3;
+}
+
+.story-card--horizontal .story-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.story-card--horizontal h3 {
+  font-size: clamp(1.4rem, 3vw, 1.9rem);
+}
+
+@media (max-width: 800px) {
+  .story-card--horizontal {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .story-card--horizontal .story-card__thumb {
     aspect-ratio: 16 / 10;
+  }
+
+  .story-card--horizontal h3 {
+    font-size: 1.2rem;
   }
 }
 
