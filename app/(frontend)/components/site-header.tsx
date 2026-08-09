@@ -8,7 +8,8 @@ import { ScrollHeader } from './motion/scroll-header'
 
 const FALLBACK_NAV: NavLink[] = [
   { label: 'Journal', url: JOURNAL_PATH },
-  { label: 'Search', url: SEARCH_PATH },
+  { label: 'Topics', url: '/topics' },
+  { label: 'About', url: '/about' },
 ]
 
 const FALLBACK_CTA: NavLink = { label: 'Newsletter', url: NEWSLETTER_PATH }
@@ -39,12 +40,32 @@ export function SiteHeader({
               </Link>
             ))}
           </nav>
-          <Link
-            href={action.url}
-            className="button button--primary site-header__cta"
-          >
-            {action.label}
-          </Link>
+          <div className="site-header__right">
+            <Link
+              href={SEARCH_PATH}
+              className="site-header__search"
+              aria-label="Search"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                aria-hidden="true"
+              >
+                <circle cx="11" cy="11" r="7" />
+                <line x1="16.5" y1="16.5" x2="21" y2="21" />
+              </svg>
+            </Link>
+            <Link
+              href={action.url}
+              className="button button--primary site-header__cta"
+            >
+              {action.label}
+            </Link>
+          </div>
           <MobileNav links={nav} cta={action} />
         </div>
       </header>
