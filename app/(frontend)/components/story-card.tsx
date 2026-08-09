@@ -15,34 +15,39 @@ export function StoryCard({
   variant = 'default',
 }: {
   post: PostCard
-  variant?: 'default' | 'feature'
+  variant?: 'default' | 'feature' | 'horizontal'
 }) {
   const href = postPath(post.slug)
-  const isFeature = variant === 'feature'
+  const showExcerpt = variant === 'feature' || variant === 'horizontal'
+  const thumbSizes =
+    variant === 'default' ? THUMB_SIZES_DEFAULT : THUMB_SIZES_FEATURE
 
-  return (
-    <article className={`story-card ${isFeature ? 'story-card--feature' : ''}`}>
-      <Link
-        href={href}
-        className="story-card__thumb"
-        aria-hidden="true"
-        tabIndex={-1}
-      >
-        {post.image && (
-          <Image
-            src={post.image.url}
-            alt={post.image.alt}
-            fill
-            sizes={isFeature ? THUMB_SIZES_FEATURE : THUMB_SIZES_DEFAULT}
-            className="story-card__image"
-          />
-        )}
-      </Link>
+  const thumb = (
+    <Link
+      href={href}
+      className="story-card__thumb"
+      aria-hidden="true"
+      tabIndex={-1}
+    >
+      {post.image && (
+        <Image
+          src={post.image.url}
+          alt={post.image.alt}
+          fill
+          sizes={thumbSizes}
+          className="story-card__image"
+        />
+      )}
+    </Link>
+  )
+
+  const text = (
+    <>
       {post.tag && <p className="eyebrow">{post.tag}</p>}
       <h3>
         <Link href={href}>{post.title}</Link>
       </h3>
-      {isFeature && post.excerpt && (
+      {showExcerpt && post.excerpt && (
         <p className="story-card__excerpt">{post.excerpt}</p>
       )}
       <p className="story-card__meta">
@@ -54,6 +59,29 @@ export function StoryCard({
           .filter(Boolean)
           .join(' · ')}
       </p>
+    </>
+  )
+
+  const className = [
+    'story-card',
+    variant !== 'default' && `story-card--${variant}`,
+  ]
+    .filter(Boolean)
+    .join(' ')
+
+  if (variant === 'horizontal') {
+    return (
+      <article className={className}>
+        {thumb}
+        <div className="story-card__body">{text}</div>
+      </article>
+    )
+  }
+
+  return (
+    <article className={className}>
+      {thumb}
+      {text}
     </article>
   )
 }
