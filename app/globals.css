@@ -349,6 +349,19 @@ img {
   }
 }
 
+/* --- Scroll progress ---------------------------------------------------- */
+
+.scroll-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--color-burgundy);
+  z-index: 100;
+  will-change: transform;
+}
+
 /* --- Hero --------------------------------------------------------------- */
 
 .hero {
@@ -383,12 +396,23 @@ img {
   position: relative;
   padding-top: 5rem;
   padding-bottom: 5rem;
-  max-width: 46rem;
+}
+
+.hero__split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3rem;
+  align-items: center;
+  max-width: var(--maxw);
+}
+
+.hero__text {
+  max-width: 30rem;
 }
 
 .hero h1 {
   color: var(--color-on-dark);
-  font-size: clamp(2.4rem, 6vw, 3.8rem);
+  font-size: clamp(2.2rem, 5vw, 3.4rem);
   margin-top: 0.6rem;
 }
 
@@ -397,6 +421,36 @@ img {
   font-size: 1.15rem;
   max-width: 34rem;
   margin: 0 0 2rem;
+}
+
+.hero__image-wrap {
+  position: relative;
+}
+
+.hero__parallax {
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+}
+
+.hero__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+@media (max-width: 800px) {
+  .hero__split {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+
+  .hero__image-wrap {
+    order: -1;
+  }
+
+  .hero__parallax {
+    aspect-ratio: 16 / 10;
+  }
 }
 
 /* --- Sections and cards ------------------------------------------------- */
@@ -440,10 +494,148 @@ img {
   flex-shrink: 0;
 }
 
+/* --- Perspective -------------------------------------------------------- */
+
+.perspective {
+  border-bottom: 1px solid var(--color-line);
+}
+
+.perspective__inner {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 3rem;
+  align-items: center;
+}
+
+.perspective__quote {
+  font-family: var(--font-serif);
+  font-size: clamp(1.2rem, 2.5vw, 1.6rem);
+  font-style: italic;
+  line-height: 1.45;
+  color: var(--color-ink);
+  border-left: 2px solid var(--color-burgundy);
+  padding-left: 1.5rem;
+  margin: 0;
+}
+
+.perspective__body p {
+  color: var(--color-muted);
+  margin: 0.5rem 0 0;
+  font-size: 0.95rem;
+  max-width: 28rem;
+}
+
+.perspective__link {
+  display: inline-block;
+  margin-top: 1rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-burgundy);
+}
+
+.perspective__link:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 800px) {
+  .perspective__inner {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+}
+
+/* --- Lead story --------------------------------------------------------- */
+
+.lead-story {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 2.5rem;
+  align-items: center;
+}
+
+.lead-story__image-wrap {
+  overflow: hidden;
+}
+
+.lead-story__image {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.lead-story__title {
+  font-size: clamp(1.6rem, 3.5vw, 2.4rem);
+  max-width: 32rem;
+}
+
+.lead-story__excerpt {
+  color: var(--color-muted);
+  font-size: 1rem;
+  max-width: 30rem;
+  margin: 0 0 0.5rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .lead-story__image {
+    transition: transform 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+  }
+
+  .lead-story__image-wrap:hover .lead-story__image {
+    transform: scale(1.02);
+  }
+}
+
+@media (max-width: 800px) {
+  .lead-story {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+}
+
+/* --- Magazine card grid ------------------------------------------------- */
+
 .card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
   gap: 2rem;
+}
+
+.card-grid--magazine {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 2rem;
+}
+
+.card-grid__feature .story-card__thumb {
+  aspect-ratio: 3 / 4;
+}
+
+.card-grid__feature .story-card h3 {
+  font-size: clamp(1.3rem, 2.5vw, 1.6rem);
+}
+
+.card-grid__side {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+@media (max-width: 800px) {
+  .card-grid--magazine {
+    grid-template-columns: 1fr;
+  }
+
+  .card-grid__feature .story-card__thumb {
+    aspect-ratio: 16 / 10;
+  }
+}
+
+/* --- Story card (feature variant) --------------------------------------- */
+
+.story-card--feature .story-card__excerpt {
+  margin: 0;
 }
 
 .story-card {
@@ -492,6 +684,102 @@ img {
 
 .muted {
   color: var(--color-muted);
+}
+
+/* --- Topics (dark section) ---------------------------------------------- */
+
+.topics {
+  background: var(--color-dark);
+  color: var(--color-on-dark);
+}
+
+.topics__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 1rem;
+}
+
+.topic-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  background: linear-gradient(
+    135deg,
+    var(--color-burgundy-deep),
+    var(--color-dark)
+  );
+}
+
+.topic-card__image {
+  object-fit: cover;
+}
+
+.topic-card__overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    rgba(20, 17, 16, 0.8) 0%,
+    rgba(20, 17, 16, 0.2) 50%,
+    transparent 100%
+  );
+  z-index: 1;
+}
+
+.topic-card__content {
+  position: relative;
+  z-index: 2;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.topic-card__name {
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--color-on-dark);
+}
+
+.topic-card__count {
+  font-size: 0.75rem;
+  color: color-mix(in srgb, var(--color-on-dark) 55%, transparent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .topic-card__image {
+    transition: transform 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+  }
+
+  .topic-card:hover .topic-card__image {
+    transform: scale(1.05);
+  }
+
+  .topic-card {
+    transition: transform 0.35s cubic-bezier(0.25, 0.1, 0.25, 1);
+  }
+
+  .topic-card:hover {
+    transform: translateY(-2px);
+  }
+}
+
+.topic-card:hover {
+  text-decoration: none;
+}
+
+@media (max-width: 600px) {
+  .topics__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .topic-card {
+    aspect-ratio: 1;
+  }
 }
 
 /* --- Newsletter band ---------------------------------------------------- */
