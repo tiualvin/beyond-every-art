@@ -247,9 +247,24 @@ img {
   text-decoration: none;
 }
 
-/* Mobile navigation. Both the toggle and the panel are hidden above the
-   breakpoint, so exactly one navigation is ever exposed to assistive
-   technology, whatever state the disclosure was left in. */
+.site-header__right {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-shrink: 0;
+}
+
+.site-header__search {
+  display: flex;
+  align-items: center;
+  color: var(--color-ink);
+}
+
+.site-header__search:hover {
+  color: var(--color-burgundy);
+}
+
+/* Mobile navigation */
 
 .nav-toggle,
 .mobile-nav {
@@ -295,7 +310,7 @@ img {
   }
 
   .site-nav,
-  .site-header__cta {
+  .site-header__right {
     display: none;
   }
 
@@ -306,46 +321,83 @@ img {
   .mobile-nav {
     display: flex;
     flex-direction: column;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    z-index: 20;
-    max-height: min(70vh, 30rem);
+    justify-content: center;
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    padding: 5rem 1.5rem 2rem;
+    background: var(--color-dark);
     overflow-y: auto;
-    padding: 0 1.5rem 1.5rem;
-    background: var(--color-surface);
-    border-bottom: 1px solid var(--color-line);
-    box-shadow: 0 14px 28px -20px rgb(20 17 16 / 65%);
   }
 
-  .mobile-nav[hidden] {
-    display: none;
+  .mobile-nav__links {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-bottom: 2rem;
   }
 
-  .mobile-nav a {
-    padding: 0.9rem 0;
-    border-top: 1px solid var(--color-line);
-    font-size: 0.85rem;
+  .mobile-nav__link {
+    display: block;
+    font-family: var(--font-serif);
+    font-size: 2rem;
     font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--color-ink);
+    color: var(--color-on-dark);
+    text-decoration: none;
+    padding: 0.4rem 0;
+    line-height: 1.2;
   }
 
-  .mobile-nav a:hover {
+  .mobile-nav__link:hover {
     color: var(--color-burgundy);
     text-decoration: none;
   }
 
-  /* Outranks the `.mobile-nav a` rule above, which would otherwise strip the
-     button back to a plain list row. */
-  .mobile-nav a.mobile-nav__cta {
-    margin-top: 1.25rem;
-    padding: 0.9rem 1.3rem;
-    border: 0;
+  .mobile-nav__link small {
+    display: block;
+    font-family: var(--font-sans);
+    font-size: 0.72rem;
+    font-weight: 400;
+    color: color-mix(in srgb, var(--color-on-dark) 45%, transparent);
+    letter-spacing: 0.01em;
+    margin-top: 0.1rem;
+    text-transform: none;
+  }
+
+  .mobile-nav__cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.75rem 1.5rem;
+    background: var(--color-burgundy);
     color: var(--color-on-dark);
-    text-align: center;
+    font-family: var(--font-sans);
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    border-radius: var(--radius);
+    text-decoration: none;
+    align-self: flex-start;
+  }
+
+  .mobile-nav__cta:hover {
+    background: var(--color-burgundy-deep);
+    text-decoration: none;
+  }
+
+  .nav-toggle {
+    position: relative;
+    z-index: 2;
+  }
+
+  .nav-toggle--on-dark {
+    color: var(--color-on-dark);
+    border-color: color-mix(in srgb, var(--color-on-dark) 30%, transparent);
+  }
+
+  .nav-toggle--on-dark:hover {
+    color: var(--color-burgundy);
+    border-color: var(--color-burgundy);
   }
 }
 
