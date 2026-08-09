@@ -1,6 +1,18 @@
+'use client'
+
+import { usePathname } from 'next/navigation'
+
 import { subscribeToNewsletter } from '@/app/(frontend)/newsletter/actions'
+import { NEWSLETTER_PATH } from '@/lib/seo/site'
 
 export function NewsletterBand() {
+  const pathname = usePathname()
+  // The newsletter page has its own signup form; showing this band there too
+  // puts two identically-labeled "Email address" inputs on one page.
+  if (pathname?.replace(/\/$/, '') === NEWSLETTER_PATH.replace(/\/$/, '')) {
+    return null
+  }
+
   return (
     <section className="newsletter-band">
       <div className="container newsletter-band__inner">
