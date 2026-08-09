@@ -11,10 +11,8 @@ Related: [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md),
 
 ## Done
 
-- VPS provisioned (Hetzner), Docker installed, repo cloned.
-- `.env` configured on the VPS (Postgres, R2, Payload secrets); the
-  `postgres`, `app`, `caddy`, and `backup` services run via
-  `docker compose up -d`.
+- VPS provisioned (Hetzner), Docker installed, repo cloned; the `postgres`,
+  `app`, `caddy`, and `backup` services run via `docker compose up -d`.
 - **Automatic deploy on merge to `main`** (`.github/workflows/ci.yml`,
   `deploy` job): after `checks`, `browser-smoke`, `backup-image`, and
   `app-image` all pass, it
@@ -45,6 +43,44 @@ Related: [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md),
   slugs, 0 missing authors/tags, 1 redirect planned. No importer code
   changes are needed; it fetches media over HTTP and the source Ghost site
   (`beyondeveryart.com`) is still live.
+- **`.env` on the VPS, actually created.** It turned out not to exist at all
+  (the previous version of this doc claimed otherwise) — the stack had been
+  running on `docker-compose.yml`'s bare fallback defaults the whole time,
+  including the publicly-known `PAYLOAD_SECRET=development-only-change-me`.
+  Now created from `.env.example` with a real generated `PAYLOAD_SECRET`,
+  `SITE_ADDRESS`/`NEXT_PUBLIC_SITE_URL`/`NEXT_PUBLIC_SERVER_URL`/
+  `PAYLOAD_PUBLIC_SERVER_URL` set to the staging domain, `CMS_ADDRESS` set,
+  and `NEXT_PUBLIC_NOINDEX=1` / `STAGING_BASIC_AUTH` set so the rehearsal
+  site is neither indexed nor public. `MCP_ENABLED` and an MCP API key are
+  still not set up — see item 0.5 below, still open.
+- **DNS + TLS, for staging.** `staging.beyondeveryart.com` and
+  `cms.beyondeveryart.com` both point at the VPS (Cloudflare, DNS-only —
+  proxying either would break Let's Encrypt's HTTP-01 challenge) and Caddy
+  holds real certificates for both.
+- **Real Ghost import, done for real on staging.** Ran `pnpm migrate:ghost`
+  and `pnpm migrate:redirects` (for real, not dry-run) against the staging
+  environment above: 2 authors, 10 tags, 117 posts, 2 pages, 110/110 media
+  imported with zero failures, 1 redirect created. `pnpm migrate:validate`
+  confirms `"ok": true` with every collection's expected count matching
+  actual. Members are still not imported — see item 3 below, still open.
+- **Fixed three bugs found while getting the above working**, all merged to
+  `main`:
+  - The `app` container had been reporting `unhealthy` since it was created
+    (11+ days). Cause: Docker sets `HOSTNAME` to the container ID by default,
+    and Next's standalone server binds to that instead of `0.0.0.0`, so
+    loopback (the Compose healthcheck, and the deploy workflow's own
+    post-deploy health check) could never reach it. Fixed with an explicit
+    `ENV HOSTNAME="0.0.0.0"` in the `Dockerfile` (#53).
+  - `NewsletterBand` rendered on every page including `/newsletter` itself,
+    putting two inputs both labeled "Email address" on one page — a real
+    duplicate for assistive tech, and the reason `browser-smoke` CI was
+    failing on `main`. Fixed by hiding it on the newsletter page itself
+    (#54).
+  - `.env`'s `DATABASE_URI`, copied verbatim from `.env.example`, pointed at
+    `localhost` — correct for `pnpm dev` on a host machine, but inside the
+    `app` container `localhost` is its own loopback, not the `postgres`
+    container. Fixed by pointing it at the `postgres` service hostname
+    instead (`.env` only, not a code change).
 
 ## Not done yet
 
@@ -56,52 +92,40 @@ Related: [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md),
    then run the baseline commands in
    [`DATABASE_MIGRATIONS.md`](DATABASE_MIGRATIONS.md). The script refuses
    anything that is not a pre-migrations database, and is safe to rerun.
+   Several deploys have succeeded since this was written (most recently #53,
+   #54), so this is likely already resolved — not reconfirmed directly, worth
+   a quick `docker compose run --rm migrate pnpm migrate:db:status` check
+   before treating it as closed.
 
-0.5. **CMS subdomain, for MCP from mobile (operator action).** Point a DNS A
-record for `cms.beyondeveryart.com` at the VPS and set `CMS_ADDRESS` in the
-VPS `.env`. Caddy then issues a certificate for it and serves Payload Admin
-and `POST /api/mcp` there, while the apex keeps pointing at the live Ghost
-site — the public hostname returns 404 for `/api/mcp` by design. Then set
-`MCP_ENABLED=1`, create an editor-bound key in Payload Admin under
-MCP → API Keys, and add it to the Claude connector. See
-[`MCP_SERVER.md`](MCP_SERVER.md).
+0.5. **MCP from mobile — subdomain is live, endpoint is not enabled yet
+(operator action).** `cms.beyondeveryart.com` now has a real certificate (see
+above) and Payload Admin loads there. Still needed: set `MCP_ENABLED=1`,
+create an editor-bound key in Payload Admin under MCP → API Keys, and add it
+to the Claude connector. See [`MCP_SERVER.md`](MCP_SERVER.md).
 
-1. **DNS + TLS.** No domain points at the VPS yet, and `SITE_ADDRESS` /
-   `NEXT_PUBLIC_SITE_URL` / `NEXT_PUBLIC_SERVER_URL` /
-   `PAYLOAD_PUBLIC_SERVER_URL` in the VPS's `.env` are still placeholders.
-   Once a domain's A record points at the VPS, update those variables and
-   restart the stack once — Caddy provisions a real Let's Encrypt
-   certificate automatically. Until then, HTTP requests correctly 308 to
-   HTTPS, but HTTPS itself fails (Let's Encrypt cannot issue a cert for a
-   bare IP address) — that failure is expected, not a bug.
-2. **Real Ghost import.** Dry runs are clean, but nothing has been imported
-   into Payload for real. Do this after DNS/TLS, following
-   `MIGRATION_REHEARSAL.md` (set `NEXT_PUBLIC_NOINDEX=1` and
-   `STAGING_BASIC_AUTH` first if rehearsing before the site should be
-   public).
-3. **Members CSV.** Not included in the site archive already checked. Export
+1. **Members CSV.** Not included in the site archive already checked. Export
    separately from Ghost Admin (Members → Settings → Export all members)
    before migrating member records and Stripe IDs.
-4. **Stripe webhook takeover.** Required before Ghost is cancelled — see
+2. **Stripe webhook takeover.** Required before Ghost is cancelled — see
    `CUTOVER_RUNBOOK.md`'s "Paid subscriptions in Stripe" checklist and
    `SUBSCRIPTION_WEBHOOKS.md`. Not started.
-5. **VPS security hardening**, found while debugging the deploy key:
+3. **VPS security hardening**, found while debugging the deploy key:
    - Root SSH login currently accepts **password** authentication, not just
      keys. Disable `PasswordAuthentication` in `sshd_config` once key-based
      login is confirmed working for every account that needs access.
    - The deploy SSH user (`VPS_USER`) is currently `root`. Consider a
      dedicated low-privilege deploy user in the `docker` group instead.
-6. **Docker image/layer cleanup (operator action).** Nothing automatically
+4. **Docker image/layer cleanup (operator action).** Nothing automatically
    prunes old images or layers on the VPS. That is intentional: an unattended
    prune can remove rollback material and consume I/O at the worst time.
    Periodically inspect `docker system df`, then have an operator review and
    remove only confirmed-unused images/layers during a maintenance window.
-7. **GitHub branch protection (operator action).** Configure the `main` branch
+5. **GitHub branch protection (operator action).** Configure the `main` branch
    in repository settings to require the `checks`, `browser-smoke`,
    `backup-image`, and `app-image` jobs and disallow bypasses appropriate to
    the team. The workflow does not mutate repository protection rules or infer
    who should have bypass authority.
-8. **Lower priority / only if needed later:**
+6. **Lower priority / only if needed later:**
    - Move the image build off the production VPS (build in CI, push to a
      registry, VPS just pulls) if frequent merges start causing noticeable
      CPU contention with live traffic during the ~2–3 minute build window.
