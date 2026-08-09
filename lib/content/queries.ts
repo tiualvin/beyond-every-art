@@ -3,6 +3,7 @@ import type { Where } from 'payload'
 import { toMediaImage, type MediaImage } from '@/lib/content/media'
 import { ARCHIVE_PAGE_SIZE } from '@/lib/content/pagination'
 import { toBodyHtml } from '@/lib/content/richtext'
+import { readingTimeMinutes } from '@/lib/format'
 import { getPayloadClient } from '@/lib/payload'
 import type { PreviewUser } from '@/lib/preview/session'
 
@@ -25,6 +26,7 @@ export type PostCard = {
   authors: AuthorSummary[]
   tag: string | null
   image: MediaImage | null
+  readingTime: number
 }
 
 const DEFAULT_SETTINGS: SiteSettings = {
@@ -51,6 +53,8 @@ type RawPost = {
   authors?: Array<RawAuthor | string | number>
   tags?: Array<RawTag | string | number>
   featuredImage?: unknown
+  legacyHTML?: string
+  content?: unknown
 }
 
 function toAuthorSummaries(authors: RawPost['authors']): AuthorSummary[] {
@@ -68,6 +72,16 @@ function firstTagName(tags: RawPost['tags']): string | null {
   return tag?.name ?? null
 }
 
+function estimateWordCount(doc: RawPost): number {
+  const html = doc.legacyHTML ?? ''
+  if (html) {
+    const text = html.replace(/<[^>]*>/g, ' ')
+    return text.split(/\s+/).filter(Boolean).length
+  }
+  const excerpt = doc.excerpt ?? ''
+  return excerpt.split(/\s+/).filter(Boolean).length * 8
+}
+
 function toPostCard(doc: RawPost): PostCard | null {
   if (!doc.slug) return null
   return {
@@ -80,6 +94,7 @@ function toPostCard(doc: RawPost): PostCard | null {
     authors: toAuthorSummaries(doc.authors),
     tag: firstTagName(doc.tags),
     image: toMediaImage(doc.featuredImage),
+    readingTime: readingTimeMinutes(estimateWordCount(doc)),
   }
 }
 
@@ -482,4 +497,56 @@ export function getTagSlugs(): Promise<SlugRef[]> {
 /** All author slugs (for the sitemap). */
 export function getAuthorSlugs(): Promise<SlugRef[]> {
   return getSlugRefs('authors')
+}
+
+// --- Homepage topic cards -------------------------------------------------
+
+export type TopicCard = {
+  name: string
+  slug: string
+  postCount: number
+  image: MediaImage | null
+}
+
+export async function getTagsWithCounts(limit = 6): Promise<TopicCard[]> {
+  try {
+    const payload = await getPayloadClient()
+    const tags = await payload.find({
+      collection: 'tags',
+      overrideAccess: true,
+      depth: 1,
+      pagination: false,
+      limit: 0,
+    })
+
+    const results: TopicCard[] = []
+    for (const tag of tags.docs as Array<{
+      id?: string | number
+      name?: string
+      slug?: string
+      featuredImage?: unknown
+    }>) {
+      if (!tag.slug || !tag.name) continue
+      const count = await payload.count({
+        collection: 'posts',
+        overrideAccess: true,
+        where: {
+          and: [{ tags: { in: [tag.id] } }, publishedPublic],
+        },
+      })
+      results.push({
+        name: tag.name,
+        slug: tag.slug,
+        postCount: count.totalDocs,
+        image: toMediaImage(tag.featuredImage),
+      })
+    }
+
+    return results
+      .filter((t) => t.postCount > 0)
+      .sort((a, b) => b.postCount - a.postCount)
+      .slice(0, limit)
+  } catch {
+    return []
+  }
 }
