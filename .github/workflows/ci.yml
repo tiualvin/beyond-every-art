@@ -48,7 +48,23 @@ jobs:
       # Automatic schema push is off in every environment, so the CI database
       # is built the same way production's is: by replaying the committed
       # migrations. Everything below that touches PostgreSQL depends on this.
-      - run: pnpm migrate:db
+      #
+      # `payload migrate` occasionally exits 0 without executing the migration
+      # SQL, leaving the tables missing while recording the migration as done.
+      # The sentinel check catches this: if a known table is absent, the
+      # migration tracking rows are removed so the retry re-runs from scratch.
+      - name: Run and verify database migrations
+        run: |
+          pnpm migrate:db
+          if ! psql "$DATABASE_URI" -tAc "SELECT to_regclass('public.authors')" | grep -q 'authors'; then
+            echo "::warning::Tables missing after payload migrate; resetting migration state and retrying"
+            psql "$DATABASE_URI" -c "DELETE FROM payload_migrations;" 2>/dev/null || true
+            pnpm migrate:db
+            if ! psql "$DATABASE_URI" -tAc "SELECT to_regclass('public.authors')" | grep -q 'authors'; then
+              echo "::error::Migrations failed to create tables after retry"
+              exit 1
+            fi
+          fi
       # Guard the workflow that push used to hide. A field added to a
       # collection without a matching migration leaves CI and production
       # disagreeing about the schema, and the only symptom is a query failing
@@ -124,8 +140,20 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       # Schema push is off, so the seeds have no tables to write into until the
-      # committed migrations have built them.
-      - run: pnpm migrate:db
+      # committed migrations have built them. Same sentinel check as in
+      # `checks` — see the comment there for why.
+      - name: Run and verify database migrations
+        run: |
+          pnpm migrate:db
+          if ! psql "$DATABASE_URI" -tAc "SELECT to_regclass('public.authors')" | grep -q 'authors'; then
+            echo "::warning::Tables missing after payload migrate; resetting migration state and retrying"
+            psql "$DATABASE_URI" -c "DELETE FROM payload_migrations;" 2>/dev/null || true
+            pnpm migrate:db
+            if ! psql "$DATABASE_URI" -tAc "SELECT to_regclass('public.authors')" | grep -q 'authors'; then
+              echo "::error::Migrations failed to create tables after retry"
+              exit 1
+            fi
+          fi
       - run: pnpm seed:dev
       - run: pnpm seed:e2e
       - run: pnpm build
