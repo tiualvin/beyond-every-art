@@ -10,12 +10,11 @@ import { formatDate } from '@/lib/format'
 import { JOURNAL_PATH, postPath } from '@/lib/seo/site'
 
 import { StoryCard } from './components/story-card'
-import { TopicCard } from './components/topic-card'
+import { TopicsCarousel } from './components/topics-carousel'
 import { FadeIn } from './components/motion/fade-in'
 import { ImageReveal } from './components/motion/image-reveal'
 import { Parallax } from './components/motion/parallax'
 import { Reveal } from './components/motion/reveal'
-import { ScrollProgress } from './components/motion/scroll-progress'
 import { StaggerChildren, StaggerItem } from './components/motion/stagger'
 
 export const dynamic = 'force-dynamic'
@@ -29,12 +28,9 @@ export default async function HomePage() {
 
   const [lead, ...rest] = posts
   const featured = rest.length > 0 ? rest : posts
-  const [firstFeatured, ...otherFeatured] = featured
 
   return (
     <main>
-      <ScrollProgress />
-
       {/* ── Hero ── */}
       <section className="hero">
         <div className="container hero__inner hero__split">
@@ -107,9 +103,6 @@ export default async function HomePage() {
       {lead && (
         <section className="section" style={{ paddingTop: 0 }}>
           <div className="container">
-            <div className="section-divider" aria-hidden="true">
-              <span className="section-divider__dot" />
-            </div>
             <Reveal>
               <div className="lead-story">
                 {lead.image && (
@@ -122,8 +115,7 @@ export default async function HomePage() {
                       <Image
                         src={lead.image.url}
                         alt={lead.image.alt}
-                        width={lead.image.width ?? 800}
-                        height={lead.image.height ?? 530}
+                        fill
                         className="lead-story__image"
                         sizes="(max-width: 800px) 100vw, 55vw"
                       />
@@ -131,12 +123,8 @@ export default async function HomePage() {
                   </ImageReveal>
                 )}
                 <div className="lead-story__text">
-                  {lead.tag && <p className="eyebrow">{lead.tag}</p>}
-                  <p
-                    className="eyebrow"
-                    style={{ color: 'var(--color-muted)' }}
-                  >
-                    Latest
+                  <p className="eyebrow">
+                    {[lead.tag, 'Latest'].filter(Boolean).join(' · ')}
                   </p>
                   <h2 className="lead-story__title">
                     <Link href={postPath(lead.slug)}>{lead.title}</Link>
@@ -163,9 +151,6 @@ export default async function HomePage() {
       {/* ── Featured stories (magazine layout) ── */}
       <section className="section" style={{ paddingTop: 0 }}>
         <div className="container">
-          <div className="section-divider" aria-hidden="true">
-            <span className="section-divider__dot" />
-          </div>
           <Reveal>
             <div className="section__head">
               <p className="eyebrow">Featured Stories</p>
@@ -175,18 +160,11 @@ export default async function HomePage() {
 
           {featured.length > 0 ? (
             <StaggerChildren className="card-grid--magazine">
-              {firstFeatured && (
-                <StaggerItem className="card-grid__feature">
-                  <StoryCard post={firstFeatured} variant="horizontal" />
+              {featured.map((post) => (
+                <StaggerItem key={post.id}>
+                  <StoryCard post={post} variant="feature" />
                 </StaggerItem>
-              )}
-              <div className="card-grid__columns">
-                {otherFeatured.map((post) => (
-                  <StaggerItem key={post.id}>
-                    <StoryCard post={post} />
-                  </StaggerItem>
-                ))}
-              </div>
+              ))}
             </StaggerChildren>
           ) : (
             <p className="muted" style={{ textAlign: 'center' }}>
@@ -209,13 +187,7 @@ export default async function HomePage() {
                 </h2>
               </div>
             </Reveal>
-            <StaggerChildren className="topics__grid">
-              {topics.map((topic) => (
-                <StaggerItem key={topic.slug}>
-                  <TopicCard topic={topic} />
-                </StaggerItem>
-              ))}
-            </StaggerChildren>
+            <TopicsCarousel topics={topics} />
           </div>
         </section>
       )}
