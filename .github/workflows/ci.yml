@@ -49,21 +49,18 @@ jobs:
       # is built the same way production's is: by replaying the committed
       # migrations. Everything below that touches PostgreSQL depends on this.
       #
-      # `payload migrate` occasionally exits 0 without executing the migration
-      # SQL, leaving the tables missing while recording the migration as done.
-      # The sentinel check catches this: if a known table is absent, the
-      # migration tracking rows are removed so the retry re-runs from scratch.
+      # `payload migrate` can exit 0 without running at all — see
+      # `scripts/run-migrations.mjs`, which `migrate:db` now goes through and
+      # which detects and retries that case. The table check stays as a second
+      # opinion: it confirms the schema really exists rather than trusting the
+      # CLI's own account of itself, and it is what caught the problem
+      # originally.
       - name: Run and verify database migrations
         run: |
           pnpm migrate:db
           if ! psql "$DATABASE_URI" -tAc "SELECT to_regclass('public.authors')" | grep -q 'authors'; then
-            echo "::warning::Tables missing after payload migrate; resetting migration state and retrying"
-            psql "$DATABASE_URI" -c "DELETE FROM payload_migrations;" 2>/dev/null || true
-            pnpm migrate:db
-            if ! psql "$DATABASE_URI" -tAc "SELECT to_regclass('public.authors')" | grep -q 'authors'; then
-              echo "::error::Migrations failed to create tables after retry"
-              exit 1
-            fi
+            echo "::error::Migrations reported success but the schema is missing"
+            exit 1
           fi
       # Guard the workflow that push used to hide. A field added to a
       # collection without a matching migration leaves CI and production
@@ -140,19 +137,14 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
       # Schema push is off, so the seeds have no tables to write into until the
-      # committed migrations have built them. Same sentinel check as in
-      # `checks` — see the comment there for why.
+      # committed migrations have built them. Same table check as in `checks` —
+      # see the comment there for why.
       - name: Run and verify database migrations
         run: |
           pnpm migrate:db
           if ! psql "$DATABASE_URI" -tAc "SELECT to_regclass('public.authors')" | grep -q 'authors'; then
-            echo "::warning::Tables missing after payload migrate; resetting migration state and retrying"
-            psql "$DATABASE_URI" -c "DELETE FROM payload_migrations;" 2>/dev/null || true
-            pnpm migrate:db
-            if ! psql "$DATABASE_URI" -tAc "SELECT to_regclass('public.authors')" | grep -q 'authors'; then
-              echo "::error::Migrations failed to create tables after retry"
-              exit 1
-            fi
+            echo "::error::Migrations reported success but the schema is missing"
+            exit 1
           fi
       - run: pnpm seed:dev
       - run: pnpm seed:e2e
