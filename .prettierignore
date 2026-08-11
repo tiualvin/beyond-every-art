@@ -7,5 +7,9 @@ pnpm-lock.yaml
 # make every migration a diff against the tool that produced it.
 /migrations/
 docs/GHOST_TO_PAYLOAD_HANDOFF_WITH_APP_STRATEGY.md
+# Design prototypes, kept byte-for-byte as reviewed. They are reference
+# artifacts rather than source, and reflowing their inline CSS and JS would
+# make every future revision an unreadable diff.
+/docs/assets/redesign-prototypes/
 AGENTS.md
 /.claude/

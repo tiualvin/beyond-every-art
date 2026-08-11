@@ -1,0 +1,2207 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Beyond Every Art — Topic Page</title>
+  </head>
+  <body>
+<style>
+  /* ==========================================================================
+     Tokens — identical to the homepage and article mockups.
+     ========================================================================== */
+  :root {
+    --color-paper: #f6f2eb;
+    --color-surface: #fffdf9;
+    --color-ink: #1b1714;
+    --color-muted: #6f665c;
+    --color-burgundy: #6d1f2c;
+    --color-burgundy-deep: #4c1420;
+    --color-dark: #141110;
+    --color-on-dark: #f3ede4;
+    --color-line: #e4ddd2;
+    --color-rule: color-mix(in srgb, var(--color-ink) 26%, var(--color-paper));
+
+    --font-serif: 'Playfair Display', Georgia, 'Times New Roman', serif;
+    --font-sans: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+    --maxw: 78rem;
+    --radius: 2px;
+
+    --pig-ultramarine: #1f3a93;
+    --pig-sienna: #8a3a1e;
+    --pig-viridian: #2e6b52;
+    --pig-cadmium: #c9820a;
+    --pig-lead-white: #efe9dd;
+    --pig-bone-black: #20211f;
+
+    color-scheme: light;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 1.0625rem;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0.4;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.32'/%3E%3C/svg%3E");
+  }
+
+  h1, h2, h3 {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-weight: 600;
+    line-height: 1.12;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  a { color: inherit; text-decoration: none; }
+  img { max-width: 100%; display: block; }
+
+  :focus-visible { outline: 2px solid var(--color-burgundy); outline-offset: 3px; }
+
+  .container {
+    width: 100%;
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: 0 1.75rem;
+  }
+
+  .eyebrow {
+    font-family: var(--font-sans);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--color-burgundy);
+    margin: 0;
+  }
+
+  .num { font-variant-numeric: tabular-nums; }
+
+  .button {
+    display: inline-block;
+    font-family: var(--font-sans);
+    font-size: 0.76rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 0.9rem 1.5rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .button:hover { text-decoration: none; }
+
+  .button--primary {
+    background: var(--color-burgundy);
+    border-color: var(--color-burgundy);
+    color: var(--color-on-dark);
+  }
+
+  .button--primary:hover {
+    background: var(--color-burgundy-deep);
+    border-color: var(--color-burgundy-deep);
+  }
+
+  .button--on-dark {
+    background: var(--color-on-dark);
+    border-color: var(--color-on-dark);
+    color: var(--color-burgundy-deep);
+  }
+
+  .button--on-dark:hover { background: transparent; color: var(--color-on-dark); }
+
+  .button--ghost { border-color: var(--color-line); color: var(--color-ink); }
+
+  .button--ghost:hover { border-color: var(--color-ink); }
+
+  .button--compact { padding: 0.55rem 1.05rem; font-size: 0.72rem; }
+
+  /* ==========================================================================
+     Masthead + mobile menu
+     ========================================================================== */
+  .masthead {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    padding: 0.85rem 1.75rem;
+    background: var(--color-paper);
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .masthead__wordmark { font-family: var(--font-serif); font-size: 1.05rem; white-space: nowrap; }
+
+  .masthead__nav {
+    display: flex;
+    gap: 1.75rem;
+    font-size: 0.78rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    font-weight: 500;
+    color: var(--color-muted);
+  }
+
+  .masthead__nav a { position: relative; padding-bottom: 2px; }
+
+  .masthead__nav a::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 1px;
+    background: var(--color-burgundy);
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+
+  .masthead__nav a:hover { color: var(--color-ink); }
+  .masthead__nav a:hover::after { transform: scaleX(1); }
+
+  /* Current section stays marked while you are inside it. */
+  .masthead__nav a[aria-current='page'] { color: var(--color-ink); }
+  .masthead__nav a[aria-current='page']::after { transform: scaleX(1); }
+
+  .masthead__actions { display: flex; align-items: center; gap: 1.1rem; }
+
+  .icon-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem; height: 2rem;
+    padding: 0; border: 0;
+    background: none;
+    color: var(--color-muted);
+    cursor: pointer;
+    border-radius: 50%;
+  }
+
+  .icon-button:hover { color: var(--color-ink); }
+
+  .masthead__signin {
+    font-size: 0.78rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    font-weight: 500;
+    color: var(--color-muted);
+    white-space: nowrap;
+  }
+
+  .masthead__signin:hover { color: var(--color-ink); }
+
+  .nav-toggle {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    width: 2rem; height: 2rem;
+    padding: 0; border: 0;
+    background: none;
+    cursor: pointer;
+  }
+
+  .nav-toggle span {
+    display: block;
+    width: 1.15rem; height: 1.5px;
+    background: var(--color-ink);
+    transform-origin: center;
+  }
+
+  .nav-toggle[aria-expanded='true'] span:first-child { transform: translateY(3.25px) rotate(45deg); }
+  .nav-toggle[aria-expanded='true'] span:last-child { transform: translateY(-3.25px) rotate(-45deg); }
+
+  .mobile-nav {
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    padding-top: var(--masthead-h, 3.5rem);
+    background: var(--color-paper);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    opacity: 0;
+  }
+
+  .mobile-nav.is-open { opacity: 1; }
+  .mobile-nav[hidden] { display: none; }
+
+  .mobile-nav__search,
+  .mobile-nav__links a,
+  .mobile-nav__foot { opacity: 0; transform: translateY(14px); }
+
+  .mobile-nav.is-open .mobile-nav__search,
+  .mobile-nav.is-open .mobile-nav__links a,
+  .mobile-nav.is-open .mobile-nav__foot { opacity: 1; transform: none; }
+
+  .mobile-nav__search { --i: 0; }
+  .mobile-nav__links a:nth-child(1) { --i: 1; }
+  .mobile-nav__links a:nth-child(2) { --i: 2; }
+  .mobile-nav__links a:nth-child(3) { --i: 3; }
+  .mobile-nav__links a:nth-child(4) { --i: 4; }
+  .mobile-nav__foot { --i: 5; }
+
+  .mobile-nav__search {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    margin: 1.75rem 1.75rem 0;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    color: var(--color-muted);
+  }
+
+  .mobile-nav__search input {
+    flex: 1; min-width: 0;
+    border: 0; background: none;
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    color: var(--color-ink);
+  }
+
+  .mobile-nav__search input:focus { outline: none; }
+  .mobile-nav__search:focus-within { border-color: var(--color-burgundy); }
+
+  .mobile-nav__links { display: flex; flex-direction: column; padding: 1.5rem 1.75rem; }
+
+  .mobile-nav__links a {
+    font-family: var(--font-serif);
+    font-size: clamp(1.9rem, 8vw, 2.6rem);
+    letter-spacing: -0.025em;
+    padding: 0.55rem 0;
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .mobile-nav__links a:hover { color: var(--color-burgundy); padding-left: 0.5rem; }
+
+  .mobile-nav__foot {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    padding: 1.75rem;
+    border-top: 1px solid var(--color-line);
+    flex-shrink: 0;
+  }
+
+  .mobile-nav__foot .button { text-align: center; }
+
+  .mobile-nav__signin {
+    font-size: 0.8rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--color-muted);
+    text-align: center;
+  }
+
+  @media (max-width: 980px) {
+    .masthead__nav { display: none; }
+    .nav-toggle { display: flex; }
+  }
+
+  @media (max-width: 620px) {
+    .masthead__signin { display: none; }
+    .masthead .button--compact { display: none; }
+    .masthead { padding: 0.75rem 1.1rem; }
+    .masthead__actions { gap: 0.4rem; }
+  }
+
+  @media (min-width: 981px) { .mobile-nav { display: none; } }
+
+  /* ==========================================================================
+     Topic masthead — the one place a tag page differs from the journal. The
+     topic's own pigment stains the head, so arriving on a topic feels like
+     arriving somewhere, not like a filtered list.
+     ========================================================================== */
+  .topic-head {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    padding-top: calc(var(--masthead-h, 3.5rem) + clamp(2.5rem, 6vw, 5rem));
+    padding-bottom: clamp(2rem, 5vw, 3.5rem);
+  }
+
+  .topic-head__wash { position: absolute; inset: 0; z-index: -2; }
+  .topic-head__wash canvas { width: 100%; height: 100%; display: block; }
+
+  .topic-head__scrim {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    /* Clears the lower band of the head so the description and the counts
+       always land on paper — right-aligned figures would otherwise sit in the
+       deepest part of the wash. */
+    background:
+      linear-gradient(to bottom, transparent 0%, transparent 42%,
+        color-mix(in srgb, var(--color-paper) 82%, transparent) 68%,
+        var(--color-paper) 88%),
+      linear-gradient(to right,
+        color-mix(in srgb, var(--color-paper) 55%, transparent) 0%,
+        transparent 42%);
+  }
+
+  .topic-head__crumb {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.68rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--color-muted);
+    margin: 0 0 1.25rem;
+  }
+
+  .topic-head__crumb a:hover { color: var(--color-ink); }
+
+  .topic-head__kicker {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    margin: 0 0 0.9rem;
+  }
+
+  .topic-head__swatch {
+    width: 0.85rem; height: 0.85rem;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: inset 0 0 0 1px rgba(27, 23, 20, 0.35);
+  }
+
+  /* ==========================================================================
+     Archive body
+     ========================================================================== */
+  .archive {
+    /* The first group's own rule opens the list, so no header rule here. */
+    padding-top: clamp(0.5rem, 1.5vw, 1.25rem);
+    padding-bottom: clamp(3rem, 7vw, 5rem);
+  }
+
+  .archive__title {
+    font-size: clamp(2.6rem, 6.5vw, 4.5rem);
+    letter-spacing: -0.032em;
+    margin: 0 0 1rem;
+  }
+
+  /* Sibling topics, so a tag page is a place to move on from rather than a
+     dead end. */
+  .related {
+    border-top: 1px solid var(--color-line);
+    padding: clamp(2.5rem, 5vw, 3.5rem) 0;
+  }
+
+  .related__label {
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-weight: 600;
+    color: var(--color-muted);
+    margin: 0 0 1rem;
+  }
+
+  .related__list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+  .archive__intro {
+    margin: 0;
+    color: var(--color-muted);
+    max-width: 46ch;
+  }
+
+  /* ==========================================================================
+     Topic chips — related topics at the foot of the page.
+     ========================================================================== */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.74rem;
+    letter-spacing: 0.06em;
+    font-weight: 500;
+    color: var(--color-muted);
+    border: 1px solid var(--color-line);
+    border-radius: 999px;
+    padding: 0.4rem 0.85rem;
+    background: none;
+    font-family: var(--font-sans);
+    cursor: pointer;
+  }
+
+  /* The ring carries the pale pigments — Lead White on paper is otherwise
+     a dot you cannot see. */
+  .chip i {
+    width: 0.5rem; height: 0.5rem;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: inset 0 0 0 1px rgba(27, 23, 20, 0.38);
+  }
+
+  .chip:hover { color: var(--color-ink); border-color: var(--color-ink); text-decoration: none; }
+
+  .chip__count { font-variant-numeric: tabular-nums; opacity: 0.6; }
+
+  /* ==========================================================================
+     Grouped entries. The date rail is the structure: an archive's one true
+     organising fact is when things were published.
+     ========================================================================== */
+  .group {
+    display: grid;
+    grid-template-columns: 7.5rem minmax(0, 1fr);
+    column-gap: 2.5rem;
+    margin-top: 3rem;
+  }
+
+  .group__label {
+    grid-column: 1;
+    position: sticky;
+    top: calc(var(--masthead-h, 3.5rem) + 1.75rem);
+    align-self: start;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-weight: 600;
+    color: var(--color-muted);
+    padding-top: 1.4rem;
+  }
+
+  .group__items { grid-column: 2; }
+
+  .entry {
+    display: grid;
+    /* Last track holds "29 Jul 2026 · 12 min" on one line; narrower and the
+       separator gets stranded at the end of a wrapped line. */
+    grid-template-columns: 5rem minmax(0, 1fr) 9.5rem 8rem;
+    gap: 1.5rem;
+    align-items: start;
+    padding: 1.35rem 0;
+    border-bottom: 1px solid var(--color-line);
+    position: relative;
+  }
+
+  .entry__body, .entry__tag, .entry__len { align-self: baseline; }
+
+  .entry:first-child { border-top: 1px solid var(--color-line); }
+
+  .entry::before {
+    content: '';
+    position: absolute;
+    left: -1.25rem; right: -1.25rem;
+    top: 0; bottom: 0;
+    background: color-mix(in srgb, var(--color-burgundy) 5%, transparent);
+    transform: scaleX(0);
+    transform-origin: left;
+    z-index: -1;
+  }
+
+  .entry:hover::before, .entry:focus-within::before { transform: scaleX(1); }
+
+  .entry__thumb {
+    width: 5rem;
+    aspect-ratio: 4 / 3;
+    margin-top: 0.15rem;
+    overflow: hidden;
+    border-radius: var(--radius);
+  }
+
+  .entry__thumb canvas { width: 100%; height: 100%; display: block; }
+
+  .entry__title {
+    font-family: var(--font-serif);
+    font-size: 1.3rem;
+    font-weight: 500;
+    letter-spacing: -0.018em;
+    line-height: 1.22;
+    margin: 0;
+  }
+
+  .entry:hover .entry__title { color: var(--color-burgundy); }
+
+  .entry__excerpt {
+    font-size: 0.88rem;
+    color: var(--color-muted);
+    margin: 0.3rem 0 0;
+    max-width: 58ch;
+  }
+
+  .entry__tag {
+    font-size: 0.68rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+    font-weight: 600;
+  }
+
+  .entry__len {
+    font-size: 0.78rem;
+    color: var(--color-muted);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 900px) {
+    .group { grid-template-columns: minmax(0, 1fr); }
+    .group__label {
+      grid-column: 1;
+      position: static;
+      margin-bottom: 0.5rem;
+      padding-top: 1rem;
+    }
+    .group__items { grid-column: 1; }
+  }
+
+  @media (max-width: 720px) {
+    .entry {
+      grid-template-columns: 4rem minmax(0, 1fr) auto;
+      gap: 0.6rem 1rem;
+    }
+    .entry__thumb { width: 4rem; grid-row: span 3; }
+    .entry__body { grid-column: 2 / -1; }
+    .entry__tag { grid-column: 2; grid-row: 3; }
+    .entry__len { grid-column: 3; grid-row: 3; }
+  }
+
+  /* ==========================================================================
+     Pagination
+     ========================================================================== */
+  .pagination {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 3.5rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--color-rule);
+  }
+
+  .pagination__next { justify-self: end; }
+
+  .pagination__status {
+    margin: 0;
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--color-muted);
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+  }
+
+  /* Stacked, and in source order — reordering rows here only makes the
+     reading order disagree with the DOM for no visual gain. */
+  @media (max-width: 560px) {
+    .pagination {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.9rem;
+    }
+    .pagination__next { justify-self: auto; text-align: center; }
+  }
+
+  /* ==========================================================================
+     Subscribe + footer
+     ========================================================================== */
+  .subscribe {
+    background: var(--color-burgundy-deep);
+    color: var(--color-on-dark);
+    padding: clamp(3.5rem, 8vh, 5.5rem) 0;
+  }
+
+  .subscribe__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.85fr);
+    gap: clamp(2rem, 6vw, 5rem);
+    align-items: center;
+  }
+
+  .subscribe h2 {
+    color: var(--color-on-dark);
+    font-size: clamp(1.7rem, 3.5vw, 2.6rem);
+    letter-spacing: -0.028em;
+    margin: 0.85rem 0 0.9rem;
+    max-width: 18ch;
+  }
+
+  .subscribe p {
+    color: color-mix(in srgb, var(--color-on-dark) 78%, transparent);
+    margin: 0;
+    max-width: 42ch;
+    font-size: 0.98rem;
+  }
+
+  .subscribe .eyebrow { color: color-mix(in srgb, var(--color-on-dark) 80%, transparent); }
+
+  .signup { display: flex; flex-direction: column; gap: 0.75rem; }
+  .signup__row { display: flex; gap: 0.6rem; }
+
+  .signup input {
+    flex: 1; min-width: 0;
+    padding: 0.9rem 1rem;
+    font-family: var(--font-sans);
+    font-size: 0.92rem;
+    color: var(--color-on-dark);
+    background: color-mix(in srgb, var(--color-on-dark) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-on-dark) 32%, transparent);
+    border-radius: var(--radius);
+  }
+
+  .signup input::placeholder { color: color-mix(in srgb, var(--color-on-dark) 52%, transparent); }
+  .signup input:focus { outline: none; border-color: var(--color-on-dark); }
+  .signup small { font-size: 0.72rem; color: color-mix(in srgb, var(--color-on-dark) 62%, transparent); }
+
+  .footer {
+    background: var(--color-dark);
+    color: color-mix(in srgb, var(--color-on-dark) 70%, transparent);
+    padding: 3rem 0;
+    font-size: 0.82rem;
+  }
+
+  .footer__grid {
+    display: flex;
+    justify-content: space-between;
+    gap: 2rem;
+    flex-wrap: wrap;
+    align-items: baseline;
+  }
+
+  .footer__wordmark { font-family: var(--font-serif); font-size: 1.15rem; color: var(--color-on-dark); }
+  .footer nav { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+  .footer a:hover { color: var(--color-on-dark); }
+
+  @media (max-width: 640px) {
+    .subscribe__grid { grid-template-columns: 1fr; }
+    .signup__row { flex-direction: column; }
+  }
+
+  /* ==========================================================================
+     Motion
+     ========================================================================== */
+  .reveal { opacity: 0; transform: translateY(16px); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal {
+      transition: opacity 0.65s cubic-bezier(0.22, 1, 0.36, 1),
+                  transform 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .reveal.is-in { opacity: 1; transform: none; }
+
+    .masthead__nav a::after { transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1); }
+    .entry::before { transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1); }
+    .entry__title, .masthead__nav a, .masthead__signin { transition: color 0.22s ease; }
+    .entry__thumb canvas { transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1); }
+    .entry:hover .entry__thumb canvas { transform: scale(1.07); }
+    .chip, .button, .icon-button, .signup input {
+      transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+    }
+
+    .mobile-nav { transition: opacity 0.3s ease; }
+    .mobile-nav.is-open { transition-duration: 0.16s; }
+    .mobile-nav__search,
+    .mobile-nav__links a,
+    .mobile-nav__foot {
+      transition: opacity 0.3s ease,
+                  transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+                  color 0.2s ease,
+                  padding-left 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .mobile-nav.is-open .mobile-nav__search,
+    .mobile-nav.is-open .mobile-nav__links a,
+    .mobile-nav.is-open .mobile-nav__foot { transition-delay: calc(0.05s * var(--i) + 0.06s); }
+    .nav-toggle span { transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reveal { opacity: 1; transform: none; }
+    .mobile-nav,
+    .mobile-nav__search,
+    .mobile-nav__links a,
+    .mobile-nav__foot { opacity: 1; transform: none; }
+  }
+
+  /* ==========================================================================
+     Search panel — drops from under the masthead. Not a modal: the page stays
+     visible behind it, so searching feels like opening a drawer on the site
+     rather than leaving it.
+     ========================================================================== */
+  .search-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 49;
+    background: color-mix(in srgb, var(--color-dark) 38%, transparent);
+    opacity: 0;
+  }
+
+  .search-scrim[hidden] { display: none; }
+  .search-scrim.is-open { opacity: 1; }
+
+  .search-panel {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 50;
+    max-height: 100dvh;
+    overflow-y: auto;
+    padding-top: var(--masthead-h, 3.5rem);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-line);
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  .search-panel[hidden] { display: none; }
+  .search-panel.is-open { opacity: 1; transform: none; }
+
+  .search__field {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.4rem 0 1.1rem;
+    border-bottom: 2px solid var(--color-ink);
+  }
+
+  .search__field > svg { color: var(--color-burgundy); flex-shrink: 0; }
+
+  .search__field input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: none;
+    padding: 0;
+    font-family: var(--font-serif);
+    font-size: clamp(1.35rem, 3.5vw, 2rem);
+    letter-spacing: -0.022em;
+    color: var(--color-ink);
+  }
+
+  .search__field input::-webkit-search-cancel-button,
+  .search__field input::-webkit-search-decoration { -webkit-appearance: none; }
+
+  .search__field input:focus { outline: none; }
+  .search__field input::placeholder { color: color-mix(in srgb, var(--color-muted) 55%, transparent); }
+
+  .search__meta {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding: 0.9rem 0 0.3rem;
+    font-size: 0.66rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--color-muted);
+  }
+
+  .search__hint kbd {
+    font-family: var(--font-sans);
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius);
+    padding: 0.1rem 0.35rem;
+    margin: 0 0.15rem;
+  }
+
+  .search__results { list-style: none; margin: 0; padding: 0 0 2rem; }
+
+  .search__result {
+    display: grid;
+    grid-template-columns: 0.6rem minmax(0, 1fr) auto;
+    gap: 0.9rem;
+    align-items: baseline;
+    padding: 0.85rem 0;
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .search__result i {
+    width: 0.55rem; height: 0.55rem;
+    border-radius: 50%;
+    align-self: start;
+    margin-top: 0.42rem;
+    box-shadow: inset 0 0 0 1px rgba(27, 23, 20, 0.38);
+  }
+
+  .search__result h3 {
+    font-family: var(--font-serif);
+    font-size: 1.15rem;
+    font-weight: 500;
+    letter-spacing: -0.018em;
+    line-height: 1.25;
+    margin: 0;
+  }
+
+  .search__result mark {
+    background: color-mix(in srgb, var(--color-burgundy) 16%, transparent);
+    color: inherit;
+    border-radius: 1px;
+  }
+
+  .search__result p {
+    margin: 0.2rem 0 0;
+    font-size: 0.85rem;
+    color: var(--color-muted);
+  }
+
+  .search__result-meta {
+    font-size: 0.7rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--color-muted);
+    white-space: nowrap;
+  }
+
+  .search__result:hover h3,
+  .search__result:focus-visible h3 { color: var(--color-burgundy); }
+
+  @media (hover: none), (pointer: coarse) {
+    .search__hint { display: none; }
+  }
+
+  .search__empty { padding: 2rem 0 3rem; color: var(--color-muted); }
+  .search__empty b { color: var(--color-ink); font-weight: 600; }
+
+  @media (max-width: 640px) {
+    .search__result { grid-template-columns: 0.6rem minmax(0, 1fr); }
+    .search__result-meta { grid-column: 2; }
+  }
+
+  /* ==========================================================================
+     Subscribe modal
+     ========================================================================== */
+  .modal-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    display: grid;
+    justify-items: center;
+    align-items: start;
+    padding: 1.5rem;
+    background: color-mix(in srgb, var(--color-dark) 58%, transparent);
+    opacity: 0;
+    overflow-y: auto;
+  }
+
+  .modal-scrim[hidden] { display: none; }
+  .modal-scrim.is-open { opacity: 1; }
+
+  .modal:focus { outline: none; }
+
+  .modal {
+    position: relative;
+    margin: auto 0;
+    width: min(29rem, 100%);
+    background: var(--color-paper);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: 0 32px 80px -24px rgba(20, 17, 16, 0.55);
+    opacity: 0;
+    transform: translateY(16px) scale(0.985);
+  }
+
+  .modal-scrim.is-open .modal { opacity: 1; transform: none; }
+
+  .modal__close {
+    position: absolute;
+    top: 0.85rem; right: 0.85rem;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem; height: 2rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--color-muted);
+    cursor: pointer;
+  }
+
+  .modal__close:hover { color: var(--color-ink); }
+
+  .modal__body { padding: 1.9rem 1.75rem 1.75rem; }
+
+  .modal__body h2 {
+    font-size: 1.6rem;
+    letter-spacing: -0.025em;
+    margin: 0.6rem 0 0.6rem;
+  }
+
+  .modal__body > p {
+    margin: 0 0 1.25rem;
+    font-size: 0.95rem;
+    color: var(--color-muted);
+  }
+
+  .modal__form { display: flex; flex-direction: column; gap: 0.7rem; }
+
+  .modal__form input {
+    width: 100%;
+    padding: 0.85rem 1rem;
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    color: var(--color-ink);
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius);
+  }
+
+  .modal__form input:focus { outline: none; border-color: var(--color-burgundy); }
+  .modal__form .button { width: 100%; text-align: center; }
+
+  .modal__small { margin: 0; font-size: 0.72rem; color: var(--color-muted); }
+
+  .modal__error {
+    margin: 0;
+    font-size: 0.78rem;
+    color: var(--color-burgundy);
+    font-weight: 600;
+  }
+
+  .modal__error[hidden] { display: none; }
+
+  .modal__done { text-align: center; padding: 0.5rem 0 0.25rem; }
+  .modal__done[hidden] { display: none; }
+  .modal__done h2 { margin-bottom: 0.5rem; }
+  .modal__done p { color: var(--color-muted); font-size: 0.92rem; margin: 0 0 1.25rem; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .search-scrim, .modal-scrim { transition: opacity 0.25s ease; }
+    .search-panel {
+      transition: opacity 0.22s ease,
+                  transform 0.36s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .modal {
+      transition: opacity 0.28s ease,
+                  transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .search__result { animation: bea-rise 0.4s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+    .search__result h3, .modal__close, .modal__form input { transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease; }
+  }
+
+  @keyframes bea-rise {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .search-panel, .modal { opacity: 1; transform: none; }
+    .search-scrim, .modal-scrim { opacity: 1; }
+    .search__result { animation: none; }
+  }
+
+  /* ==========================================================================
+     Membership plans inside the subscribe modal. Free and paid map to the two
+     member states the product already has, and to the three post visibility
+     levels: public, members, paid.
+     ========================================================================== */
+  .modal { width: min(34rem, 100%); }
+
+  /* A tall modal on a short viewport must not have its head cut off, which is
+     what centred grid alignment does once the item overflows. */
+  .modal__lede {
+    margin: 0 0 1.15rem;
+    font-size: 0.92rem;
+    color: var(--color-muted);
+  }
+
+  .plans {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.7rem;
+    margin: 0 0 1rem;
+  }
+
+  .plan {
+    position: relative;
+    display: block;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    padding: 0.85rem 0.9rem 0.95rem;
+    cursor: pointer;
+  }
+
+  /* Selection is driven by a class rather than :has(), so the state does not
+     depend on selector support. */
+  .plan.is-selected {
+    border-color: var(--color-burgundy);
+    box-shadow: inset 0 0 0 1px var(--color-burgundy);
+  }
+
+  .plan input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+  }
+
+  .plan.is-focused { outline: 2px solid var(--color-burgundy); outline-offset: 2px; }
+
+  .plan__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding-bottom: 0.55rem;
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .plan__name {
+    font-family: var(--font-serif);
+    font-size: 1.05rem;
+    letter-spacing: -0.015em;
+  }
+
+  .plan__price {
+    font-size: 0.74rem;
+    color: var(--color-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .plan__price b {
+    font-family: var(--font-serif);
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--color-ink);
+  }
+
+  .plan__list {
+    list-style: none;
+    margin: 0.6rem 0 0;
+    padding: 0;
+    display: grid;
+    gap: 0.32rem;
+    font-size: 0.79rem;
+    line-height: 1.4;
+    color: var(--color-muted);
+  }
+
+  .plan__list li {
+    display: grid;
+    grid-template-columns: 0.75rem minmax(0, 1fr);
+    gap: 0.45rem;
+    align-items: start;
+  }
+
+  .plan__list svg { color: var(--color-burgundy); margin-top: 0.28rem; }
+
+  .plan__badge {
+    position: absolute;
+    top: -0.5rem;
+    right: 0.7rem;
+    background: var(--color-burgundy);
+    color: var(--color-on-dark);
+    font-size: 0.55rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 600;
+    padding: 0.18rem 0.45rem;
+    border-radius: 999px;
+  }
+
+  .billing {
+    display: flex;
+    gap: 0.4rem;
+    margin: 0 0 1rem;
+  }
+
+  .billing[hidden] { display: none; }
+
+  .billing button {
+    flex: 1;
+    font-family: var(--font-sans);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    color: var(--color-muted);
+    background: none;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius);
+    padding: 0.5rem 0.6rem;
+    cursor: pointer;
+  }
+
+  .billing button:hover { color: var(--color-ink); border-color: var(--color-ink); }
+
+  .billing button[aria-pressed='true'] {
+    background: var(--color-burgundy);
+    border-color: var(--color-burgundy);
+    color: var(--color-on-dark);
+  }
+
+  .billing button span {
+    display: block;
+    font-size: 0.6rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.75;
+    margin-top: 0.1rem;
+  }
+
+  .modal__signin {
+    margin: 1rem 0 0;
+    padding-top: 0.9rem;
+    border-top: 1px solid var(--color-line);
+    font-size: 0.8rem;
+    color: var(--color-muted);
+    text-align: center;
+  }
+
+  .modal__signin a { color: var(--color-burgundy); font-weight: 600; }
+
+  @media (max-width: 560px) {
+    .plans { grid-template-columns: 1fr; }
+    .modal__body { padding: 1.4rem 1.25rem 1.5rem; }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .plan, .billing button { transition: border-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease, background-color 0.2s ease; }
+  }
+</style>
+
+<header class="masthead">
+  <a class="masthead__wordmark" href="#">Beyond&nbsp;Every&nbsp;Art</a>
+  <nav class="masthead__nav" aria-label="Primary">
+    <a href="#">Journal</a>
+    <a href="#" aria-current="page">Topics</a>
+    <a href="#">Reading</a>
+    <a href="#">About</a>
+  </nav>
+  <div class="masthead__actions">
+    <button class="icon-button" type="button" aria-label="Search">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" /><path d="M20.5 20.5 16.7 16.7" />
+      </svg>
+    </button>
+    <a class="masthead__signin" href="#">Sign in</a>
+    <a class="button button--primary button--compact" href="#subscribe">Subscribe</a>
+    <button class="nav-toggle" type="button" id="nav-toggle"
+            aria-label="Open menu" aria-expanded="false" aria-controls="mobile-nav">
+      <span></span><span></span>
+    </button>
+  </div>
+</header>
+
+<div class="mobile-nav" id="mobile-nav" hidden>
+  <label class="mobile-nav__search">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2" stroke-linecap="round" aria-hidden="true">
+      <circle cx="11" cy="11" r="7" /><path d="M20.5 20.5 16.7 16.7" />
+    </svg>
+    <input type="search" placeholder="Search the archive" aria-label="Search the archive" />
+  </label>
+  <nav class="mobile-nav__links" aria-label="Mobile">
+    <a href="#">Journal</a>
+    <a href="#">Topics</a>
+    <a href="#">Reading</a>
+    <a href="#">About</a>
+  </nav>
+  <div class="mobile-nav__foot">
+    <a class="button button--primary" href="#subscribe">Subscribe</a>
+    <a class="mobile-nav__signin" href="#">Sign in</a>
+  </div>
+</div>
+
+
+<!-- ── Search ───────────────────────────────────────────────────────────── -->
+<div class="search-scrim" id="search-scrim" hidden></div>
+<div class="search-panel" id="search-panel" role="search"
+     aria-label="Search the archive" hidden>
+  <div class="container">
+    <div class="search__field">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" /><path d="M20.5 20.5 16.7 16.7" />
+      </svg>
+      <input type="search" id="search-input" placeholder="Search the archive"
+             aria-label="Search the archive" autocomplete="off" spellcheck="false" />
+      <button class="icon-button" type="button" id="search-close" aria-label="Close search">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+          <path d="M6 6l12 12M18 6L6 18" />
+        </svg>
+      </button>
+    </div>
+    <p class="search__meta">
+      <span id="search-count">All pieces</span>
+      <span class="search__hint"><kbd>↑</kbd><kbd>↓</kbd> to move <kbd>Esc</kbd> to close</span>
+    </p>
+    <ul class="search__results" id="search-results"></ul>
+    <div class="search__empty" id="search-empty" hidden></div>
+  </div>
+</div>
+
+<!-- ── Subscribe modal ──────────────────────────────────────────────────── -->
+<div class="modal-scrim" id="modal-scrim" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" id="modal" tabindex="-1">
+    <button class="modal__close" type="button" id="modal-close" aria-label="Close">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+        <path d="M6 6l12 12M18 6L6 18" />
+      </svg>
+    </button>
+    <div class="modal__body">
+      <div id="modal-offer">
+        <p class="eyebrow">Join Beyond Every Art</p>
+        <h2 id="modal-title">Two ways to read</h2>
+        <p class="modal__lede">
+          The Friday letter is free. A full membership opens the paywalled
+          pieces and the specimen sheets behind them.
+        </p>
+
+        <div class="plans" role="radiogroup" aria-label="Membership">
+          <label class="plan is-selected" data-plan="free">
+            <input type="radio" name="plan" value="free" checked />
+            <span class="plan__head">
+              <span class="plan__name">Free</span>
+              <span class="plan__price">£0</span>
+            </span>
+            <ul class="plan__list">
+              <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>The Friday letter, weekly</span></li>
+              <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>Members-only pieces</span></li>
+              <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>The full archive index</span></li>
+            </ul>
+          </label>
+
+          <label class="plan" data-plan="paid">
+            <span class="plan__badge">Full access</span>
+            <input type="radio" name="plan" value="paid" />
+            <span class="plan__head">
+              <span class="plan__name">Member</span>
+              <span class="plan__price"><b id="plan-price">£6</b><span id="plan-period">/month</span></span>
+            </span>
+            <ul class="plan__list">
+              <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>Everything in Free</span></li>
+              <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>Paywalled long reads</span></li>
+              <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>Specimen sheets for every pigment</span></li>
+              <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>You fund the research</span></li>
+            </ul>
+          </label>
+        </div>
+
+        <div class="billing" id="modal-billing" role="group" aria-label="Billing period" hidden>
+          <button type="button" data-cycle="monthly" aria-pressed="true">Monthly</button>
+          <button type="button" data-cycle="annual" aria-pressed="false">
+            Annual <span>Two months free</span>
+          </button>
+        </div>
+
+        <form class="modal__form" id="modal-form" novalidate>
+          <label for="modal-email" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Email address</label>
+          <input type="email" id="modal-email" placeholder="you@studio.com"
+                 autocomplete="email" required aria-describedby="modal-error" />
+          <p class="modal__error" id="modal-error" role="alert" hidden></p>
+          <button class="button button--primary" type="submit" id="modal-submit">Sign up free</button>
+          <p class="modal__small" id="modal-small">Free. One letter a week. Unsubscribe in a click.</p>
+        </form>
+
+        <p class="modal__signin">Already a member? <a href="#">Sign in</a></p>
+      </div>
+
+      <div class="modal__done" id="modal-done" hidden>
+        <h2 id="modal-done-title">You're on the list</h2>
+        <p id="modal-done-note">The first letter arrives on Friday.</p>
+        <button class="button button--primary" type="button" id="modal-dismiss">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<main>
+  <header class="topic-head">
+    <div class="topic-head__wash" data-wash="ultramarine" data-seed="7" data-mode="stain" aria-hidden="true"></div>
+    <div class="topic-head__scrim" aria-hidden="true"></div>
+    <div class="container">
+      <p class="topic-head__crumb">
+        <a href="#">Journal</a>
+        <span aria-hidden="true">/</span>
+        <span>Topics</span>
+      </p>
+      <p class="topic-head__kicker reveal">
+        <span class="topic-head__swatch" style="background: var(--pig-ultramarine)"></span>
+        <span class="eyebrow">Topic</span>
+      </p>
+      <h1 class="archive__title reveal">Materials</h1>
+      <p class="archive__intro reveal">
+        What paint is actually made of — pigments, binders, grounds, and
+        supports, and the working properties that follow from them.
+      </p>
+    </div>
+  </header>
+
+  <section class="archive">
+    <div class="container">
+      <div id="groups"></div>
+
+      <nav class="pagination reveal" aria-label="Materials pages">
+        <span></span>
+        <p class="pagination__status">Page 1 of 2</p>
+        <a class="button button--ghost pagination__next" href="#" rel="next">Older stories</a>
+      </nav>
+    </div>
+  </section>
+
+  <section class="related">
+    <div class="container">
+      <p class="related__label">Related topics</p>
+      <div class="related__list">
+        <a class="chip" href="#"><i style="background: var(--pig-cadmium)"></i>Colour &amp; Light<span class="chip__count">19</span></a>
+        <a class="chip" href="#"><i style="background: var(--pig-lead-white)"></i>Art History<span class="chip__count">16</span></a>
+        <a class="chip" href="#"><i style="background: var(--pig-sienna)"></i>Creative Practice<span class="chip__count">14</span></a>
+        <a class="chip" href="#"><i style="background: var(--pig-viridian)"></i>Exhibitions<span class="chip__count">11</span></a>
+        <a class="chip" href="#"><i style="background: var(--pig-bone-black)"></i>Conservation<span class="chip__count">8</span></a>
+      </div>
+    </div>
+  </section>
+
+  <section class="subscribe" id="subscribe">
+    <div class="container">
+      <div class="subscribe__grid">
+        <div class="reveal">
+          <p class="eyebrow">The Friday letter</p>
+          <h2>One pigment, examined, every Friday</h2>
+          <p>
+            A single material each week — where it comes from, how it behaves,
+            and which paintings depend on it. No roundups.
+          </p>
+        </div>
+        <form class="signup reveal" onsubmit="return false">
+          <label for="email" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Email address</label>
+          <div class="signup__row">
+            <input id="email" type="email" placeholder="you@studio.com" autocomplete="email" />
+            <button class="button button--on-dark" type="submit">Subscribe</button>
+          </div>
+          <small>Free. One letter a week. Unsubscribe in a click.</small>
+        </form>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="container footer__grid">
+    <span class="footer__wordmark">Beyond Every Art</span>
+    <nav aria-label="Footer">
+      <a href="#">Journal</a>
+      <a href="#">Topics</a>
+      <a href="#subscribe">Subscribe</a>
+      <a href="#">Sign in</a>
+      <a href="#">About</a>
+      <a href="#">RSS</a>
+    </nav>
+    <span class="num">© 2026 Beyond Every Art</span>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    'use strict'
+
+    var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+    var PIGMENTS = {
+      ultramarine: { hex: '#1f3a93', deep: '#0f1f57' },
+      sienna:      { hex: '#8a3a1e', deep: '#4a1c0c' },
+      viridian:    { hex: '#2e6b52', deep: '#123227' },
+      cadmium:     { hex: '#c9820a', deep: '#6b4103' },
+      leadwhite:   { hex: '#efe9dd', deep: '#b6ab97' },
+      bone:        { hex: '#20211f', deep: '#000000' }
+    }
+
+    /* One page of a tag archive — the same rows as the journal, already
+       filtered to this topic, so the tag column carries the sub-topic rather
+       than repeating "Materials" twelve times. */
+    var POSTS = [
+      { title: 'The Chemical Symphony of Ultramarine', tag: 'Pigments', pig: 'ultramarine', seed: 7,
+        excerpt: 'Ground lapis cost more than gold — and the reason is still in the crystal structure.',
+        len: 14, date: '6 Aug 2026', group: 'August 2026' },
+
+      { title: 'How to Read a Pigment Supplier’s Catalogue', tag: 'Pigments', pig: 'cadmium', seed: 68,
+        excerpt: 'Pigment index numbers, lightfastness ratings, and what the codes actually promise.',
+        len: 7, date: '24 Jun 2026', group: 'June 2026' },
+      { title: 'Chalk, Gesso, and What a Ground Is Really For', tag: 'Supports', pig: 'leadwhite', seed: 39,
+        excerpt: 'The layer nobody looks at decides how much of the paint above it will survive.',
+        len: 9, date: '11 Jun 2026', group: 'June 2026' },
+
+      { title: 'Why Titanium White Behaves Differently Than Lead White', tag: 'Pigments', pig: 'leadwhite', seed: 96,
+        excerpt: 'Two whites, similar in appearance but worlds apart in composition and performance.',
+        len: 11, date: '20 May 2026', group: 'May 2026' },
+      { title: 'Verdigris, and the Green That Eats Its Own Paper', tag: 'Pigments', pig: 'viridian', seed: 47,
+        excerpt: 'A copper green so corrosive that surviving manuscripts are perforated where it was used.',
+        len: 13, date: '12 May 2026', group: 'May 2026' },
+      { title: 'Linseed, Walnut, Poppy: Choosing an Oil', tag: 'Binders', pig: 'cadmium', seed: 81,
+        excerpt: 'Yellowing, drying rate, and flexibility pull in different directions. Pick two.',
+        len: 10, date: '4 May 2026', group: 'May 2026' },
+
+      { title: 'The Chemistry of Color: Pigments Through Time', tag: 'Pigments', pig: 'cadmium', seed: 12,
+        excerpt: 'How an artist’s palette encodes centuries of chemistry, trade, and discovery.',
+        len: 13, date: '28 Apr 2026', group: 'April 2026' },
+      { title: 'Rabbit-Skin Glue and the Sizing Problem', tag: 'Supports', pig: 'sienna', seed: 55,
+        excerpt: 'A size that moves with the weather, on a canvas that cannot afford to move.',
+        len: 8, date: '9 Apr 2026', group: 'April 2026' },
+
+      { title: 'Bone Black, Vine Black, Lamp Black', tag: 'Pigments', pig: 'bone', seed: 24,
+        excerpt: 'Three carbon blacks with three different undertones, and why the choice shows.',
+        len: 12, date: '26 Mar 2026', group: 'March 2026' },
+      { title: 'What Makes a Pigment Lightfast', tag: 'Pigments', pig: 'viridian', seed: 66,
+        excerpt: 'Fading is a photochemical process, and the ratings are a shorthand for how fast.',
+        len: 11, date: '5 Mar 2026', group: 'March 2026' }
+    ]
+
+    /* ------------------------------------------------------------------
+       Pigment plates — same generated art as the other pages.
+       ------------------------------------------------------------------ */
+    function rng(seed) {
+      var a = seed >>> 0
+      return function () {
+        a = (a + 0x6d2b79f5) | 0
+        var t = Math.imul(a ^ (a >>> 15), 1 | a)
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+      }
+    }
+
+    function hexA(hex, alpha) {
+      var n = parseInt(hex.replace('#', ''), 16)
+      return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + alpha + ')'
+    }
+
+    function paintPlate(canvas, pigKey, seed) {
+      var pig = PIGMENTS[pigKey] || PIGMENTS.ultramarine
+      var rect = canvas.getBoundingClientRect()
+      if (rect.width < 2 || rect.height < 2) return
+
+      var dpr = Math.min(window.devicePixelRatio || 1, 2)
+      var w = Math.round(rect.width), h = Math.round(rect.height)
+      canvas.width = w * dpr
+      canvas.height = h * dpr
+
+      var ctx = canvas.getContext('2d')
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      var r = rng(seed)
+      var cx = w * 0.5, cy = h * 0.5, reach = Math.max(w, h)
+
+      ctx.fillStyle = pig.hex
+      ctx.fillRect(0, 0, w, h)
+
+      for (var i = 0; i < 12; i++) {
+        var bx = cx + (r() - 0.5) * w * 1.6
+        var by = cy + (r() - 0.5) * h * 1.6
+        var br = (0.28 + r() * 0.55) * reach
+        var g = ctx.createRadialGradient(bx, by, 0, bx, by, br)
+        var tone = r() > 0.4 ? pig.hex : pig.deep
+        g.addColorStop(0, hexA(tone, 0.95 * (0.65 + r() * 0.35)))
+        g.addColorStop(0.5, hexA(tone, 0.28))
+        g.addColorStop(1, hexA(tone, 0))
+        ctx.fillStyle = g
+        ctx.beginPath()
+        ctx.arc(bx, by, br, 0, Math.PI * 2)
+        ctx.fill()
+      }
+
+      ctx.save()
+      ctx.globalCompositeOperation = 'screen'
+      for (var l = 0; l < 7; l++) {
+        var lx = cx + (r() - 0.5) * w * 1.3
+        var ly = cy + (r() - 0.5) * h * 1.3
+        var lr = reach * (0.18 + r() * 0.35)
+        var lg = ctx.createRadialGradient(lx, ly, 0, lx, ly, lr)
+        lg.addColorStop(0, hexA(pig.hex, 0.32 + r() * 0.3))
+        lg.addColorStop(1, hexA(pig.hex, 0))
+        ctx.fillStyle = lg
+        ctx.beginPath()
+        ctx.arc(lx, ly, lr, 0, Math.PI * 2)
+        ctx.fill()
+      }
+      ctx.restore()
+
+      var angle = -0.35 + r() * 0.7
+      for (var s = 0; s < 30; s++) {
+        ctx.save()
+        ctx.translate(cx + (r() - 0.5) * w * 1.5, cy + (r() - 0.5) * h * 1.5)
+        ctx.rotate(angle + (r() - 0.5) * 0.5)
+        ctx.globalAlpha = 0.34 * (0.3 + r() * 0.7)
+        ctx.fillStyle = r() > 0.62 ? pig.deep : pig.hex
+        ctx.beginPath()
+        ctx.ellipse(0, 0, (0.03 + r() * r() * 0.16) * w, 2 + r() * r() * 14, 0, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.restore()
+      }
+      ctx.globalAlpha = 1
+
+      ctx.save()
+      ctx.strokeStyle = pig.deep
+      ctx.lineCap = 'round'
+      for (var t = 0; t < 4; t++) {
+        var st = r() * Math.PI * 2
+        ctx.lineWidth = 0.8 + r() * 1.4
+        ctx.globalAlpha = 0.05 + r() * 0.09
+        ctx.beginPath()
+        ctx.ellipse(
+          cx + (r() - 0.5) * w * 0.5, cy + (r() - 0.5) * h * 0.6,
+          reach * (0.12 + r() * 0.3), reach * (0.1 + r() * 0.26),
+          r() * Math.PI, st, st + 0.5 + r() * 1.4
+        )
+        ctx.stroke()
+      }
+      ctx.restore()
+
+      var vg = ctx.createRadialGradient(cx, cy, reach * 0.2, cx, cy, reach * 0.78)
+      vg.addColorStop(0, 'rgba(0,0,0,0)')
+      vg.addColorStop(1, hexA(pig.deep, 0.55))
+      ctx.fillStyle = vg
+      ctx.fillRect(0, 0, w, h)
+
+      var hx = w * (0.3 + r() * 0.4), hy = h * (0.22 + r() * 0.3)
+      var hg = ctx.createRadialGradient(hx, hy, 0, hx, hy, reach * 0.5)
+      hg.addColorStop(0, 'rgba(255,255,255,0.18)')
+      hg.addColorStop(1, 'rgba(255,255,255,0)')
+      ctx.fillStyle = hg
+      ctx.fillRect(0, 0, w, h)
+    }
+
+    /* The topic masthead uses the cover treatment: pigment bleeding into the
+       paper from one focal point, so the display type stays ink-on-paper. */
+    function paintStain(canvas, pigKey, seed) {
+      var pig = PIGMENTS[pigKey] || PIGMENTS.ultramarine
+      var rect = canvas.getBoundingClientRect()
+      if (rect.width < 2 || rect.height < 2) return
+
+      var dpr = Math.min(window.devicePixelRatio || 1, 2)
+      var w = Math.round(rect.width), h = Math.round(rect.height)
+      canvas.width = w * dpr
+      canvas.height = h * dpr
+
+      var ctx = canvas.getContext('2d')
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      ctx.fillStyle = '#f6f2eb'
+      ctx.fillRect(0, 0, w, h)
+
+      var r = rng(seed)
+      var narrow = w < 760
+      var fx = narrow ? w * 0.7 : w * 0.8
+      var fy = narrow ? h * 0.2 : h * 0.34
+      var reach = Math.max(w, h)
+
+      function layer() {
+        var c = document.createElement('canvas')
+        c.width = Math.max(1, Math.round(w * dpr))
+        c.height = Math.max(1, Math.round(h * dpr))
+        var g = c.getContext('2d')
+        g.setTransform(dpr, 0, 0, dpr, 0, 0)
+        return { canvas: c, ctx: g }
+      }
+
+      var pigment = layer()
+      var o = pigment.ctx
+
+      for (var i = 0; i < 20; i++) {
+        var bx = fx + (r() - 0.5) * w * 0.9
+        var by = fy + (r() - 0.5) * h * 0.9
+        var br = (0.14 + r() * 0.38) * reach
+        var g = o.createRadialGradient(bx, by, 0, bx, by, br)
+        var tone = r() > 0.4 ? pig.hex : pig.deep
+        g.addColorStop(0, hexA(tone, 0.85 * (0.65 + r() * 0.35)))
+        g.addColorStop(0.5, hexA(tone, 0.26))
+        g.addColorStop(1, hexA(tone, 0))
+        o.fillStyle = g
+        o.beginPath()
+        o.arc(bx, by, br, 0, Math.PI * 2)
+        o.fill()
+      }
+
+      for (var s = 0; s < 34; s++) {
+        o.save()
+        o.translate(fx + (r() - 0.5) * w * 0.75, fy + (r() - 0.5) * h * 0.75)
+        o.rotate(-0.5 + (r() - 0.5) * 0.5)
+        o.globalAlpha = 0.34 * (0.3 + r() * 0.7)
+        o.fillStyle = r() > 0.62 ? pig.deep : pig.hex
+        o.beginPath()
+        o.ellipse(0, 0, (0.03 + r() * r() * 0.16) * w, 2 + r() * r() * 12, 0, 0, Math.PI * 2)
+        o.fill()
+        o.restore()
+      }
+      o.globalAlpha = 1
+
+      // Irregular mask, so the wash has a dried edge rather than a round one.
+      var mask = layer()
+      var m = mask.ctx
+      for (var k = 0; k < 18; k++) {
+        var bias = k / 18
+        var mx = fx + (r() - 0.5) * w * (0.5 + bias * 0.85)
+        var my = fy + (r() - 0.5) * h * (0.55 + bias * 0.95)
+        var mr = reach * (0.14 + r() * (0.34 - bias * 0.14))
+        var mg = m.createRadialGradient(mx, my, 0, mx, my, mr)
+        mg.addColorStop(0, 'rgba(0,0,0,0.95)')
+        mg.addColorStop(0.5, 'rgba(0,0,0,0.55)')
+        mg.addColorStop(1, 'rgba(0,0,0,0)')
+        m.fillStyle = mg
+        m.beginPath()
+        m.arc(mx, my, mr, 0, Math.PI * 2)
+        m.fill()
+      }
+
+      m.globalCompositeOperation = 'destination-out'
+      var clear
+      if (narrow) {
+        clear = m.createLinearGradient(0, h, 0, h * 0.32)
+        clear.addColorStop(0, 'rgba(0,0,0,1)')
+        clear.addColorStop(1, 'rgba(0,0,0,0)')
+        m.fillStyle = clear
+        m.fillRect(0, h * 0.32, w, h * 0.68)
+      } else {
+        clear = m.createLinearGradient(0, 0, w * 0.5, 0)
+        clear.addColorStop(0, 'rgba(0,0,0,1)')
+        clear.addColorStop(1, 'rgba(0,0,0,0)')
+        m.fillStyle = clear
+        m.fillRect(0, 0, w * 0.5, h)
+      }
+
+      o.globalCompositeOperation = 'destination-in'
+      o.setTransform(1, 0, 0, 1, 0, 0)
+      o.drawImage(mask.canvas, 0, 0)
+
+      ctx.save()
+      ctx.globalCompositeOperation = 'multiply'
+      ctx.setTransform(1, 0, 0, 1, 0, 0)
+      ctx.drawImage(pigment.canvas, 0, 0)
+      ctx.restore()
+    }
+
+    function mountWash(host) {
+      var canvas = host.querySelector('canvas')
+      if (!canvas) {
+        canvas = document.createElement('canvas')
+        host.appendChild(canvas)
+      }
+      var seed = parseInt(host.dataset.seed, 10) || 1
+      if (host.dataset.mode === 'stain') paintStain(canvas, host.dataset.wash, seed)
+      else paintPlate(canvas, host.dataset.wash, seed)
+    }
+
+
+    var washHosts = Array.prototype.slice.call(
+      document.querySelectorAll('[data-wash][data-mode="stain"]')
+    )
+    washHosts.forEach(mountWash)
+
+    /* ------------------------------------------------------------------
+       Build the grouped list
+       ------------------------------------------------------------------ */
+    var groupsEl = document.getElementById('groups')
+    var current = null
+    var itemsEl = null
+
+    POSTS.forEach(function (post) {
+      if (post.group !== current) {
+        current = post.group
+        var group = document.createElement('section')
+        group.className = 'group'
+
+        var label = document.createElement('h2')
+        label.className = 'group__label'
+        label.textContent = post.group
+
+        itemsEl = document.createElement('div')
+        itemsEl.className = 'group__items'
+
+        group.appendChild(label)
+        group.appendChild(itemsEl)
+        groupsEl.appendChild(group)
+      }
+
+      var entry = document.createElement('a')
+      entry.className = 'entry reveal'
+      entry.href = '#'
+
+      var thumb = document.createElement('span')
+      thumb.className = 'entry__thumb'
+      thumb.dataset.wash = post.pig
+      thumb.dataset.seed = post.seed
+
+      var body = document.createElement('div')
+      body.className = 'entry__body'
+      var title = document.createElement('h3')
+      title.className = 'entry__title'
+      title.textContent = post.title
+      var excerpt = document.createElement('p')
+      excerpt.className = 'entry__excerpt'
+      excerpt.textContent = post.excerpt
+      body.appendChild(title)
+      body.appendChild(excerpt)
+
+      var tag = document.createElement('span')
+      tag.className = 'entry__tag'
+      tag.textContent = post.tag
+
+      var len = document.createElement('span')
+      len.className = 'entry__len'
+      len.textContent = post.date + ' · ' + post.len + ' min'
+
+      entry.appendChild(thumb)
+      entry.appendChild(body)
+      entry.appendChild(tag)
+      entry.appendChild(len)
+      itemsEl.appendChild(entry)
+
+      washHosts.push(thumb)
+      mountWash(thumb)
+    })
+
+    var repaint
+    window.addEventListener('resize', function () {
+      clearTimeout(repaint)
+      repaint = setTimeout(function () { washHosts.forEach(mountWash) }, 180)
+    })
+
+    /* ------------------------------------------------------------------
+       Mobile menu
+       ------------------------------------------------------------------ */
+    var navToggle = document.getElementById('nav-toggle')
+    var mobileNav = document.getElementById('mobile-nav')
+    var masthead = document.querySelector('.masthead')
+    var closeTimer = null
+
+    function syncMastheadHeight() {
+      document.documentElement.style.setProperty('--masthead-h', masthead.offsetHeight + 'px')
+    }
+    syncMastheadHeight()
+    window.addEventListener('resize', syncMastheadHeight)
+
+    function setMenu(open) {
+      navToggle.setAttribute('aria-expanded', String(open))
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu')
+      document.body.style.overflow = open ? 'hidden' : ''
+      clearTimeout(closeTimer)
+
+      if (open) {
+        syncMastheadHeight()
+        mobileNav.hidden = false
+        void mobileNav.offsetWidth
+        mobileNav.classList.add('is-open')
+      } else {
+        mobileNav.classList.remove('is-open')
+        if (reduced) mobileNav.hidden = true
+        else closeTimer = setTimeout(function () { mobileNav.hidden = true }, 340)
+        navToggle.focus()
+      }
+    }
+
+    navToggle.addEventListener('click', function () { setMenu(mobileNav.hidden) })
+
+    Array.prototype.forEach.call(mobileNav.querySelectorAll('a'), function (link) {
+      link.addEventListener('click', function () { setMenu(false) })
+    })
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !mobileNav.hidden) setMenu(false)
+    })
+
+    var desktop = window.matchMedia('(min-width: 981px)')
+    var onDesktop = function (e) { if (e.matches && !mobileNav.hidden) setMenu(false) }
+    if (desktop.addEventListener) desktop.addEventListener('change', onDesktop)
+    else desktop.addListener(onDesktop)
+
+    /* ------------------------------------------------------------------
+       Reveals
+       ------------------------------------------------------------------ */
+    var targets = document.querySelectorAll('.reveal')
+
+    if (reduced || !('IntersectionObserver' in window)) {
+      Array.prototype.forEach.call(targets, function (el) { el.classList.add('is-in') })
+    } else {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return
+          var el = entry.target
+          var siblings = Array.prototype.slice.call(
+            el.parentElement ? el.parentElement.children : []
+          ).filter(function (n) { return n.classList.contains('reveal') })
+          var i = Math.max(0, siblings.indexOf(el))
+          setTimeout(function () { el.classList.add('is-in') }, Math.min(i, 5) * 60)
+          io.unobserve(el)
+        })
+      }, { threshold: 0.08, rootMargin: '0px 0px -5% 0px' })
+
+      Array.prototype.forEach.call(targets, function (el) { io.observe(el) })
+    }
+  })()
+</script>
+
+<script>
+  /* Shared masthead chrome: search panel + subscribe modal. Kept out of the
+     page IIFE so every page carries an identical copy. */
+  (function () {
+    'use strict'
+
+    var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+    var PIG_HEX = {
+      ultramarine: '#1f3a93', sienna: '#8a3a1e', viridian: '#2e6b52',
+      cadmium: '#c9820a', leadwhite: '#efe9dd', bone: '#20211f'
+    }
+
+    /* Stands in for a real search index. Each entry is what a PostCard
+       carries, so wiring this to the search route is a swap, not a rewrite. */
+    var INDEX = [
+      { t: 'The Chemical Symphony of Ultramarine', g: 'Materials', p: 'ultramarine', m: '14 min', d: 'Ground lapis cost more than gold — and the reason is still in the crystal structure.' },
+      { t: 'What Raking Light Reveals About a Painting\u2019s Surface', g: 'Conservation', p: 'viridian', m: '12 min', d: 'Turn the lamp sideways and the brushwork, the losses, and the retouching all show.' },
+      { t: 'Why Burnt Sienna Behaves Differently in Oil Than in Watercolour', g: 'Creative practice', p: 'sienna', m: '9 min', d: 'The same earth, two binders, and a working property that reverses between them.' },
+      { t: 'How to Read a Pigment Supplier\u2019s Catalogue', g: 'Materials', p: 'cadmium', m: '7 min', d: 'Pigment index numbers, lightfastness ratings, and what the codes actually promise.' },
+      { t: 'Egg Tempera and the Problem of Drying Time', g: 'Creative practice', p: 'leadwhite', m: '10 min', d: 'A medium that sets in seconds forces a way of building an image stroke by stroke.' },
+      { t: 'Light and Shadow in Renaissance Masterpieces', g: 'Art history', p: 'bone', m: '16 min', d: 'Reading the deliberate choreography of light that gives Renaissance painting its depth.' },
+      { t: 'Why Titanium White Behaves Differently Than Lead White', g: 'Materials', p: 'leadwhite', m: '11 min', d: 'Two whites, similar in appearance but worlds apart in composition and performance.' },
+      { t: 'Verdigris, and the Green That Eats Its Own Paper', g: 'Materials', p: 'viridian', m: '13 min', d: 'A copper green so corrosive that surviving manuscripts are perforated where it was used.' },
+      { t: 'The Chemistry of Color: Pigments Through Time', g: 'Materials', p: 'cadmium', m: '13 min', d: 'How an artist\u2019s palette encodes centuries of chemistry, trade, and discovery.' },
+      { t: 'What a Craquelure Pattern Tells a Conservator', g: 'Conservation', p: 'bone', m: '11 min', d: 'The direction and spacing of the cracks record the support, the ground, and the age.' },
+      { t: 'Building Texture: From Surface to Soul', g: 'Creative practice', p: 'ultramarine', m: '8 min', d: 'Impasto, glazing, and the tactile decisions that turn a flat surface into a felt experience.' },
+      { t: 'Mummy Brown and the Ethics of a Pigment', g: 'Art history', p: 'sienna', m: '15 min', d: 'A colour that stayed on palettes for three centuries, and what happened when painters learned its source.' },
+      { t: 'Chalk, Gesso, and What a Ground Is Really For', g: 'Materials', p: 'leadwhite', m: '9 min', d: 'The layer nobody looks at decides how much of the paint above it will survive.' },
+      { t: 'Linseed, Walnut, Poppy: Choosing an Oil', g: 'Materials', p: 'cadmium', m: '10 min', d: 'Yellowing, drying rate, and flexibility pull in different directions. Pick two.' },
+      { t: 'Bone Black, Vine Black, Lamp Black', g: 'Materials', p: 'bone', m: '12 min', d: 'Three carbon blacks with three different undertones, and why the choice shows.' },
+      { t: 'What Makes a Pigment Lightfast', g: 'Materials', p: 'viridian', m: '11 min', d: 'Fading is a photochemical process, and the ratings are a shorthand for how fast.' }
+    ]
+
+    var lastFocus = null
+    var EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+    function trap(container, e) {
+      if (e.key !== 'Tab') return
+      var f = container.querySelectorAll(
+        'a[href], button:not([disabled]), input, [tabindex]:not([tabindex="-1"])'
+      )
+      var vis = Array.prototype.filter.call(f, function (el) { return el.offsetParent !== null })
+      if (!vis.length) return
+      var first = vis[0], last = vis[vis.length - 1]
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
+    }
+
+    /* ---------------------------------------------------------------- Search */
+    var panel = document.getElementById('search-panel')
+    var scrim = document.getElementById('search-scrim')
+    var input = document.getElementById('search-input')
+    var listEl = document.getElementById('search-results')
+    var emptyEl = document.getElementById('search-empty')
+    var countEl = document.getElementById('search-count')
+    var searchTimer = null
+
+    function escapeHtml(s) {
+      return s.replace(/[&<>"]/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]
+      })
+    }
+
+    function highlight(text, q) {
+      var safe = escapeHtml(text)
+      if (!q) return safe
+      var i = safe.toLowerCase().indexOf(q.toLowerCase())
+      if (i === -1) return safe
+      return safe.slice(0, i) + '<mark>' + safe.slice(i, i + q.length) + '</mark>' + safe.slice(i + q.length)
+    }
+
+    function renderResults(q) {
+      var query = q.trim()
+      var hits = query
+        ? INDEX.filter(function (r) {
+            var hay = (r.t + ' ' + r.g + ' ' + r.d).toLowerCase()
+            return query.toLowerCase().split(/\s+/).every(function (w) { return hay.indexOf(w) !== -1 })
+          })
+        : INDEX.slice(0, 6)
+
+      listEl.innerHTML = ''
+      emptyEl.hidden = hits.length > 0
+      countEl.textContent = query
+        ? hits.length + (hits.length === 1 ? ' result' : ' results')
+        : 'Recent pieces'
+
+      if (!hits.length) {
+        emptyEl.innerHTML = 'No pieces match <b>' + escapeHtml(query) +
+          '</b>. Try a pigment name — ultramarine, lead white, verdigris.'
+        return
+      }
+
+      hits.forEach(function (r, i) {
+        var li = document.createElement('li')
+        var a = document.createElement('a')
+        a.className = 'search__result'
+        a.href = '#'
+        if (!reduced) a.style.animationDelay = Math.min(i, 8) * 35 + 'ms'
+
+        var dot = document.createElement('i')
+        dot.style.background = PIG_HEX[r.p] || PIG_HEX.ultramarine
+
+        var body = document.createElement('div')
+        var h = document.createElement('h3')
+        h.innerHTML = highlight(r.t, query)
+        var p = document.createElement('p')
+        p.innerHTML = highlight(r.d, query)
+        body.appendChild(h)
+        body.appendChild(p)
+
+        var meta = document.createElement('span')
+        meta.className = 'search__result-meta'
+        meta.textContent = r.g + ' · ' + r.m
+
+        a.appendChild(dot)
+        a.appendChild(body)
+        a.appendChild(meta)
+        li.appendChild(a)
+        listEl.appendChild(li)
+      })
+    }
+
+    function setSearch(open) {
+      Array.prototype.forEach.call(
+        document.querySelectorAll('.masthead .icon-button[aria-label="Search"]'),
+        function (b) { b.setAttribute('aria-expanded', String(open)) }
+      )
+      if (open) {
+        lastFocus = document.activeElement
+        scrim.hidden = false
+        panel.hidden = false
+        void panel.offsetWidth
+        scrim.classList.add('is-open')
+        panel.classList.add('is-open')
+        document.body.style.overflow = 'hidden'
+        renderResults(input.value)
+        input.focus()
+        input.select()
+      } else {
+        scrim.classList.remove('is-open')
+        panel.classList.remove('is-open')
+        document.body.style.overflow = ''
+        var done = function () { scrim.hidden = true; panel.hidden = true }
+        if (reduced) done()
+        else setTimeout(done, 260)
+        if (lastFocus && lastFocus.focus) lastFocus.focus()
+      }
+    }
+
+    input.addEventListener('input', function () {
+      // Debounced so a fast typist does not repaint the list on every keystroke.
+      clearTimeout(searchTimer)
+      searchTimer = setTimeout(function () { renderResults(input.value) }, 120)
+    })
+
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown') {
+        var first = listEl.querySelector('.search__result')
+        if (first) { e.preventDefault(); first.focus() }
+      }
+    })
+
+    listEl.addEventListener('keydown', function (e) {
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+      var items = Array.prototype.slice.call(listEl.querySelectorAll('.search__result'))
+      var i = items.indexOf(document.activeElement)
+      if (i === -1) return
+      e.preventDefault()
+      if (e.key === 'ArrowDown' && items[i + 1]) items[i + 1].focus()
+      else if (e.key === 'ArrowUp') (items[i - 1] || input).focus()
+    })
+
+    document.getElementById('search-close').addEventListener('click', function () { setSearch(false) })
+    scrim.addEventListener('click', function () { setSearch(false) })
+    panel.addEventListener('keydown', function (e) { trap(panel, e) })
+
+    // Every search affordance on the page opens the same panel.
+    Array.prototype.forEach.call(
+      document.querySelectorAll('.masthead .icon-button[aria-label="Search"]'),
+      function (btn) {
+        btn.setAttribute('aria-expanded', 'false')
+        btn.setAttribute('aria-controls', 'search-panel')
+        btn.addEventListener('click', function () { setSearch(panel.hidden) })
+      }
+    )
+
+    var menuSearch = document.querySelector('.mobile-nav__search')
+    if (menuSearch) {
+      var menuInput = menuSearch.querySelector('input')
+      if (menuInput) menuInput.readOnly = true
+      menuSearch.addEventListener('click', function (e) {
+        e.preventDefault()
+        var toggle = document.getElementById('nav-toggle')
+        if (toggle && toggle.getAttribute('aria-expanded') === 'true') toggle.click()
+        setTimeout(function () { setSearch(true) }, reduced ? 0 : 200)
+      })
+    }
+
+    /* ----------------------------------------------------------------- Modal */
+    var mScrim = document.getElementById('modal-scrim')
+    var mClose = document.getElementById('modal-close')
+    var mForm = document.getElementById('modal-form')
+    var mEmail = document.getElementById('modal-email')
+    var mError = document.getElementById('modal-error')
+    var mOffer = document.getElementById('modal-offer')
+    var mDone = document.getElementById('modal-done')
+    var mSubmit = document.getElementById('modal-submit')
+    var mSmall = document.getElementById('modal-small')
+    var billing = document.getElementById('modal-billing')
+
+    /* Placeholder pricing — there is none in the repo yet. Monthly and annual
+       are both here because the Stripe handling already assumes both. */
+    var PRICES = {
+      monthly: { price: '£6', period: '/month', note: 'Billed monthly. Cancel any time.' },
+      annual: { price: '£60', period: '/year', note: 'Billed yearly. Cancel any time.' }
+    }
+
+    var plan = 'free'
+    var cycle = 'monthly'
+
+    function syncPlan() {
+      Array.prototype.forEach.call(document.querySelectorAll('.plan'), function (el) {
+        var on = el.dataset.plan === plan
+        el.classList.toggle('is-selected', on)
+        var radio = el.querySelector('input')
+        if (radio.checked !== on) radio.checked = on
+      })
+
+      billing.hidden = plan !== 'paid'
+      document.getElementById('plan-price').textContent = PRICES[cycle].price
+      document.getElementById('plan-period').textContent = PRICES[cycle].period
+
+      Array.prototype.forEach.call(billing.querySelectorAll('button'), function (b) {
+        b.setAttribute('aria-pressed', String(b.dataset.cycle === cycle))
+      })
+
+      // The button says what happens next, and the small print matches it.
+      mSubmit.textContent = plan === 'free' ? 'Sign up free' : 'Continue to payment'
+      mSmall.textContent = plan === 'free'
+        ? 'Free. One letter a week. Unsubscribe in a click.'
+        : PRICES[cycle].note + ' Card details are taken on the next step.'
+    }
+
+    Array.prototype.forEach.call(document.querySelectorAll('.plan input'), function (radio) {
+      radio.addEventListener('change', function () { plan = radio.value; syncPlan() })
+      radio.addEventListener('focus', function () { radio.closest('.plan').classList.add('is-focused') })
+      radio.addEventListener('blur', function () { radio.closest('.plan').classList.remove('is-focused') })
+    })
+
+    Array.prototype.forEach.call(billing.querySelectorAll('button'), function (b) {
+      b.addEventListener('click', function () { cycle = b.dataset.cycle; syncPlan() })
+    })
+
+    syncPlan()
+
+    function setModal(open) {
+      if (open) {
+        lastFocus = document.activeElement
+        mScrim.hidden = false
+        void mScrim.offsetWidth
+        mScrim.classList.add('is-open')
+        document.body.style.overflow = 'hidden'
+        document.getElementById('modal').focus({ preventScroll: true })
+        mScrim.scrollTop = 0
+      } else {
+        mScrim.classList.remove('is-open')
+        document.body.style.overflow = ''
+        var done = function () {
+          mScrim.hidden = true
+          mOffer.hidden = false
+          mDone.hidden = true
+          mForm.reset()
+          mError.hidden = true
+          plan = 'free'
+          cycle = 'monthly'
+          syncPlan()
+        }
+        if (reduced) done()
+        else setTimeout(done, 280)
+        if (lastFocus && lastFocus.focus) lastFocus.focus()
+      }
+    }
+
+    mClose.addEventListener('click', function () { setModal(false) })
+    document.getElementById('modal-dismiss').addEventListener('click', function () { setModal(false) })
+    mScrim.addEventListener('click', function (e) { if (e.target === mScrim) setModal(false) })
+    mScrim.addEventListener('keydown', function (e) { trap(mScrim, e) })
+
+    mForm.addEventListener('submit', function (e) {
+      e.preventDefault()
+      var value = mEmail.value.trim()
+      if (!EMAIL.test(value)) {
+        mError.textContent = 'Enter an email address so we know where to send it.'
+        mError.hidden = false
+        mEmail.focus()
+        return
+      }
+      mError.hidden = true
+
+      if (plan === 'free') {
+        document.getElementById('modal-done-title').textContent = "You're on the list"
+        document.getElementById('modal-done-note').textContent =
+          'The first letter goes to ' + value + ' on Friday.'
+      } else {
+        document.getElementById('modal-done-title').textContent = 'One more step'
+        document.getElementById('modal-done-note').textContent =
+          'Checkout would open here to take card details for the ' +
+          (cycle === 'annual' ? 'annual' : 'monthly') + ' plan, then ' + value +
+          ' gets full access.'
+      }
+
+      mOffer.hidden = true
+      mDone.hidden = false
+      document.getElementById('modal-dismiss').focus()
+    })
+
+    // Anything pointing at the subscribe section opens the modal instead.
+    Array.prototype.forEach.call(
+      document.querySelectorAll('a[href="#subscribe"]'),
+      function (a) {
+        a.addEventListener('click', function (e) { e.preventDefault(); setModal(true) })
+      }
+    )
+
+    // The inline band keeps its own form; it just needs to answer.
+    var inline = document.querySelector('.signup')
+    if (inline) {
+      inline.addEventListener('submit', function (e) {
+        e.preventDefault()
+        var field = inline.querySelector('input')
+        var value = field.value.trim()
+        if (!EMAIL.test(value)) { field.focus(); return }
+        setModal(true)
+        mEmail.value = value
+        mForm.dispatchEvent(new Event('submit', { cancelable: true }))
+      })
+    }
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape') return
+      if (!mScrim.hidden) setModal(false)
+      else if (!panel.hidden) setSearch(false)
+    })
+  })()
+</script>
+  </body>
+</html>

@@ -15,6 +15,10 @@ content, URLs, metadata, media, behavior, and SEO; use this direction for a
 separately scoped enhancement after migration parity and production stability
 are established.
 
+Interactive prototypes that take this direction into working layout,
+breakpoints, and interaction states are recorded in
+[`WEBSITE_REDESIGN_PROTOTYPES.md`](WEBSITE_REDESIGN_PROTOTYPES.md).
+
 ## Concept boards
 
 The direction below is derived from two supplied concept boards, each showing a
