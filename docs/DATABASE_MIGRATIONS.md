@@ -36,6 +36,17 @@ The cost is one command per schema change, and CI fails if you skip it.
 Payload's CLI also offers `migrate:fresh`, `migrate:refresh`, and
 `migrate:reset`. They drop data and are deliberately not exposed as scripts.
 
+`migrate:db` goes through `scripts/run-migrations.mjs` rather than calling
+`payload migrate` directly. The CLI can exit 0 having done nothing at all — it
+transpiles itself through tsx's ESM loader and floats the resulting promise, so
+a stalled loader leaves nothing holding the event loop open and Node exits
+cleanly without an error or a database connection. Observed in CI as a 1.7s
+migrate that printed nothing against an empty schema, where a healthy run takes
+about four seconds. The wrapper requires the CLI's own start and `Done.` markers
+in the output before reporting success, retries up to three times when they are
+missing, and passes a genuine non-zero exit straight through. It wraps the
+script rather than the CI step so the release migrator container is covered too.
+
 ## Changing the schema
 
 1. Edit the collection, global, or field.

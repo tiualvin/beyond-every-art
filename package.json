@@ -20,7 +20,7 @@
     "payload": "payload",
     "generate:types": "payload generate:types",
     "bootstrap:admin": "tsx scripts/bootstrap-admin.ts",
-    "migrate:db": "payload migrate",
+    "migrate:db": "node scripts/run-migrations.mjs",
     "migrate:db:create": "payload migrate:create",
     "migrate:db:status": "payload migrate:status",
     "migrate:db:down": "payload migrate:down",
