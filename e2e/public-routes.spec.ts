@@ -6,17 +6,16 @@ test.describe('representative public journeys', () => {
   test('homepage leads into the seeded journal', async ({ page }) => {
     await page.goto('/')
 
-    await expect(
-      page.getByRole('heading', {
-        level: 1,
-        name: 'Art Lives Beyond What We See',
-      }),
-    ).toBeVisible()
+    // The cover's wording is editorial and changes with the design; what this
+    // journey guards is that the page has exactly one first-level heading and
+    // that it renders. Naming the copy here only made a redesign look like a
+    // regression.
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
     await expect(
       page.getByText(fixtures.publicPost.title).first(),
     ).toBeVisible()
     await expect(
-      page.getByRole('link', { name: 'Explore the Journal' }),
+      page.getByRole('link', { name: 'Read the journal' }),
     ).toHaveAttribute('href', '/journal')
   })
 
