@@ -1,0 +1,2735 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Beyond Every Art — Homepage Redesign</title>
+  </head>
+  <body>
+<style>
+  /* ==========================================================================
+     Tokens — names match app/globals.css 1:1 so this maps straight across.
+     ========================================================================== */
+  :root {
+    --color-paper: #f6f2eb;
+    --color-surface: #fffdf9;
+    --color-ink: #1b1714;
+    --color-muted: #6f665c;
+    --color-burgundy: #6d1f2c;
+    --color-burgundy-deep: #4c1420;
+    --color-dark: #141110;
+    --color-on-dark: #f3ede4;
+    --color-line: #e4ddd2;
+    --color-rule: color-mix(in srgb, var(--color-ink) 26%, var(--color-paper));
+
+    --font-serif: 'Playfair Display', Georgia, 'Times New Roman', serif;
+    --font-sans: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+    --maxw: 78rem;
+    --radius: 2px;
+
+    /* Pigments. Content, not chrome — these never style UI. */
+    --pig-ultramarine: #1f3a93;
+    --pig-sienna: #8a3a1e;
+    --pig-viridian: #2e6b52;
+    --pig-cadmium: #c9820a;
+    --pig-lead-white: #efe9dd;
+    --pig-bone-black: #20211f;
+
+    color-scheme: light;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 1.0625rem;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+  }
+
+  /* Paper grain. The publication is about surface and material; a flat cream
+     field reads as a default background, a grained one reads as stock. */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0.4;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.32'/%3E%3C/svg%3E");
+  }
+
+  h1, h2, h3 {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-weight: 600;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  a { color: inherit; text-decoration: none; }
+  img { max-width: 100%; display: block; }
+
+  :focus-visible {
+    outline: 2px solid var(--color-burgundy);
+    outline-offset: 3px;
+  }
+
+  .container {
+    width: 100%;
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: 0 1.75rem;
+  }
+
+  .eyebrow {
+    font-family: var(--font-sans);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--color-burgundy);
+    margin: 0;
+  }
+
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* Base carries shape only; every colour lives in a variant. Keeping them
+     in one place stops a later block from quietly winning the cascade. */
+  .button {
+    display: inline-block;
+    font-family: var(--font-sans);
+    font-size: 0.76rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 0.9rem 1.5rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .button:hover { text-decoration: none; }
+
+  /* On paper */
+  .button--primary {
+    background: var(--color-burgundy);
+    border-color: var(--color-burgundy);
+    color: var(--color-on-dark);
+  }
+
+  .button--primary:hover {
+    background: var(--color-burgundy-deep);
+    border-color: var(--color-burgundy-deep);
+  }
+
+  /* On a dark or burgundy ground */
+  .button--on-dark {
+    background: var(--color-on-dark);
+    border-color: var(--color-on-dark);
+    color: var(--color-burgundy-deep);
+  }
+
+  .button--on-dark:hover {
+    background: transparent;
+    color: var(--color-on-dark);
+  }
+
+  .button--compact { padding: 0.55rem 1.05rem; font-size: 0.72rem; }
+
+  /* ==========================================================================
+     Masthead
+     ========================================================================== */
+  .masthead {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    padding: 0.85rem 1.75rem;
+    background: var(--color-paper);
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .masthead__wordmark {
+    font-family: var(--font-serif);
+    font-size: 1.05rem;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+  }
+
+  .masthead__nav {
+    display: flex;
+    gap: 1.75rem;
+    font-size: 0.78rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    font-weight: 500;
+    color: var(--color-muted);
+  }
+
+  .masthead__nav a { position: relative; padding-bottom: 2px; }
+
+  .masthead__nav a::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 1px;
+    background: var(--color-burgundy);
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+
+  .masthead__nav a:hover { color: var(--color-ink); }
+  .masthead__nav a:hover::after { transform: scaleX(1); }
+
+  .masthead__actions {
+    display: flex;
+    align-items: center;
+    gap: 1.1rem;
+  }
+
+  .icon-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-muted);
+    cursor: pointer;
+    border-radius: 50%;
+  }
+
+  .icon-button:hover { color: var(--color-ink); }
+
+  .masthead__signin {
+    font-size: 0.78rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    font-weight: 500;
+    color: var(--color-muted);
+    white-space: nowrap;
+  }
+
+  .masthead__signin:hover { color: var(--color-ink); }
+
+  /* Hamburger ------------------------------------------------------------ */
+
+  .nav-toggle {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+  }
+
+  .nav-toggle span {
+    display: block;
+    width: 1.15rem;
+    height: 1.5px;
+    background: var(--color-ink);
+    transform-origin: center;
+  }
+
+  /* The bars cross into an X in place. The panel sits below the bar, so the
+     control that opened the menu is the same one that closes it. */
+  .nav-toggle[aria-expanded='true'] span:first-child {
+    transform: translateY(3.25px) rotate(45deg);
+  }
+
+  .nav-toggle[aria-expanded='true'] span:last-child {
+    transform: translateY(-3.25px) rotate(-45deg);
+  }
+
+  .mobile-nav {
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    padding-top: var(--masthead-h, 3.5rem);
+    background: var(--color-paper);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    opacity: 0;
+  }
+
+  .mobile-nav.is-open { opacity: 1; }
+
+  .mobile-nav[hidden] { display: none; }
+
+  /* Staggered entrance, same shape as a framer-motion variant tree: the
+     panel fades, then its children rise in sequence. */
+  .mobile-nav__search,
+  .mobile-nav__links a,
+  .mobile-nav__foot {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  .mobile-nav.is-open .mobile-nav__search,
+  .mobile-nav.is-open .mobile-nav__links a,
+  .mobile-nav.is-open .mobile-nav__foot {
+    opacity: 1;
+    transform: none;
+  }
+
+  .mobile-nav__search { --i: 0; }
+  .mobile-nav__links a:nth-child(1) { --i: 1; }
+  .mobile-nav__links a:nth-child(2) { --i: 2; }
+  .mobile-nav__links a:nth-child(3) { --i: 3; }
+  .mobile-nav__links a:nth-child(4) { --i: 4; }
+  .mobile-nav__foot { --i: 5; }
+
+  .mobile-nav__search {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    margin: 1.75rem 1.75rem 0;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    color: var(--color-muted);
+  }
+
+  .mobile-nav__search input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: none;
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    color: var(--color-ink);
+  }
+
+  .mobile-nav__search input:focus { outline: none; }
+  .mobile-nav__search:focus-within { border-color: var(--color-burgundy); }
+
+  .mobile-nav__links {
+    display: flex;
+    flex-direction: column;
+    padding: 1.5rem 1.75rem;
+  }
+
+  .mobile-nav__links a {
+    font-family: var(--font-serif);
+    font-size: clamp(1.9rem, 8vw, 2.6rem);
+    letter-spacing: -0.025em;
+    padding: 0.55rem 0;
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .mobile-nav__links a:hover {
+    color: var(--color-burgundy);
+    padding-left: 0.5rem;
+    text-decoration: none;
+  }
+
+  .mobile-nav__foot {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    padding: 1.75rem;
+    border-top: 1px solid var(--color-line);
+    flex-shrink: 0;
+  }
+
+  .mobile-nav__foot .button { text-align: center; }
+
+  .mobile-nav__signin {
+    font-size: 0.8rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--color-muted);
+    text-align: center;
+  }
+
+  @media (max-width: 980px) {
+    .masthead__nav { display: none; }
+    .nav-toggle { display: flex; }
+  }
+
+  /* On phones the bar carries search and the menu; Subscribe and Sign in are
+     both waiting at the foot of the menu itself. */
+  @media (max-width: 620px) {
+    .masthead__signin { display: none; }
+    .masthead .button--compact { display: none; }
+    .masthead { padding: 0.75rem 1.1rem; }
+    .masthead__actions { gap: 0.4rem; }
+  }
+
+  /* Desktop never shows the overlay, even if it was left open on resize. */
+  @media (min-width: 981px) {
+    .mobile-nav { display: none; }
+  }
+
+  /* ==========================================================================
+     Cover — the lead story is the hero. No tagline, no mission statement:
+     a reader lands directly on an article.
+     ========================================================================== */
+  /* ==========================================================================
+     Cover — a slow oxblood wash. Every tone is drawn from the burgundy family,
+     so the field moves tonally rather than through colour, which is what keeps
+     it reading as pigment instead of a gradient animation.
+     ========================================================================== */
+  .cover {
+    position: relative;
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    overflow: hidden;
+    isolation: isolate;
+    /* Painted before the canvas has its first frame, so there is no flash of
+       paper on load. */
+    background: #26080f;
+    color: var(--color-on-dark);
+  }
+
+  .cover__wash {
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+  }
+
+  .cover__wash canvas { width: 100%; height: 100%; display: block; }
+
+  /* Deepens the column the type sits in and closes the corners, so the
+     headline always has the darkest part of the field behind it. */
+  .cover__scrim {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background:
+      linear-gradient(
+        to right,
+        rgba(23, 5, 10, 0.82) 0%,
+        rgba(23, 5, 10, 0.55) 34%,
+        rgba(23, 5, 10, 0.12) 62%,
+        transparent 85%
+      ),
+      linear-gradient(
+        to bottom,
+        rgba(23, 5, 10, 0.45) 0%,
+        transparent 26%,
+        transparent 68%,
+        rgba(23, 5, 10, 0.55) 100%
+      );
+  }
+
+  .cover__inner {
+    position: relative;
+    z-index: 2;
+    padding-bottom: clamp(3rem, 8vh, 6rem);
+    padding-top: 8rem;
+  }
+
+  .cover__grid { max-width: 46rem; }
+
+  .cover__kicker {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    margin-bottom: 1.4rem;
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--color-on-dark);
+  }
+
+  .cover__swatch {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--color-on-dark);
+  }
+
+  .cover__title {
+    font-size: clamp(2.6rem, 8.5vw, 7rem);
+    letter-spacing: -0.035em;
+    line-height: 0.94;
+    margin: 0 0 1.5rem;
+    max-width: 15ch;
+    color: var(--color-on-dark);
+    /* The field behind is dark but not uniform; a soft shadow guarantees the
+       counters stay clean wherever a bloom drifts. */
+    text-shadow: 0 1px 24px rgba(23, 5, 10, 0.45);
+  }
+
+  .cover__standfirst {
+    font-size: clamp(1rem, 1.5vw, 1.2rem);
+    line-height: 1.55;
+    color: color-mix(in srgb, var(--color-on-dark) 84%, transparent);
+    max-width: 42ch;
+    margin: 0 0 1.9rem;
+  }
+
+  .cover__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.9rem 1.6rem;
+    margin: 0;
+  }
+
+  .cover__secondary {
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: color-mix(in srgb, var(--color-on-dark) 88%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--color-on-dark) 35%, transparent);
+    padding-bottom: 0.15rem;
+  }
+
+  .cover__secondary:hover {
+    color: var(--color-on-dark);
+    border-bottom-color: var(--color-on-dark);
+    text-decoration: none;
+  }
+
+  @media (max-width: 900px) {
+    .cover__inner { padding-top: 6rem; }
+  }
+
+  /* ==========================================================================
+     Latest — one wide band, the newest piece.
+     ========================================================================== */
+  .latest {
+    display: block;
+    border-top: 1px solid var(--color-line);
+    border-bottom: 1px solid var(--color-line);
+    background: var(--color-surface);
+  }
+
+  .latest:hover { background: color-mix(in srgb, var(--color-burgundy) 4%, var(--color-surface)); }
+
+  .latest__inner {
+    display: grid;
+    grid-template-columns: 6.5rem minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 1.75rem;
+    padding-top: 1.5rem;
+    padding-bottom: 1.5rem;
+  }
+
+  .latest__plate {
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+    border-radius: var(--radius);
+  }
+
+  .latest__plate canvas { width: 100%; height: 100%; }
+
+  .latest__title {
+    font-size: clamp(1.15rem, 1.9vw, 1.5rem);
+    letter-spacing: -0.02em;
+    margin: 0.4rem 0 0.35rem;
+  }
+
+  .latest:hover .latest__title { color: var(--color-burgundy); }
+
+  .latest__excerpt {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--color-muted);
+    max-width: 56ch;
+  }
+
+  .latest__meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    margin: 0;
+    text-align: right;
+    font-size: 0.78rem;
+    color: var(--color-muted);
+    white-space: nowrap;
+  }
+
+  .latest__arrow { color: var(--color-burgundy); display: flex; }
+
+  @media (max-width: 900px) {
+    .latest__inner {
+      grid-template-columns: 4.5rem minmax(0, 1fr);
+      gap: 1rem 1.25rem;
+    }
+    /* Byline and date sit side by side when they fit and wrap when they do
+       not — nowrap here pushes the line past the viewport on small phones. */
+    .latest__meta {
+      grid-column: 2;
+      text-align: left;
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 0.15rem 0.9rem;
+      white-space: normal;
+    }
+    .latest__excerpt, .latest__arrow { display: none; }
+  }
+
+  /* ==========================================================================
+     The Index — a real table of contents. Numbering is legitimate here:
+     it is the issue's running order, not decoration.
+     ========================================================================== */
+  .section { padding: clamp(4rem, 10vh, 7.5rem) 0; }
+
+  .section__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    padding-bottom: 1.5rem;
+    margin-bottom: 0.5rem;
+    border-bottom: 1px solid var(--color-rule);
+  }
+
+  .section__head h2 {
+    font-size: clamp(1.75rem, 3.5vw, 2.6rem);
+    letter-spacing: -0.025em;
+  }
+
+  .section__note {
+    font-size: 0.85rem;
+    color: var(--color-muted);
+    max-width: 34ch;
+    margin: 0;
+  }
+
+  .index__row {
+    display: grid;
+    grid-template-columns: 5.5rem minmax(0, 1fr) 11rem 6rem;
+    gap: 1.5rem;
+    /* The thumbnail hangs from the top; the text columns align to each
+       other's first baseline so tag and length sit on the title's line. */
+    align-items: start;
+    padding: 1.5rem 0;
+    border-bottom: 1px solid var(--color-line);
+    position: relative;
+  }
+
+  .index__body,
+  .index__tag,
+  .index__len { align-self: baseline; }
+
+  /* Burgundy wash on hover, drawn from the left so the row reads as being
+     marked up rather than merely highlighted. */
+  .index__row::before {
+    content: '';
+    position: absolute;
+    left: -1.5rem; right: -1.5rem;
+    top: 0; bottom: 0;
+    background: color-mix(in srgb, var(--color-burgundy) 5%, transparent);
+    transform: scaleX(0);
+    transform-origin: left;
+    z-index: -1;
+  }
+
+  .index__row:hover::before,
+  .index__row:focus-within::before { transform: scaleX(1); }
+
+  /* Cover image, always visible — it identifies the piece faster than an
+     ordinal did, and it works the same on touch as it does with a cursor. */
+  .index__thumb {
+    width: 5.5rem;
+    aspect-ratio: 4 / 3;
+    margin-top: 0.2rem;
+    overflow: hidden;
+    border-radius: var(--radius);
+  }
+
+  .index__thumb canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .index__title {
+    font-family: var(--font-serif);
+    font-size: clamp(1.25rem, 2.1vw, 1.7rem);
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    margin: 0;
+  }
+
+  .index__row:hover .index__title { color: var(--color-burgundy); }
+
+  .index__excerpt {
+    font-size: 0.9rem;
+    color: var(--color-muted);
+    margin: 0.4rem 0 0;
+    max-width: 58ch;
+  }
+
+  .index__tag {
+    font-size: 0.7rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+    font-weight: 600;
+  }
+
+  .index__len {
+    font-size: 0.8rem;
+    color: var(--color-muted);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (max-width: 820px) {
+    .index__row {
+      grid-template-columns: 4rem minmax(0, 1fr) auto;
+      gap: 0.6rem 1rem;
+    }
+    .index__thumb { width: 4rem; grid-row: span 3; }
+    .index__body { grid-column: 2 / -1; }
+    .index__tag { grid-column: 2; grid-row: 3; }
+    .index__len { grid-column: 3; grid-row: 3; }
+  }
+
+  /* ==========================================================================
+     Read together — a curated pairing, with the editor's reason stated.
+     ========================================================================== */
+  .pairing { background: var(--color-surface); border-top: 1px solid var(--color-line); }
+
+  /* Subgrid keeps the two stories level row by row, so the plates, kickers,
+     titles, and meta lines all align even when one title runs longer. */
+  .pairing__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: repeat(5, auto);
+    /* Row gap stays 0 — the shared rows are the alignment mechanism, and the
+       elements' own margins set the vertical rhythm inside each story. */
+    column-gap: clamp(1.5rem, 4vw, 3.5rem);
+    row-gap: 0;
+    margin-top: 3rem;
+    position: relative;
+  }
+
+  /* Five rows: plate, kicker, title, excerpt, meta. */
+  .pairing__item {
+    display: grid;
+    grid-row: span 5;
+    grid-template-rows: subgrid;
+    align-content: start;
+    gap: 0;
+  }
+
+  .pairing__art {
+    aspect-ratio: 5 / 4;
+    overflow: hidden;
+    border-radius: var(--radius);
+    margin-bottom: 1.25rem;
+    position: relative;
+  }
+
+  .pairing__art canvas { width: 100%; height: 100%; }
+
+  .pairing__item h3 {
+    font-size: clamp(1.35rem, 2.4vw, 1.9rem);
+    margin: 0.75rem 0 0.6rem;
+    letter-spacing: -0.022em;
+  }
+
+  .pairing__item:hover h3 { color: var(--color-burgundy); }
+
+  .pairing__item p {
+    color: var(--color-muted);
+    font-size: 0.95rem;
+    margin: 0 0 0.85rem;
+    max-width: 44ch;
+  }
+
+  .pairing__meta {
+    font-size: 0.78rem;
+    color: var(--color-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .pairing__note {
+    margin: 3rem auto 0;
+    max-width: 52ch;
+    text-align: center;
+    font-family: var(--font-serif);
+    font-size: clamp(1.05rem, 1.9vw, 1.35rem);
+    line-height: 1.45;
+    color: var(--color-ink);
+    position: relative;
+    padding-top: 2.25rem;
+  }
+
+  .pairing__note::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 50%;
+    width: 1px; height: 1.5rem;
+    background: var(--color-burgundy);
+  }
+
+  .pairing__note cite {
+    display: block;
+    margin-top: 1rem;
+    font-family: var(--font-sans);
+    font-style: normal;
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+  }
+
+  /* Stacked, there is no second column to align against, so the subgrid has
+     no work to do — plain flow avoids implicit-row surprises. */
+  @media (max-width: 760px) {
+    .pairing__grid {
+      display: flex;
+      flex-direction: column;
+      gap: 2.75rem;
+    }
+    .pairing__item { display: block; }
+  }
+
+  /* ==========================================================================
+     Pigments — topics as swatches. The taxonomy of this publication is
+     material, so the filter should look like a paint box.
+     ========================================================================== */
+  .pigments { background: var(--color-dark); color: var(--color-on-dark); }
+  .pigments h2 { color: var(--color-on-dark); }
+  .pigments .section__head { border-bottom-color: color-mix(in srgb, var(--color-on-dark) 45%, transparent); }
+  .pigments .section__note { color: color-mix(in srgb, var(--color-on-dark) 68%, transparent); }
+  .pigments .eyebrow { color: color-mix(in srgb, var(--color-on-dark) 82%, transparent); }
+
+  .swatches {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+    gap: 1px;
+    margin-top: 3rem;
+    background: color-mix(in srgb, var(--color-on-dark) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-on-dark) 16%, transparent);
+  }
+
+  .swatch {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    aspect-ratio: 3 / 4;
+    padding: 1.1rem;
+    background: var(--color-dark);
+    overflow: hidden;
+  }
+
+  /* The pigment itself fills from the bottom in proportion to how much of the
+     archive it covers — the swatch is a bar chart you read as paint. The top
+     edge is lit so near-black pigments still show their level. */
+  .swatch__fill {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    background: var(--pig);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--color-on-dark) 30%, transparent);
+  }
+
+  /* Label colour is computed per pigment against both brand text colours and
+     set inline — a blend mode disappears whenever the pigment happens to sit
+     near the text colour, which is exactly what Lead White does. */
+  .swatch__body {
+    position: relative;
+    z-index: 2;
+    color: var(--ink-on-pig);
+  }
+
+  .swatch__name {
+    font-family: var(--font-serif);
+    font-size: 1.1rem;
+    line-height: 1.15;
+    margin: 0 0 0.35rem;
+    color: inherit;
+  }
+
+  .swatch__figures {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    font-size: 0.66rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.78;
+  }
+
+  .swatch:hover .swatch__fill { height: 100% !important; }
+
+  /* ==========================================================================
+     Subscribe
+     ========================================================================== */
+  .subscribe {
+    background: var(--color-burgundy-deep);
+    color: var(--color-on-dark);
+    padding: clamp(4rem, 9vh, 6.5rem) 0;
+  }
+
+  .subscribe__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.85fr);
+    gap: clamp(2rem, 6vw, 5rem);
+    align-items: center;
+  }
+
+  .subscribe h2 {
+    color: var(--color-on-dark);
+    font-size: clamp(1.9rem, 4vw, 3rem);
+    letter-spacing: -0.028em;
+    margin: 0.85rem 0 0.9rem;
+    max-width: 18ch;
+  }
+
+  .subscribe p {
+    color: color-mix(in srgb, var(--color-on-dark) 78%, transparent);
+    margin: 0;
+    max-width: 42ch;
+    font-size: 0.98rem;
+  }
+
+  .subscribe .eyebrow { color: color-mix(in srgb, var(--color-on-dark) 80%, transparent); }
+
+  .signup { display: flex; flex-direction: column; gap: 0.75rem; }
+
+  .signup__row { display: flex; gap: 0.6rem; }
+
+  .signup input {
+    flex: 1;
+    min-width: 0;
+    padding: 0.9rem 1rem;
+    font-family: var(--font-sans);
+    font-size: 0.92rem;
+    color: var(--color-on-dark);
+    background: color-mix(in srgb, var(--color-on-dark) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-on-dark) 32%, transparent);
+    border-radius: var(--radius);
+  }
+
+  .signup input::placeholder { color: color-mix(in srgb, var(--color-on-dark) 52%, transparent); }
+  .signup input:focus { outline: none; border-color: var(--color-on-dark); }
+
+  .signup small {
+    font-size: 0.72rem;
+    color: color-mix(in srgb, var(--color-on-dark) 62%, transparent);
+  }
+
+  @media (max-width: 760px) {
+    .subscribe__grid { grid-template-columns: 1fr; }
+    .signup__row { flex-direction: column; }
+  }
+
+  /* ==========================================================================
+     Footer
+     ========================================================================== */
+  .footer {
+    background: var(--color-dark);
+    color: color-mix(in srgb, var(--color-on-dark) 70%, transparent);
+    padding: 3rem 0;
+    font-size: 0.82rem;
+  }
+
+  .footer__grid {
+    display: flex;
+    justify-content: space-between;
+    gap: 2rem;
+    flex-wrap: wrap;
+    align-items: baseline;
+  }
+
+  .footer__wordmark {
+    font-family: var(--font-serif);
+    font-size: 1.15rem;
+    color: var(--color-on-dark);
+  }
+
+  .footer nav { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+  .footer a:hover { color: var(--color-on-dark); }
+
+  /* ==========================================================================
+     Motion — every transition and reveal is gated on this query.
+     ========================================================================== */
+  .reveal { opacity: 0; transform: translateY(18px); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal {
+      transition: opacity 0.75s cubic-bezier(0.22, 1, 0.36, 1),
+                  transform 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .reveal.is-in { opacity: 1; transform: none; }
+
+    .masthead__nav a::after { transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1); }
+    .index__row::before { transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1); }
+    .index__title, .pairing__item h3, .masthead__nav a, .cover__title a { transition: color 0.25s ease; }
+    .swatch__fill { transition: height 0.55s cubic-bezier(0.22, 1, 0.36, 1); }
+    .button, .signup input, .icon-button, .masthead__signin {
+      transition: background-color 0.22s ease, color 0.22s ease, border-color 0.22s ease;
+    }
+    .latest { transition: background-color 0.25s ease; }
+    .latest__title { transition: color 0.25s ease; }
+    .index__thumb canvas { transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1); }
+    .index__row:hover .index__thumb canvas { transform: scale(1.07); }
+    /* Opening, the ground goes opaque almost at once so the page underneath
+       is never seen through a half-faded panel; the children carry the motion
+       from there. Closing takes the slower base duration. */
+    .mobile-nav { transition: opacity 0.3s ease; }
+    .mobile-nav.is-open { transition-duration: 0.16s; }
+
+    /* Children lead on the way in (delay grows down the list) and follow on
+       the way out (no delay), so closing feels like one motion, not six. */
+    .mobile-nav__search,
+    .mobile-nav__links a,
+    .mobile-nav__foot {
+      transition:
+        opacity 0.3s ease,
+        transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+        color 0.2s ease,
+        padding-left 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .mobile-nav.is-open .mobile-nav__search,
+    .mobile-nav.is-open .mobile-nav__links a,
+    .mobile-nav.is-open .mobile-nav__foot {
+      transition-delay: calc(0.05s * var(--i) + 0.06s);
+    }
+
+    .nav-toggle span { transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1); }
+    .pairing__art canvas { transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1); }
+    .pairing__item:hover .pairing__art canvas { transform: scale(1.04); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reveal { opacity: 1; transform: none; }
+
+    /* No transitions run here, so the closed state would otherwise leave the
+       menu permanently invisible. */
+    .mobile-nav,
+    .mobile-nav__search,
+    .mobile-nav__links a,
+    .mobile-nav__foot {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  /* ==========================================================================
+     Search panel — drops from under the masthead. Not a modal: the page stays
+     visible behind it, so searching feels like opening a drawer on the site
+     rather than leaving it.
+     ========================================================================== */
+  .search-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 49;
+    background: color-mix(in srgb, var(--color-dark) 38%, transparent);
+    opacity: 0;
+  }
+
+  .search-scrim[hidden] { display: none; }
+  .search-scrim.is-open { opacity: 1; }
+
+  .search-panel {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 50;
+    max-height: 100dvh;
+    overflow-y: auto;
+    padding-top: var(--masthead-h, 3.5rem);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-line);
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  .search-panel[hidden] { display: none; }
+  .search-panel.is-open { opacity: 1; transform: none; }
+
+  .search__field {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.4rem 0 1.1rem;
+    border-bottom: 2px solid var(--color-ink);
+  }
+
+  .search__field > svg { color: var(--color-burgundy); flex-shrink: 0; }
+
+  .search__field input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: none;
+    padding: 0;
+    font-family: var(--font-serif);
+    font-size: clamp(1.35rem, 3.5vw, 2rem);
+    letter-spacing: -0.022em;
+    color: var(--color-ink);
+  }
+
+  .search__field input::-webkit-search-cancel-button,
+  .search__field input::-webkit-search-decoration { -webkit-appearance: none; }
+
+  .search__field input:focus { outline: none; }
+  .search__field input::placeholder { color: color-mix(in srgb, var(--color-muted) 55%, transparent); }
+
+  .search__meta {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding: 0.9rem 0 0.3rem;
+    font-size: 0.66rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--color-muted);
+  }
+
+  .search__hint kbd {
+    font-family: var(--font-sans);
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius);
+    padding: 0.1rem 0.35rem;
+    margin: 0 0.15rem;
+  }
+
+  .search__results { list-style: none; margin: 0; padding: 0 0 2rem; }
+
+  .search__result {
+    display: grid;
+    grid-template-columns: 0.6rem minmax(0, 1fr) auto;
+    gap: 0.9rem;
+    align-items: baseline;
+    padding: 0.85rem 0;
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .search__result i {
+    width: 0.55rem; height: 0.55rem;
+    border-radius: 50%;
+    align-self: start;
+    margin-top: 0.42rem;
+    box-shadow: inset 0 0 0 1px rgba(27, 23, 20, 0.38);
+  }
+
+  .search__result h3 {
+    font-family: var(--font-serif);
+    font-size: 1.15rem;
+    font-weight: 500;
+    letter-spacing: -0.018em;
+    line-height: 1.25;
+    margin: 0;
+  }
+
+  .search__result mark {
+    background: color-mix(in srgb, var(--color-burgundy) 16%, transparent);
+    color: inherit;
+    border-radius: 1px;
+  }
+
+  .search__result p {
+    margin: 0.2rem 0 0;
+    font-size: 0.85rem;
+    color: var(--color-muted);
+  }
+
+  .search__result-meta {
+    font-size: 0.7rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--color-muted);
+    white-space: nowrap;
+  }
+
+  .search__result:hover h3,
+  .search__result:focus-visible h3 { color: var(--color-burgundy); }
+
+  @media (hover: none), (pointer: coarse) {
+    .search__hint { display: none; }
+  }
+
+  .search__empty { padding: 2rem 0 3rem; color: var(--color-muted); }
+  .search__empty b { color: var(--color-ink); font-weight: 600; }
+
+  @media (max-width: 640px) {
+    .search__result { grid-template-columns: 0.6rem minmax(0, 1fr); }
+    .search__result-meta { grid-column: 2; }
+  }
+
+  /* ==========================================================================
+     Subscribe modal
+     ========================================================================== */
+  .modal-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    display: grid;
+    justify-items: center;
+    align-items: start;
+    padding: 1.5rem;
+    background: color-mix(in srgb, var(--color-dark) 58%, transparent);
+    opacity: 0;
+    overflow-y: auto;
+  }
+
+  .modal-scrim[hidden] { display: none; }
+  .modal-scrim.is-open { opacity: 1; }
+
+  .modal:focus { outline: none; }
+
+  .modal {
+    position: relative;
+    margin: auto 0;
+    width: min(29rem, 100%);
+    background: var(--color-paper);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: 0 32px 80px -24px rgba(20, 17, 16, 0.55);
+    opacity: 0;
+    transform: translateY(16px) scale(0.985);
+  }
+
+  .modal-scrim.is-open .modal { opacity: 1; transform: none; }
+
+  .modal__close {
+    position: absolute;
+    top: 0.85rem; right: 0.85rem;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem; height: 2rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--color-muted);
+    cursor: pointer;
+  }
+
+  .modal__close:hover { color: var(--color-ink); }
+
+  .modal__body { padding: 1.9rem 1.75rem 1.75rem; }
+
+  .modal__body h2 {
+    font-size: 1.6rem;
+    letter-spacing: -0.025em;
+    margin: 0.6rem 0 0.6rem;
+  }
+
+  .modal__body > p {
+    margin: 0 0 1.25rem;
+    font-size: 0.95rem;
+    color: var(--color-muted);
+  }
+
+  .modal__form { display: flex; flex-direction: column; gap: 0.7rem; }
+
+  .modal__form input {
+    width: 100%;
+    padding: 0.85rem 1rem;
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    color: var(--color-ink);
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius);
+  }
+
+  .modal__form input:focus { outline: none; border-color: var(--color-burgundy); }
+  .modal__form .button { width: 100%; text-align: center; }
+
+  .modal__small { margin: 0; font-size: 0.72rem; color: var(--color-muted); }
+
+  .modal__error {
+    margin: 0;
+    font-size: 0.78rem;
+    color: var(--color-burgundy);
+    font-weight: 600;
+  }
+
+  .modal__error[hidden] { display: none; }
+
+  .modal__done { text-align: center; padding: 0.5rem 0 0.25rem; }
+  .modal__done[hidden] { display: none; }
+  .modal__done h2 { margin-bottom: 0.5rem; }
+  .modal__done p { color: var(--color-muted); font-size: 0.92rem; margin: 0 0 1.25rem; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .search-scrim, .modal-scrim { transition: opacity 0.25s ease; }
+    .search-panel {
+      transition: opacity 0.22s ease,
+                  transform 0.36s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .modal {
+      transition: opacity 0.28s ease,
+                  transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .search__result { animation: bea-rise 0.4s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+    .search__result h3, .modal__close, .modal__form input { transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease; }
+  }
+
+  @keyframes bea-rise {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .search-panel, .modal { opacity: 1; transform: none; }
+    .search-scrim, .modal-scrim { opacity: 1; }
+    .search__result { animation: none; }
+  }
+
+  /* ==========================================================================
+     Membership plans inside the subscribe modal. Free and paid map to the two
+     member states the product already has, and to the three post visibility
+     levels: public, members, paid.
+     ========================================================================== */
+  .modal { width: min(34rem, 100%); }
+
+  /* A tall modal on a short viewport must not have its head cut off, which is
+     what centred grid alignment does once the item overflows. */
+  .modal__lede {
+    margin: 0 0 1.15rem;
+    font-size: 0.92rem;
+    color: var(--color-muted);
+  }
+
+  .plans {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.7rem;
+    margin: 0 0 1rem;
+  }
+
+  .plan {
+    position: relative;
+    display: block;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    padding: 0.85rem 0.9rem 0.95rem;
+    cursor: pointer;
+  }
+
+  /* Selection is driven by a class rather than :has(), so the state does not
+     depend on selector support. */
+  .plan.is-selected {
+    border-color: var(--color-burgundy);
+    box-shadow: inset 0 0 0 1px var(--color-burgundy);
+  }
+
+  .plan input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+  }
+
+  .plan.is-focused { outline: 2px solid var(--color-burgundy); outline-offset: 2px; }
+
+  .plan__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding-bottom: 0.55rem;
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .plan__name {
+    font-family: var(--font-serif);
+    font-size: 1.05rem;
+    letter-spacing: -0.015em;
+  }
+
+  .plan__price {
+    font-size: 0.74rem;
+    color: var(--color-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .plan__price b {
+    font-family: var(--font-serif);
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--color-ink);
+  }
+
+  .plan__list {
+    list-style: none;
+    margin: 0.6rem 0 0;
+    padding: 0;
+    display: grid;
+    gap: 0.32rem;
+    font-size: 0.79rem;
+    line-height: 1.4;
+    color: var(--color-muted);
+  }
+
+  .plan__list li {
+    display: grid;
+    grid-template-columns: 0.75rem minmax(0, 1fr);
+    gap: 0.45rem;
+    align-items: start;
+  }
+
+  .plan__list svg { color: var(--color-burgundy); margin-top: 0.28rem; }
+
+  .plan__badge {
+    position: absolute;
+    top: -0.5rem;
+    right: 0.7rem;
+    background: var(--color-burgundy);
+    color: var(--color-on-dark);
+    font-size: 0.55rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 600;
+    padding: 0.18rem 0.45rem;
+    border-radius: 999px;
+  }
+
+  .billing {
+    display: flex;
+    gap: 0.4rem;
+    margin: 0 0 1rem;
+  }
+
+  .billing[hidden] { display: none; }
+
+  .billing button {
+    flex: 1;
+    font-family: var(--font-sans);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    color: var(--color-muted);
+    background: none;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius);
+    padding: 0.5rem 0.6rem;
+    cursor: pointer;
+  }
+
+  .billing button:hover { color: var(--color-ink); border-color: var(--color-ink); }
+
+  .billing button[aria-pressed='true'] {
+    background: var(--color-burgundy);
+    border-color: var(--color-burgundy);
+    color: var(--color-on-dark);
+  }
+
+  .billing button span {
+    display: block;
+    font-size: 0.6rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.75;
+    margin-top: 0.1rem;
+  }
+
+  .modal__signin {
+    margin: 1rem 0 0;
+    padding-top: 0.9rem;
+    border-top: 1px solid var(--color-line);
+    font-size: 0.8rem;
+    color: var(--color-muted);
+    text-align: center;
+  }
+
+  .modal__signin a { color: var(--color-burgundy); font-weight: 600; }
+
+  @media (max-width: 560px) {
+    .plans { grid-template-columns: 1fr; }
+    .modal__body { padding: 1.4rem 1.25rem 1.5rem; }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .plan, .billing button { transition: border-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease, background-color 0.2s ease; }
+  }
+</style>
+
+<header class="masthead">
+  <a class="masthead__wordmark" href="#">Beyond&nbsp;Every&nbsp;Art</a>
+  <nav class="masthead__nav" aria-label="Primary">
+    <a href="#featured">Journal</a>
+    <a href="#topics">Topics</a>
+    <a href="#pairing">Reading</a>
+    <a href="#">About</a>
+  </nav>
+  <div class="masthead__actions">
+    <button class="icon-button" type="button" aria-label="Search">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" />
+        <path d="M20.5 20.5 16.7 16.7" />
+      </svg>
+    </button>
+    <a class="masthead__signin" href="#">Sign in</a>
+    <a class="button button--primary button--compact" href="#subscribe">Subscribe</a>
+    <button class="nav-toggle" type="button" id="nav-toggle"
+            aria-label="Open menu" aria-expanded="false" aria-controls="mobile-nav">
+      <span></span><span></span>
+    </button>
+  </div>
+</header>
+
+<!-- ── Mobile menu ──────────────────────────────────────────────────────── -->
+<div class="mobile-nav" id="mobile-nav" hidden>
+  <label class="mobile-nav__search">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2" stroke-linecap="round" aria-hidden="true">
+      <circle cx="11" cy="11" r="7" />
+      <path d="M20.5 20.5 16.7 16.7" />
+    </svg>
+    <input type="search" placeholder="Search the archive" aria-label="Search the archive" />
+  </label>
+
+  <nav class="mobile-nav__links" aria-label="Mobile">
+    <a href="#featured">Journal</a>
+    <a href="#topics">Topics</a>
+    <a href="#pairing">Reading</a>
+    <a href="#">About</a>
+  </nav>
+
+  <div class="mobile-nav__foot">
+    <a class="button button--primary" href="#subscribe">Subscribe</a>
+    <a class="mobile-nav__signin" href="#">Sign in</a>
+  </div>
+</div>
+
+
+<!-- ── Search ───────────────────────────────────────────────────────────── -->
+<div class="search-scrim" id="search-scrim" hidden></div>
+<div class="search-panel" id="search-panel" role="search"
+     aria-label="Search the archive" hidden>
+  <div class="container">
+    <div class="search__field">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" /><path d="M20.5 20.5 16.7 16.7" />
+      </svg>
+      <input type="search" id="search-input" placeholder="Search the archive"
+             aria-label="Search the archive" autocomplete="off" spellcheck="false" />
+      <button class="icon-button" type="button" id="search-close" aria-label="Close search">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+          <path d="M6 6l12 12M18 6L6 18" />
+        </svg>
+      </button>
+    </div>
+    <p class="search__meta">
+      <span id="search-count">All pieces</span>
+      <span class="search__hint"><kbd>↑</kbd><kbd>↓</kbd> to move <kbd>Esc</kbd> to close</span>
+    </p>
+    <ul class="search__results" id="search-results"></ul>
+    <div class="search__empty" id="search-empty" hidden></div>
+  </div>
+</div>
+
+<!-- ── Subscribe modal ──────────────────────────────────────────────────── -->
+<div class="modal-scrim" id="modal-scrim" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" id="modal" tabindex="-1">
+    <button class="modal__close" type="button" id="modal-close" aria-label="Close">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+        <path d="M6 6l12 12M18 6L6 18" />
+      </svg>
+    </button>
+    <div class="modal__body">
+      <div id="modal-offer">
+        <p class="eyebrow">Join Beyond Every Art</p>
+        <h2 id="modal-title">Two ways to read</h2>
+        <p class="modal__lede">
+          The Friday letter is free. A full membership opens the paywalled
+          pieces and the specimen sheets behind them.
+        </p>
+
+        <div class="plans" role="radiogroup" aria-label="Membership">
+          <label class="plan is-selected" data-plan="free">
+            <input type="radio" name="plan" value="free" checked />
+            <span class="plan__head">
+              <span class="plan__name">Free</span>
+              <span class="plan__price">£0</span>
+            </span>
+            <ul class="plan__list">
+              <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>The Friday letter, weekly</span></li>
+              <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>Members-only pieces</span></li>
+              <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>The full archive index</span></li>
+            </ul>
+          </label>
+
+          <label class="plan" data-plan="paid">
+            <span class="plan__badge">Full access</span>
+            <input type="radio" name="plan" value="paid" />
+            <span class="plan__head">
+              <span class="plan__name">Member</span>
+              <span class="plan__price"><b id="plan-price">£6</b><span id="plan-period">/month</span></span>
+            </span>
+            <ul class="plan__list">
+              <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>Everything in Free</span></li>
+              <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>Paywalled long reads</span></li>
+              <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>Specimen sheets for every pigment</span></li>
+              <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>You fund the research</span></li>
+            </ul>
+          </label>
+        </div>
+
+        <div class="billing" id="modal-billing" role="group" aria-label="Billing period" hidden>
+          <button type="button" data-cycle="monthly" aria-pressed="true">Monthly</button>
+          <button type="button" data-cycle="annual" aria-pressed="false">
+            Annual <span>Two months free</span>
+          </button>
+        </div>
+
+        <form class="modal__form" id="modal-form" novalidate>
+          <label for="modal-email" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Email address</label>
+          <input type="email" id="modal-email" placeholder="you@studio.com"
+                 autocomplete="email" required aria-describedby="modal-error" />
+          <p class="modal__error" id="modal-error" role="alert" hidden></p>
+          <button class="button button--primary" type="submit" id="modal-submit">Sign up free</button>
+          <p class="modal__small" id="modal-small">Free. One letter a week. Unsubscribe in a click.</p>
+        </form>
+
+        <p class="modal__signin">Already a member? <a href="#">Sign in</a></p>
+      </div>
+
+      <div class="modal__done" id="modal-done" hidden>
+        <h2 id="modal-done-title">You're on the list</h2>
+        <p id="modal-done-note">The first letter arrives on Friday.</p>
+        <button class="button button--primary" type="button" id="modal-dismiss">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<main>
+  <!-- ── Cover ─────────────────────────────────────────────────────────── -->
+  <article class="cover">
+    <div class="cover__wash" id="cover-wash" aria-hidden="true"></div>
+    <div class="cover__scrim" aria-hidden="true"></div>
+
+    <div class="cover__inner">
+      <div class="container">
+        <div class="cover__grid">
+          <div>
+            <p class="cover__kicker reveal">
+              <span class="cover__swatch"></span>
+              An independent journal
+            </p>
+            <h1 class="cover__title reveal">What paintings are actually made of</h1>
+            <p class="cover__standfirst reveal">
+              Pigments, binders, technique, and the exhibitions that put them in
+              front of you — closely researched long reads on the chemistry and
+              history behind the work.
+            </p>
+            <p class="cover__actions reveal">
+              <a class="button button--on-dark" href="#featured">Read the journal</a>
+              <a class="cover__secondary" href="#subscribe">
+                Get the Friday letter <span aria-hidden="true">&rarr;</span>
+              </a>
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </article>
+
+  <!-- ── Latest ────────────────────────────────────────────────────────
+       The cover no longer carries an article, so the newest piece needs its
+       own entry point before the curated sections begin. -->
+  <a class="latest" href="#">
+    <div class="container latest__inner">
+      <div class="latest__plate" data-wash="ultramarine" data-seed="7"></div>
+      <div class="latest__body">
+        <p class="eyebrow">Latest · Materials</p>
+        <h2 class="latest__title">The Chemical Symphony of Ultramarine</h2>
+        <p class="latest__excerpt">
+          Ground lapis lazuli cost more than gold, and Renaissance contracts
+          specified it by weight.
+        </p>
+      </div>
+      <p class="latest__meta num">
+        <span>Livia M. Calderon</span>
+        <span>14 min · 6 Aug 2026</span>
+      </p>
+      <span class="latest__arrow" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h13M12 5l7 7-7 7" />
+        </svg>
+      </span>
+    </div>
+  </a>
+
+  <!-- ── The Index ─────────────────────────────────────────────────────── -->
+  <section class="section" id="featured">
+    <div class="container">
+      <div class="section__head reveal">
+        <div>
+          <p class="eyebrow">Editors' picks</p>
+          <h2>Featured articles</h2>
+        </div>
+        <p class="section__note">Six pieces worth starting with.</p>
+      </div>
+
+      <div id="index-rows"></div>
+    </div>
+  </section>
+
+  <!-- ── Read together ─────────────────────────────────────────────────── -->
+  <section class="section pairing" id="pairing">
+    <div class="container">
+      <div class="section__head reveal">
+        <div>
+          <p class="eyebrow">Read together</p>
+          <h2>Two whites, one argument</h2>
+        </div>
+        <p class="section__note">
+          A pairing from the archive, chosen because the second piece answers a
+          question the first one leaves open.
+        </p>
+      </div>
+
+      <div class="pairing__grid">
+        <a class="pairing__item reveal" href="#">
+          <div class="pairing__art" data-wash="leadwhite" data-seed="21"></div>
+          <p class="eyebrow">Materials</p>
+          <h3>Why Titanium White Behaves Differently Than Lead White</h3>
+          <p>
+            Two whites, similar in appearance but worlds apart in composition,
+            performance, and history.
+          </p>
+          <p class="pairing__meta">Livia M. Calderon · 11 min · 20 May 2026</p>
+        </a>
+
+        <a class="pairing__item reveal" href="#">
+          <div class="pairing__art" data-wash="sienna" data-seed="34"></div>
+          <p class="eyebrow">Creative practice</p>
+          <h3>Why Burnt Sienna Behaves Differently in Oil Than in Watercolour</h3>
+          <p>
+            The same earth, two binders, and a working property that reverses
+            depending on which one you reach for.
+          </p>
+          <p class="pairing__meta">Livia M. Calderon · 9 min · 2 July 2026</p>
+        </a>
+      </div>
+
+      <p class="pairing__note reveal">
+        Both pieces are really about binders, not colour. Read in sequence, they
+        make the case that a pigment has no fixed behaviour — only a behaviour in
+        a medium.
+        <cite>Editor's note</cite>
+      </p>
+    </div>
+  </section>
+
+  <!-- ── Pigments ──────────────────────────────────────────────────────── -->
+  <section class="section pigments" id="topics">
+    <div class="container">
+      <div class="section__head reveal">
+        <div>
+          <p class="eyebrow">Browse the archive</p>
+          <h2>What we cover</h2>
+        </div>
+        <p class="section__note">
+          Fill height shows how much of the archive each subject accounts for.
+        </p>
+      </div>
+
+      <div class="swatches" id="swatches"></div>
+    </div>
+  </section>
+
+  <!-- ── Subscribe ─────────────────────────────────────────────────────── -->
+  <section class="subscribe" id="subscribe">
+    <div class="container">
+      <div class="subscribe__grid">
+        <div class="reveal">
+          <p class="eyebrow">The Friday letter</p>
+          <h2>One pigment, examined, every Friday</h2>
+          <p>
+            A single material each week — where it comes from, how it behaves,
+            and which paintings depend on it. No roundups.
+          </p>
+        </div>
+        <form class="signup reveal" onsubmit="return false">
+          <label class="visually-hidden" for="email" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Email address</label>
+          <div class="signup__row">
+            <input id="email" type="email" placeholder="you@studio.com" autocomplete="email" />
+            <button class="button button--on-dark" type="submit">Subscribe</button>
+          </div>
+          <small>Free. One letter a week. Unsubscribe in a click.</small>
+        </form>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="container footer__grid">
+    <span class="footer__wordmark">Beyond Every Art</span>
+    <nav aria-label="Footer">
+      <a href="#featured">Journal</a>
+      <a href="#topics">Topics</a>
+      <a href="#subscribe">Subscribe</a>
+      <a href="#">Sign in</a>
+      <a href="#">About</a>
+      <a href="#">RSS</a>
+    </nav>
+    <span class="num">© 2026 Beyond Every Art</span>
+  </div>
+</footer>
+
+
+<script>
+  (function () {
+    'use strict'
+
+    var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+    /* ------------------------------------------------------------------
+       Content. Mirrors the shape of PostCard / TopicCard from
+       lib/content/queries.ts so this maps onto real data directly.
+       ------------------------------------------------------------------ */
+    var PIGMENTS = {
+      ultramarine: { name: 'Ultramarine', hex: '#1f3a93', deep: '#0f1f57', formula: 'Na₈₋₁₀Al₆Si₆O₂₄S₂₋₄' },
+      sienna:      { name: 'Burnt Sienna', hex: '#8a3a1e', deep: '#4a1c0c', formula: 'Fe₂O₃ · MnO₂' },
+      viridian:    { name: 'Viridian',    hex: '#2e6b52', deep: '#123227', formula: 'Cr₂O₃ · 2H₂O' },
+      cadmium:     { name: 'Cadmium Yellow', hex: '#c9820a', deep: '#6b4103', formula: 'CdS' },
+      leadwhite:   { name: 'Lead White',  hex: '#efe9dd', deep: '#b6ab97', formula: '2PbCO₃ · Pb(OH)₂' },
+      bone:        { name: 'Bone Black',  hex: '#20211f', deep: '#000000', formula: 'C · Ca₃(PO₄)₂' }
+    }
+
+    /* Deliberately excludes the piece in the Latest band above — running the
+       same article twice inside one screen wastes the slot. */
+    var POSTS = [
+      { n: 1, title: 'Why Titanium White Behaves Differently Than Lead White', tag: 'Materials',
+        excerpt: 'Two whites, similar in appearance but worlds apart in composition and performance.',
+        len: 11, pig: 'leadwhite', seed: 21 },
+      { n: 2, title: 'Why Burnt Sienna Behaves Differently in Oil Than in Watercolour', tag: 'Creative practice',
+        excerpt: 'The same earth, two binders, and a working property that reverses between them.',
+        len: 9, pig: 'sienna', seed: 34 },
+      { n: 3, title: 'Light and Shadow in Renaissance Masterpieces', tag: 'Art history',
+        excerpt: 'Reading the deliberate choreography of light that gives Renaissance painting its depth.',
+        len: 16, pig: 'bone', seed: 52 },
+      { n: 4, title: 'The Chemistry of Color: Pigments Through Time', tag: 'Materials',
+        excerpt: 'How an artist’s palette encodes centuries of chemistry, trade, and discovery.',
+        len: 13, pig: 'cadmium', seed: 68 },
+      { n: 5, title: 'What Raking Light Reveals About a Painting’s Surface', tag: 'Conservation',
+        excerpt: 'Turn the lamp sideways and the brushwork, the losses, and the retouching all show.',
+        len: 12, pig: 'viridian', seed: 83 },
+      { n: 6, title: 'Building Texture: From Surface to Soul', tag: 'Creative practice',
+        excerpt: 'Impasto, glazing, and the tactile decisions that turn a flat surface into a felt experience.',
+        len: 8, pig: 'ultramarine', seed: 96 }
+    ]
+
+    /* Editorial sections, not pigments. The palette still supplies the colour
+       — it is what makes the row read as a paint box rather than a chart —
+       but the taxonomy a reader browses by is the subject, not the material. */
+    var TOPICS = [
+      { name: 'Materials',        pig: 'ultramarine', count: 24 },
+      { name: 'Colour & Light',   pig: 'cadmium',     count: 19 },
+      // Bone black barely separates from the dark ground, so it goes to the
+      // smallest topic — a quiet swatch on a short bar reads as consistent,
+      // on a tall one it inverts the hierarchy.
+      { name: 'Art History',      pig: 'leadwhite',   count: 16 },
+      { name: 'Creative Practice', pig: 'sienna',     count: 14 },
+      { name: 'Exhibitions',      pig: 'viridian',    count: 11 },
+      { name: 'Conservation',     pig: 'bone',        count: 8  }
+    ]
+
+    /* ------------------------------------------------------------------
+       Pigment washes. The subject is paint, so the placeholder art is
+       generated paint rather than a grey box — layered washes and brush
+       streaks, seeded per story so each plate is distinct and stable.
+       ------------------------------------------------------------------ */
+    function rng(seed) {
+      var a = seed >>> 0
+      return function () {
+        a = (a + 0x6d2b79f5) | 0
+        var t = Math.imul(a ^ (a >>> 15), 1 | a)
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+      }
+    }
+
+    /* Thumbnails and previews: small, contained, and read as reproductions,
+       so they can carry a dense saturated field. */
+    function paintWash(canvas, pigKey, seed) {
+      var pig = PIGMENTS[pigKey] || PIGMENTS.ultramarine
+      var rect = canvas.getBoundingClientRect()
+      if (rect.width < 2 || rect.height < 2) return
+
+      var dpr = Math.min(window.devicePixelRatio || 1, 2)
+      var w = Math.round(rect.width)
+      var h = Math.round(rect.height)
+      canvas.width = w * dpr
+      canvas.height = h * dpr
+
+      var ctx = canvas.getContext('2d')
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      ctx.clearRect(0, 0, w, h)
+
+      paintPlate(ctx, w, h, pig, rng(seed))
+    }
+
+    function blobField(ctx, w, h, pig, r, opts) {
+      for (var i = 0; i < opts.count; i++) {
+        var cx = opts.fx + (r() - 0.5) * w * opts.spread
+        var cy = opts.fy + (r() - 0.5) * h * opts.spread
+        var rad = (opts.minR + r() * opts.varR) * Math.max(w, h)
+        var g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad)
+        var tone = r() > 0.4 ? pig.hex : pig.deep
+        g.addColorStop(0, hexA(tone, opts.alpha * (0.65 + r() * 0.35)))
+        g.addColorStop(0.5, hexA(tone, opts.alpha * 0.3))
+        g.addColorStop(1, hexA(tone, 0))
+        ctx.fillStyle = g
+        ctx.beginPath()
+        ctx.arc(cx, cy, rad, 0, Math.PI * 2)
+        ctx.fill()
+      }
+    }
+
+    /* Short, soft, wildly varied marks. Long uniform bars read as scratches
+       on the surface rather than pigment sitting in it. */
+    function brushMarks(ctx, w, h, pig, r, opts) {
+      var angle = opts.angle
+      for (var s = 0; s < opts.count; s++) {
+        ctx.save()
+        ctx.translate(
+          opts.fx + (r() - 0.5) * w * opts.spread,
+          opts.fy + (r() - 0.5) * h * opts.spread
+        )
+        ctx.rotate(angle + (r() - 0.5) * 0.5)
+        ctx.globalAlpha = opts.alpha * (0.3 + r() * 0.7)
+        ctx.fillStyle = r() > 0.62 ? pig.deep : pig.hex
+        var len = (0.03 + r() * r() * 0.16) * w
+        var thick = 2 + r() * r() * 14
+        ctx.beginPath()
+        ctx.ellipse(0, 0, len, thick, 0, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.restore()
+      }
+      ctx.globalAlpha = 1
+    }
+
+    /* Watercolour dries darker where the wash pooled and stopped. Without
+       these rings a field reads as an airbrush gradient. */
+    function tideLines(ctx, w, h, pig, r, opts) {
+      ctx.save()
+      ctx.strokeStyle = pig.deep
+      ctx.lineCap = 'round'
+      for (var t = 0; t < opts.count; t++) {
+        // Partial arcs, not closed ellipses. A complete ring reads as drawn
+        // geometry; a wash only leaves an edge where it actually stopped.
+        var start = r() * Math.PI * 2
+        var sweep = 0.5 + r() * 1.4
+        ctx.lineWidth = 0.8 + r() * 1.4
+        ctx.globalAlpha = 0.05 + r() * 0.09
+        ctx.beginPath()
+        ctx.ellipse(
+          opts.fx + (r() - 0.5) * w * 0.5,
+          opts.fy + (r() - 0.5) * h * 0.6,
+          opts.reach * (0.12 + r() * 0.3),
+          opts.reach * (0.1 + r() * 0.26),
+          r() * Math.PI,
+          start, start + sweep
+        )
+        ctx.stroke()
+      }
+      ctx.restore()
+    }
+
+    function paintPlate(ctx, w, h, pig, r) {
+      var cx = w * 0.5
+      var cy = h * 0.5
+      var reach = Math.max(w, h)
+
+      // Start mid-tone rather than at the deepest value, so the darks that
+      // follow read as pigment density instead of as the background.
+      ctx.fillStyle = pig.hex
+      ctx.fillRect(0, 0, w, h)
+
+      // Shadow pass, then a lighter pass on top: the alternation is what
+      // gives a small plate its tonal range.
+      blobField(ctx, w, h, pig, r, {
+        count: 12, fx: cx, fy: cy, spread: 1.6,
+        minR: 0.28, varR: 0.55, alpha: 0.95
+      })
+
+      ctx.save()
+      ctx.globalCompositeOperation = 'screen'
+      for (var i = 0; i < 7; i++) {
+        var lx = cx + (r() - 0.5) * w * 1.3
+        var ly = cy + (r() - 0.5) * h * 1.3
+        var lr = reach * (0.18 + r() * 0.35)
+        var lg = ctx.createRadialGradient(lx, ly, 0, lx, ly, lr)
+        lg.addColorStop(0, hexA(pig.hex, 0.32 + r() * 0.3))
+        lg.addColorStop(1, hexA(pig.hex, 0))
+        ctx.fillStyle = lg
+        ctx.beginPath()
+        ctx.arc(lx, ly, lr, 0, Math.PI * 2)
+        ctx.fill()
+      }
+      ctx.restore()
+
+      brushMarks(ctx, w, h, pig, r, {
+        count: 32, fx: cx, fy: cy, spread: 1.5,
+        angle: -0.35 + r() * 0.7, alpha: 0.34
+      })
+
+      tideLines(ctx, w, h, pig, r, { fx: cx, fy: cy, reach: reach, count: 4 })
+
+      // Vignette settles the plate so it reads as a reproduction with edges.
+      var vg = ctx.createRadialGradient(cx, cy, reach * 0.2, cx, cy, reach * 0.78)
+      vg.addColorStop(0, 'rgba(0,0,0,0)')
+      vg.addColorStop(1, hexA(pig.deep, 0.55))
+      ctx.fillStyle = vg
+      ctx.fillRect(0, 0, w, h)
+
+      var hx = w * (0.3 + r() * 0.4)
+      var hy = h * (0.22 + r() * 0.3)
+      var hg = ctx.createRadialGradient(hx, hy, 0, hx, hy, reach * 0.5)
+      hg.addColorStop(0, 'rgba(255,255,255,0.18)')
+      hg.addColorStop(1, 'rgba(255,255,255,0)')
+      ctx.fillStyle = hg
+      ctx.fillRect(0, 0, w, h)
+    }
+
+    function hexA(hex, alpha) {
+      var v = hex.replace('#', '')
+      var n = parseInt(v, 16)
+      return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + alpha + ')'
+    }
+
+    function mountWash(host) {
+      var canvas = host.querySelector('canvas')
+      if (!canvas) {
+        canvas = document.createElement('canvas')
+        host.appendChild(canvas)
+      }
+      paintWash(canvas, host.dataset.wash, parseInt(host.dataset.seed, 10) || 1)
+      return canvas
+    }
+
+
+
+    /* ------------------------------------------------------------------
+       Cover field. Every tone is drawn from the burgundy family, so the wash
+       moves tonally rather than through colour — that is what keeps it
+       reading as pigment in motion rather than as an animated gradient.
+       ------------------------------------------------------------------ */
+    var COVER_BASE = '#26080f'
+    var COVER_TONES = ['#6d1f2c', '#4c1420', '#8f3340']
+
+    function initCover(host) {
+      var canvas = document.createElement('canvas')
+      host.appendChild(canvas)
+      var ctx = canvas.getContext('2d')
+
+      // The field is soft, so it is rendered at half resolution and stretched.
+      // Invisible at this blur radius, and roughly four times cheaper.
+      var SCALE = 0.5
+      var w = 0, h = 0, blooms = [], texture = null, raf = null
+
+      function build() {
+        var rect = host.getBoundingClientRect()
+        if (rect.width < 2 || rect.height < 2) return false
+
+        w = Math.max(1, Math.round(rect.width * SCALE))
+        h = Math.max(1, Math.round(rect.height * SCALE))
+        canvas.width = w
+        canvas.height = h
+
+        var r = rng(11)
+        blooms = []
+        for (var i = 0; i < 7; i++) {
+          blooms.push({
+            // Held to the right of centre: the headline occupies the left.
+            x: (0.42 + r() * 0.62) * w,
+            y: (0.08 + r() * 0.86) * h,
+            rad: (0.26 + r() * 0.44) * Math.max(w, h),
+            tone: COVER_TONES[i % COVER_TONES.length],
+            alpha: 0.26 + r() * 0.3,
+            ax: (0.04 + r() * 0.1) * w,
+            ay: (0.03 + r() * 0.08) * h,
+            sx: 0.000055 + r() * 0.00009,
+            sy: 0.00005 + r() * 0.00008,
+            px: r() * Math.PI * 2,
+            py: r() * Math.PI * 2
+          })
+        }
+
+        // Brush marks and tide lines never move, so they are painted once and
+        // stamped each frame; the per-frame cost stays at gradients plus one
+        // drawImage.
+        texture = document.createElement('canvas')
+        texture.width = w
+        texture.height = h
+        var tx = texture.getContext('2d')
+        var tr = rng(29)
+        brushMarks(tx, w, h, { hex: '#8f3340', deep: '#3a0f18' }, tr, {
+          count: 30, fx: w * 0.62, fy: h * 0.5, spread: 1.15, angle: -0.5, alpha: 0.24
+        })
+        tideLines(tx, w, h, { deep: '#a8505c' }, tr, {
+          fx: w * 0.62, fy: h * 0.5, reach: Math.max(w, h), count: 5
+        })
+        return true
+      }
+
+      function draw(t) {
+        ctx.globalCompositeOperation = 'source-over'
+        ctx.fillStyle = COVER_BASE
+        ctx.fillRect(0, 0, w, h)
+
+        ctx.globalCompositeOperation = 'screen'
+        for (var i = 0; i < blooms.length; i++) {
+          var b = blooms[i]
+          var cx = b.x + Math.sin(t * b.sx + b.px) * b.ax
+          var cy = b.y + Math.cos(t * b.sy + b.py) * b.ay
+          var rad = b.rad * (1 + Math.sin(t * b.sx * 0.7 + b.py) * 0.09)
+          var g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad)
+          g.addColorStop(0, hexA(b.tone, b.alpha))
+          g.addColorStop(0.55, hexA(b.tone, b.alpha * 0.3))
+          g.addColorStop(1, hexA(b.tone, 0))
+          ctx.fillStyle = g
+          ctx.beginPath()
+          ctx.arc(cx, cy, rad, 0, Math.PI * 2)
+          ctx.fill()
+        }
+
+        ctx.globalCompositeOperation = 'overlay'
+        ctx.globalAlpha = 0.55
+        ctx.drawImage(texture, 0, 0)
+        ctx.globalAlpha = 1
+        ctx.globalCompositeOperation = 'source-over'
+      }
+
+      function loop(t) { draw(t); raf = requestAnimationFrame(loop) }
+      function start() { if (!raf && !reduced) raf = requestAnimationFrame(loop) }
+      function stop() { if (raf) { cancelAnimationFrame(raf); raf = null } }
+
+      if (!build()) return
+      draw(0)
+      start()
+
+      // Nothing to animate once the cover has scrolled out of view.
+      if ('IntersectionObserver' in window) {
+        new IntersectionObserver(function (entries) {
+          if (entries[0].isIntersecting) start()
+          else stop()
+        }, { threshold: 0 }).observe(host)
+      }
+
+      var resizeTimer
+      window.addEventListener('resize', function () {
+        clearTimeout(resizeTimer)
+        resizeTimer = setTimeout(function () {
+          if (build()) draw(performance.now())
+        }, 200)
+      })
+    }
+
+    var coverHost = document.getElementById('cover-wash')
+    if (coverHost) initCover(coverHost)
+
+    var washHosts = Array.prototype.slice.call(document.querySelectorAll('[data-wash]'))
+    washHosts.forEach(mountWash)
+
+    var repaint
+    window.addEventListener('resize', function () {
+      clearTimeout(repaint)
+      repaint = setTimeout(function () { washHosts.forEach(mountWash) }, 180)
+    })
+
+    /* ------------------------------------------------------------------
+       Featured
+       ------------------------------------------------------------------ */
+    var rowsEl = document.getElementById('index-rows')
+
+    POSTS.forEach(function (post) {
+      var row = document.createElement('a')
+      row.className = 'index__row reveal'
+      row.href = '#'
+
+      var thumb = document.createElement('span')
+      thumb.className = 'index__thumb'
+      thumb.dataset.wash = post.pig
+      thumb.dataset.seed = post.seed
+
+      var body = document.createElement('div')
+      body.className = 'index__body'
+      var title = document.createElement('h3')
+      title.className = 'index__title'
+      title.textContent = post.title
+      var excerpt = document.createElement('p')
+      excerpt.className = 'index__excerpt'
+      excerpt.textContent = post.excerpt
+      body.appendChild(title)
+      body.appendChild(excerpt)
+
+      var tag = document.createElement('span')
+      tag.className = 'index__tag'
+      tag.textContent = post.tag
+
+      var len = document.createElement('span')
+      len.className = 'index__len'
+      len.textContent = post.len + ' min'
+
+      row.appendChild(thumb)
+      row.appendChild(body)
+      row.appendChild(tag)
+      row.appendChild(len)
+      rowsEl.appendChild(row)
+
+      washHosts.push(thumb)
+      mountWash(thumb)
+    })
+
+    /* ------------------------------------------------------------------
+       Pigment swatches
+       ------------------------------------------------------------------ */
+    var swatchesEl = document.getElementById('swatches')
+    var maxCount = Math.max.apply(null, TOPICS.map(function (t) { return t.count }))
+
+    /* Pick whichever brand text colour actually contrasts better against the
+       pigment, rather than assuming one of them will. */
+    function luminance(hex) {
+      var n = parseInt(hex.replace('#', ''), 16)
+      var ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(function (v) {
+        var c = v / 255
+        return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+      })
+      return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2]
+    }
+
+    function ratio(a, b) {
+      return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
+    }
+
+    var L_INK = luminance('#1b1714')
+    var L_CREAM = luminance('#f3ede4')
+
+    function textOn(hex) {
+      var L = luminance(hex)
+      return ratio(L, L_INK) >= ratio(L, L_CREAM) ? '#1b1714' : '#f3ede4'
+    }
+
+    TOPICS.forEach(function (topic) {
+      var pig = PIGMENTS[topic.pig]
+      var a = document.createElement('a')
+      a.className = 'swatch'
+      a.href = '#'
+      a.style.setProperty('--pig', pig.hex)
+      a.style.setProperty('--ink-on-pig', textOn(pig.hex))
+
+      var fill = document.createElement('span')
+      fill.className = 'swatch__fill'
+      // Floor at 30% so the label always sits on pigment, never half on it.
+      fill.style.height = (30 + (topic.count / maxCount) * 54) + '%'
+
+      var bodyEl = document.createElement('span')
+      bodyEl.className = 'swatch__body'
+
+      var name = document.createElement('h3')
+      name.className = 'swatch__name'
+      name.textContent = topic.name
+
+      var figures = document.createElement('span')
+      figures.className = 'swatch__figures'
+      var count = document.createElement('span')
+      count.textContent = topic.count + ' pieces'
+      figures.appendChild(count)
+
+      bodyEl.appendChild(name)
+      bodyEl.appendChild(figures)
+
+      a.appendChild(fill)
+      a.appendChild(bodyEl)
+      swatchesEl.appendChild(a)
+    })
+
+    /* ------------------------------------------------------------------
+       Mobile menu
+       ------------------------------------------------------------------ */
+    var navToggle = document.getElementById('nav-toggle')
+    var mobileNav = document.getElementById('mobile-nav')
+    var masthead = document.querySelector('.masthead')
+    var closeTimer = null
+
+    // The panel starts below the bar. Measuring beats a magic number that
+    // would drift the moment the bar's padding changes.
+    function syncMastheadHeight() {
+      document.documentElement.style.setProperty(
+        '--masthead-h', masthead.offsetHeight + 'px'
+      )
+    }
+    syncMastheadHeight()
+    window.addEventListener('resize', syncMastheadHeight)
+
+    function setMenu(open) {
+      navToggle.setAttribute('aria-expanded', String(open))
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu')
+      // The page behind a full-screen menu must not scroll under it.
+      document.body.style.overflow = open ? 'hidden' : ''
+      clearTimeout(closeTimer)
+
+      if (open) {
+        syncMastheadHeight()
+        mobileNav.hidden = false
+        // Flush the un-hidden state so the transition has a start value to
+        // animate from; without this the panel would simply appear.
+        void mobileNav.offsetWidth
+        mobileNav.classList.add('is-open')
+      } else {
+        mobileNav.classList.remove('is-open')
+        if (reduced) {
+          mobileNav.hidden = true
+        } else {
+          // Stay in the tree until the fade finishes, then leave for real.
+          closeTimer = setTimeout(function () { mobileNav.hidden = true }, 340)
+        }
+        navToggle.focus()
+      }
+    }
+
+    navToggle.addEventListener('click', function () {
+      setMenu(mobileNav.hidden)
+    })
+
+    // Every link is an in-page anchor, so the menu has to get out of the way
+    // for the jump to be visible.
+    Array.prototype.forEach.call(
+      mobileNav.querySelectorAll('a'),
+      function (link) { link.addEventListener('click', function () { setMenu(false) }) }
+    )
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !mobileNav.hidden) setMenu(false)
+    })
+
+    // Crossing into desktop hides the overlay by media query; without this the
+    // scroll lock and the toggle's state would be left behind.
+    var desktop = window.matchMedia('(min-width: 981px)')
+    var onDesktop = function (e) { if (e.matches && !mobileNav.hidden) setMenu(false) }
+    if (desktop.addEventListener) desktop.addEventListener('change', onDesktop)
+    else desktop.addListener(onDesktop)
+
+    /* ------------------------------------------------------------------
+       Scroll reveals
+       ------------------------------------------------------------------ */
+    var targets = document.querySelectorAll('.reveal')
+
+    if (reduced || !('IntersectionObserver' in window)) {
+      Array.prototype.forEach.call(targets, function (el) { el.classList.add('is-in') })
+    } else {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return
+          var el = entry.target
+          // Stagger within a section so a group arrives as a sequence.
+          var siblings = Array.prototype.slice.call(
+            el.parentElement ? el.parentElement.children : []
+          ).filter(function (n) { return n.classList.contains('reveal') })
+          var i = Math.max(0, siblings.indexOf(el))
+          setTimeout(function () { el.classList.add('is-in') }, Math.min(i, 6) * 70)
+          io.unobserve(el)
+        })
+      }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' })
+
+      Array.prototype.forEach.call(targets, function (el) { io.observe(el) })
+
+      // Cover copy is above the fold: run it as a load sequence instead of
+      // waiting on a scroll that may never happen.
+      window.addEventListener('load', function () {
+        var coverBits = document.querySelectorAll('.cover .reveal')
+        Array.prototype.forEach.call(coverBits, function (el, i) {
+          setTimeout(function () { el.classList.add('is-in') }, 120 + i * 110)
+        })
+      })
+    }
+  })()
+</script>
+
+<script>
+  /* Shared masthead chrome: search panel + subscribe modal. Kept out of the
+     page IIFE so every page carries an identical copy. */
+  (function () {
+    'use strict'
+
+    var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+    var PIG_HEX = {
+      ultramarine: '#1f3a93', sienna: '#8a3a1e', viridian: '#2e6b52',
+      cadmium: '#c9820a', leadwhite: '#efe9dd', bone: '#20211f'
+    }
+
+    /* Stands in for a real search index. Each entry is what a PostCard
+       carries, so wiring this to the search route is a swap, not a rewrite. */
+    var INDEX = [
+      { t: 'The Chemical Symphony of Ultramarine', g: 'Materials', p: 'ultramarine', m: '14 min', d: 'Ground lapis cost more than gold — and the reason is still in the crystal structure.' },
+      { t: 'What Raking Light Reveals About a Painting\u2019s Surface', g: 'Conservation', p: 'viridian', m: '12 min', d: 'Turn the lamp sideways and the brushwork, the losses, and the retouching all show.' },
+      { t: 'Why Burnt Sienna Behaves Differently in Oil Than in Watercolour', g: 'Creative practice', p: 'sienna', m: '9 min', d: 'The same earth, two binders, and a working property that reverses between them.' },
+      { t: 'How to Read a Pigment Supplier\u2019s Catalogue', g: 'Materials', p: 'cadmium', m: '7 min', d: 'Pigment index numbers, lightfastness ratings, and what the codes actually promise.' },
+      { t: 'Egg Tempera and the Problem of Drying Time', g: 'Creative practice', p: 'leadwhite', m: '10 min', d: 'A medium that sets in seconds forces a way of building an image stroke by stroke.' },
+      { t: 'Light and Shadow in Renaissance Masterpieces', g: 'Art history', p: 'bone', m: '16 min', d: 'Reading the deliberate choreography of light that gives Renaissance painting its depth.' },
+      { t: 'Why Titanium White Behaves Differently Than Lead White', g: 'Materials', p: 'leadwhite', m: '11 min', d: 'Two whites, similar in appearance but worlds apart in composition and performance.' },
+      { t: 'Verdigris, and the Green That Eats Its Own Paper', g: 'Materials', p: 'viridian', m: '13 min', d: 'A copper green so corrosive that surviving manuscripts are perforated where it was used.' },
+      { t: 'The Chemistry of Color: Pigments Through Time', g: 'Materials', p: 'cadmium', m: '13 min', d: 'How an artist\u2019s palette encodes centuries of chemistry, trade, and discovery.' },
+      { t: 'What a Craquelure Pattern Tells a Conservator', g: 'Conservation', p: 'bone', m: '11 min', d: 'The direction and spacing of the cracks record the support, the ground, and the age.' },
+      { t: 'Building Texture: From Surface to Soul', g: 'Creative practice', p: 'ultramarine', m: '8 min', d: 'Impasto, glazing, and the tactile decisions that turn a flat surface into a felt experience.' },
+      { t: 'Mummy Brown and the Ethics of a Pigment', g: 'Art history', p: 'sienna', m: '15 min', d: 'A colour that stayed on palettes for three centuries, and what happened when painters learned its source.' },
+      { t: 'Chalk, Gesso, and What a Ground Is Really For', g: 'Materials', p: 'leadwhite', m: '9 min', d: 'The layer nobody looks at decides how much of the paint above it will survive.' },
+      { t: 'Linseed, Walnut, Poppy: Choosing an Oil', g: 'Materials', p: 'cadmium', m: '10 min', d: 'Yellowing, drying rate, and flexibility pull in different directions. Pick two.' },
+      { t: 'Bone Black, Vine Black, Lamp Black', g: 'Materials', p: 'bone', m: '12 min', d: 'Three carbon blacks with three different undertones, and why the choice shows.' },
+      { t: 'What Makes a Pigment Lightfast', g: 'Materials', p: 'viridian', m: '11 min', d: 'Fading is a photochemical process, and the ratings are a shorthand for how fast.' }
+    ]
+
+    var lastFocus = null
+    var EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+    function trap(container, e) {
+      if (e.key !== 'Tab') return
+      var f = container.querySelectorAll(
+        'a[href], button:not([disabled]), input, [tabindex]:not([tabindex="-1"])'
+      )
+      var vis = Array.prototype.filter.call(f, function (el) { return el.offsetParent !== null })
+      if (!vis.length) return
+      var first = vis[0], last = vis[vis.length - 1]
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
+    }
+
+    /* ---------------------------------------------------------------- Search */
+    var panel = document.getElementById('search-panel')
+    var scrim = document.getElementById('search-scrim')
+    var input = document.getElementById('search-input')
+    var listEl = document.getElementById('search-results')
+    var emptyEl = document.getElementById('search-empty')
+    var countEl = document.getElementById('search-count')
+    var searchTimer = null
+
+    function escapeHtml(s) {
+      return s.replace(/[&<>"]/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]
+      })
+    }
+
+    function highlight(text, q) {
+      var safe = escapeHtml(text)
+      if (!q) return safe
+      var i = safe.toLowerCase().indexOf(q.toLowerCase())
+      if (i === -1) return safe
+      return safe.slice(0, i) + '<mark>' + safe.slice(i, i + q.length) + '</mark>' + safe.slice(i + q.length)
+    }
+
+    function renderResults(q) {
+      var query = q.trim()
+      var hits = query
+        ? INDEX.filter(function (r) {
+            var hay = (r.t + ' ' + r.g + ' ' + r.d).toLowerCase()
+            return query.toLowerCase().split(/\s+/).every(function (w) { return hay.indexOf(w) !== -1 })
+          })
+        : INDEX.slice(0, 6)
+
+      listEl.innerHTML = ''
+      emptyEl.hidden = hits.length > 0
+      countEl.textContent = query
+        ? hits.length + (hits.length === 1 ? ' result' : ' results')
+        : 'Recent pieces'
+
+      if (!hits.length) {
+        emptyEl.innerHTML = 'No pieces match <b>' + escapeHtml(query) +
+          '</b>. Try a pigment name — ultramarine, lead white, verdigris.'
+        return
+      }
+
+      hits.forEach(function (r, i) {
+        var li = document.createElement('li')
+        var a = document.createElement('a')
+        a.className = 'search__result'
+        a.href = '#'
+        if (!reduced) a.style.animationDelay = Math.min(i, 8) * 35 + 'ms'
+
+        var dot = document.createElement('i')
+        dot.style.background = PIG_HEX[r.p] || PIG_HEX.ultramarine
+
+        var body = document.createElement('div')
+        var h = document.createElement('h3')
+        h.innerHTML = highlight(r.t, query)
+        var p = document.createElement('p')
+        p.innerHTML = highlight(r.d, query)
+        body.appendChild(h)
+        body.appendChild(p)
+
+        var meta = document.createElement('span')
+        meta.className = 'search__result-meta'
+        meta.textContent = r.g + ' · ' + r.m
+
+        a.appendChild(dot)
+        a.appendChild(body)
+        a.appendChild(meta)
+        li.appendChild(a)
+        listEl.appendChild(li)
+      })
+    }
+
+    function setSearch(open) {
+      Array.prototype.forEach.call(
+        document.querySelectorAll('.masthead .icon-button[aria-label="Search"]'),
+        function (b) { b.setAttribute('aria-expanded', String(open)) }
+      )
+      if (open) {
+        lastFocus = document.activeElement
+        scrim.hidden = false
+        panel.hidden = false
+        void panel.offsetWidth
+        scrim.classList.add('is-open')
+        panel.classList.add('is-open')
+        document.body.style.overflow = 'hidden'
+        renderResults(input.value)
+        input.focus()
+        input.select()
+      } else {
+        scrim.classList.remove('is-open')
+        panel.classList.remove('is-open')
+        document.body.style.overflow = ''
+        var done = function () { scrim.hidden = true; panel.hidden = true }
+        if (reduced) done()
+        else setTimeout(done, 260)
+        if (lastFocus && lastFocus.focus) lastFocus.focus()
+      }
+    }
+
+    input.addEventListener('input', function () {
+      // Debounced so a fast typist does not repaint the list on every keystroke.
+      clearTimeout(searchTimer)
+      searchTimer = setTimeout(function () { renderResults(input.value) }, 120)
+    })
+
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown') {
+        var first = listEl.querySelector('.search__result')
+        if (first) { e.preventDefault(); first.focus() }
+      }
+    })
+
+    listEl.addEventListener('keydown', function (e) {
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+      var items = Array.prototype.slice.call(listEl.querySelectorAll('.search__result'))
+      var i = items.indexOf(document.activeElement)
+      if (i === -1) return
+      e.preventDefault()
+      if (e.key === 'ArrowDown' && items[i + 1]) items[i + 1].focus()
+      else if (e.key === 'ArrowUp') (items[i - 1] || input).focus()
+    })
+
+    document.getElementById('search-close').addEventListener('click', function () { setSearch(false) })
+    scrim.addEventListener('click', function () { setSearch(false) })
+    panel.addEventListener('keydown', function (e) { trap(panel, e) })
+
+    // Every search affordance on the page opens the same panel.
+    Array.prototype.forEach.call(
+      document.querySelectorAll('.masthead .icon-button[aria-label="Search"]'),
+      function (btn) {
+        btn.setAttribute('aria-expanded', 'false')
+        btn.setAttribute('aria-controls', 'search-panel')
+        btn.addEventListener('click', function () { setSearch(panel.hidden) })
+      }
+    )
+
+    var menuSearch = document.querySelector('.mobile-nav__search')
+    if (menuSearch) {
+      var menuInput = menuSearch.querySelector('input')
+      if (menuInput) menuInput.readOnly = true
+      menuSearch.addEventListener('click', function (e) {
+        e.preventDefault()
+        var toggle = document.getElementById('nav-toggle')
+        if (toggle && toggle.getAttribute('aria-expanded') === 'true') toggle.click()
+        setTimeout(function () { setSearch(true) }, reduced ? 0 : 200)
+      })
+    }
+
+    /* ----------------------------------------------------------------- Modal */
+    var mScrim = document.getElementById('modal-scrim')
+    var mClose = document.getElementById('modal-close')
+    var mForm = document.getElementById('modal-form')
+    var mEmail = document.getElementById('modal-email')
+    var mError = document.getElementById('modal-error')
+    var mOffer = document.getElementById('modal-offer')
+    var mDone = document.getElementById('modal-done')
+    var mSubmit = document.getElementById('modal-submit')
+    var mSmall = document.getElementById('modal-small')
+    var billing = document.getElementById('modal-billing')
+
+    /* Placeholder pricing — there is none in the repo yet. Monthly and annual
+       are both here because the Stripe handling already assumes both. */
+    var PRICES = {
+      monthly: { price: '£6', period: '/month', note: 'Billed monthly. Cancel any time.' },
+      annual: { price: '£60', period: '/year', note: 'Billed yearly. Cancel any time.' }
+    }
+
+    var plan = 'free'
+    var cycle = 'monthly'
+
+    function syncPlan() {
+      Array.prototype.forEach.call(document.querySelectorAll('.plan'), function (el) {
+        var on = el.dataset.plan === plan
+        el.classList.toggle('is-selected', on)
+        var radio = el.querySelector('input')
+        if (radio.checked !== on) radio.checked = on
+      })
+
+      billing.hidden = plan !== 'paid'
+      document.getElementById('plan-price').textContent = PRICES[cycle].price
+      document.getElementById('plan-period').textContent = PRICES[cycle].period
+
+      Array.prototype.forEach.call(billing.querySelectorAll('button'), function (b) {
+        b.setAttribute('aria-pressed', String(b.dataset.cycle === cycle))
+      })
+
+      // The button says what happens next, and the small print matches it.
+      mSubmit.textContent = plan === 'free' ? 'Sign up free' : 'Continue to payment'
+      mSmall.textContent = plan === 'free'
+        ? 'Free. One letter a week. Unsubscribe in a click.'
+        : PRICES[cycle].note + ' Card details are taken on the next step.'
+    }
+
+    Array.prototype.forEach.call(document.querySelectorAll('.plan input'), function (radio) {
+      radio.addEventListener('change', function () { plan = radio.value; syncPlan() })
+      radio.addEventListener('focus', function () { radio.closest('.plan').classList.add('is-focused') })
+      radio.addEventListener('blur', function () { radio.closest('.plan').classList.remove('is-focused') })
+    })
+
+    Array.prototype.forEach.call(billing.querySelectorAll('button'), function (b) {
+      b.addEventListener('click', function () { cycle = b.dataset.cycle; syncPlan() })
+    })
+
+    syncPlan()
+
+    function setModal(open) {
+      if (open) {
+        lastFocus = document.activeElement
+        mScrim.hidden = false
+        void mScrim.offsetWidth
+        mScrim.classList.add('is-open')
+        document.body.style.overflow = 'hidden'
+        document.getElementById('modal').focus({ preventScroll: true })
+        mScrim.scrollTop = 0
+      } else {
+        mScrim.classList.remove('is-open')
+        document.body.style.overflow = ''
+        var done = function () {
+          mScrim.hidden = true
+          mOffer.hidden = false
+          mDone.hidden = true
+          mForm.reset()
+          mError.hidden = true
+          plan = 'free'
+          cycle = 'monthly'
+          syncPlan()
+        }
+        if (reduced) done()
+        else setTimeout(done, 280)
+        if (lastFocus && lastFocus.focus) lastFocus.focus()
+      }
+    }
+
+    mClose.addEventListener('click', function () { setModal(false) })
+    document.getElementById('modal-dismiss').addEventListener('click', function () { setModal(false) })
+    mScrim.addEventListener('click', function (e) { if (e.target === mScrim) setModal(false) })
+    mScrim.addEventListener('keydown', function (e) { trap(mScrim, e) })
+
+    mForm.addEventListener('submit', function (e) {
+      e.preventDefault()
+      var value = mEmail.value.trim()
+      if (!EMAIL.test(value)) {
+        mError.textContent = 'Enter an email address so we know where to send it.'
+        mError.hidden = false
+        mEmail.focus()
+        return
+      }
+      mError.hidden = true
+
+      if (plan === 'free') {
+        document.getElementById('modal-done-title').textContent = "You're on the list"
+        document.getElementById('modal-done-note').textContent =
+          'The first letter goes to ' + value + ' on Friday.'
+      } else {
+        document.getElementById('modal-done-title').textContent = 'One more step'
+        document.getElementById('modal-done-note').textContent =
+          'Checkout would open here to take card details for the ' +
+          (cycle === 'annual' ? 'annual' : 'monthly') + ' plan, then ' + value +
+          ' gets full access.'
+      }
+
+      mOffer.hidden = true
+      mDone.hidden = false
+      document.getElementById('modal-dismiss').focus()
+    })
+
+    // Anything pointing at the subscribe section opens the modal instead.
+    Array.prototype.forEach.call(
+      document.querySelectorAll('a[href="#subscribe"]'),
+      function (a) {
+        a.addEventListener('click', function (e) { e.preventDefault(); setModal(true) })
+      }
+    )
+
+    // The inline band keeps its own form; it just needs to answer.
+    var inline = document.querySelector('.signup')
+    if (inline) {
+      inline.addEventListener('submit', function (e) {
+        e.preventDefault()
+        var field = inline.querySelector('input')
+        var value = field.value.trim()
+        if (!EMAIL.test(value)) { field.focus(); return }
+        setModal(true)
+        mEmail.value = value
+        mForm.dispatchEvent(new Event('submit', { cancelable: true }))
+      })
+    }
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape') return
+      if (!mScrim.hidden) setModal(false)
+      else if (!panel.hidden) setSearch(false)
+    })
+  })()
+</script>
+  </body>
+</html>
