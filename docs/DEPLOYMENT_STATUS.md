@@ -97,6 +97,27 @@ Related: [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md),
    a quick `docker compose run --rm migrate pnpm migrate:db:status` check
    before treating it as closed.
 
+0.4. **Re-import the media after the next deploy (operator action).**
+Uploads are stored on local disk — no object storage is configured, so
+`useR2` in `payload.config.ts` is false and Payload writes to `/app/media`
+inside the app container. Until the `media_data` volume was added there was
+nothing persisting that directory, so `docker compose up -d --build` threw it
+away on every release: the container is recreated and its writable layer goes
+with it. The `media` rows survived in Postgres, so each post kept pointing at
+a file that no longer existed, `/api/media/file/<name>` answered 500 with a
+JSON body, and every image on the site rendered as a broken-image icon.
+
+The volume stops it happening again but cannot bring back what was already
+discarded. Re-run the Ghost media import once, after a deploy that includes
+the volume, and the files will land in the volume and stay there:
+
+```
+docker compose run --rm migrate pnpm migrate:ghost --input <export.json>
+```
+
+Worth doing before the public cutover regardless, since the same wipe would
+have taken any image uploaded through Payload Admin.
+
 0.5. **MCP from mobile — subdomain is live, endpoint is not enabled yet
 (operator action).** `cms.beyondeveryart.com` now has a real certificate (see
 above) and Payload Admin loads there. Still needed: set `MCP_ENABLED=1`,
