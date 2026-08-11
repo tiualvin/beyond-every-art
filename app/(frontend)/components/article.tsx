@@ -7,6 +7,7 @@ import { formatDate } from '@/lib/format'
 import { tagPath } from '@/lib/seo/site'
 
 import { FadeIn } from './motion/fade-in'
+import { ShareRow } from './share-row'
 import { Reveal } from './motion/reveal'
 import { StaggerChildren, StaggerItem } from './motion/stagger'
 
@@ -46,6 +47,9 @@ export function Article({ post }: { post: PostDetail }) {
                 <p className="article__byline">{byline}</p>
               </FadeIn>
             )}
+            <FadeIn delay={0.26}>
+              <ShareRow title={post.title} />
+            </FadeIn>
           </header>
 
           {post.image && (
