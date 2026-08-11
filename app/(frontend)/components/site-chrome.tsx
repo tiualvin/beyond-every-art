@@ -8,6 +8,14 @@ import { useActionState, useEffect, useRef, useState } from 'react'
 
 import { subscribeFromModal } from '@/app/(frontend)/newsletter/actions'
 import type { NavLink } from '@/lib/content/queries'
+import {
+  type BillingPeriod,
+  checkoutUrl,
+  FREE_BENEFITS,
+  PAID_BENEFITS,
+  PRICES,
+  YEARLY_SAVING,
+} from '@/lib/membership'
 import { SEARCH_PATH } from '@/lib/seo/site'
 
 import { editorial, quick } from './motion/variants'
@@ -468,6 +476,8 @@ function SubscribeModal({
 
 function SubscribeBody({ onClose }: { onClose: () => void }) {
   const [status, formAction, pending] = useActionState(subscribeFromModal, null)
+  const [plan, setPlan] = useState<'free' | 'paid'>('free')
+  const [period, setPeriod] = useState<BillingPeriod>('monthly')
 
   if (status === 'success') {
     return (
@@ -491,44 +501,154 @@ function SubscribeBody({ onClose }: { onClose: () => void }) {
     )
   }
 
+  const paid = plan === 'paid'
+  const checkout = checkoutUrl(period)
+
   return (
     <div className="modal__body">
       <h2 id="subscribe-title">Stay close to the work</h2>
       <p className="modal__lede">
-        One email when a piece is ready. No schedule, no filler, and nothing
-        else sent to your address.
+        Read the journal, or back it — and open the pieces written for members.
       </p>
 
-      <form className="modal__form" action={formAction}>
-        <input
-          type="email"
-          name="email"
-          required
-          placeholder="you@example.com"
-          aria-label="Email address"
-          autoComplete="email"
-        />
-        {status === 'invalid' && (
-          <p className="modal__error">
-            That address doesn&rsquo;t look right — check it and try again.
+      <fieldset className="plans">
+        <legend className="visually-hidden">Choose a membership</legend>
+
+        <label className={`plan${paid ? '' : ' is-selected'}`}>
+          <input
+            type="radio"
+            name="plan"
+            value="free"
+            checked={!paid}
+            onChange={() => setPlan('free')}
+          />
+          <span className="plan__head">
+            <span className="plan__name">Free</span>
+            <span className="plan__price">
+              <b>$0</b>
+            </span>
+          </span>
+          <Benefits items={FREE_BENEFITS} />
+        </label>
+
+        <label className={`plan${paid ? ' is-selected' : ''}`}>
+          <span className="plan__badge">Full access</span>
+          <input
+            type="radio"
+            name="plan"
+            value="paid"
+            checked={paid}
+            onChange={() => setPlan('paid')}
+          />
+          <span className="plan__head">
+            <span className="plan__name">Member</span>
+            <span className="plan__price">
+              <b>${PRICES[period]}</b>
+              {period === 'monthly' ? '/mo' : '/yr'}
+            </span>
+          </span>
+          <Benefits items={PAID_BENEFITS} />
+        </label>
+      </fieldset>
+
+      {paid && (
+        <div className="billing" role="group" aria-label="Billing period">
+          <button
+            type="button"
+            aria-pressed={period === 'monthly'}
+            onClick={() => setPeriod('monthly')}
+          >
+            Monthly
+            <span>${PRICES.monthly} a month</span>
+          </button>
+          <button
+            type="button"
+            aria-pressed={period === 'yearly'}
+            onClick={() => setPeriod('yearly')}
+          >
+            Yearly
+            <span>Save ${YEARLY_SAVING}</span>
+          </button>
+        </div>
+      )}
+
+      {paid ? (
+        checkout ? (
+          <a className="button button--primary modal__cta" href={checkout}>
+            Continue to payment
+          </a>
+        ) : (
+          <>
+            <button className="button button--primary modal__cta" disabled>
+              Continue to payment
+            </button>
+            {/* Said plainly rather than failing at the click: this site reads
+                Stripe webhooks but has no checkout of its own yet. */}
+            <p className="modal__small">
+              Paid membership isn&rsquo;t open here yet. Choose Free above and
+              we&rsquo;ll write to you when it is.
+            </p>
+          </>
+        )
+      ) : null}
+
+      {!paid && (
+        <form className="modal__form" action={formAction}>
+          <input
+            type="email"
+            name="email"
+            required
+            placeholder="you@example.com"
+            aria-label="Email address"
+            autoComplete="email"
+          />
+          {status === 'invalid' && (
+            <p className="modal__error">
+              That address doesn&rsquo;t look right — check it and try again.
+            </p>
+          )}
+          {status === 'error' && (
+            <p className="modal__error">
+              Something went wrong on our end. Please try again in a moment.
+            </p>
+          )}
+          <button
+            className="button button--primary"
+            type="submit"
+            disabled={pending}
+          >
+            {pending ? 'Subscribing…' : 'Subscribe'}
+          </button>
+          <p className="modal__small">
+            Free. Unsubscribe from any email, any time.
           </p>
-        )}
-        {status === 'error' && (
-          <p className="modal__error">
-            Something went wrong on our end. Please try again in a moment.
-          </p>
-        )}
-        <button
-          className="button button--primary"
-          type="submit"
-          disabled={pending}
-        >
-          {pending ? 'Subscribing…' : 'Subscribe'}
-        </button>
-        <p className="modal__small">
-          Free. Unsubscribe from any email, any time.
-        </p>
-      </form>
+        </form>
+      )}
     </div>
+  )
+}
+
+function Benefits({ items }: { items: string[] }) {
+  return (
+    <ul className="plan__list">
+      {items.map((item) => (
+        <li key={item}>
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M20 6 9 17l-5-5" />
+          </svg>
+          <span>{item}</span>
+        </li>
+      ))}
+    </ul>
   )
 }

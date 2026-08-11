@@ -102,4 +102,34 @@ test.describe('header chrome', () => {
     await dialog.getByRole('button', { name: 'Done' }).click()
     await expect(dialog).toBeHidden()
   })
+
+  test('the paid plan prices both periods and offers no dead payment button', async ({
+    page,
+  }) => {
+    await openHome(page)
+    await page.locator('.site-header__subscribe').click()
+
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+
+    // Free is the default, and the billing toggle belongs to the paid plan.
+    await expect(dialog.locator('.plan.is-selected .plan__name')).toHaveText(
+      'Free',
+    )
+    await expect(dialog.locator('.billing')).toBeHidden()
+
+    await dialog.locator('.plan input[value=paid]').check({ force: true })
+    await expect(dialog.locator('.plan.is-selected .plan__name')).toHaveText(
+      'Member',
+    )
+    await expect(dialog.locator('.plan__price').nth(1)).toContainText('$5')
+
+    await dialog.getByRole('button', { name: /Yearly/ }).click()
+    await expect(dialog.locator('.plan__price').nth(1)).toContainText('$50')
+
+    // No payment link is configured in CI, and the modal has to say so rather
+    // than offer a button that goes nowhere.
+    await expect(dialog.locator('.modal__cta')).toBeDisabled()
+    await expect(dialog.getByText(/isn.t open here yet/i)).toBeVisible()
+  })
 })
