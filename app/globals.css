@@ -9,6 +9,7 @@
   --color-dark: #141110;
   --color-on-dark: #f3ede4;
   --color-line: #e4ddd2;
+  --color-rule: color-mix(in srgb, var(--color-ink) 26%, var(--color-paper));
 
   /* Type — expressive serif display paired with a restrained sans. */
   --font-serif: var(--font-playfair), Georgia, 'Times New Roman', serif;
@@ -111,6 +112,31 @@ a:hover {
   .story-card:hover h3 {
     color: var(--color-burgundy);
   }
+
+  .entry::before {
+    transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .entry__title,
+  .latest__title {
+    transition: color 0.22s ease;
+  }
+
+  .entry__thumb img {
+    transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .entry:hover .entry__thumb img {
+    transform: scale(1.07);
+  }
+
+  .latest {
+    transition: background-color 0.25s ease;
+  }
+
+  .swatch__fill {
+    transition: height 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+  }
 }
 
 img {
@@ -175,6 +201,18 @@ img {
 .button--ghost {
   border-color: currentColor;
   color: var(--color-ink);
+}
+
+/* On a dark or burgundy ground. */
+.button--on-dark {
+  background: var(--color-on-dark);
+  border-color: var(--color-on-dark);
+  color: var(--color-burgundy-deep);
+}
+
+.button--on-dark:hover {
+  background: transparent;
+  color: var(--color-on-dark);
 }
 
 /* --- Site header -------------------------------------------------------- */
@@ -401,94 +439,334 @@ img {
   }
 }
 
-/* --- Hero --------------------------------------------------------------- */
+/* --- Cover -------------------------------------------------------------- */
 
-.hero {
-  background: var(--color-dark);
-  color: var(--color-on-dark);
+/* A slow oxblood wash. Every tone comes from the burgundy family, so the field
+   moves tonally rather than through colour — that is what keeps it reading as
+   pigment in motion rather than as an animated gradient. */
+.cover {
   position: relative;
+  min-height: min(46rem, 82vh);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
   overflow: hidden;
+  isolation: isolate;
+  /* Painted before the canvas has a first frame, so there is no flash. */
+  background: #26080f;
+  color: var(--color-on-dark);
 }
 
-.hero::before {
-  content: '';
+.cover__wash {
   position: absolute;
   inset: 0;
-  background: radial-gradient(
-    ellipse 80% 60% at 70% 40%,
-    rgba(109, 31, 44, 0.12),
-    transparent 70%
-  );
-  pointer-events: none;
+  z-index: -2;
 }
 
-.hero__rule {
-  display: block;
-  width: 3rem;
-  height: 1px;
-  background: var(--color-burgundy);
-  border: 0;
-  margin: 0.75rem 0;
-}
-
-.hero__inner {
-  position: relative;
-  padding-top: 5rem;
-  padding-bottom: 5rem;
-}
-
-.hero__split {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 3rem;
-  align-items: center;
-  max-width: var(--maxw);
-}
-
-.hero__text {
-  max-width: 30rem;
-}
-
-.hero h1 {
-  color: var(--color-on-dark);
-  font-size: clamp(2.2rem, 5vw, 3.4rem);
-  margin-top: 0.6rem;
-}
-
-.hero p {
-  color: color-mix(in srgb, var(--color-on-dark) 82%, transparent);
-  font-size: 1.15rem;
-  max-width: 34rem;
-  margin: 0 0 2rem;
-}
-
-.hero__image-wrap {
-  position: relative;
-}
-
-.hero__parallax {
-  aspect-ratio: 4 / 3;
-  overflow: hidden;
-}
-
-.hero__image {
+.cover__wash canvas {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  display: block;
 }
 
-@media (max-width: 800px) {
-  .hero__split {
-    grid-template-columns: 1fr;
-    gap: 2rem;
+/* Deepens the column the type sits in, so the headline always has the darkest
+   part of the field behind it wherever a bloom drifts. */
+.cover__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(
+      to right,
+      rgba(23, 5, 10, 0.82) 0%,
+      rgba(23, 5, 10, 0.55) 34%,
+      rgba(23, 5, 10, 0.12) 62%,
+      transparent 85%
+    ),
+    linear-gradient(
+      to bottom,
+      rgba(23, 5, 10, 0.45) 0%,
+      transparent 26%,
+      transparent 68%,
+      rgba(23, 5, 10, 0.55) 100%
+    );
+}
+
+.cover__inner {
+  position: relative;
+  z-index: 2;
+  padding-top: clamp(5rem, 14vh, 9rem);
+  padding-bottom: clamp(3rem, 8vh, 5.5rem);
+}
+
+.cover__text {
+  max-width: 46rem;
+}
+
+.cover__kicker {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 0 0 1.4rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--color-on-dark);
+}
+
+.cover__swatch {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--color-on-dark);
+}
+
+.cover__title {
+  font-size: clamp(2.6rem, 8vw, 6.5rem);
+  letter-spacing: -0.035em;
+  line-height: 0.94;
+  margin: 0 0 1.5rem;
+  max-width: 15ch;
+  color: var(--color-on-dark);
+  text-shadow: 0 1px 24px rgba(23, 5, 10, 0.45);
+}
+
+.cover__standfirst {
+  font-size: clamp(1rem, 1.5vw, 1.2rem);
+  line-height: 1.55;
+  color: color-mix(in srgb, var(--color-on-dark) 84%, transparent);
+  max-width: 42ch;
+  margin: 0 0 1.9rem;
+}
+
+.cover__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.9rem 1.6rem;
+  margin: 0;
+}
+
+.cover__secondary {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: color-mix(in srgb, var(--color-on-dark) 88%, transparent);
+  border-bottom: 1px solid
+    color-mix(in srgb, var(--color-on-dark) 35%, transparent);
+  padding-bottom: 0.15rem;
+}
+
+.cover__secondary:hover {
+  color: var(--color-on-dark);
+  border-bottom-color: var(--color-on-dark);
+  text-decoration: none;
+}
+
+/* --- Latest band -------------------------------------------------------- */
+
+/* The cover carries the publication rather than a story, so the newest piece
+   needs its own entry point before the curated sections begin. */
+.latest {
+  display: block;
+  border-bottom: 1px solid var(--color-line);
+  background: var(--color-surface);
+}
+
+.latest:hover {
+  background: color-mix(
+    in srgb,
+    var(--color-burgundy) 4%,
+    var(--color-surface)
+  );
+  text-decoration: none;
+}
+
+.latest__inner {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 1.75rem;
+  padding-top: 1.5rem;
+  padding-bottom: 1.5rem;
+}
+
+.latest__plate {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: var(--color-paper);
+}
+
+.latest__title {
+  font-size: clamp(1.15rem, 1.9vw, 1.5rem);
+  letter-spacing: -0.02em;
+  margin: 0.4rem 0 0.35rem;
+}
+
+.latest:hover .latest__title {
+  color: var(--color-burgundy);
+}
+
+.latest__excerpt {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-muted);
+  max-width: 56ch;
+}
+
+.latest__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin: 0;
+  text-align: right;
+  font-size: 0.78rem;
+  color: var(--color-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.latest__arrow {
+  color: var(--color-burgundy);
+  display: flex;
+}
+
+@media (max-width: 900px) {
+  .latest__inner {
+    grid-template-columns: 4.5rem minmax(0, 1fr);
+    gap: 1rem 1.25rem;
   }
 
-  .hero__image-wrap {
-    order: -1;
+  .latest__meta {
+    grid-column: 2;
+    text-align: left;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.15rem 0.9rem;
+    white-space: normal;
   }
 
-  .hero__parallax {
-    aspect-ratio: 16 / 10;
+  .latest__excerpt,
+  .latest__arrow {
+    display: none;
+  }
+}
+
+/* --- Entry list --------------------------------------------------------- */
+
+/* The cover image identifies a piece faster than an ordinal did, and it works
+   the same on touch as it does with a cursor. */
+.entry {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr) 11rem 8rem;
+  gap: 1.5rem;
+  align-items: start;
+  padding: 1.5rem 0;
+  border-bottom: 1px solid var(--color-line);
+  position: relative;
+}
+
+.entry:first-child {
+  border-top: 1px solid var(--color-line);
+}
+
+.entry__body,
+.entry__tag,
+.entry__meta {
+  align-self: baseline;
+}
+
+.entry::before {
+  content: '';
+  position: absolute;
+  left: -1.25rem;
+  right: -1.25rem;
+  top: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--color-burgundy) 5%, transparent);
+  transform: scaleX(0);
+  transform-origin: left;
+  z-index: -1;
+}
+
+.entry:hover::before,
+.entry:focus-within::before {
+  transform: scaleX(1);
+}
+
+.entry__thumb {
+  position: relative;
+  width: 5.5rem;
+  aspect-ratio: 4 / 3;
+  margin-top: 0.2rem;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: var(--color-paper);
+}
+
+.entry__title {
+  font-family: var(--font-serif);
+  font-size: clamp(1.25rem, 2.1vw, 1.6rem);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.22;
+  margin: 0;
+}
+
+.entry:hover .entry__title {
+  color: var(--color-burgundy);
+}
+
+.entry__excerpt {
+  font-size: 0.9rem;
+  color: var(--color-muted);
+  margin: 0.35rem 0 0;
+  max-width: 58ch;
+}
+
+.entry__tag {
+  font-size: 0.7rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  font-weight: 600;
+}
+
+.entry__meta {
+  font-size: 0.78rem;
+  color: var(--color-muted);
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 820px) {
+  .entry {
+    grid-template-columns: 4rem minmax(0, 1fr) auto;
+    gap: 0.6rem 1rem;
+  }
+
+  .entry__thumb {
+    width: 4rem;
+    grid-row: span 3;
+  }
+
+  .entry__body {
+    grid-column: 2 / -1;
+  }
+
+  .entry__tag {
+    grid-column: 2;
+    grid-row: 3;
+  }
+
+  .entry__meta {
+    grid-column: 3;
+    grid-row: 3;
   }
 }
 
@@ -500,8 +778,22 @@ img {
 }
 
 .section__head {
-  text-align: center;
-  margin-bottom: 2.5rem;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  padding-bottom: 1.5rem;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid var(--color-rule);
+  text-align: left;
+}
+
+.section__note {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-muted);
+  max-width: 34ch;
 }
 
 .section__head h2 {
@@ -509,131 +801,12 @@ img {
   margin-top: 0.4rem;
 }
 
-/* --- Perspective -------------------------------------------------------- */
-
-.perspective {
-  border-bottom: 1px solid var(--color-line);
-}
-
-.perspective__inner {
-  display: grid;
-  grid-template-columns: 1.1fr 1fr;
-  gap: 3rem;
-  align-items: center;
-}
-
-.perspective__quote {
-  font-family: var(--font-serif);
-  font-size: clamp(1.2rem, 2.5vw, 1.6rem);
-  font-style: italic;
-  line-height: 1.45;
-  color: var(--color-ink);
-  border-left: 2px solid var(--color-burgundy);
-  padding-left: 1.5rem;
-  margin: 0;
-}
-
-.perspective__body p {
-  color: var(--color-muted);
-  margin: 0.5rem 0 0;
-  font-size: 0.95rem;
-  max-width: 28rem;
-}
-
-.perspective__link {
-  display: inline-block;
-  margin-top: 1rem;
-  font-size: 0.78rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--color-burgundy);
-}
-
-.perspective__link:hover {
-  text-decoration: underline;
-}
-
-@media (max-width: 800px) {
-  .perspective__inner {
-    grid-template-columns: 1fr;
-    gap: 1.5rem;
-  }
-}
-
-/* --- Lead story --------------------------------------------------------- */
-
-.lead-story {
-  display: grid;
-  grid-template-columns: 1.2fr 1fr;
-  gap: 2.5rem;
-  align-items: start;
-}
-
-.lead-story__image-wrap {
-  position: relative;
-  aspect-ratio: 4 / 3;
-  overflow: hidden;
-  border-radius: var(--radius);
-}
-
-.lead-story__image {
-  object-fit: cover;
-}
-
-.lead-story__text {
-  padding-top: 0.25rem;
-}
-
-.lead-story__title {
-  font-size: clamp(1.6rem, 3.5vw, 2.4rem);
-  max-width: 32rem;
-}
-
-.lead-story__excerpt {
-  color: var(--color-muted);
-  font-size: 1rem;
-  max-width: 30rem;
-  margin: 0 0 0.5rem;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .lead-story__image {
-    transition: transform 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
-  }
-
-  .lead-story__image-wrap:hover .lead-story__image {
-    transform: scale(1.02);
-  }
-}
-
-@media (max-width: 800px) {
-  .lead-story {
-    grid-template-columns: 1fr;
-    gap: 1.5rem;
-  }
-}
-
-/* --- Magazine card grid (editorial spread) ------------------------------ */
+/* --- Card grid ---------------------------------------------------------- */
 
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
   gap: 2rem;
-}
-
-.card-grid--magazine {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  column-gap: 2.5rem;
-  row-gap: 3rem;
-}
-
-@media (max-width: 700px) {
-  .card-grid--magazine {
-    grid-template-columns: 1fr;
-    row-gap: 2.5rem;
-  }
 }
 
 /* --- Story card (horizontal variant) ------------------------------------ */
@@ -735,212 +908,91 @@ img {
   color: var(--color-on-dark);
 }
 
-.topics-carousel {
-  position: relative;
-}
-
-.topics-carousel__viewport {
-  -webkit-mask-image: linear-gradient(
-    90deg,
-    transparent 0,
-    black 2rem,
-    black calc(100% - 2rem),
-    transparent 100%
-  );
-  mask-image: linear-gradient(
-    90deg,
-    transparent 0,
-    black 2rem,
-    black calc(100% - 2rem),
-    transparent 100%
-  );
-}
-
-.topics-carousel__viewport[data-at-start='true'] {
-  -webkit-mask-image: linear-gradient(
-    90deg,
-    black 0,
-    black calc(100% - 2rem),
-    transparent 100%
-  );
-  mask-image: linear-gradient(
-    90deg,
-    black 0,
-    black calc(100% - 2rem),
-    transparent 100%
-  );
-}
-
-.topics-carousel__viewport[data-at-end='true'] {
-  -webkit-mask-image: linear-gradient(
-    90deg,
-    transparent 0,
-    black 2rem,
-    black 100%
-  );
-  mask-image: linear-gradient(90deg, transparent 0, black 2rem, black 100%);
-}
-
-.topics-carousel__viewport[data-at-start='true'][data-at-end='true'] {
-  -webkit-mask-image: none;
-  mask-image: none;
-}
-
-.topics-carousel__track {
-  display: flex;
-  gap: 1rem;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  padding-bottom: 0.25rem;
-}
-
-.topics-carousel__track::-webkit-scrollbar {
-  display: none;
-}
-
-.topics-carousel__item {
-  flex: 0 0 auto;
-  scroll-snap-align: start;
-}
-
-.topics-carousel__button {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.75rem;
-  height: 2.75rem;
-  border-radius: 50%;
-  border: 1px solid color-mix(in srgb, var(--color-on-dark) 30%, transparent);
-  background: color-mix(in srgb, var(--color-dark) 70%, transparent);
+.topics h2 {
   color: var(--color-on-dark);
-  cursor: pointer;
-  backdrop-filter: blur(6px);
 }
 
-.topics-carousel__button:hover:not(:disabled) {
-  border-color: var(--color-on-dark);
+.topics .section__head {
+  border-bottom-color: color-mix(
+    in srgb,
+    var(--color-on-dark) 45%,
+    transparent
+  );
 }
 
-.topics-carousel__button:disabled {
-  opacity: 0;
-  pointer-events: none;
+.topics .section__note {
+  color: color-mix(in srgb, var(--color-on-dark) 68%, transparent);
 }
 
-.topics-carousel__button--prev {
-  left: -0.25rem;
+.topics .eyebrow {
+  color: color-mix(in srgb, var(--color-on-dark) 82%, transparent);
 }
 
-.topics-carousel__button--next {
-  right: -0.25rem;
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: 1px;
+  margin-top: 3rem;
+  background: color-mix(in srgb, var(--color-on-dark) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-on-dark) 16%, transparent);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .topics-carousel__button {
-    transition:
-      opacity 0.2s ease,
-      border-color 0.2s ease;
-  }
-}
-
-@media (max-width: 800px) {
-  .topics-carousel__button {
-    display: none;
-  }
-}
-
-.topic-card {
+.swatch {
   position: relative;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  flex: 0 0 220px;
   aspect-ratio: 3 / 4;
+  padding: 1.1rem;
+  background: var(--color-dark);
   overflow: hidden;
-  scroll-snap-align: start;
-  border-radius: 3px;
-  background: linear-gradient(
-    135deg,
-    var(--color-burgundy-deep),
-    var(--color-dark)
-  );
 }
 
-.topic-card__image {
-  object-fit: cover;
-}
-
-.topic-card__overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    to top,
-    rgba(20, 17, 16, 0.8) 0%,
-    rgba(20, 17, 16, 0.2) 50%,
-    transparent 100%
-  );
-  z-index: 1;
-}
-
-.topic-card__content {
-  position: relative;
-  z-index: 2;
-  padding: 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-
-.topic-card__name {
-  font-family: var(--font-serif);
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: var(--color-on-dark);
-}
-
-.topic-card__count {
-  font-size: 0.72rem;
-  color: color-mix(in srgb, var(--color-on-dark) 55%, transparent);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .topic-card__image {
-    transition: transform 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
-  }
-
-  .topic-card:hover .topic-card__image {
-    transform: scale(1.05);
-  }
-
-  .topic-card {
-    transition: transform 0.35s cubic-bezier(0.25, 0.1, 0.25, 1);
-  }
-
-  .topic-card:hover {
-    transform: translateY(-2px);
-  }
-}
-
-.topic-card:hover {
+.swatch:hover {
   text-decoration: none;
 }
 
-@media (max-width: 600px) {
-  .topic-card {
-    flex: 0 0 160px;
-  }
+/* The pigment fills from the bottom in proportion to how much of the archive
+   the subject covers — a paint box you can also read as a bar chart. The lit
+   top edge is what lets a near-black pigment still show its level. */
+.swatch__fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--pigment);
+  box-shadow: inset 0 1px 0
+    color-mix(in srgb, var(--color-on-dark) 30%, transparent);
+}
 
-  .topic-card__content {
-    padding: 0.85rem;
-  }
+.swatch:hover .swatch__fill {
+  height: 100%;
+}
 
-  .topic-card__name {
-    font-size: 0.95rem;
-  }
+/* Label colour is computed per pigment against both brand text colours. A
+   blend mode disappears whenever the pigment sits near the text colour, which
+   is exactly what the pale ones do. */
+.swatch__body {
+  position: relative;
+  z-index: 2;
+  color: var(--pigment-ink);
+}
+
+.swatch__name {
+  font-family: var(--font-serif);
+  font-size: 1.1rem;
+  line-height: 1.15;
+  margin: 0 0 0.35rem;
+  color: inherit;
+}
+
+.swatch__count {
+  display: block;
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.78;
 }
 
 /* --- Newsletter band ---------------------------------------------------- */

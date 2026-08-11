@@ -5,15 +5,15 @@ import {
   getRecentPosts,
   getSiteSettings,
   getTagsWithCounts,
+  type PostCard,
 } from '@/lib/content/queries'
 import { formatDate } from '@/lib/format'
-import { JOURNAL_PATH, postPath } from '@/lib/seo/site'
+import { JOURNAL_PATH, NEWSLETTER_PATH, postPath } from '@/lib/seo/site'
 
-import { StoryCard } from './components/story-card'
-import { TopicsCarousel } from './components/topics-carousel'
+import { CoverField } from './components/cover-field'
+import { EntryRow } from './components/entry-row'
+import { TopicSwatches } from './components/topic-swatches'
 import { FadeIn } from './components/motion/fade-in'
-import { ImageReveal } from './components/motion/image-reveal'
-import { Parallax } from './components/motion/parallax'
 import { Reveal } from './components/motion/reveal'
 import { StaggerChildren, StaggerItem } from './components/motion/stagger'
 
@@ -26,148 +26,73 @@ export default async function HomePage() {
     getTagsWithCounts(6),
   ])
 
-  const [lead, ...rest] = posts
+  const [latest, ...rest] = posts
   const featured = rest.length > 0 ? rest : posts
 
   return (
     <main>
-      {/* ── Hero ── */}
-      <section className="hero">
-        <div className="container hero__inner hero__split">
-          <div className="hero__text">
+      {/* ── Cover ── */}
+      <section className="cover">
+        <CoverField />
+        <div className="cover__scrim" aria-hidden="true" />
+        <div className="container cover__inner">
+          <div className="cover__text">
             <FadeIn delay={0}>
-              <p className="eyebrow eyebrow--on-dark">
-                Science · Materials · Meaning
+              <p className="cover__kicker">
+                <span className="cover__swatch" />
+                An independent journal
               </p>
             </FadeIn>
             <FadeIn delay={0.08}>
-              <hr className="hero__rule" />
+              <h1 className="cover__title">
+                What paintings are actually made of
+              </h1>
             </FadeIn>
-            <FadeIn delay={0.15}>
-              <h1>Art Lives Beyond What We See</h1>
+            <FadeIn delay={0.16}>
+              <p className="cover__standfirst">{settings.description}</p>
             </FadeIn>
-            <FadeIn delay={0.22}>
-              <p>{settings.description}</p>
-            </FadeIn>
-            <FadeIn delay={0.3}>
-              <Link href={JOURNAL_PATH} className="button button--primary">
-                Explore the Journal
-              </Link>
-            </FadeIn>
-          </div>
-          {lead?.image && (
-            <FadeIn delay={0.2} className="hero__image-wrap">
-              <Parallax className="hero__parallax" offset={30}>
-                <Image
-                  src={lead.image.url}
-                  alt={lead.image.alt}
-                  width={lead.image.width ?? 800}
-                  height={lead.image.height ?? 600}
-                  className="hero__image"
-                  priority
-                  sizes="(max-width: 800px) 100vw, 50vw"
-                />
-              </Parallax>
-            </FadeIn>
-          )}
-        </div>
-      </section>
-
-      {/* ── Our Perspective ── */}
-      <section className="section perspective">
-        <div className="container">
-          <Reveal>
-            <div className="perspective__inner">
-              <blockquote className="perspective__quote">
-                &ldquo;We explore the unseen forces that shape art&mdash;the
-                chemistry of pigments, the physics of light, the stories
-                embedded in every material.&rdquo;
-              </blockquote>
-              <div className="perspective__body">
-                <p className="eyebrow">Our Perspective</p>
-                <p>
-                  {settings.description} We investigate the stories behind
-                  creative practice&mdash;from ancient techniques to
-                  contemporary exhibitions.
-                </p>
-                <Link href={JOURNAL_PATH} className="perspective__link">
-                  Read the Journal <span aria-hidden="true">&rarr;</span>
+            <FadeIn delay={0.24}>
+              <p className="cover__actions">
+                <Link href={JOURNAL_PATH} className="button button--on-dark">
+                  Read the journal
                 </Link>
-              </div>
-            </div>
-          </Reveal>
+                <Link href={NEWSLETTER_PATH} className="cover__secondary">
+                  Get the newsletter <span aria-hidden="true">&rarr;</span>
+                </Link>
+              </p>
+            </FadeIn>
+          </div>
         </div>
       </section>
 
-      {/* ── Lead story ── */}
-      {lead && (
-        <section className="section" style={{ paddingTop: 0 }}>
-          <div className="container">
-            <Reveal>
-              <div className="lead-story">
-                {lead.image && (
-                  <ImageReveal className="lead-story__image-wrap">
-                    <Link
-                      href={postPath(lead.slug)}
-                      aria-hidden="true"
-                      tabIndex={-1}
-                    >
-                      <Image
-                        src={lead.image.url}
-                        alt={lead.image.alt}
-                        fill
-                        className="lead-story__image"
-                        sizes="(max-width: 800px) 100vw, 55vw"
-                      />
-                    </Link>
-                  </ImageReveal>
-                )}
-                <div className="lead-story__text">
-                  <p className="eyebrow">
-                    {[lead.tag, 'Latest'].filter(Boolean).join(' · ')}
-                  </p>
-                  <h2 className="lead-story__title">
-                    <Link href={postPath(lead.slug)}>{lead.title}</Link>
-                  </h2>
-                  {lead.excerpt && (
-                    <p className="lead-story__excerpt">{lead.excerpt}</p>
-                  )}
-                  <p className="story-card__meta">
-                    {[
-                      lead.authors.map((a) => a.name).join(', '),
-                      `${lead.readingTime} min read`,
-                      formatDate(lead.publishedAt),
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </p>
-                </div>
-              </div>
-            </Reveal>
-          </div>
-        </section>
-      )}
+      {/* ── Latest ──
+          The cover carries the publication rather than a story, so the newest
+          piece needs its own entry point before the curated sections begin. */}
+      {latest && <LatestBand post={latest} />}
 
-      {/* ── Featured stories (magazine layout) ── */}
-      <section className="section" style={{ paddingTop: 0 }}>
+      {/* ── Featured ── */}
+      <section className="section" id="featured">
         <div className="container">
           <Reveal>
             <div className="section__head">
-              <p className="eyebrow">Featured Stories</p>
-              <h2>Ideas. Materials. Inspiration.</h2>
+              <div>
+                <p className="eyebrow">Editors&rsquo; picks</p>
+                <h2>Featured articles</h2>
+              </div>
+              <p className="section__note">Pieces worth starting with.</p>
             </div>
           </Reveal>
 
           {featured.length > 0 ? (
-            <StaggerChildren className="card-grid--magazine">
+            <StaggerChildren>
               {featured.map((post) => (
                 <StaggerItem key={post.id}>
-                  <StoryCard post={post} variant="feature" />
+                  <EntryRow post={post} />
                 </StaggerItem>
               ))}
             </StaggerChildren>
           ) : (
-            <p className="muted" style={{ textAlign: 'center' }}>
+            <p className="muted">
               Stories will appear here once content is published. Run{' '}
               <code>pnpm seed:dev</code> to load sample content locally.
             </p>
@@ -175,22 +100,80 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ── Explore by Topic ── */}
+      {/* ── Topics ── */}
       {topics.length > 0 && (
-        <section className="section topics">
+        <section className="section topics" id="topics">
           <div className="container">
             <Reveal>
               <div className="section__head">
-                <p className="eyebrow eyebrow--on-dark">Explore by Topic</p>
-                <h2 style={{ color: 'var(--color-on-dark)' }}>
-                  Discover What Moves You
-                </h2>
+                <div>
+                  <p className="eyebrow eyebrow--on-dark">Browse the archive</p>
+                  <h2>What we cover</h2>
+                </div>
+                <p className="section__note">
+                  Fill height shows how much of the archive each subject
+                  accounts for.
+                </p>
               </div>
             </Reveal>
-            <TopicsCarousel topics={topics} />
+            <TopicSwatches topics={topics} />
           </div>
         </section>
       )}
     </main>
+  )
+}
+
+function LatestBand({ post }: { post: PostCard }) {
+  const byline = post.authors.map((author) => author.name).join(', ')
+  const meta = [post.publishedAt ? formatDate(post.publishedAt) : null]
+    .concat(`${post.readingTime} min`)
+    .filter(Boolean)
+    .join(' · ')
+
+  return (
+    <Link href={postPath(post.slug)} className="latest">
+      <div className="container latest__inner">
+        <span className="latest__plate">
+          {post.image && (
+            <Image
+              src={post.image.url}
+              alt=""
+              fill
+              sizes="(max-width: 56rem) 4.5rem, 6.5rem"
+              style={{ objectFit: 'cover' }}
+            />
+          )}
+        </span>
+
+        <div>
+          <p className="eyebrow">
+            {['Latest', post.tag].filter(Boolean).join(' · ')}
+          </p>
+          <h2 className="latest__title">{post.title}</h2>
+          {post.excerpt && <p className="latest__excerpt">{post.excerpt}</p>}
+        </div>
+
+        <p className="latest__meta">
+          {byline && <span>{byline}</span>}
+          <span>{meta}</span>
+        </p>
+
+        <span className="latest__arrow" aria-hidden="true">
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M5 12h13M12 5l7 7-7 7" />
+          </svg>
+        </span>
+      </div>
+    </Link>
   )
 }
