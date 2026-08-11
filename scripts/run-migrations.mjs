@@ -25,6 +25,7 @@ import { fileURLToPath } from 'node:url'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const CLI = path.join(ROOT, 'node_modules', '.bin', 'payload')
+const BIN = path.join(ROOT, 'node_modules', 'payload', 'bin.js')
 
 const ATTEMPTS = 3
 const RETRY_DELAY_MS = 2000
@@ -39,9 +40,9 @@ const args = process.argv.slice(2)
  * Runs the CLI once, streaming its output so a normal run looks unchanged,
  * while keeping a copy to check for the markers afterwards.
  */
-function runOnce() {
+function runOnce(command, argv) {
   return new Promise((resolve, reject) => {
-    const child = spawn(CLI, ['migrate', ...args], {
+    const child = spawn(command, argv, {
       cwd: ROOT,
       stdio: ['inherit', 'pipe', 'pipe'],
     })
@@ -68,15 +69,17 @@ if (!existsSync(CLI)) {
   process.exit(1)
 }
 
-for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
-  const { code, log } = await runOnce()
-
+/** Exits the process when this attempt settled the question either way. */
+function judge({ code, log }) {
   // A non-zero exit is a real migration error: the SQL failed, the database is
   // unreachable, a migration is malformed. Retrying cannot help and would only
   // bury the message the CLI already printed.
   if (code !== 0) process.exit(code ?? 1)
-
   if (log.includes(STARTED) && log.includes(FINISHED)) process.exit(0)
+}
+
+for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
+  judge(await runOnce(CLI, ['migrate', ...args]))
 
   console.error(
     `payload migrate exited 0 without running (attempt ${attempt}/${ATTEMPTS}).`,
@@ -84,8 +87,31 @@ for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
   if (attempt < ATTEMPTS) await wait(RETRY_DELAY_MS)
 }
 
+// Retrying the same entry point has been seen to fail three times running, so
+// the last resort is a different one rather than a fourth go at the same one.
+//
+// `bin.js` normally transpiles itself by calling tsx's `tsImport()` from inside
+// an async function whose promise it then floats — that is the stall. Asking
+// Node to register the loader with `--import` instead means it is in place
+// before any of that code runs, and `--disable-transpile` stops the CLI
+// reaching for `tsImport` at all.
+if (existsSync(BIN)) {
+  console.error('Retrying with the loader registered by Node instead.')
+  judge(
+    await runOnce(process.execPath, [
+      '--import',
+      'tsx',
+      BIN,
+      'migrate',
+      '--disable-transpile',
+      ...args,
+    ]),
+  )
+  console.error('The alternate entry point did not run either.')
+}
+
 console.error(
-  `payload migrate exited 0 without running ${ATTEMPTS} times. The database ` +
-    `has not been migrated; refusing to continue.`,
+  `payload migrate exited 0 without running. The database has not been ` +
+    `migrated; refusing to continue.`,
 )
 process.exit(1)
