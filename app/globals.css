@@ -332,6 +332,21 @@ img {
   color: var(--color-ink);
 }
 
+/* The bar's controls are 2rem so it can stay thin, which is smaller than a
+   comfortable touch target. The hit area is grown with a pseudo-element
+   instead of padding, so it reaches ~44px without making the bar taller. */
+.icon-button,
+.nav-toggle {
+  position: relative;
+}
+
+.icon-button::after,
+.nav-toggle::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+}
+
 /* Mobile navigation ------------------------------------------------------
    The bar keeps search and the menu at every width; only the wordmark's
    companions change. Subscribe steps aside on phones because the menu's own
@@ -458,7 +473,7 @@ img {
   /* Subscribe is the tallest thing in the bar, so dropping it shortens the
      masthead — and the drawers measure themselves against that height. */
   :root {
-    --masthead-h: 4.25rem;
+    --masthead-h: 3.25rem;
   }
 
   .site-header__subscribe {
@@ -467,6 +482,17 @@ img {
 
   .site-header__actions {
     gap: 0.4rem;
+  }
+
+  /* A phone has little enough height that the bar should take as little of it
+     as the 44px touch targets allow. */
+  .site-header__inner {
+    padding-top: 0.6rem;
+    padding-bottom: 0.6rem;
+  }
+
+  .brand {
+    font-size: 1rem;
   }
 }
 
@@ -971,6 +997,20 @@ img {
   z-index: 2;
   padding-top: clamp(5rem, 14vh, 9rem);
   padding-bottom: clamp(3rem, 8vh, 5.5rem);
+}
+
+/* On a phone the cover is nearly a full screen, and bottom-aligned type leaves
+   a large dead field above it. Centring puts the headline where the eye lands
+   and balances the wash around it. */
+@media (max-width: 40rem) {
+  .cover {
+    justify-content: center;
+  }
+
+  .cover__inner {
+    padding-top: clamp(2rem, 7vh, 3.5rem);
+    padding-bottom: clamp(2rem, 7vh, 3.5rem);
+  }
 }
 
 .cover__text {
@@ -1645,6 +1685,48 @@ img {
   color: var(--color-muted);
   padding-top: 1rem;
   border-top: 1px solid var(--color-line);
+}
+
+/* Share row — sits under the byline, above the piece itself, where a reader
+   decides whether to send it on. */
+
+.share {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 1.25rem 0 2rem;
+}
+
+.share button,
+.share__link {
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--color-muted);
+  background: none;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.7rem;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.share button:hover,
+.share__link:hover {
+  color: var(--color-ink);
+  border-color: var(--color-ink);
+  text-decoration: none;
+}
+
+.share__said {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--color-burgundy);
+  /* Reserves its line so confirming a copy does not shift the article down. */
+  min-height: 1.2em;
 }
 
 .article__figure {
