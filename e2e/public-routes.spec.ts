@@ -75,7 +75,8 @@ test.describe('representative public journeys', () => {
     await page
       .getByRole('searchbox', { name: 'Search articles' })
       .fill('Titanium')
-    await page.getByRole('button', { name: 'Search' }).click()
+    // `exact`: the masthead's "Open search" button also contains "Search".
+    await page.getByRole('button', { name: 'Search', exact: true }).click()
 
     await expect(page).toHaveURL(/\/search\/?\?q=Titanium$/)
     await expect(

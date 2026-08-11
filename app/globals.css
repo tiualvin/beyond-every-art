@@ -18,6 +18,10 @@
 
   --maxw: 72rem;
   --radius: 2px;
+  /* Height of the masthead. The search drawer and the mobile menu both open
+     underneath it rather than over it, so they need it as a number. Asserted
+     against the rendered header in the browser smoke suite. */
+  --masthead-h: 4.75rem;
 
   color-scheme: light;
 }
@@ -150,6 +154,20 @@ img {
   outline-offset: 2px;
 }
 
+/* Reaches a screen reader without taking space. `display: none` would drop it
+   from the accessibility tree, which defeats the point. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* --- Primitives --------------------------------------------------------- */
 
 .container {
@@ -219,6 +237,10 @@ img {
 
 .site-header {
   position: relative;
+  /* Above the search drawer and the mobile menu, both of which open beneath
+     the bar rather than over it, and below the subscribe modal, which is the
+     one overlay that does take the whole screen. */
+  z-index: 56;
   border-bottom: 1px solid var(--color-line);
   background: var(--color-surface);
 }
@@ -228,7 +250,7 @@ img {
   top: 0;
   left: 0;
   right: 0;
-  z-index: 50;
+  z-index: 56;
   background: color-mix(in srgb, var(--color-surface) 85%, transparent);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -285,61 +307,137 @@ img {
   text-decoration: none;
 }
 
-.site-header__right {
+.site-header__actions {
   display: flex;
   align-items: center;
-  gap: 1.25rem;
+  gap: 1.1rem;
   flex-shrink: 0;
 }
 
-.site-header__search {
+.icon-button {
   display: flex;
   align-items: center;
-  color: var(--color-ink);
-}
-
-.site-header__search:hover {
-  color: var(--color-burgundy);
-}
-
-/* Mobile navigation */
-
-.nav-toggle,
-.mobile-nav {
-  display: none;
-}
-
-.nav-toggle {
-  align-items: center;
-  gap: 0.6rem;
-  min-height: 44px;
-  padding: 0.5rem 0.8rem;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
   background: none;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius);
-  color: var(--color-ink);
-  font-family: var(--font-sans);
-  font-size: 0.72rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
+  color: var(--color-muted);
   cursor: pointer;
 }
 
-.nav-toggle:hover {
+.icon-button:hover {
+  color: var(--color-ink);
+}
+
+/* Mobile navigation ------------------------------------------------------
+   The bar keeps search and the menu at every width; only the wordmark's
+   companions change. Subscribe steps aside on phones because the menu's own
+   foot carries it. */
+
+.nav-toggle {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.nav-toggle span {
+  display: block;
+  width: 1.15rem;
+  height: 1.5px;
+  background: var(--color-ink);
+  transform-origin: center;
+}
+
+/* The panel opens below the bar, so the control that opened the menu is the
+   same one that closes it — the bars cross into an X in place. */
+
+.mobile-nav {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  display: flex;
+  flex-direction: column;
+  padding-top: var(--masthead-h);
+  background: var(--color-paper);
+  overflow-y: auto;
+}
+
+.mobile-nav__search {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 1.75rem 1.75rem 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-muted);
+}
+
+.mobile-nav__search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  color: var(--color-ink);
+}
+
+.mobile-nav__search input:focus {
+  outline: none;
+}
+
+.mobile-nav__search:focus-within {
   border-color: var(--color-burgundy);
+}
+
+.mobile-nav__links {
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem 1.75rem;
+}
+
+.mobile-nav__links a {
+  display: block;
+  font-family: var(--font-serif);
+  font-size: clamp(1.9rem, 8vw, 2.6rem);
+  letter-spacing: -0.025em;
+  color: var(--color-ink);
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--color-line);
+  text-decoration: none;
+}
+
+.mobile-nav__links a:hover {
   color: var(--color-burgundy);
+  text-decoration: none;
 }
 
-.nav-toggle__bars {
-  display: grid;
-  gap: 3px;
-  width: 18px;
+.mobile-nav__foot {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1.75rem;
+  border-top: 1px solid var(--color-line);
+  flex-shrink: 0;
 }
 
-.nav-toggle__bars span {
-  height: 2px;
-  background: currentColor;
+.mobile-nav__foot .button {
+  width: 100%;
+  text-align: center;
+  justify-content: center;
 }
 
 @media (max-width: 800px) {
@@ -347,95 +445,471 @@ img {
     gap: 1rem;
   }
 
-  .site-nav,
-  .site-header__right {
+  .site-nav {
     display: none;
   }
 
   .nav-toggle {
-    display: inline-flex;
-  }
-
-  .mobile-nav {
     display: flex;
-    flex-direction: column;
-    justify-content: center;
-    position: fixed;
-    inset: 0;
-    z-index: 1;
-    padding: 5rem 1.5rem 2rem;
-    background: var(--color-dark);
-    overflow-y: auto;
+  }
+}
+
+@media (max-width: 38rem) {
+  /* Subscribe is the tallest thing in the bar, so dropping it shortens the
+     masthead — and the drawers measure themselves against that height. */
+  :root {
+    --masthead-h: 4.25rem;
   }
 
-  .mobile-nav__links {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    margin-bottom: 2rem;
+  .site-header__subscribe {
+    display: none;
   }
 
-  .mobile-nav__link {
-    display: block;
-    font-family: var(--font-serif);
-    font-size: 2rem;
-    font-weight: 600;
-    color: var(--color-on-dark);
-    text-decoration: none;
-    padding: 0.4rem 0;
-    line-height: 1.2;
-  }
-
-  .mobile-nav__link:hover {
-    color: var(--color-burgundy);
-    text-decoration: none;
-  }
-
-  .mobile-nav__link small {
-    display: block;
-    font-family: var(--font-sans);
-    font-size: 0.72rem;
-    font-weight: 400;
-    color: color-mix(in srgb, var(--color-on-dark) 45%, transparent);
-    letter-spacing: 0.01em;
-    margin-top: 0.1rem;
-    text-transform: none;
-  }
-
-  .mobile-nav__cta {
-    display: inline-flex;
-    align-items: center;
+  .site-header__actions {
     gap: 0.4rem;
-    padding: 0.75rem 1.5rem;
-    background: var(--color-burgundy);
-    color: var(--color-on-dark);
-    font-family: var(--font-sans);
-    font-size: 0.82rem;
-    font-weight: 600;
-    letter-spacing: 0.03em;
-    border-radius: var(--radius);
-    text-decoration: none;
-    align-self: flex-start;
   }
+}
 
-  .mobile-nav__cta:hover {
-    background: var(--color-burgundy-deep);
-    text-decoration: none;
+/* --- Overlays -----------------------------------------------------------
+   Search drops from under the masthead and leaves the page visible behind it,
+   so searching reads as opening a drawer on the site rather than leaving it.
+   Subscribe is a real modal, because signing up is a decision, not a lookup. */
+
+.overlay-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 49;
+  background: color-mix(in srgb, var(--color-dark) 38%, transparent);
+}
+
+.overlay-scrim--modal {
+  z-index: 60;
+  display: grid;
+  /* Centring an overflowing item crops it at both edges, which on a short
+     viewport takes the modal's heading with it. */
+  align-items: start;
+  justify-items: center;
+  padding: 1.5rem 1.25rem;
+  overflow-y: auto;
+}
+
+.search-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  max-height: 100dvh;
+  overflow-y: auto;
+  padding-top: var(--masthead-h);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.search__field {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.4rem 0 1.1rem;
+  border-bottom: 2px solid var(--color-ink);
+}
+
+.search__field > svg {
+  color: var(--color-burgundy);
+  flex-shrink: 0;
+}
+
+.search__field input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  padding: 0;
+  font-family: var(--font-serif);
+  font-size: clamp(1.35rem, 3.5vw, 2rem);
+  letter-spacing: -0.022em;
+  color: var(--color-ink);
+}
+
+/* Chromium draws its own clear affordance next to the explicit close button. */
+.search__field input::-webkit-search-cancel-button,
+.search__field input::-webkit-search-decoration {
+  -webkit-appearance: none;
+}
+
+.search__field input:focus {
+  outline: none;
+}
+
+.search__field input::placeholder {
+  color: color-mix(in srgb, var(--color-muted) 55%, transparent);
+}
+
+.search__meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.9rem 0 0.3rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--color-muted);
+}
+
+.search__hint kbd {
+  font-family: var(--font-sans);
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  padding: 0.1rem 0.35rem;
+  margin: 0 0.15rem;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .search__hint {
+    display: none;
   }
+}
 
-  .nav-toggle {
-    position: relative;
-    z-index: 2;
+.search__results {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 2rem;
+}
+
+.search__result {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.9rem;
+  align-items: baseline;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--color-line);
+  color: inherit;
+  text-decoration: none;
+}
+
+.search__result-title {
+  display: block;
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  font-weight: 500;
+  letter-spacing: -0.018em;
+  line-height: 1.25;
+}
+
+.search__result-body span + span {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.85rem;
+  color: var(--color-muted);
+}
+
+.search__result-meta {
+  font-size: 0.7rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+.search__result:hover,
+.search__result:focus-visible {
+  text-decoration: none;
+}
+
+.search__result:hover .search__result-title,
+.search__result:focus-visible .search__result-title {
+  color: var(--color-burgundy);
+}
+
+@media (max-width: 40rem) {
+  .search__result {
+    grid-template-columns: minmax(0, 1fr);
   }
+}
 
-  .nav-toggle--on-dark {
-    color: var(--color-on-dark);
-    border-color: color-mix(in srgb, var(--color-on-dark) 30%, transparent);
+.search__empty {
+  padding: 2rem 0 3rem;
+  color: var(--color-muted);
+}
+
+.search__empty b {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.modal {
+  position: relative;
+  width: min(30rem, 100%);
+  margin: auto 0;
+  background: var(--color-paper);
+  border-radius: var(--radius);
+  box-shadow: 0 24px 60px rgba(20, 17, 16, 0.28);
+}
+
+.modal:focus {
+  outline: none;
+}
+
+.modal__close {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  display: flex;
+  padding: 0.35rem;
+  border: 0;
+  background: none;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.modal__close:hover {
+  color: var(--color-ink);
+}
+
+.modal__body {
+  padding: 1.9rem 1.75rem 1.75rem;
+}
+
+.modal__body h2 {
+  font-size: clamp(1.5rem, 3vw, 1.9rem);
+  margin: 0 0 0.5rem;
+}
+
+.modal__lede {
+  margin: 0 0 1.15rem;
+  font-size: 0.92rem;
+  color: var(--color-muted);
+}
+
+/* Membership plans. Free and paid map to the two member states the product
+   already has, and to the three post visibility levels: public, members,
+   paid. */
+
+.plans {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.7rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  border: 0;
+  /* A fieldset will not shrink below its content unless told to, which is what
+     makes a plan grid overflow its modal on a phone. */
+  min-inline-size: 0;
+}
+
+.plan {
+  position: relative;
+  display: block;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  padding: 0.85rem 0.9rem 0.95rem;
+  cursor: pointer;
+}
+
+/* Driven by a class rather than :has(), so the state does not depend on
+   selector support. */
+.plan.is-selected {
+  border-color: var(--color-burgundy);
+  box-shadow: inset 0 0 0 1px var(--color-burgundy);
+}
+
+.plan input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+}
+
+.plan:focus-within {
+  outline: 2px solid var(--color-burgundy);
+  outline-offset: 2px;
+}
+
+.plan__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.plan__name {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  letter-spacing: -0.015em;
+}
+
+.plan__price {
+  font-size: 0.74rem;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.plan__price b {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.plan__list {
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.32rem;
+  font-size: 0.79rem;
+  line-height: 1.4;
+  color: var(--color-muted);
+}
+
+.plan__list li {
+  display: grid;
+  grid-template-columns: 0.75rem minmax(0, 1fr);
+  gap: 0.45rem;
+  align-items: start;
+}
+
+.plan__list svg {
+  color: var(--color-burgundy);
+  margin-top: 0.28rem;
+}
+
+.plan__badge {
+  position: absolute;
+  top: -0.5rem;
+  right: 0.7rem;
+  background: var(--color-burgundy);
+  color: var(--color-on-dark);
+  font-size: 0.55rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 600;
+  padding: 0.18rem 0.45rem;
+  border-radius: 999px;
+}
+
+.billing {
+  display: flex;
+  gap: 0.4rem;
+  margin: 0 0 1rem;
+}
+
+.billing button {
+  flex: 1;
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  color: var(--color-muted);
+  background: none;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.6rem;
+  cursor: pointer;
+}
+
+.billing button:hover {
+  color: var(--color-ink);
+  border-color: var(--color-ink);
+}
+
+.billing button[aria-pressed='true'] {
+  background: var(--color-burgundy);
+  border-color: var(--color-burgundy);
+  color: var(--color-on-dark);
+}
+
+.billing button span {
+  display: block;
+  font-size: 0.6rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.75;
+  margin-top: 0.1rem;
+}
+
+.modal__cta {
+  display: block;
+  width: 100%;
+  text-align: center;
+}
+
+.modal__cta:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 35rem) {
+  .plans {
+    grid-template-columns: 1fr;
   }
+}
 
-  .nav-toggle--on-dark:hover {
-    color: var(--color-burgundy);
-    border-color: var(--color-burgundy);
+.modal__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.modal__form input {
+  width: 100%;
+  padding: 0.8rem 0.9rem;
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  color: var(--color-ink);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+}
+
+.modal__form input:focus {
+  outline: none;
+  border-color: var(--color-burgundy);
+}
+
+.modal__form .button {
+  width: 100%;
+  text-align: center;
+  justify-content: center;
+}
+
+.modal__small {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--color-muted);
+}
+
+.modal__error {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--color-burgundy);
+}
+
+.modal__done {
+  text-align: center;
+}
+
+.modal__done p {
+  color: var(--color-muted);
+  font-size: 0.92rem;
+  margin: 0 0 1.25rem;
+}
+
+@media (max-width: 35rem) {
+  .modal__body {
+    padding: 1.4rem 1.25rem 1.5rem;
   }
 }
 
@@ -668,10 +1142,6 @@ img {
   padding: 1.5rem 0;
   border-bottom: 1px solid var(--color-line);
   position: relative;
-}
-
-.entry:first-child {
-  border-top: 1px solid var(--color-line);
 }
 
 .entry__body,
@@ -930,10 +1400,7 @@ img {
 
 .swatches {
   display: grid;
-  /* Capped rather than 1fr: with only a few subjects, stretching the columns
-     to full width makes each swatch enormous once the aspect ratio applies. */
-  grid-template-columns: repeat(auto-fit, minmax(9rem, 13rem));
-  justify-content: start;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
   gap: 1px;
   margin-top: 3rem;
 }
@@ -954,6 +1421,15 @@ img {
   background: var(--color-dark);
   outline: 1px solid color-mix(in srgb, var(--color-on-dark) 16%, transparent);
   overflow: hidden;
+}
+
+/* Portrait swatches stack into a full screen of scrolling once the grid is
+   down to two columns. Landscape keeps the whole taxonomy in view, and the
+   fill still reads as a level because it is measured against the box. */
+@media (max-width: 40rem) {
+  .swatch {
+    aspect-ratio: 4 / 3;
+  }
 }
 
 .swatch:hover {
