@@ -936,10 +936,14 @@ img {
   justify-content: start;
   gap: 1px;
   margin-top: 3rem;
-  background: color-mix(in srgb, var(--color-on-dark) 16%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-on-dark) 16%, transparent);
 }
 
+/* The hairline grid is drawn per swatch rather than by showing a container
+   background through the gaps. A grid is a block box: it stretches to the full
+   column even when `auto-fit` collapses the tracks it does not need, so a
+   container background paints across the empty end of a row as a grey slab.
+   Outlines cost no layout and overlap in the 1px gap, so neighbours still share
+   a single line — and an absent swatch now draws nothing at all. */
 .swatch {
   position: relative;
   display: flex;
@@ -948,6 +952,7 @@ img {
   aspect-ratio: 3 / 4;
   padding: 1.1rem;
   background: var(--color-dark);
+  outline: 1px solid color-mix(in srgb, var(--color-on-dark) 16%, transparent);
   overflow: hidden;
 }
 

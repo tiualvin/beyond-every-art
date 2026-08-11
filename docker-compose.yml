@@ -50,6 +50,14 @@ services:
     ports:
       # Bind to localhost; Caddy terminates TLS and proxies public traffic.
       - '127.0.0.1:3000:3000'
+    volumes:
+      # Uploads live on disk (no object storage is configured), and Payload
+      # resolves them to /app/media. Without this volume they sit in the
+      # container's writable layer, which a deploy destroys: `up -d --build`
+      # recreates the container, so every release silently discarded every
+      # uploaded file while the database kept pointing at them. The symptom is
+      # a 500 from /api/media/file/<name> and a broken image on the page.
+      - media_data:/app/media
 
   caddy:
     image: caddy:2-alpine
@@ -93,6 +101,11 @@ services:
       DATABASE_URI: ${DATABASE_URI:-postgresql://payload:payload@postgres:5432/beyond_every_art}
       PAYLOAD_SECRET: ${PAYLOAD_SECRET:-development-only-change-me}
     restart: 'no'
+    volumes:
+      # The same volume as `app`. This image is also what runs `migrate:ghost`,
+      # and an import that wrote into its own throwaway container would leave
+      # the media rows in the database with no files behind them.
+      - media_data:/app/media
 
   backup:
     build:
@@ -113,5 +126,6 @@ services:
 
 volumes:
   postgres_data:
+  media_data:
   caddy_data:
   caddy_config:
