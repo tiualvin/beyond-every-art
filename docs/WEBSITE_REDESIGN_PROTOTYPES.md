@@ -85,18 +85,32 @@ Stands in for the overview route in
 and follows that spec's data model rather than inventing a second one.
 
 - **It reads as a roadmap, not a store.** The intro says outright that nothing
-  has shipped, and the four `Apps.status` values are declared as a key at the
-  top instead of leaving unexplained badges scattered down the page. Every
-  entry sits at `concept`, because that is where all four actually are.
+  has shipped, and a line under it states the one thing the page actually
+  claims: the order. Every entry sits at `concept`, because that is where all
+  four are.
 - **Entries are editorial spreads, not a card grid** — `PRODUCT.md` lists the
   identical icon+heading+text grid as an anti-reference. Each app gets a plate,
-  a serif name, a tagline, prose, and a two-column feature list, with the plate
-  side alternating down the page.
-- **The plates are pigment washes**, one family per app, standing in for
-  `Apps.heroImage`. No device frames and no invented screenshots: nothing has
-  been designed yet, and a mocked screenshot would imply otherwise.
+  a serif name, a tagline, prose, and a single line of concrete detail, with
+  the plate side alternating down the page.
+- **The four spreads are not identical**, which was the flaw in the first pass:
+  four of the same spread is a card grid at a larger size. Two things vary with
+  the product. The plate is drawn per app rather than shared. And the type
+  scale falls from the lead to the tail, so the sequence is legible before the
+  captions are read — the companion app is next and near-certain, Echo Garden
+  is a distant prototype the handoff calls the highest-risk of the set, and an
+  even weighting across all four denied that.
+- **Each plate is drawn from what its app does**, standing in for
+  `Apps.heroImage`: a page of set type with a pigment specimen in the margin; a
+  botanical outline with the colour going in, one petal deliberately past its
+  line; six weeks of daily marks, each a different kind; marks ringing outward
+  on night. No device frames and no invented screenshots — nothing has been
+  designed yet, and a mocked interface would imply otherwise. A drawing of the
+  idea is a claim the page can support.
 - **Status badges take their colour from the deep end of each pigment family**
-  so small uppercase text clears 4.5:1 on paper.
+  so small uppercase text clears 4.5:1 on paper. The four styles are all
+  defined, but only `concept` appears; an earlier pass opened the page with a
+  four-column key explaining all four states, which is a legend for a chart
+  that is not there.
 - **One waitlist form covers every app.** Ticking several boxes matches the
   `AppWaitlist` shape exactly — a row per `(email, app)` pair, one signup per
   person per app — so the form maps onto the collection without a second
@@ -105,10 +119,10 @@ and follows that spec's data model rather than inventing a second one.
   the publication moment on the left, the app it hands off to on the right.
 - **It renders without script.** The reveal's hidden state is conditional on a
   `js` class set by an inline script, so a viewer that blocks JavaScript gets
-  the page rather than a blank one, and each plate carries a CSS gradient of
-  its pigment beneath the canvas. The revealed state also sits outside the
-  motion queries: held inside `no-preference`, a browser matching neither
-  motion query would never restore the content.
+  the page rather than a blank one, and the plates keep a CSS ground beneath
+  the canvas rather than collapsing to empty rectangles. The revealed state
+  also sits outside the motion queries: held inside `no-preference`, a browser
+  matching neither motion query would never restore the content.
 
   The other four prototypes still gate their content on script and go blank
   without it — sandboxed previews and in-app browsers routinely block it. The
@@ -156,7 +170,7 @@ Read this before treating anything here as a specification.
   webfont; production self-hosts Playfair Display and Inter through
   `next/font`.
 - **No app has shipped, and the apps page says so.** Positioning, taglines,
-  and feature lists are lifted from the app strategy in the handoff; the
+  and the detail lines are drawn from the app strategy in the handoff; the
   sequencing lines under each entry paraphrase its phase order. There are no
   dates, no store links, and no download counts, because none exist. The
   waitlist form writes nothing — it validates, then renders its own success
@@ -172,14 +186,14 @@ Read this before treating anything here as a specification.
   because the animated field and the stained topic masthead sit behind text.
   Cover type measures ~16.8:1; swatch labels compute their colour per pigment
   against both brand text colours rather than assuming one works.
-- On the apps page the same method was applied to the plate marks, sampling
-  every composited pixel behind the type with the mark itself hidden. The worst
-  pixel across the four plates is 12.2:1, on cadmium. A flat scrim cleared AA
-  too, at 5.6:1, but the pool is centred on the type instead: it holds a wider
-  margin against artwork nobody has drawn yet, and leaves the plate edges at
-  full strength. Status badges run 5.5:1 to 11.9:1; the lowest contrast
-  anywhere on the page is 5.0:1, the shared muted token the rest of the site
-  already uses for secondary text.
+- The apps page carries no type on its plates at all. An earlier pass centred
+  each app's name over its artwork, which needed a scrim measured against
+  composited pixels to stay legible — and had to be hidden from assistive tech,
+  because the heading beside it already said the same words. Removing it took
+  the contrast question with it and freed the plate to be a drawing. Status
+  badges run 5.5:1 to 11.9:1; the lowest contrast anywhere on the page is
+  5.0:1, the shared muted token the rest of the site already uses for
+  secondary text.
 - Every overlay closes by Escape, backdrop, and its own control; scroll lock is
   always released; focus returns to whatever opened it.
 - `prefers-reduced-motion` is honoured throughout. The animated cover paints a

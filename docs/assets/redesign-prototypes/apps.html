@@ -374,31 +374,26 @@
 
   .apps__intro strong { color: var(--color-ink); font-weight: 600; }
 
-  /* ==========================================================================
-     Status key. The page has to read as a roadmap, so the vocabulary is
-     declared once, up front, instead of leaving four unexplained badges
-     scattered down the page. Mirrors Apps.status in the collection:
-     concept | in_development | coming_soon | available.
-     ========================================================================== */
-  .key {
-    margin-top: clamp(2rem, 4vw, 3rem);
-    padding-top: 1.5rem;
+  /* Where the four-column status key used to be. One state, one sentence. */
+  .apps__state {
+    margin: clamp(2rem, 4vw, 3rem) 0 0;
+    padding-top: 1.35rem;
     border-top: 1px solid var(--color-rule);
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 1.25rem 2rem;
-  }
-
-  .key__item { display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-start; }
-
-  .key__note {
-    margin: 0;
-    font-size: 0.82rem;
-    line-height: 1.5;
+    max-width: 60ch;
+    font-size: 0.95rem;
     color: var(--color-muted);
-    max-width: 26ch;
   }
 
+  /* ==========================================================================
+     Status badge. Mirrors Apps.status: concept | in_development |
+     coming_soon | available.
+
+     An earlier pass opened the page with a four-column key explaining all
+     four states. It went: the page has one state on it. Teaching a vocabulary
+     the page never uses is a legend for a chart that isn't there, and it cost
+     the band directly under the title. The four styles still exist here for
+     when an app advances; the page says its one state in a sentence instead.
+     ========================================================================== */
   .status {
     display: inline-flex;
     align-items: center;
@@ -454,6 +449,11 @@
      identical icon+heading+text grid as an anti-reference. Each app gets an
      editorial spread with a plate, the way featured stories do on the
      homepage, and the plate side alternates to keep a rhythm down the page.
+
+     Four identical spreads are only a card grid at a larger size, though, so
+     two things vary with the thing being described: the plate is drawn per
+     app rather than shared, and the type scale falls from the lead to the
+     tail in the order the work is actually sequenced.
      ========================================================================== */
   .roster { padding-bottom: clamp(2.5rem, 6vw, 4rem); }
 
@@ -472,37 +472,27 @@
   .app--flip .app__plate { grid-column: 2; grid-row: 1; }
   .app--flip .app__body { grid-column: 1; grid-row: 1; }
 
+  /* The plate carries no type. The heading beside it already names the app,
+     and a centred wordmark over the artwork only duplicated it — it had to be
+     hidden from assistive tech, which is the tell. Freed of the label, the
+     plate can show what the app actually does. */
   .app__plate {
     position: relative;
     aspect-ratio: 4 / 5;
     overflow: hidden;
     border-radius: var(--radius);
-    background: var(--color-dark);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    padding: 1.5rem;
+    /* Three of the four plates are drawn on paper, on a paper page. At
+       --color-line they dissolved into the background; the frame has to be
+       the heavier hairline to read as a mounted plate rather than a bleed. */
+    border: 1px solid var(--color-rule);
+    background: var(--color-surface);
   }
 
-  /* The wash is painted onto a canvas, so the plate needs a ground that holds
-     the pigment on its own. Without one, a viewer with no script gets four
-     near-black rectangles instead of four colours. The canvas covers this
-     when it paints. */
-  .app__plate[data-wash='bone'] {
-    background: radial-gradient(circle at 38% 32%, #35352f, #20211f 58%, #0b0b0a);
-  }
-
-  .app__plate[data-wash='cadmium'] {
-    background: radial-gradient(circle at 38% 32%, #d8931f, #a5680a 55%, #4a2d02);
-  }
-
-  .app__plate[data-wash='viridian'] {
-    background: radial-gradient(circle at 38% 32%, #3f8465, #2e6b52 55%, #0e2a20);
-  }
-
-  .app__plate[data-wash='ultramarine'] {
-    background: radial-gradient(circle at 38% 32%, #2c4fb4, #1f3a93 55%, #0c1a4a);
+  /* Echo Garden is the one drawn on night rather than paper — it is the game,
+     and the marks in it glow. */
+  .app__plate[data-plate='echo'] {
+    border-color: color-mix(in srgb, var(--pig-ultramarine) 40%, var(--color-dark));
+    background: radial-gradient(ellipse 90% 70% at 50% 42%, #16255c, #0d1636 60%, #080d20);
   }
 
   .app__plate canvas {
@@ -510,60 +500,6 @@
     inset: 0;
     width: 100%;
     height: 100%;
-  }
-
-  /* A scrim, not decoration: the wash is generated, so the plate mark needs a
-     guaranteed floor to sit on rather than whatever tone the seed produced.
-     The pool is centred on the type and falls away fast, so cadmium and
-     ultramarine keep their brightness at the edges where nothing sits on
-     them. Measured against composited pixels, not declared colour. */
-  .app__plate::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background:
-      radial-gradient(
-        ellipse 76% 44% at 50% 50%,
-        color-mix(in srgb, var(--color-dark) 82%, transparent),
-        color-mix(in srgb, var(--color-dark) 62%, transparent) 55%,
-        transparent 100%
-      ),
-      linear-gradient(
-        to bottom,
-        color-mix(in srgb, var(--color-dark) 14%, transparent),
-        color-mix(in srgb, var(--color-dark) 46%, transparent)
-      );
-  }
-
-  .app__mark {
-    position: relative;
-    z-index: 1;
-    color: var(--color-on-dark);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.7rem;
-  }
-
-  .app__mark-name {
-    font-family: var(--font-serif);
-    font-size: clamp(1.5rem, 3.2vw, 2.1rem);
-    line-height: 1.1;
-    letter-spacing: -0.02em;
-  }
-
-  .app__mark-rule {
-    width: 2.25rem;
-    height: 1px;
-    background: color-mix(in srgb, var(--color-on-dark) 55%, transparent);
-  }
-
-  .app__mark-platforms {
-    font-size: 0.66rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.16em;
-    color: color-mix(in srgb, var(--color-on-dark) 82%, transparent);
   }
 
   .app__body { display: flex; flex-direction: column; align-items: flex-start; }
@@ -599,32 +535,23 @@
 
   .app__summary + .app__summary { margin-top: 0.85rem; }
 
-  .app__features {
-    list-style: none;
-    margin: 1.5rem 0 0;
-    padding: 0;
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.5rem 1.75rem;
-    max-width: 46rem;
+  /* Replaces the two-column feature list. Six ticked bullets per app is
+     proof-point grammar — the thing PRODUCT.md asks the page not to be — and
+     four identical lists flattened four different products into one shape.
+     One line of concrete nouns does the same job in the publication's voice. */
+  .app__detail {
+    margin: 1.25rem 0 0;
+    max-width: 52ch;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-line);
     font-size: 0.92rem;
+    line-height: 1.6;
     color: var(--color-muted);
   }
 
-  .app__features li {
-    position: relative;
-    padding-left: 0.95rem;
-    line-height: 1.5;
-  }
-
-  .app__features li::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0.62em;
-    width: 0.3rem;
-    height: 1px;
-    background: var(--color-burgundy);
+  .app__detail b {
+    font-weight: 600;
+    color: var(--color-ink);
   }
 
   .app__meta {
@@ -639,6 +566,28 @@
     font-size: 0.82rem;
     color: var(--color-muted);
   }
+
+  .app__platforms {
+    font-size: 0.66rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--color-muted);
+  }
+
+  /* The four apps are not equal and the page should not pretend otherwise:
+     the companion app is next and near-certain, Echo Garden is a distant
+     prototype the handoff calls the highest-risk of the set. Weight falls
+     down the page so the order is legible before the captions are read. */
+  /* Wider than the others, but not so wide that the lead ends up with the
+     tightest measure on the page — which is what an even split produced. */
+  .app--lead { grid-template-columns: minmax(0, 0.94fr) minmax(0, 1.06fr); }
+  .app--lead .app__name { font-size: clamp(2.3rem, 5vw, 3.6rem); }
+  .app--lead .app__tagline { font-size: clamp(1.2rem, 2.4vw, 1.6rem); }
+  .app--lead .app__summary { font-size: 1.08rem; }
+
+  .app--tail { padding-top: clamp(2rem, 4vw, 3rem); }
+  .app--tail .app__name { font-size: clamp(1.6rem, 3vw, 2.2rem); }
 
   .app__link {
     margin-top: 1.5rem;
@@ -832,22 +781,21 @@
      Breakpoints
      ========================================================================== */
   @media (max-width: 900px) {
-    .key { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-
     .app,
-    .app--flip { grid-template-columns: minmax(0, 1fr); }
+    .app--flip,
+    .app--lead { grid-template-columns: minmax(0, 1fr); }
 
     .app--flip .app__plate,
     .app--flip .app__body { grid-column: 1; grid-row: auto; }
 
-    .app__plate { aspect-ratio: 16 / 10; max-width: 26rem; }
+    /* Nearer square than the desktop crop: the plates are drawings now, and a
+       letterbox would cut the compositions rather than reframe them. */
+    .app__plate { aspect-ratio: 5 / 4; max-width: 28rem; }
     .thread__grid,
     .waitlist__grid { grid-template-columns: minmax(0, 1fr); }
   }
 
   @media (max-width: 560px) {
-    .key { grid-template-columns: minmax(0, 1fr); }
-    .app__features { grid-template-columns: minmax(0, 1fr); }
     .waitlist__options { grid-template-columns: minmax(0, 1fr); }
     .waitlist__row { flex-direction: column; }
 
@@ -1591,69 +1539,49 @@
         </p>
       </div>
 
-      <div class="key reveal">
-        <div class="key__item">
-          <span class="status status--concept">Concept</span>
-          <p class="key__note">Written down and costed. No code yet.</p>
-        </div>
-        <div class="key__item">
-          <span class="status status--dev">In development</span>
-          <p class="key__note">Being built. Nothing to install.</p>
-        </div>
-        <div class="key__item">
-          <span class="status status--soon">Coming soon</span>
-          <p class="key__note">Feature complete, in testing, dated.</p>
-        </div>
-        <div class="key__item">
-          <span class="status status--live">Available</span>
-          <p class="key__note">On the App Store and Google Play.</p>
-        </div>
-      </div>
+      <p class="apps__state reveal">
+        All four are concepts. Nothing is in testing, nothing has a date, and
+        the order below is the order we intend to build them in — which is the
+        only claim on this page.
+      </p>
     </div>
   </section>
 
   <!-- ── The roster ───────────────────────────────────────────────────────
        Four entries, ordered the way the app strategy sequences them. Each one
-       stands in for an Apps document; the plate stands in for heroImage.
+       stands in for an Apps document; the plate stands in for heroImage and is
+       drawn from what the app does, not from a shared wash.
        ──────────────────────────────────────────────────────────────────── -->
   <section class="roster">
     <div class="container">
 
-      <article class="app reveal">
-        <div class="app__plate" data-wash="bone" data-seed="19">
-          <span class="app__mark" aria-hidden="true">
-            <span class="app__mark-name">Beyond&nbsp;Every&nbsp;Art</span>
-            <span class="app__mark-rule"></span>
-            <span class="app__mark-platforms">iOS · Android</span>
-          </span>
-        </div>
+      <article class="app app--lead reveal">
+        <div class="app__plate" data-plate="reader" data-seed="19"></div>
         <div class="app__body">
           <p class="app__index">01</p>
           <h2 class="app__name">Beyond Every Art</h2>
           <p class="app__tagline">Art, colour, materials, exhibitions, and creative practice.</p>
           <p class="app__summary">
-            The companion to this publication — and not a website in a
-            wrapper. A native reader that draws on the same content as the
-            site, with offline reading, saved pieces, highlights, and private
-            notes that stay yours.
+            The companion to this publication — and not a website in a wrapper.
+            A native reader on the same content as the site, which means the
+            archive works on a train: pieces saved, read offline, highlighted,
+            annotated in private notes that stay yours.
           </p>
           <p class="app__summary">
-            It opens on Today: one featured piece, a pigment to look at, a
-            short exercise, an exhibition worth the trip. Explore turns the
-            archive sideways — by artist, artwork, pigment, palette, material
-            — and Studio is where you actually mix something.
+            It opens on Today rather than on a feed — one piece, one pigment to
+            look at, one short exercise. Explore turns the archive sideways, by
+            artist and artwork and material instead of by date, and Studio is
+            where you stop reading about a limited palette and go mix one.
           </p>
-          <ul class="app__features">
-            <li>Native reader with offline articles</li>
-            <li>Highlights, notes, and reading history</li>
-            <li>Pigment, palette, and materials index</li>
-            <li>Palette builder and limited-palette challenges</li>
-            <li>Daily prompts and short exercises</li>
-            <li>The discovery hub for everything below</li>
-          </ul>
+          <p class="app__detail">
+            <b>The one to build first.</b> Everything below borrows from it:
+            the account, the entitlements, the media pipeline, and the way
+            people find the other three.
+          </p>
           <div class="app__meta">
             <span class="status status--concept">Concept</span>
             <span class="app__sequence">First, once the site migration is done</span>
+            <span class="app__platforms">iOS · Android</span>
           </div>
           <a class="app__link" href="#">
             More about the companion app
@@ -1666,39 +1594,31 @@
       </article>
 
       <article class="app app--flip reveal">
-        <div class="app__plate" data-wash="cadmium" data-seed="47">
-          <span class="app__mark" aria-hidden="true">
-            <span class="app__mark-name">Dapple</span>
-            <span class="app__mark-rule"></span>
-            <span class="app__mark-platforms">iOS · Android</span>
-          </span>
-        </div>
+        <div class="app__plate" data-plate="colouring" data-seed="47"></div>
         <div class="app__body">
           <p class="app__index">02</p>
           <h2 class="app__name">Dapple</h2>
           <p class="app__tagline">A quiet place to colour.</p>
           <p class="app__summary">
-            Freehand colouring for adults, built around artist-made
-            illustrations rather than colour-by-number. Watercolour, pencil,
-            pastel, marker, ink, and textured brushes that behave like the
-            real thing, with pressure support where the hardware allows it.
+            Freehand colouring for adults, on illustrations drawn by artists
+            rather than generated by numbers. The media behave: watercolour
+            blooms into damp paper, pencil catches on the tooth, marker pools
+            where you pause.
           </p>
           <p class="app__summary">
-            Staying inside the lines is optional and off by default. A page a
-            day is free, the collections are curated rather than endless, and
-            what you finish is yours to export at print resolution.
+            Staying inside the lines is optional, and off by default. The
+            collections are curated rather than endless, a page a day is free,
+            and what you finish exports at a size worth printing.
           </p>
-          <ul class="app__features">
-            <li>Artist-made adult colouring illustrations</li>
-            <li>Realistic digital media and paper textures</li>
-            <li>Optional stay-inside-the-lines assistance</li>
-            <li>Custom, curated, and mood-based palettes</li>
-            <li>One free page every day</li>
-            <li>High-resolution and wallpaper export</li>
-          </ul>
+          <p class="app__detail">
+            <b>Watercolour, pencil, pastel, marker, ink.</b> Custom palettes,
+            artist-curated palettes, paper and canvas textures, and pressure
+            support where the hardware offers it.
+          </p>
           <div class="app__meta">
             <span class="status status--concept">Concept</span>
             <span class="app__sequence">After the companion app</span>
+            <span class="app__platforms">iOS · Android</span>
           </div>
           <a class="app__link" href="#">
             More about Dapple
@@ -1711,41 +1631,32 @@
       </article>
 
       <article class="app reveal">
-        <div class="app__plate" data-wash="viridian" data-seed="61">
-          <span class="app__mark" aria-hidden="true">
-            <span class="app__mark-name">Morrow</span>
-            <span class="app__mark-rule"></span>
-            <span class="app__mark-platforms">iOS · Android</span>
-          </span>
-        </div>
+        <div class="app__plate" data-plate="year" data-seed="61"></div>
         <div class="app__body">
           <p class="app__index">03</p>
           <h2 class="app__name">Morrow</h2>
           <p class="app__tagline">Make a little space for yourself.</p>
           <p class="app__summary">
             An art planner, visual journal, and creative diary — planning,
-            handwriting, drawing, collage, and reflection in one place,
-            without the tone of a corporate productivity app.
+            handwriting, drawing, collage, and reflection in one place, without
+            the tone of a corporate productivity app.
           </p>
           <p class="app__summary">
-            Instead of picking an emoji for the day, you leave a mark: a
-            colour, a brushstroke, a shape, a small drawing, a photograph.
-            The marks accumulate into a month, and the months into something
-            closer to an abstract portrait of a year. Journals are private
-            user content — held on the device by default, with encrypted sync
-            only if you ask for it.
+            Its one real idea is the mark. Instead of picking an emoji for the
+            day you leave a colour, a brushstroke, a shape, a small drawing, a
+            photograph. Thirty of them make a month you can read at a glance,
+            and twelve of those make something closer to an abstract portrait
+            of a year — which is the plate beside this.
           </p>
-          <ul class="app__features">
-            <li>Daily and weekly planning pages</li>
-            <li>Handwriting, drawing, stickers, and tape</li>
-            <li>Visual mood tracking, not emoji</li>
-            <li>Mood boards and monthly reviews</li>
-            <li>Private by default, encrypted sync optional</li>
-            <li>PDF export and printed yearly editions</li>
-          </ul>
+          <p class="app__detail">
+            <b>Private by default.</b> Journals are user content, not CMS
+            content: held on the device unless you ask for sync, encrypted when
+            you do, exportable and deletable on demand.
+          </p>
           <div class="app__meta">
             <span class="status status--concept">Concept</span>
             <span class="app__sequence">Reuses Dapple's canvas and palette work</span>
+            <span class="app__platforms">iOS · Android</span>
           </div>
           <a class="app__link" href="#">
             More about Morrow
@@ -1757,42 +1668,29 @@
         </div>
       </article>
 
-      <article class="app app--flip reveal">
-        <div class="app__plate" data-wash="ultramarine" data-seed="88">
-          <span class="app__mark" aria-hidden="true">
-            <span class="app__mark-name">Echo Garden</span>
-            <span class="app__mark-rule"></span>
-            <span class="app__mark-platforms">iOS · Android</span>
-          </span>
-        </div>
+      <article class="app app--flip app--tail reveal">
+        <div class="app__plate" data-plate="echo" data-seed="88"></div>
         <div class="app__body">
           <p class="app__index">04</p>
           <h2 class="app__name">Echo Garden</h2>
           <p class="app__tagline">Paint a world that sings back.</p>
           <p class="app__summary">
-            An atmospheric art-and-sound game. You enter somewhere quiet and
+            An atmospheric art-and-sound game. You arrive somewhere quiet and
             unfinished — an abandoned garden, a floating observatory, a
             submerged temple — and find the thing that has lost its colour and
-            its voice.
+            its voice. Every mark you make answers in sound: dots ring, long
+            strokes pull strings, spirals turn vocal, a wash opens into a pad.
           </p>
-          <p class="app__summary">
-            Every mark you make answers in sound. Dots ring like bells, long
-            strokes pull strings, spirals turn vocal, a watercolour wash opens
-            into a pad. The system harmonises what you draw, so restoring a
-            place needs neither drawing nor musical training. It is the most
-            ambitious of the four, and the least certain.
+          <p class="app__detail">
+            <b>The least certain thing on this page.</b> The handoff calls it
+            the highest-risk of the four, and it starts as a prototype with the
+            scope decided afterwards — possibly in another engine, possibly in
+            another repository.
           </p>
-          <ul class="app__features">
-            <li>Paint, trace, and complete to restore a place</li>
-            <li>Marks map to instruments and harmony</li>
-            <li>Colour controls instrument family and pitch</li>
-            <li>Forgiving input — no skill prerequisite</li>
-            <li>Original world, music, and sound library</li>
-            <li>Prototype first, scope decided after</li>
-          </ul>
           <div class="app__meta">
             <span class="status status--concept">Concept</span>
             <span class="app__sequence">Last, and only as a prototype to begin with</span>
+            <span class="app__platforms">iOS · Android</span>
           </div>
           <a class="app__link" href="#">
             More about Echo Garden
@@ -1974,7 +1872,9 @@
     }
 
     /* ------------------------------------------------------------------
-       Pigment plates — same generated art as the other pages.
+       Seeded randomness and pigment alpha — the same helpers the other
+       pages draw their plates with, so the artwork below stays in the
+       family even though the drawings are new.
        ------------------------------------------------------------------ */
     function rng(seed) {
       var a = seed >>> 0
@@ -1991,8 +1891,443 @@
       return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + alpha + ')'
     }
 
-    function paintPlate(canvas, pigKey, seed) {
-      var pig = PIGMENTS[pigKey] || PIGMENTS.ultramarine
+    /* ------------------------------------------------------------------
+       App plates.
+
+       These stand in for Apps.heroImage. There is no app artwork yet, so
+       nothing here is a screenshot — a mocked interface would claim
+       something has been built. They are drawings of what each app does,
+       in the publication's own pigments, which is a claim the page can
+       actually support.
+
+       The first pass gave all four the same generated wash. Four identical
+       rectangles labelled with four different names told the reader nothing:
+       a colouring app, a journal, and a game are not the same picture. Each
+       plate is now drawn from its own product.
+       ------------------------------------------------------------------ */
+    var PAPER = '#f6f2eb'
+    var SURFACE = '#fffdf9'
+    var INK = '#1b1714'
+    var BURGUNDY = '#6d1f2c'
+
+    /* Laid paper, so the drawings sit on a surface rather than on a colour. */
+    function paper(ctx, w, h, r) {
+      var g = ctx.createLinearGradient(0, 0, w * 0.4, h)
+      g.addColorStop(0, SURFACE)
+      g.addColorStop(1, PAPER)
+      ctx.fillStyle = g
+      ctx.fillRect(0, 0, w, h)
+
+      ctx.save()
+      ctx.globalAlpha = 0.5
+      for (var i = 0; i < 260; i++) {
+        ctx.fillStyle = r() > 0.5 ? hexA(INK, 0.05) : hexA('#ffffff', 0.5)
+        ctx.fillRect(r() * w, r() * h, 1.4, 1.4)
+      }
+      ctx.restore()
+    }
+
+    /* A wet-edged stroke: the pigment pools at the rim the way it does on
+       damp paper. The angle is passed in rather than random — a wash that
+       ignores the shape it is filling reads as a blob dropped on a drawing,
+       which is what the first pass looked like. */
+    function wash(ctx, x, y, rx, ry, angle, hex, alpha, r) {
+      ctx.save()
+      ctx.globalCompositeOperation = 'multiply'
+      for (var i = 0; i < 4; i++) {
+        var g = ctx.createRadialGradient(x, y, 0, x, y, Math.max(rx, ry) * (1 + i * 0.06))
+        g.addColorStop(0, hexA(hex, alpha * 0.42))
+        g.addColorStop(0.7, hexA(hex, alpha * 0.7))
+        g.addColorStop(1, hexA(hex, 0))
+        ctx.fillStyle = g
+        ctx.beginPath()
+        ctx.ellipse(
+          x + (r() - 0.5) * rx * 0.14,
+          y + (r() - 0.5) * ry * 0.14,
+          rx * (0.92 + r() * 0.16),
+          ry * (0.92 + r() * 0.16),
+          angle + (r() - 0.5) * 0.16, 0, Math.PI * 2
+        )
+        ctx.fill()
+      }
+      ctx.restore()
+    }
+
+    /* 01 — the reader. A page of the publication: drop cap, a measure of
+       text, a plate in the margin. Type as texture, at the size type
+       actually reads on a phone. */
+    function plateReader(ctx, w, h, r) {
+      paper(ctx, w, h, r)
+
+      /* Type, not rules. A solid bar per line is wireframe grammar and reads
+         as an unbuilt interface; breaking each line into word-length runs
+         with spaces between them reads as a page of set type, which is what
+         the app actually is. */
+      function setLine(x, y, len, size, alpha, r) {
+        var at = x
+        var right = x + len
+        while (at < right) {
+          var word = size * (1.4 + r() * 3.6)
+          if (at + word > right) word = right - at
+          if (word < size * 0.5) break
+          ctx.fillStyle = hexA(INK, alpha * (0.85 + r() * 0.3))
+          ctx.fillRect(at, y, word, size)
+          at += word + size * (0.7 + r() * 0.35)
+        }
+      }
+
+      var m = w * 0.13
+      var col = w - m * 2
+      var y = h * 0.115
+
+      ctx.fillStyle = hexA(BURGUNDY, 0.8)
+      ctx.fillRect(m, y, col * 0.3, Math.max(1, h * 0.004))
+      y += h * 0.05
+
+      // Headline: the same words, set larger.
+      var head = Math.max(2, h * 0.016)
+      setLine(m, y, col * 0.9, head, 0.82, r)
+      setLine(m, y + h * 0.032, col * 0.55, head, 0.82, r)
+      y += h * 0.075
+
+      var by = Math.max(1, h * 0.006)
+      setLine(m, y, col * 0.3, by, 0.34, r)
+      y += h * 0.042
+
+      // The figure the text has to flow around.
+      var fw = w * 0.3
+      var fx = m + col - fw
+      var fy = h * 0.55
+      var figure = { x: fx - fw * 0.07, y: fy - fw * 0.07, w: fw * 1.14, h: fw * 1.36 }
+
+      var size = Math.max(1, h * 0.0072)
+      var gap = h * 0.0178
+      var capH = h * 0.058
+
+      ctx.fillStyle = BURGUNDY
+      ctx.fillRect(m, y, capH * 0.7, capH)
+
+      for (var i = 0; i < 44; i++) {
+        var ty = y + i * gap
+        if (ty > h * 0.9) break
+
+        var indent = ty < y + capH - size ? capH * 0.86 : 0
+        var start = m + indent
+        var end = m + col
+
+        if (ty + size > figure.y && ty < figure.y + figure.h) end = figure.x - w * 0.028
+
+        var len = end - start - r() * col * 0.04
+        if (i > 6 && r() > 0.93) len *= 0.55
+        if (len < col * 0.1) continue
+
+        setLine(start, ty, len, size, 0.34, r)
+      }
+
+      // A pigment specimen in the margin, mounted on its own card.
+      ctx.fillStyle = SURFACE
+      ctx.fillRect(figure.x, figure.y, figure.w, figure.h)
+      wash(ctx, fx + fw / 2, fy + fw / 2, fw * 0.46, fw * 0.46, 0, PIGMENTS.ultramarine.hex, 0.95, r)
+      ctx.strokeStyle = hexA(INK, 0.16)
+      ctx.lineWidth = 1
+      ctx.strokeRect(figure.x, figure.y, figure.w, figure.h)
+
+      setLine(fx, fy + fw * 1.08, fw * 0.86, Math.max(1, h * 0.0055), 0.34, r)
+      setLine(fx, fy + fw * 1.08 + h * 0.014, fw * 0.55, Math.max(1, h * 0.0055), 0.34, r)
+    }
+
+    /* 02 — colouring. An ink outline with the colour going in: some of it
+       inside the line, some of it deliberately over. Staying inside is
+       optional, so the drawing shows that rather than asserting it. */
+    function plateColouring(ctx, w, h, r) {
+      paper(ctx, w, h, r)
+
+      var cx = w * 0.5, cy = h * 0.47, s = Math.min(w, h)
+      var petals = 6
+      var a0 = -Math.PI / 2 + 0.18
+      var inner = s * 0.075
+      var outer = s * 0.33
+      var mid = (inner + outer) / 2
+      var halfLen = (outer - inner) / 2
+      var halfWide = s * 0.075
+
+      // Two of six carry the deep tone; the rest stay warm, or the middle
+      // turns to mud where the petals meet.
+      var hues = [
+        PIGMENTS.cadmium.hex, PIGMENTS.sienna.hex, PIGMENTS.cadmium.hex,
+        BURGUNDY, PIGMENTS.cadmium.hex, PIGMENTS.sienna.hex
+      ]
+
+      // Colour first: the paint goes down before the line reads.
+      for (var i = 0; i < petals; i++) {
+        var a = a0 + (i / petals) * Math.PI * 2
+        // One petal is coloured past its outline, on purpose: staying inside
+        // the lines is optional in this app, so the drawing says so.
+        var slip = i === 4 ? s * 0.055 : 0
+        wash(
+          ctx,
+          cx + Math.cos(a) * (mid + slip),
+          cy + Math.sin(a) * (mid + slip),
+          halfLen * 0.94, halfWide * 0.88,
+          a,
+          hues[i], 0.62 + r() * 0.16, r
+        )
+      }
+
+      wash(ctx, cx, cy, inner * 0.95, inner * 0.95, 0, PIGMENTS.cadmium.hex, 0.9, r)
+
+      // Stem and one leaf.
+      wash(ctx, cx - s * 0.012, cy + s * 0.3, s * 0.016, s * 0.15, 0.05, PIGMENTS.viridian.hex, 0.55, r)
+      wash(ctx, cx - s * 0.14, cy + s * 0.3, s * 0.085, s * 0.032, -0.45, PIGMENTS.viridian.hex, 0.6, r)
+
+      // The ink outline, over the colour.
+      ctx.save()
+      ctx.strokeStyle = hexA(INK, 0.72)
+      ctx.lineWidth = Math.max(1.2, s * 0.0045)
+      ctx.lineJoin = 'round'
+      ctx.lineCap = 'round'
+
+      for (var p = 0; p < petals; p++) {
+        var pa = a0 + (p / petals) * Math.PI * 2
+        ctx.save()
+        ctx.translate(cx, cy)
+        ctx.rotate(pa)
+        ctx.beginPath()
+        ctx.moveTo(inner, 0)
+        ctx.bezierCurveTo(mid * 0.9, -halfWide, outer * 0.94, -halfWide * 0.55, outer, 0)
+        ctx.bezierCurveTo(outer * 0.94, halfWide * 0.55, mid * 0.9, halfWide, inner, 0)
+        ctx.stroke()
+        ctx.restore()
+      }
+
+      ctx.beginPath()
+      ctx.arc(cx, cy, inner, 0, Math.PI * 2)
+      ctx.stroke()
+
+      ctx.beginPath()
+      ctx.moveTo(cx, cy + inner)
+      ctx.quadraticCurveTo(cx - s * 0.03, cy + s * 0.28, cx - s * 0.012, cy + s * 0.46)
+      ctx.stroke()
+
+      ctx.beginPath()
+      ctx.moveTo(cx - s * 0.02, cy + s * 0.3)
+      ctx.quadraticCurveTo(cx - s * 0.13, cy + s * 0.24, cx - s * 0.23, cy + s * 0.32)
+      ctx.quadraticCurveTo(cx - s * 0.13, cy + s * 0.36, cx - s * 0.02, cy + s * 0.3)
+      ctx.stroke()
+      ctx.restore()
+    }
+
+    /* 03 — the year. Morrow's one real idea: a day recorded as a mark, not
+       an emoji. Five weeks of them, every mark a different kind. */
+    function plateYear(ctx, w, h, r) {
+      paper(ctx, w, h, r)
+
+      var cols = 7, rows = 6
+      var padX = w * 0.09, padY = h * 0.075
+      var cw = (w - padX * 2) / cols
+      var ch = (h - padY * 2) / rows
+      var cell = Math.min(cw, ch)
+      var hues = [PIGMENTS.ultramarine.hex, PIGMENTS.sienna.hex, PIGMENTS.viridian.hex,
+                  PIGMENTS.cadmium.hex, BURGUNDY, PIGMENTS.bone.hex]
+
+      for (var y = 0; y < rows; y++) {
+        for (var x = 0; x < cols; x++) {
+          var cxp = padX + cw * x + cw / 2
+          var cyp = padY + ch * y + ch / 2
+          var k = r()
+          var hue = hues[Math.floor(r() * hues.length)]
+          var rad = cell * (0.3 + r() * 0.14)
+
+          // A handful of days are left blank. Not every day gets a mark —
+          // but the first pass left a third of the grid empty, which read as
+          // an unfinished drawing rather than an honest one.
+          if (r() > 0.93) continue
+
+          if (k < 0.26) {
+            wash(ctx, cxp, cyp, rad * 1.15, rad * 1.15, r() * Math.PI, hue, 0.7, r)
+          } else if (k < 0.46) {
+            ctx.save()
+            ctx.translate(cxp, cyp)
+            ctx.rotate((r() - 0.5) * 1.6)
+            ctx.globalAlpha = 0.6 + r() * 0.3
+            ctx.fillStyle = hue
+            ctx.beginPath()
+            ctx.ellipse(0, 0, rad * 1.5, rad * 0.32, 0, 0, Math.PI * 2)
+            ctx.fill()
+            ctx.restore()
+          } else if (k < 0.62) {
+            ctx.save()
+            ctx.strokeStyle = hexA(hue, 0.75)
+            ctx.lineWidth = Math.max(1.2, cell * 0.06)
+            ctx.beginPath()
+            ctx.arc(cxp, cyp, rad * 0.92, 0, Math.PI * 2)
+            ctx.stroke()
+            ctx.restore()
+          } else if (k < 0.78) {
+            ctx.save()
+            ctx.translate(cxp, cyp)
+            ctx.rotate((r() - 0.5) * 0.3)
+            ctx.globalAlpha = 0.6 + r() * 0.25
+            ctx.fillStyle = hue
+            ctx.fillRect(-rad * 0.85, -rad * 0.85, rad * 1.7, rad * 1.7)
+            ctx.restore()
+          } else if (k < 0.91) {
+            ctx.save()
+            ctx.strokeStyle = hexA(hue, 0.7)
+            ctx.lineWidth = Math.max(1, cell * 0.045)
+            ctx.lineCap = 'round'
+            ctx.lineJoin = 'round'
+            ctx.beginPath()
+            ctx.moveTo(cxp - rad, cyp + rad * 0.5)
+            for (var t = 1; t <= 5; t++) {
+              ctx.lineTo(cxp - rad + (rad * 2 * t) / 5, cyp + (r() - 0.5) * rad * 1.9)
+            }
+            ctx.stroke()
+            ctx.restore()
+          } else {
+            ctx.save()
+            ctx.translate(cxp, cyp)
+            ctx.rotate((r() - 0.5) * 0.24)
+            ctx.fillStyle = SURFACE
+            ctx.fillRect(-rad, -rad * 1.05, rad * 2, rad * 2.4)
+            ctx.globalAlpha = 0.75
+            ctx.fillStyle = hue
+            ctx.fillRect(-rad * 0.84, -rad * 0.88, rad * 1.68, rad * 1.6)
+            ctx.globalAlpha = 1
+            ctx.strokeStyle = hexA(INK, 0.16)
+            ctx.lineWidth = 1
+            ctx.strokeRect(-rad, -rad * 1.05, rad * 2, rad * 2.4)
+            ctx.restore()
+          }
+        }
+      }
+    }
+
+    /* 04 — marks that sound. Dots ring, long strokes pull strings, spirals
+       turn vocal. Drawn on night, with the response rippling out of each
+       mark rather than the mark sitting alone. */
+    function plateEcho(ctx, w, h, r) {
+      var s = Math.min(w, h)
+
+      var g = ctx.createRadialGradient(w * 0.5, h * 0.42, 0, w * 0.5, h * 0.42, Math.max(w, h) * 0.8)
+      g.addColorStop(0, '#16255c')
+      g.addColorStop(0.6, '#0d1636')
+      g.addColorStop(1, '#080d20')
+      ctx.fillStyle = g
+      ctx.fillRect(0, 0, w, h)
+
+      ctx.save()
+      ctx.globalAlpha = 0.7
+      for (var i = 0; i < 90; i++) {
+        ctx.fillStyle = hexA('#ffffff', 0.1 + r() * 0.35)
+        var sr = r() * 1.3
+        ctx.fillRect(r() * w, r() * h * 0.75, sr, sr)
+      }
+      ctx.restore()
+
+      ctx.lineCap = 'round'
+
+      // Dots, each ringing outward.
+      var bells = [
+        { x: w * 0.28, y: h * 0.3, hue: '#c9820a' },
+        { x: w * 0.7, y: h * 0.22, hue: '#efe9dd' },
+        { x: w * 0.76, y: h * 0.6, hue: '#c9820a' }
+      ]
+      bells.forEach(function (b) {
+        for (var k = 1; k <= 4; k++) {
+          ctx.strokeStyle = hexA(b.hue, 0.36 / k)
+          ctx.lineWidth = Math.max(0.8, s * 0.005 / k)
+          ctx.beginPath()
+          ctx.arc(b.x, b.y, s * 0.035 * k * (1 + r() * 0.15), 0, Math.PI * 2)
+          ctx.stroke()
+        }
+        var bg = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, s * 0.05)
+        bg.addColorStop(0, hexA(b.hue, 0.95))
+        bg.addColorStop(1, hexA(b.hue, 0))
+        ctx.fillStyle = bg
+        ctx.beginPath()
+        ctx.arc(b.x, b.y, s * 0.05, 0, Math.PI * 2)
+        ctx.fill()
+      })
+
+      // A long stroke, and the string it pulls.
+      ctx.save()
+      ctx.strokeStyle = hexA('#efe9dd', 0.9)
+      ctx.lineWidth = Math.max(1.6, s * 0.011)
+      ctx.beginPath()
+      ctx.moveTo(w * 0.14, h * 0.62)
+      ctx.bezierCurveTo(w * 0.3, h * 0.5, w * 0.44, h * 0.72, w * 0.6, h * 0.58)
+      ctx.stroke()
+
+      for (var v = 1; v <= 3; v++) {
+        ctx.strokeStyle = hexA('#8fb4ff', 0.3 / v)
+        ctx.lineWidth = Math.max(0.7, s * 0.004)
+        ctx.beginPath()
+        for (var px = 0; px <= 60; px++) {
+          var tx = w * 0.14 + (w * 0.46 * px) / 60
+          var base = h * 0.62 - Math.sin((px / 60) * Math.PI) * h * 0.08
+          var ty = base + Math.sin((px / 60) * Math.PI * 6) * s * 0.018 * v
+          if (px === 0) ctx.moveTo(tx, ty)
+          else ctx.lineTo(tx, ty)
+        }
+        ctx.stroke()
+      }
+      ctx.restore()
+
+      // A spiral, turning vocal.
+      ctx.save()
+      ctx.strokeStyle = hexA('#e8c8a0', 0.75)
+      ctx.lineWidth = Math.max(1.2, s * 0.008)
+      ctx.beginPath()
+      var sx = w * 0.36, sy = h * 0.82
+      for (var a = 0; a < Math.PI * 6; a += 0.12) {
+        var rad = s * 0.006 * a
+        var qx = sx + Math.cos(a) * rad
+        var qy = sy + Math.sin(a) * rad * 0.8
+        if (a === 0) ctx.moveTo(qx, qy)
+        else ctx.lineTo(qx, qy)
+      }
+      ctx.stroke()
+      ctx.restore()
+
+      // A watercolour wash, opening into a pad.
+      ctx.save()
+      ctx.globalCompositeOperation = 'screen'
+      var wg = ctx.createRadialGradient(w * 0.66, h * 0.84, 0, w * 0.66, h * 0.84, s * 0.3)
+      wg.addColorStop(0, hexA('#2e6b52', 0.55))
+      wg.addColorStop(0.6, hexA('#1f3a93', 0.3))
+      wg.addColorStop(1, hexA('#1f3a93', 0))
+      ctx.fillStyle = wg
+      ctx.beginPath()
+      ctx.ellipse(w * 0.66, h * 0.84, s * 0.3, s * 0.19, 0.3, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.restore()
+
+      // The ground the marks are restoring.
+      ctx.fillStyle = hexA('#050810', 0.55)
+      ctx.beginPath()
+      ctx.moveTo(0, h)
+      ctx.lineTo(0, h * 0.9)
+      ctx.quadraticCurveTo(w * 0.5, h * 0.83, w, h * 0.92)
+      ctx.lineTo(w, h)
+      ctx.closePath()
+      ctx.fill()
+    }
+
+    var PLATES = {
+      reader: plateReader,
+      colouring: plateColouring,
+      year: plateYear,
+      echo: plateEcho
+    }
+
+    function mountPlate(host) {
+      var canvas = host.querySelector('canvas')
+      if (!canvas) {
+        canvas = document.createElement('canvas')
+        host.appendChild(canvas)
+      }
+
       var rect = canvas.getBoundingClientRect()
       if (rect.width < 2 || rect.height < 2) return
 
@@ -2003,109 +2338,19 @@
 
       var ctx = canvas.getContext('2d')
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-      var r = rng(seed)
-      var cx = w * 0.5, cy = h * 0.5, reach = Math.max(w, h)
+      ctx.clearRect(0, 0, w, h)
 
-      ctx.fillStyle = pig.hex
-      ctx.fillRect(0, 0, w, h)
-
-      for (var i = 0; i < 12; i++) {
-        var bx = cx + (r() - 0.5) * w * 1.6
-        var by = cy + (r() - 0.5) * h * 1.6
-        var br = (0.28 + r() * 0.55) * reach
-        var g = ctx.createRadialGradient(bx, by, 0, bx, by, br)
-        var tone = r() > 0.4 ? pig.hex : pig.deep
-        g.addColorStop(0, hexA(tone, 0.95 * (0.65 + r() * 0.35)))
-        g.addColorStop(0.5, hexA(tone, 0.28))
-        g.addColorStop(1, hexA(tone, 0))
-        ctx.fillStyle = g
-        ctx.beginPath()
-        ctx.arc(bx, by, br, 0, Math.PI * 2)
-        ctx.fill()
-      }
-
-      ctx.save()
-      ctx.globalCompositeOperation = 'screen'
-      for (var l = 0; l < 7; l++) {
-        var lx = cx + (r() - 0.5) * w * 1.3
-        var ly = cy + (r() - 0.5) * h * 1.3
-        var lr = reach * (0.18 + r() * 0.35)
-        var lg = ctx.createRadialGradient(lx, ly, 0, lx, ly, lr)
-        lg.addColorStop(0, hexA(pig.hex, 0.32 + r() * 0.3))
-        lg.addColorStop(1, hexA(pig.hex, 0))
-        ctx.fillStyle = lg
-        ctx.beginPath()
-        ctx.arc(lx, ly, lr, 0, Math.PI * 2)
-        ctx.fill()
-      }
-      ctx.restore()
-
-      var angle = -0.35 + r() * 0.7
-      for (var s = 0; s < 30; s++) {
-        ctx.save()
-        ctx.translate(cx + (r() - 0.5) * w * 1.5, cy + (r() - 0.5) * h * 1.5)
-        ctx.rotate(angle + (r() - 0.5) * 0.5)
-        ctx.globalAlpha = 0.34 * (0.3 + r() * 0.7)
-        ctx.fillStyle = r() > 0.62 ? pig.deep : pig.hex
-        ctx.beginPath()
-        ctx.ellipse(0, 0, (0.03 + r() * r() * 0.16) * w, 2 + r() * r() * 14, 0, 0, Math.PI * 2)
-        ctx.fill()
-        ctx.restore()
-      }
-      ctx.globalAlpha = 1
-
-      ctx.save()
-      ctx.strokeStyle = pig.deep
-      ctx.lineCap = 'round'
-      for (var t = 0; t < 4; t++) {
-        var st = r() * Math.PI * 2
-        ctx.lineWidth = 0.8 + r() * 1.4
-        ctx.globalAlpha = 0.05 + r() * 0.09
-        ctx.beginPath()
-        ctx.ellipse(
-          cx + (r() - 0.5) * w * 0.5, cy + (r() - 0.5) * h * 0.6,
-          reach * (0.12 + r() * 0.3), reach * (0.1 + r() * 0.26),
-          r() * Math.PI, st, st + 0.5 + r() * 1.4
-        )
-        ctx.stroke()
-      }
-      ctx.restore()
-
-      var vg = ctx.createRadialGradient(cx, cy, reach * 0.2, cx, cy, reach * 0.78)
-      vg.addColorStop(0, 'rgba(0,0,0,0)')
-      vg.addColorStop(1, hexA(pig.deep, 0.55))
-      ctx.fillStyle = vg
-      ctx.fillRect(0, 0, w, h)
-
-      var hx = w * (0.3 + r() * 0.4), hy = h * (0.22 + r() * 0.3)
-      var hg = ctx.createRadialGradient(hx, hy, 0, hx, hy, reach * 0.5)
-      hg.addColorStop(0, 'rgba(255,255,255,0.18)')
-      hg.addColorStop(1, 'rgba(255,255,255,0)')
-      ctx.fillStyle = hg
-      ctx.fillRect(0, 0, w, h)
+      var draw = PLATES[host.dataset.plate] || plateReader
+      draw(ctx, w, h, rng(parseInt(host.dataset.seed, 10) || 1))
     }
 
-    function mountWash(host) {
-      var canvas = host.querySelector('canvas')
-      if (!canvas) {
-        canvas = document.createElement('canvas')
-        host.appendChild(canvas)
-      }
-      paintPlate(canvas, host.dataset.wash, parseInt(host.dataset.seed, 10) || 1)
-    }
-
-    /* ------------------------------------------------------------------
-       App plates. Each one stands in for Apps.heroImage — there is no real
-       app artwork yet, so the page paints a wash rather than shipping a
-       placeholder screenshot that implies something has been built.
-       ------------------------------------------------------------------ */
     var plates = Array.prototype.slice.call(document.querySelectorAll('.app__plate'))
-    plates.forEach(mountWash)
+    plates.forEach(mountPlate)
 
     var repaint = null
     window.addEventListener('resize', function () {
       clearTimeout(repaint)
-      repaint = setTimeout(function () { plates.forEach(mountWash) }, 180)
+      repaint = setTimeout(function () { plates.forEach(mountPlate) }, 180)
     })
 
     /* ------------------------------------------------------------------
