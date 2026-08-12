@@ -1,9 +1,13 @@
 import type { MetadataRoute } from 'next'
 
+import { cachedRead, CONTENT_TAGS } from '@/lib/cache/content'
 import { getPayloadClient } from '@/lib/payload'
 import { getSiteUrl } from '@/lib/seo/site'
 import { buildSitemapEntries, type SitemapDoc } from '@/lib/seo/sitemap'
 
+// Rendered per request so canonical URLs, feeds and JSON-LD come from the
+// running container's environment rather than the build's; the database reads
+// behind it are cached and purged on publish (lib/cache/content.ts).
 export const dynamic = 'force-dynamic'
 
 type PublishedDoc = {
@@ -22,10 +26,16 @@ function toDocs(docs: PublishedDoc[]): SitemapDoc[] {
     }))
 }
 
-export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const siteUrl = getSiteUrl()
-
-  try {
+/**
+ * Every indexable slug, cached and purged with the content it lists.
+ *
+ * Only the URLs are cached, not the sitemap itself: the origin they hang off
+ * comes from the running container's environment, which cutover changes
+ * without a rebuild.
+ */
+const readSlugs = cachedRead(
+  'sitemap-slugs',
+  async () => {
     const payload = await getPayloadClient()
     const [posts, pages, tags, authors] = await Promise.all([
       payload.find({
@@ -66,13 +76,26 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       }),
     ])
 
-    return buildSitemapEntries({
-      siteUrl,
+    return {
       posts: toDocs(posts.docs as PublishedDoc[]),
       pages: toDocs(pages.docs as PublishedDoc[]),
       tags: toDocs(tags.docs as PublishedDoc[]),
       authors: toDocs(authors.docs as PublishedDoc[]),
-    })
+    }
+  },
+  [
+    CONTENT_TAGS.posts,
+    CONTENT_TAGS.pages,
+    CONTENT_TAGS.tags,
+    CONTENT_TAGS.authors,
+  ],
+)
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const siteUrl = getSiteUrl()
+
+  try {
+    return buildSitemapEntries({ siteUrl, ...(await readSlugs()) })
   } catch {
     // If the database is unavailable (e.g. during a build), still emit a valid
     // sitemap containing the homepage rather than failing the route.

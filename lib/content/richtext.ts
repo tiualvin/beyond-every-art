@@ -72,9 +72,10 @@ const NAMED_ENTITIES: Record<string, string> = {
 function decodeEntities(value: string): string {
   return value.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (match, body: string) => {
     if (body.startsWith('#')) {
-      const code = body.startsWith('#x') || body.startsWith('#X')
-        ? Number.parseInt(body.slice(2), 16)
-        : Number.parseInt(body.slice(1), 10)
+      const code =
+        body.startsWith('#x') || body.startsWith('#X')
+          ? Number.parseInt(body.slice(2), 16)
+          : Number.parseInt(body.slice(1), 10)
       return Number.isFinite(code) && code > 0
         ? String.fromCodePoint(code)
         : match
@@ -104,7 +105,8 @@ function toComparableText(value: string): string {
 // A heading opening the body, after any leading whitespace or HTML comment.
 // Only h1–h3 count: a lower level is a section heading that happens to repeat
 // the title, not the document's own title printed twice.
-const LEADING_HEADING = /^(?:\s|<!--[\s\S]*?-->)*<h([1-3])\b[^>]*>([\s\S]*?)<\/h\1\s*>/i
+const LEADING_HEADING =
+  /^(?:\s|<!--[\s\S]*?-->)*<h([1-3])\b[^>]*>([\s\S]*?)<\/h\1\s*>/i
 
 /**
  * Drops a heading at the top of `html` when it says the same thing as `title`.

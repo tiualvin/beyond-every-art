@@ -1,7 +1,11 @@
+import { cachedRead, CONTENT_TAGS } from '@/lib/cache/content'
 import { getPayloadClient } from '@/lib/payload'
 import { renderRssFeed, type RssItem } from '@/lib/seo/rss'
 import { absoluteUrl, FEED_PATH, getSiteUrl, postPath } from '@/lib/seo/site'
 
+// Rendered per request so canonical URLs, feeds and JSON-LD come from the
+// running container's environment rather than the build's; the database reads
+// behind it are cached and purged on publish (lib/cache/content.ts).
 export const dynamic = 'force-dynamic'
 
 const FEED_LIMIT = 20
@@ -23,16 +27,16 @@ function firstAuthorName(post: FeedPost): string | undefined {
   return undefined
 }
 
-export async function GET(): Promise<Response> {
-  const siteUrl = getSiteUrl()
-  const feedUrl = absoluteUrl(FEED_PATH, siteUrl)
-
-  const rssHeaders = {
-    'Content-Type': 'application/rss+xml; charset=utf-8',
-    'Cache-Control': 'public, max-age=600, s-maxage=600',
-  }
-
-  try {
+/**
+ * The feed's data, cached and purged with the posts it lists.
+ *
+ * The route itself stays dynamic — it resolves the site's own origin at
+ * request time — but a feed reader polling every few minutes should not put a
+ * query behind every poll.
+ */
+const readFeed = cachedRead(
+  'rss-feed',
+  async () => {
     const payload = await getPayloadClient()
 
     const settings = await payload
@@ -51,6 +55,23 @@ export async function GET(): Promise<Response> {
       // here, so nothing gated escapes through the feed.
       where: { _status: { equals: 'published' } },
     })
+
+    return { settings, posts }
+  },
+  [CONTENT_TAGS.posts, CONTENT_TAGS.globals],
+)
+
+export async function GET(): Promise<Response> {
+  const siteUrl = getSiteUrl()
+  const feedUrl = absoluteUrl(FEED_PATH, siteUrl)
+
+  const rssHeaders = {
+    'Content-Type': 'application/rss+xml; charset=utf-8',
+    'Cache-Control': 'public, max-age=600, s-maxage=600',
+  }
+
+  try {
+    const { settings, posts } = await readFeed()
 
     const settingsRecord = settings as {
       title?: string

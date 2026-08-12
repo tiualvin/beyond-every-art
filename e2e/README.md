@@ -16,8 +16,9 @@ pnpm test:e2e:local
 
 That command runs the normal development seed first and the small e2e seed
 second. Both are idempotent. The e2e seed adds only the launch states absent
-from the visual development seed: a draft post, a members-only post, and a
-permanent redirect. It refuses production mode and non-local database hosts by
+from the visual development seed: a draft post, a members-only post whose body
+is long enough to be cut in two by the teaser, a post whose imported body
+repeats its own title, and a permanent redirect. It refuses production mode and non-local database hosts by
 default. Set `E2E_ALLOW_REMOTE_SEED=1` only for an explicitly disposable remote
 test database.
 

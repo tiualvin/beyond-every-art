@@ -42,13 +42,19 @@ export function ScrollHeader({ children }: { children: React.ReactNode }) {
       >
         {children}
       </div>
+      {/* Reserves the height the bar gave up when it went fixed. It holds
+          nothing: a second copy of the header would mount a second copy of
+          every control in it, and the overlays those controls open portal to
+          `document.body`, where `visibility: hidden` on this box cannot reach
+          them — one click would open two subscribe modals. The height is read
+          from the bar itself on the render that fixes it, while it is still in
+          flow. */}
       {isFixed && (
         <div
           className="site-header__spacer"
+          aria-hidden="true"
           style={{ height: headerRef.current?.offsetHeight }}
-        >
-          {children}
-        </div>
+        />
       )}
     </>
   )

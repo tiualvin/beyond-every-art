@@ -1,6 +1,8 @@
 import type { CollectionConfig } from 'payload'
 
 import { adminField, editorsAndAdmins, publicRead } from '../access/roles'
+import { CONTENT_TAGS } from '../lib/cache/content'
+import { purgeOnChange, purgeOnDelete } from '../lib/cache/purge'
 
 export const Authors: CollectionConfig = {
   slug: 'authors',
@@ -10,6 +12,10 @@ export const Authors: CollectionConfig = {
     read: publicRead,
     update: editorsAndAdmins,
     delete: editorsAndAdmins,
+  },
+  hooks: {
+    afterChange: [purgeOnChange(CONTENT_TAGS.authors)],
+    afterDelete: [purgeOnDelete(CONTENT_TAGS.authors)],
   },
   fields: [
     { name: 'name', type: 'text', required: true },

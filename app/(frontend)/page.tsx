@@ -17,6 +17,9 @@ import { FadeIn } from './components/motion/fade-in'
 import { Reveal } from './components/motion/reveal'
 import { StaggerChildren, StaggerItem } from './components/motion/stagger'
 
+// Rendered per request so canonical URLs, feeds and JSON-LD come from the
+// running container's environment rather than the build's; the database reads
+// behind it are cached and purged on publish (lib/cache/content.ts).
 export const dynamic = 'force-dynamic'
 
 export default async function HomePage() {
@@ -148,7 +151,7 @@ function LatestBand({ post }: { post: PostCard }) {
 
         <div>
           <p className="eyebrow">
-            {['Latest', post.tag].filter(Boolean).join(' · ')}
+            {['Latest', post.tags[0]?.name].filter(Boolean).join(' · ')}
           </p>
           <h2 className="latest__title">{post.title}</h2>
           {post.excerpt && <p className="latest__excerpt">{post.excerpt}</p>}

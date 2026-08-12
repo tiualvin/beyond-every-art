@@ -7,6 +7,8 @@ import {
   ownedPosts,
   postsRead,
 } from '../access/roles'
+import { CONTENT_TAGS } from '../lib/cache/content'
+import { purgeOnChange, purgeOnDelete } from '../lib/cache/purge'
 import { recordMcpWrite } from '../lib/mcp/audit'
 import { refuseMcpPublish } from '../lib/mcp/publish-guard'
 import { buildPreviewUrl } from '../lib/preview/live-preview'
@@ -37,7 +39,8 @@ export const Posts: CollectionConfig = {
       },
       refuseMcpPublish,
     ],
-    afterChange: [recordMcpWrite],
+    afterChange: [recordMcpWrite, purgeOnChange(CONTENT_TAGS.posts)],
+    afterDelete: [purgeOnDelete(CONTENT_TAGS.posts)],
   },
   // Autosave is what makes Live Preview live: the iframe re-renders on save,
   // so without it the preview only moves when an editor remembers to press a

@@ -5,6 +5,7 @@ import {
   richTextToHtml,
   stripLeadingTitleHeading,
   toBodyHtml,
+  toTeaserHtml,
 } from '../../lib/content/richtext'
 
 const text = (value: string) => ({
@@ -143,6 +144,44 @@ describe('stripLeadingTitleHeading', () => {
     const html = '<h1>Understanding Ultramarine</h1><p>Body.</p>'
     expect(stripLeadingTitleHeading(html, null)).toBe(html)
     expect(stripLeadingTitleHeading(html, '   ')).toBe(html)
+  })
+})
+
+describe('toTeaserHtml', () => {
+  const para = (text: string) => `<p>${text}</p>`
+
+  it('takes whole paragraphs until the allowance runs out', () => {
+    // Over the 500-character allowance on its own, so the cut lands after it.
+    const long = 'word '.repeat(120).trim()
+    const html = para(long) + para('Withheld.') + para('Also withheld.')
+
+    const teaser = toTeaserHtml(html)
+
+    expect(teaser).toBe(para(long))
+    expect(teaser).not.toContain('Withheld')
+  })
+
+  it('keeps going while the opening paragraphs are short', () => {
+    const html = para('One.') + para('Two.') + para('Three.')
+    expect(toTeaserHtml(html, 200)).toBe(
+      [para('One.'), para('Two.'), para('Three.')].join('\n'),
+    )
+  })
+
+  it('always yields the first paragraph, however long it is', () => {
+    const html = para('word '.repeat(400).trim()) + para('Withheld.')
+    expect(toTeaserHtml(html, 10)).not.toContain('Withheld')
+    expect(toTeaserHtml(html, 10)).toContain('word')
+  })
+
+  it('stops at anything that is not a paragraph', () => {
+    const html = para('Opening.') + '<figure><img src="/a.jpg" /></figure>'
+    expect(toTeaserHtml(html)).toBe(para('Opening.'))
+  })
+
+  it('yields nothing when the body does not open with prose', () => {
+    expect(toTeaserHtml('<figure><img src="/a.jpg" /></figure>')).toBe('')
+    expect(toTeaserHtml('')).toBe('')
   })
 })
 

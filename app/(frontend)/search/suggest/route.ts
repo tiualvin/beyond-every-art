@@ -3,6 +3,9 @@ import { NextResponse } from 'next/server'
 import { searchPosts } from '@/lib/content/queries'
 import { postPath } from '@/lib/seo/site'
 
+// Rendered per request so canonical URLs, feeds and JSON-LD come from the
+// running container's environment rather than the build's; the database reads
+// behind it are cached and purged on publish (lib/cache/content.ts).
 export const dynamic = 'force-dynamic'
 
 const LIMIT = 8
@@ -29,7 +32,7 @@ export async function GET(request: Request) {
         title: post.title,
         excerpt: post.excerpt,
         href: postPath(post.slug),
-        tag: post.tag,
+        tag: post.tags[0]?.name ?? null,
         readingTime: post.readingTime,
       })),
     },

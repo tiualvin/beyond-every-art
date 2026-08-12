@@ -6,6 +6,7 @@ import { cache } from 'react'
 import {
   getPageBySlug,
   getPostBySlug,
+  getRelatedPosts,
   getSiteSettings,
   type PageDetail,
   type PostDetail,
@@ -16,7 +17,11 @@ import { buildArticleJsonLd, serializeJsonLd } from '@/lib/seo/jsonld'
 import { absoluteUrl, getSiteUrl, pagePath, postPath } from '@/lib/seo/site'
 
 import { Article } from '../components/article'
+import { ReadNext } from '../components/read-next'
 
+// Rendered per request so canonical URLs, feeds and JSON-LD come from the
+// running container's environment rather than the build's; the database reads
+// behind it are cached and purged on publish (lib/cache/content.ts).
 export const dynamic = 'force-dynamic'
 
 type Params = { slug: string }
@@ -136,7 +141,13 @@ export default async function SlugPage({
   }
 
   const { post } = resolved
-  const settings = await getSiteSettings()
+  const [settings, related] = await Promise.all([
+    getSiteSettings(),
+    getRelatedPosts(
+      post.slug,
+      post.tags.map((tag) => tag.slug),
+    ),
+  ])
   const siteUrl = getSiteUrl()
   const url = post.canonicalURL || absoluteUrl(postPath(post.slug), siteUrl)
 
@@ -163,6 +174,7 @@ export default async function SlugPage({
       />
       {showBanner && <DraftBanner />}
       <Article post={post} />
+      <ReadNext posts={related} topic={post.tags[0]?.name} />
     </>
   )
 }

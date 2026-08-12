@@ -6,6 +6,9 @@ import { FadeIn } from '../components/motion/fade-in'
 
 import { subscribeToNewsletter } from './actions'
 
+// Rendered per request so canonical URLs, feeds and JSON-LD come from the
+// running container's environment rather than the build's; the database reads
+// behind it are cached and purged on publish (lib/cache/content.ts).
 export const dynamic = 'force-dynamic'
 
 type SearchParams = { status?: string }

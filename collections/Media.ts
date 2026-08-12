@@ -1,6 +1,8 @@
 import type { CollectionConfig } from 'payload'
 
 import { editorsAndAdmins, publicRead } from '../access/roles'
+import { CONTENT_TAGS } from '../lib/cache/content'
+import { purgeOnChange, purgeOnDelete } from '../lib/cache/purge'
 
 export const Media: CollectionConfig = {
   slug: 'media',
@@ -9,6 +11,10 @@ export const Media: CollectionConfig = {
     read: publicRead,
     update: editorsAndAdmins,
     delete: editorsAndAdmins,
+  },
+  hooks: {
+    afterChange: [purgeOnChange(CONTENT_TAGS.media)],
+    afterDelete: [purgeOnDelete(CONTENT_TAGS.media)],
   },
   upload: {
     mimeTypes: ['image/*'],

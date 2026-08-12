@@ -44,7 +44,7 @@ export function StoryCard({
 
   const text = (
     <>
-      {post.tag && <p className="eyebrow">{post.tag}</p>}
+      {post.tags[0] && <p className="eyebrow">{post.tags[0].name}</p>}
       <h3>
         <Link href={href}>{post.title}</Link>
       </h3>

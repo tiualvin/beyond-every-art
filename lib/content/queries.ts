@@ -1,5 +1,6 @@
 import type { Where } from 'payload'
 
+import { cachedRead, CONTENT_TAGS } from '@/lib/cache/content'
 import { toMediaImage, type MediaImage } from '@/lib/content/media'
 import { ARCHIVE_PAGE_SIZE } from '@/lib/content/pagination'
 import { toBodyHtml, toTeaserHtml } from '@/lib/content/richtext'
@@ -14,10 +15,18 @@ export type SiteSettings = {
   description: string
 }
 
-export type AuthorSummary = { name: string; slug?: string }
+export type AuthorSummary = {
+  name: string
+  slug?: string
+  /** Only populated where a page shows the author, not merely credits them. */
+  bio?: string
+  image?: MediaImage | null
+}
 
 /** What `Posts.visibility` holds, mirroring the levels Ghost had. */
 export type PostVisibility = 'public' | 'members' | 'paid'
+
+export type TagRef = { name: string; slug: string }
 
 export type PostCard = {
   id: string
@@ -27,7 +36,8 @@ export type PostCard = {
   publishedAt: string | null
   featured: boolean
   authors: AuthorSummary[]
-  tag: string | null
+  /** All of them, in editor order: listings show the first, filters use all. */
+  tags: TagRef[]
   image: MediaImage | null
   readingTime: number
   visibility: PostVisibility
@@ -53,8 +63,13 @@ function toVisibility(value: unknown): PostVisibility {
   return value === 'members' || value === 'paid' ? value : 'public'
 }
 
-type RawAuthor = { name?: string; slug?: string }
-type RawTag = { name?: string }
+type RawAuthor = {
+  name?: string
+  slug?: string
+  bio?: string
+  profileImage?: unknown
+}
+type RawTag = { name?: string; slug?: string }
 type RawPost = {
   id?: string | number
   slug?: string
@@ -74,15 +89,21 @@ function toAuthorSummaries(authors: RawPost['authors']): AuthorSummary[] {
   if (!authors) return []
   return authors
     .filter((a): a is RawAuthor => typeof a === 'object' && a !== null)
-    .map((a) => ({ name: a.name ?? '', slug: a.slug }))
+    .map((a) => ({
+      name: a.name ?? '',
+      slug: a.slug,
+      bio: a.bio,
+      image: toMediaImage(a.profileImage),
+    }))
     .filter((a) => a.name)
 }
 
-function firstTagName(tags: RawPost['tags']): string | null {
-  const tag = tags?.find(
-    (t): t is RawTag => typeof t === 'object' && t !== null,
-  )
-  return tag?.name ?? null
+function toTagRefs(tags: RawPost['tags']): TagRef[] {
+  if (!tags) return []
+  return tags
+    .filter((t): t is RawTag => typeof t === 'object' && t !== null)
+    .map((t) => ({ name: t.name ?? '', slug: t.slug ?? '' }))
+    .filter((t) => t.name && t.slug)
 }
 
 function estimateWordCount(doc: RawPost): number {
@@ -105,7 +126,7 @@ function toPostCard(doc: RawPost): PostCard | null {
     publishedAt: doc.publishedAt ?? null,
     featured: Boolean(doc.featured),
     authors: toAuthorSummaries(doc.authors),
-    tag: firstTagName(doc.tags),
+    tags: toTagRefs(doc.tags),
     image: toMediaImage(doc.featuredImage),
     readingTime: readingTimeMinutes(estimateWordCount(doc)),
     visibility: toVisibility(doc.visibility),
@@ -113,7 +134,7 @@ function toPostCard(doc: RawPost): PostCard | null {
 }
 
 /** Site-wide title/description, falling back to sensible defaults. */
-export async function getSiteSettings(): Promise<SiteSettings> {
+async function readSiteSettings(): Promise<SiteSettings> {
   try {
     const payload = await getPayloadClient()
     const settings = (await payload.findGlobal({
@@ -130,13 +151,17 @@ export async function getSiteSettings(): Promise<SiteSettings> {
   }
 }
 
+export const getSiteSettings = cachedRead('site-settings', readSiteSettings, [
+  CONTENT_TAGS.globals,
+])
+
 function toNavLink(value: Partial<NavLink> | undefined | null): NavLink | null {
   const label = value?.label?.trim()
   const url = value?.url?.trim()
   return label && url ? { label, url } : null
 }
 
-async function getGlobalLinks(slug: 'header' | 'footer'): Promise<{
+async function readGlobalLinks(slug: 'header' | 'footer'): Promise<{
   links: NavLink[]
   cta: NavLink | null
   copyright?: string
@@ -159,6 +184,10 @@ async function getGlobalLinks(slug: 'header' | 'footer'): Promise<{
     return { links: [], cta: null }
   }
 }
+
+const getGlobalLinks = cachedRead('global-links', readGlobalLinks, [
+  CONTENT_TAGS.globals,
+])
 
 export function getHeader(): Promise<{
   links: NavLink[]
@@ -186,7 +215,7 @@ const EMPTY_POST_PAGE: PostPage = {
 }
 
 /** One page of published posts, newest first, for the journal archive. */
-export async function getPublishedPosts({
+async function readPublishedPosts({
   page = 1,
   limit = ARCHIVE_PAGE_SIZE,
 }: { page?: number; limit?: number } = {}): Promise<PostPage> {
@@ -214,8 +243,14 @@ export async function getPublishedPosts({
   }
 }
 
+export const getPublishedPosts = cachedRead(
+  'published-posts',
+  readPublishedPosts,
+  [CONTENT_TAGS.posts, CONTENT_TAGS.tags, CONTENT_TAGS.media],
+)
+
 /** Most recent published posts, newest first. */
-export async function getRecentPosts(limit = 6): Promise<PostCard[]> {
+async function readRecentPosts(limit = 6): Promise<PostCard[]> {
   try {
     const payload = await getPayloadClient()
     const result = await payload.find({
@@ -233,6 +268,12 @@ export async function getRecentPosts(limit = 6): Promise<PostCard[]> {
     return []
   }
 }
+
+export const getRecentPosts = cachedRead('recent-posts', readRecentPosts, [
+  CONTENT_TAGS.posts,
+  CONTENT_TAGS.tags,
+  CONTENT_TAGS.media,
+])
 
 /** Published posts whose title or excerpt matches the query text. */
 export async function searchPosts(
@@ -270,8 +311,6 @@ export async function searchPosts(
 }
 
 // --- Detail + archive types --------------------------------------------
-
-export type TagRef = { name: string; slug: string }
 
 export type PostDetail = {
   slug: string
@@ -332,17 +371,6 @@ type RawContentDoc = {
   visibility?: string
 }
 
-function toTagRefs(tags: RawContentDoc['tags']): TagRef[] {
-  if (!tags) return []
-  return tags
-    .filter(
-      (t): t is RawTag & { slug?: string } =>
-        typeof t === 'object' && t !== null,
-    )
-    .map((t) => ({ name: t.name ?? '', slug: t.slug ?? '' }))
-    .filter((t) => t.name && t.slug)
-}
-
 /**
  * Turns a post document into what the article page renders.
  *
@@ -376,12 +404,7 @@ function toPostDetail(doc: RawContentDoc, preview: boolean): PostDetail {
   }
 }
 
-/**
- * A post by slug. By default only a published post is returned, with a
- * restricted one reduced to a teaser; pass `draft: true` (gated behind the
- * /api/preview route) to fetch the latest draft in full regardless of status.
- */
-export async function getPostBySlug(
+async function readPostBySlug(
   slug: string,
   options: { draft?: boolean; user?: PreviewUser | null } = {},
 ): Promise<PostDetail | null> {
@@ -393,7 +416,9 @@ export async function getPostBySlug(
       // In particular, an author may preview only posts they own.
       overrideAccess: !options.draft,
       user: options.draft ? (options.user ?? undefined) : undefined,
-      depth: 1,
+      // Depth 2 so the author card gets its portrait: depth 1 populates the
+      // author document, and the upload it points at is one level further.
+      depth: 2,
       limit: 1,
       draft: options.draft,
       where: options.draft
@@ -408,12 +433,103 @@ export async function getPostBySlug(
   }
 }
 
+const getPublishedPostBySlug = cachedRead(
+  'post-by-slug',
+  (slug: string) => readPostBySlug(slug),
+  [
+    CONTENT_TAGS.posts,
+    CONTENT_TAGS.tags,
+    CONTENT_TAGS.authors,
+    CONTENT_TAGS.media,
+  ],
+)
+
 /**
- * A page by slug. By default only a published page is returned; pass
- * `draft: true` (gated behind the /api/preview route) to fetch the latest
- * draft version regardless of status.
+ * A post by slug. By default only a published post is returned, with a
+ * restricted one reduced to a teaser; pass `draft: true` (gated behind the
+ * /api/preview route) to fetch the latest draft in full regardless of status.
+ *
+ * Only the public read is cached. A draft read is scoped to the editor making
+ * it — an author may preview only their own posts — so caching it would let
+ * one editor's session decide what another one sees.
  */
-export async function getPageBySlug(
+export function getPostBySlug(
+  slug: string,
+  options: { draft?: boolean; user?: PreviewUser | null } = {},
+): Promise<PostDetail | null> {
+  return options.draft
+    ? readPostBySlug(slug, options)
+    : getPublishedPostBySlug(slug)
+}
+
+/**
+ * What to read after a piece: other posts under the same tags, newest first,
+ * topped up with recent posts when a tag is too thin to fill the row.
+ *
+ * Both halves exclude the piece being read, and the top-up excludes whatever
+ * the tag match already found, so the three are always distinct.
+ */
+async function readRelatedPosts(
+  slug: string,
+  tagSlugs: string[],
+  limit = 3,
+): Promise<PostCard[]> {
+  try {
+    const payload = await getPayloadClient()
+    const notThisPost: Where = { slug: { not_equals: slug } }
+
+    const byTag =
+      tagSlugs.length > 0
+        ? await payload.find({
+            collection: 'posts',
+            overrideAccess: true,
+            depth: 1,
+            limit,
+            sort: '-publishedAt',
+            where: {
+              and: [published, notThisPost, { 'tags.slug': { in: tagSlugs } }],
+            },
+          })
+        : { docs: [] }
+
+    const related = (byTag.docs as RawPost[])
+      .map(toPostCard)
+      .filter((p): p is PostCard => p !== null)
+
+    if (related.length >= limit) return related
+
+    const topUp = await payload.find({
+      collection: 'posts',
+      overrideAccess: true,
+      depth: 1,
+      limit: limit - related.length,
+      sort: '-publishedAt',
+      where: {
+        and: [
+          published,
+          notThisPost,
+          { slug: { not_in: related.map((p) => p.slug) } },
+        ],
+      },
+    })
+
+    return related.concat(
+      (topUp.docs as RawPost[])
+        .map(toPostCard)
+        .filter((p): p is PostCard => p !== null),
+    )
+  } catch {
+    return []
+  }
+}
+
+export const getRelatedPosts = cachedRead('related-posts', readRelatedPosts, [
+  CONTENT_TAGS.posts,
+  CONTENT_TAGS.tags,
+  CONTENT_TAGS.media,
+])
+
+async function readPageBySlug(
   slug: string,
   options: { draft?: boolean; user?: PreviewUser | null } = {},
 ): Promise<PageDetail | null> {
@@ -456,7 +572,28 @@ export async function getPageBySlug(
   }
 }
 
-async function getArchive(
+const getPublishedPageBySlug = cachedRead(
+  'page-by-slug',
+  (slug: string) => readPageBySlug(slug),
+  [CONTENT_TAGS.pages, CONTENT_TAGS.media],
+)
+
+/**
+ * A page by slug. By default only a published page is returned; pass
+ * `draft: true` (gated behind the /api/preview route) to fetch the latest
+ * draft version regardless of status. As with posts, only the public read is
+ * cached, because a draft read carries the editor's own access.
+ */
+export function getPageBySlug(
+  slug: string,
+  options: { draft?: boolean; user?: PreviewUser | null } = {},
+): Promise<PageDetail | null> {
+  return options.draft
+    ? readPageBySlug(slug, options)
+    : getPublishedPageBySlug(slug)
+}
+
+async function readArchive(
   collection: 'tags' | 'authors',
   slug: string,
   relationField: 'tags' | 'authors',
@@ -502,6 +639,13 @@ async function getArchive(
   }
 }
 
+const getArchive = cachedRead('archive', readArchive, [
+  CONTENT_TAGS.posts,
+  CONTENT_TAGS.tags,
+  CONTENT_TAGS.authors,
+  CONTENT_TAGS.media,
+])
+
 /** Posts filed under a tag, plus the tag's own metadata. */
 export function getPostsByTag(slug: string): Promise<Archive | null> {
   return getArchive('tags', slug, 'tags')
@@ -512,7 +656,9 @@ export function getPostsByAuthor(slug: string): Promise<Archive | null> {
   return getArchive('authors', slug, 'authors')
 }
 
-async function getSlugRefs(collection: 'tags' | 'authors'): Promise<SlugRef[]> {
+async function readSlugRefs(
+  collection: 'tags' | 'authors',
+): Promise<SlugRef[]> {
   try {
     const payload = await getPayloadClient()
     const result = await payload.find({
@@ -530,6 +676,11 @@ async function getSlugRefs(collection: 'tags' | 'authors'): Promise<SlugRef[]> {
     return []
   }
 }
+
+const getSlugRefs = cachedRead('slug-refs', readSlugRefs, [
+  CONTENT_TAGS.tags,
+  CONTENT_TAGS.authors,
+])
 
 /** All tag slugs (for the sitemap). */
 export function getTagSlugs(): Promise<SlugRef[]> {
@@ -550,7 +701,7 @@ export type TopicCard = {
   image: MediaImage | null
 }
 
-export async function getTagsWithCounts(limit = 6): Promise<TopicCard[]> {
+async function readTagsWithCounts(limit = 6): Promise<TopicCard[]> {
   try {
     const payload = await getPayloadClient()
     const tags = await payload.find({
@@ -592,3 +743,9 @@ export async function getTagsWithCounts(limit = 6): Promise<TopicCard[]> {
     return []
   }
 }
+
+export const getTagsWithCounts = cachedRead(
+  'tags-with-counts',
+  readTagsWithCounts,
+  [CONTENT_TAGS.posts, CONTENT_TAGS.tags, CONTENT_TAGS.media],
+)

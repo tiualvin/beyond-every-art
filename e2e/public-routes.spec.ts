@@ -25,10 +25,7 @@ test.describe('representative public journeys', () => {
     await page.goto('/journal')
 
     await expect(
-      page.getByRole('heading', {
-        level: 1,
-        name: 'Every story, newest first',
-      }),
+      page.getByRole('heading', { level: 1, name: 'Journal' }),
     ).toBeVisible()
     await page.getByRole('link', { name: fixtures.publicPost.title }).click()
     await expect(page).toHaveURL(new RegExp(`/${fixtures.publicPost.slug}/?$`))
