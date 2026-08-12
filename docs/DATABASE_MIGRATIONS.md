@@ -47,6 +47,27 @@ in the output before reporting success, retries up to three times when they are
 missing, and passes a genuine non-zero exit straight through. It wraps the
 script rather than the CI step so the release migrator container is covered too.
 
+**`migrate:db:create` has the same fault and no wrapper.** It is the same
+entry point, so it too can exit 0 having generated nothing — no file written,
+no error, nothing in the output to distinguish it from a run that found no
+changes. Seen while adding `media.aiGenerated`: the command printed its two
+banner lines and stopped. Unlike `migrate:db` this fails quietly rather than
+loudly, because the missing migration only surfaces later, in CI's drift check
+or on a deploy against a schema that never got the column.
+
+If it produces no file for a change you know you made, use the alternate entry
+point the wrapper falls back to — Node registers the loader before any of the
+CLI's own code runs, so there is nothing to stall:
+
+```bash
+node --import tsx node_modules/payload/bin.js migrate:create <name> \
+  --disable-transpile --skip-empty
+```
+
+Wrapping this script the way `migrate:db` is wrapped is worth doing; the marker
+to require is `Migration created at`, or a clean exit with `--skip-empty` and
+genuinely no schema change.
+
 ## Changing the schema
 
 1. Edit the collection, global, or field.

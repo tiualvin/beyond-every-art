@@ -86,6 +86,17 @@ field needs a generated migration committed with it
 schema. Schema commands are `migrate:db*`; the unprefixed `migrate:*` scripts
 are the Ghost content migration and are unrelated.
 
+Two things that are easy to miss:
+
+- `migrate:db:create` can exit 0 having written nothing, the same CLI stall
+  `scripts/run-migrations.mjs` exists to defeat for `migrate:db` — and there is
+  no wrapper on the create side. Check that a file appeared before assuming
+  there was nothing to generate; `docs/DATABASE_MIGRATIONS.md` has the
+  fallback command.
+- Adding a **custom MCP tool is a schema change.** The plugin generates a
+  per-key capability column for each one, so a new tool in `lib/mcp/tools.ts`
+  needs a migration exactly as a new field does.
+
 ## Security and repository hygiene
 
 Never commit:

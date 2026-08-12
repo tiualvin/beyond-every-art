@@ -81,6 +81,44 @@ Related: [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md),
     `app` container `localhost` is its own loopback, not the `postgres`
     container. Fixed by pointing it at the `postgres` service hostname
     instead (`.env` only, not a code change).
+- **Pre-launch frontend, caching, and MCP images** (#70, #71, #72 — all merged
+  and deployed to staging). What changed, and the decisions behind it, so they
+  do not get re-argued:
+  - **Members-only and paid posts are teasers, not 404s.** They had been
+    filtered out of every query, so a post that imported cleanly then vanished
+    from the archive, tags, search, feed and sitemap, and its URL 404'd — while
+    Ghost serves the same posts as an indexed public teaser. They are now
+    listed and routed like any post; `toPostDetail` replaces the body with its
+    opening paragraphs and the rest never enters the response. The gate says
+    membership is _coming_ rather than promising a paywall, because there is no
+    sign-in and the paid plan has no checkout. Revisit the copy when either
+    exists. See [`ACCOUNT_MODEL.md`](ACCOUNT_MODEL.md).
+  - **`/journal` and `/tag/*` follow the approved prototypes**: month groups
+    against a sticky date rail, the journal's topic filter (filtering the page
+    it is on, as the prototype does), the topic page's pigment-stained head and
+    sibling topics. The article page gained the author card and read-next. The
+    specimen card is deliberately not ported — `Posts` has no fields for it.
+  - **Reads are cached, routes are not.** Database reads go through tagged
+    `unstable_cache` entries with a ten-minute backstop, purged by Payload
+    hooks on write (`lib/cache/content.ts`). The routes stay `force-dynamic`
+    **on purpose**: they resolve `NEXT_PUBLIC_SITE_URL` at render time for
+    canonical URLs, feeds and JSON-LD, and the image is built without that
+    variable, so statically rendering them would bake `localhost` into all of
+    it and the cutover env change would not fix it. Measured: a topic page cost
+    8 queries and now costs 8 cold, 0 warm. Full-route caching is available
+    later by passing the site URL in as a build arg — that is the unlock, not a
+    code change.
+  - **Imported bodies no longer print their title twice.** `toBodyHtml` drops a
+    leading `h1`–`h3` matching the document title. Render-time only;
+    `legacyHTML` keeps the heading, so it is reversible by deleting the call.
+  - **`uploadMedia` over MCP**, with a new indexed `media.aiGenerated` flag set
+    by default on that path — see item 0.5 and [`MCP_SERVER.md`](MCP_SERVER.md).
+  - Two pre-existing defects fixed on the way: `ScrollHeader` rendered the
+    whole masthead a second time as its scroll spacer (two of every control,
+    duplicate element ids, and two subscribe modals portalled to `body` past
+    80px of scroll), and the homepage topic swatches put their labels off the
+    pigment on phones, which made a pale pigment's dark ink invisible against
+    the dark card.
 
 ## Not done yet
 
@@ -124,18 +162,53 @@ above) and Payload Admin loads there. Still needed: set `MCP_ENABLED=1`,
 create an editor-bound key in Payload Admin under MCP → API Keys, and add it
 to the Claude connector. See [`MCP_SERVER.md`](MCP_SERVER.md).
 
+When creating the key, **tick the capability checkboxes**. They default off,
+and a key with none ticked still authenticates and still lists the custom
+tools — so the failure looks like the generated CRUD tools not existing rather
+than like a permissions problem. For the write-an-illustrated-draft loop, tick
+`uploadMedia`, `posts.find` and `posts.update`.
+
+That loop is `draftArticle` → `uploadMedia` → `updatePosts` setting the
+returned id as `featuredImage`, and it works on **drafts only**. Payload sends
+a document's existing `_status` with every update, so an editor-bound key
+touching a published post trips `refuseMcpPublish`. That is the guard working
+as intended, not a bug to route around.
+
+0.6. **Count the non-public posts (one query, still unanswered).** The teaser
+work in #70 shipped without anyone knowing how much content it applies to —
+the number could not be read from this environment. Run it against the staging
+or production database:
+
+```sql
+SELECT visibility, _status, count(*) FROM posts GROUP BY 1,2 ORDER BY 1,2;
+```
+
+It decides real things. If members-only and paid posts are a large share of
+the 117, the gate is a big part of the archive and sign-in becomes urgent; if
+it is three posts, publishing them outright and deleting the gate is a
+reasonable alternative. The teaser path is correct either way — this is about
+knowing what was recovered from 404, not about whether the change was right.
+
 1. **Members CSV.** Not included in the site archive already checked. Export
    separately from Ghost Admin (Members → Settings → Export all members)
    before migrating member records and Stripe IDs.
-2. **Stripe webhook takeover.** Required before Ghost is cancelled — see
-   `CUTOVER_RUNBOOK.md`'s "Paid subscriptions in Stripe" checklist and
-   `SUBSCRIPTION_WEBHOOKS.md`. Not started.
-3. **VPS security hardening**, found while debugging the deploy key:
-   - Root SSH login currently accepts **password** authentication, not just
-     keys. Disable `PasswordAuthentication` in `sshd_config` once key-based
-     login is confirmed working for every account that needs access.
-   - The deploy SSH user (`VPS_USER`) is currently `root`. Consider a
-     dedicated low-privilege deploy user in the `docker` group instead.
+
+1.5. **Sign-in, so the gate can open.** `lib/billing` reconciles Stripe
+webhooks into `Members`, but nothing authenticates a member, so a paying
+subscriber still cannot read what they pay for and the membership gate can
+only promise. This is the largest open piece and the one with real design
+questions — magic link versus password, session handling, how `Members`
+relates to `Users`. Worth scoping before building, and worth having the
+regression net (item 6) in place first. 2. **Stripe webhook takeover.** Required before Ghost is cancelled — see
+`CUTOVER_RUNBOOK.md`'s "Paid subscriptions in Stripe" checklist and
+`SUBSCRIPTION_WEBHOOKS.md`. Not started. 3. **VPS security hardening**, found while debugging the deploy key:
+
+- Root SSH login currently accepts **password** authentication, not just
+  keys. Disable `PasswordAuthentication` in `sshd_config` once key-based
+  login is confirmed working for every account that needs access.
+- The deploy SSH user (`VPS_USER`) is currently `root`. Consider a
+  dedicated low-privilege deploy user in the `docker` group instead.
+
 4. **Docker image/layer cleanup (operator action).** Nothing automatically
    prunes old images or layers on the VPS. That is intentional: an unattended
    prune can remove rollback material and consume I/O at the worst time.
@@ -146,7 +219,22 @@ to the Claude connector. See [`MCP_SERVER.md`](MCP_SERVER.md).
    `backup-image`, and `app-image` jobs and disallow bypasses appropriate to
    the team. The workflow does not mutate repository protection rules or infer
    who should have bypass authority.
-6. **Lower priority / only if needed later:**
+6. **A visual regression net in CI.** Three real defects — the duplicated
+   masthead, the off-pigment swatch labels, a missing entrance animation —
+   each passed lint, typecheck, the unit suite and the existing browser suite,
+   and were only caught by measuring geometry in a real browser. The
+   `browser-smoke` job could assert a few invariants cheaply: no horizontal
+   overflow at three widths, no text rendered outside the background it was
+   coloured for, one `h1` per page. Not screenshot diffing, which is noisy —
+   just the handful of assertions that would have caught these.
+
+7. **Lower priority / only if needed later:**
+   - Wrap `migrate:db:create` the way `migrate:db` is wrapped; it shares the
+     CLI stall and fails silently. See
+     [`DATABASE_MIGRATIONS.md`](DATABASE_MIGRATIONS.md).
+   - Pass `NEXT_PUBLIC_SITE_URL` into the Docker build so the homepage, tag and
+     author pages can be statically rendered with on-demand purging. The data
+     cache already removes the database cost; this removes the render.
    - Move the image build off the production VPS (build in CI, push to a
      registry, VPS just pulls) if frequent merges start causing noticeable
      CPU contention with live traffic during the ~2–3 minute build window.
