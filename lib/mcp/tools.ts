@@ -1,10 +1,10 @@
-// Custom MCP tools for drafting.
+// Custom MCP tools for drafting and illustrating.
 //
 // The plugin's generated CRUD tools are enough to read and edit documents, but
 // not to write one: they expose `content` as raw Lexical editor state (see
-// `markdown.ts`) and `ghostID` as a required field. These three tools close
-// both gaps, so an agent's job is to write the article rather than to satisfy
-// the schema.
+// `markdown.ts`) and `ghostID` as a required field. Nor can they carry a file,
+// so an image has no way in at all. These tools close both gaps, so an agent's
+// job is to write and illustrate the article rather than to satisfy the schema.
 //
 // `@payloadcms/plugin-mcp@3.86.0` has no `defineTool` helper — that is a later
 // API than the release this project pins — so tools are declared as plain
@@ -21,6 +21,7 @@ import {
   markdownToLexical,
   type MarkdownCollection,
 } from './markdown'
+import { decodeImageUpload } from './upload'
 
 type McpTool = NonNullable<NonNullable<MCPPluginConfig['mcp']>['tools']>[number]
 
@@ -287,6 +288,99 @@ export const mcpTools: McpTool[] = [
     parameters: {
       markdown: z.string().describe('The replacement body, in Markdown.'),
       ...targetShape,
+    },
+  },
+  {
+    description:
+      'Upload an image to the Media library from base64 and return its id, ' +
+      "for use as a post's featuredImage via `updatePosts`. Accepts PNG, " +
+      'JPEG and WebP up to 8MB; SVG is refused. Images are marked as ' +
+      'generated unless told otherwise, so the archive stays auditable. ' +
+      '`alt` is required and should describe what the image shows, not that ' +
+      'it is an illustration.',
+    handler: async (args: Record<string, unknown>, req: PayloadRequest) => {
+      const {
+        aiGenerated = true,
+        alt,
+        base64,
+        caption,
+        credit,
+        filename,
+      } = args as {
+        aiGenerated?: boolean
+        alt: string
+        base64: string
+        caption?: string
+        credit?: string
+        filename?: string
+      }
+
+      const file = decodeImageUpload({ base64, filename: filename ?? alt })
+
+      const created = await req.payload.create({
+        collection: 'media',
+        data: { aiGenerated, alt, caption, credit },
+        file,
+        // The key's own user, under the collection's `editorsAndAdmins` create
+        // rule — an agent cannot upload anything a person with that key could
+        // not upload through the admin panel.
+        overrideAccess: false,
+        req,
+        user: req.user as TypedUser,
+      })
+
+      return text({
+        aiGenerated: created.aiGenerated ?? false,
+        alt: created.alt,
+        filename: created.filename,
+        id: created.id,
+        mimetype: file.mimetype,
+        sizeBytes: file.size,
+        url: created.url,
+      })
+    },
+    name: 'uploadMedia',
+    parameters: {
+      aiGenerated: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether the image was generated rather than photographed or drawn. ' +
+            'Defaults to true, which is the safe assumption on this path: an ' +
+            'unmarked generated image is the failure worth avoiding. Pass ' +
+            'false only when relaying a real photograph of a real work.',
+        ),
+      alt: z
+        .string()
+        .min(1)
+        .describe(
+          'Alternative text describing what the image shows. Required.',
+        ),
+      base64: z
+        .string()
+        .min(1)
+        .describe(
+          'The image file as base64, optionally as a data: URL. PNG, JPEG or ' +
+            'WebP.',
+        ),
+      caption: z
+        .string()
+        .optional()
+        .describe('Caption shown under the image, when it has one.'),
+      credit: z
+        .string()
+        .optional()
+        .describe(
+          'Credit line shown after the caption. Say where a generated image ' +
+            'came from here, so a reader sees it and not just an editor.',
+        ),
+      filename: z
+        .string()
+        .optional()
+        .describe(
+          'Preferred filename. Sanitised, and its extension is replaced with ' +
+            'the real format. Defaults to something derived from the alt text.',
+        ),
     },
   },
 ]
