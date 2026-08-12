@@ -47,7 +47,9 @@ export const mcpPluginConfig: MCPPluginConfig = {
     },
     media: {
       description:
-        'Images. Read-only over MCP; uploads go through the admin panel.',
+        'Images. Use `uploadMedia` to add one — the generated create tool ' +
+        'cannot carry a file, so a document made through it would have no ' +
+        'image attached. Editing and deleting stay in the admin panel.',
       enabled: { find: true },
     },
     posts: {

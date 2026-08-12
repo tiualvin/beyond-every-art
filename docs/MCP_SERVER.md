@@ -54,6 +54,49 @@ Written for this project, because the generated ones cannot do the job:
 | `draftArticle`          | Creates a post from Markdown, always as a draft. Mints the `ghostID`, resolves tag and author slugs, refuses unknown ones.             |
 | `readArticleMarkdown`   | Reads a post back as Markdown, including the draft body. Says so plainly when the document renders from migrated `legacyHTML` instead. |
 | `updateArticleMarkdown` | Replaces a body from Markdown, saved as a draft.                                                                                       |
+| `uploadMedia`           | Adds an image to the Media library from base64 and returns its id, for `updatePosts` to set as a `featuredImage`.                      |
+
+### Images
+
+The generated `createMedia` tool cannot carry a file, so a Media document made
+through it would have no image attached. `uploadMedia` takes the bytes directly:
+the agent sends base64 — a data: URL is accepted — along with the `alt` text the
+collection requires.
+
+Nothing the caller says about the bytes is trusted. The format is read from the
+file's own leading bytes rather than from a claimed MIME type or a filename
+extension, the size is checked before the string is decoded so a long string
+cannot make the server allocate against it, and the filename is rebuilt from
+scratch so it cannot climb out of the media directory. PNG, JPEG and WebP are
+accepted, to 8MB.
+
+**SVG is refused.** `Media` itself allows `image/*`, which includes it, but an
+SVG is a document that can carry script, and one served from the media host
+would be a stored cross-site scripting vector. No image generator emits SVG, so
+nothing is lost on this path; uploading one through the admin panel, where a
+person chose the file, is unchanged.
+
+Uploading is one call; attaching is the next one. `uploadMedia` returns the new
+document's id, and `updatePosts` sets it as `featuredImage`.
+
+That second call only works on a **draft**. Payload sends a document's existing
+`_status` with every update, so an editor-bound key updating an already
+published post trips `refuseMcpPublish` — the write carries
+`_status: 'published'` even though it is not changing it, and the guard cannot
+tell the difference. This is the guard working rather than a bug to route
+around: an agent that could edit live articles is the thing it exists to
+prevent, and illustrating one is still an edit to something readers are
+looking at. Illustrate drafts over MCP; change a published article in the admin
+panel.
+
+Uploads are marked `aiGenerated` unless the call says otherwise. This
+publication writes about specific works and materials, so which pictures are
+synthetic has to stay an answerable question — the field is indexed and
+filterable in the admin panel. Default-true is the deliberate direction to fail
+in: an image wrongly marked as generated is a nuisance, one wrongly marked as a
+photograph is a false claim about a work of art. Set `credit` as well when the
+distinction should reach the reader rather than only an editor, because that is
+the line the article page actually renders.
 
 ### Publishing, and one sharp edge
 

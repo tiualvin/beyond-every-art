@@ -24,6 +24,19 @@ export const Media: CollectionConfig = {
     { name: 'alt', type: 'text', required: true },
     { name: 'caption', type: 'textarea' },
     { name: 'credit', type: 'text' },
+    {
+      name: 'aiGenerated',
+      type: 'checkbox',
+      defaultValue: false,
+      index: true,
+      admin: {
+        description:
+          'Set when the image was generated rather than photographed or ' +
+          'drawn. This publication writes about specific works and materials, ' +
+          'so which pictures are synthetic is a question that has to stay ' +
+          'answerable — filter on this to find them.',
+      },
+    },
     { name: 'ghostURL', type: 'text', unique: true, index: true },
     {
       name: 'migrationStatus',
