@@ -1856,6 +1856,193 @@ img {
   color: var(--color-muted);
 }
 
+/* --- Author card and read next ------------------------------------------ */
+
+.author-card {
+  display: flex;
+  gap: 1.25rem;
+  align-items: flex-start;
+  margin-top: 2.5rem;
+  padding: 1.5rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+}
+
+.author-card__avatar {
+  position: relative;
+  display: block;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.author-card h3 {
+  font-size: 1.15rem;
+  margin-bottom: 0.35rem;
+}
+
+.author-card p {
+  margin: 0 0 0.6rem;
+  font-size: 0.9rem;
+  color: var(--color-muted);
+}
+
+.author-card__link {
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--color-burgundy);
+}
+
+.read-next {
+  border-top: 1px solid var(--color-line);
+  background: var(--color-surface);
+  padding: clamp(3rem, 7vw, 5rem) 0;
+}
+
+.read-next__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--color-rule);
+}
+
+.read-next__head h2 {
+  font-size: clamp(1.6rem, 3vw, 2.2rem);
+}
+
+.read-next__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  /* Five rows, one per child: plate, kicker, title, excerpt, meta. Fewer rows
+     than children silently stacks the overflow onto the last row. */
+  grid-template-rows: repeat(5, auto);
+  column-gap: clamp(1.5rem, 3vw, 2.5rem);
+  row-gap: 0;
+  margin-top: 2.5rem;
+}
+
+.read-next__item {
+  display: grid;
+  grid-row: span 5;
+  grid-template-rows: subgrid;
+  align-content: start;
+}
+
+.read-next__plate {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: var(--radius);
+  margin-bottom: 1rem;
+  background: var(--color-paper);
+}
+
+.read-next__item h3 {
+  font-size: 1.2rem;
+  margin: 0.6rem 0 0.5rem;
+  letter-spacing: -0.02em;
+}
+
+.read-next__item:hover h3 {
+  color: var(--color-burgundy);
+}
+
+.read-next__item p {
+  margin: 0 0 0.6rem;
+  font-size: 0.88rem;
+  color: var(--color-muted);
+}
+
+.read-next__meta {
+  font-size: 0.76rem;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 64rem) {
+  .read-next__grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 46rem) {
+  .read-next__grid {
+    grid-template-columns: 1fr;
+    row-gap: 2rem;
+  }
+
+  /* One column: there is nothing left to line up, and subgrid would hold
+     empty rows open where a card has no excerpt. */
+  .read-next__item {
+    display: block;
+  }
+
+  .author-card {
+    flex-direction: column;
+    gap: 1rem;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .read-next__item h3 {
+    transition: color 0.2s ease;
+  }
+}
+
+/* --- Membership gate (members-only and subscriber-only posts) ------------ */
+
+/* The teaser is a whole number of paragraphs, so it ends on a clean line
+   rather than mid-sentence. The fade says "this continues" where the cut
+   itself would otherwise read as the end of a very short piece. */
+.prose--teaser {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    #000 60%,
+    color-mix(in srgb, #000 12%, transparent)
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    #000 60%,
+    color-mix(in srgb, #000 12%, transparent)
+  );
+}
+
+.gate {
+  margin-top: 2rem;
+  padding: 2.25rem 1.75rem;
+  text-align: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-top: 2px solid var(--color-rule);
+  border-radius: var(--radius);
+}
+
+.gate__title {
+  font-size: 1.6rem;
+  margin: 0.4rem 0 0;
+}
+
+.gate__body {
+  margin: 0.9rem auto 1.5rem;
+  max-width: 34rem;
+  color: var(--color-muted);
+  line-height: 1.7;
+}
+
+.gate__small {
+  margin: 0.9rem 0 0;
+  font-size: 0.8rem;
+  color: var(--color-muted);
+}
+
 .article__tags {
   margin-top: 3rem;
   padding-top: 1.5rem;
@@ -1885,7 +2072,13 @@ img {
   text-decoration: none;
 }
 
-/* --- Archive ------------------------------------------------------------ */
+/* --- Archive (journal and topic pages) ---------------------------------- */
+
+.archive {
+  /* The first group's own rule opens the list, so no header rule here. */
+  padding-top: clamp(1.5rem, 4vw, 3rem);
+  padding-bottom: clamp(3rem, 7vw, 5rem);
+}
 
 .archive__head {
   margin-bottom: 2.5rem;
@@ -1895,6 +2088,377 @@ img {
 .archive__head h1 {
   font-size: clamp(1.9rem, 4vw, 2.8rem);
   margin-top: 0.4rem;
+}
+
+/* The journal's head runs the full measure and is closed by a rule; the author
+   and search heads above stay narrow. */
+.archive__head--wide {
+  max-width: none;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--color-rule);
+}
+
+/* Qualified by the element so it outranks `.archive__head h1`, which would
+   otherwise hold the journal title down to the smaller archive size. */
+h1.archive__title {
+  font-size: clamp(2.6rem, 6.5vw, 4.5rem);
+  letter-spacing: -0.032em;
+  margin: 0.4rem 0 1rem;
+}
+
+.archive__intro {
+  margin: 0;
+  color: var(--color-muted);
+  max-width: 46ch;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 1.25rem;
+  padding-bottom: 1rem;
+}
+
+.toolbar__status {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--color-ink);
+  background: none;
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  padding: 0.5rem 0.95rem;
+  cursor: pointer;
+}
+
+.filter-toggle:hover,
+.filter-toggle[aria-expanded='true'] {
+  border-color: var(--color-ink);
+}
+
+.filter-toggle__badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: var(--color-burgundy);
+  color: var(--color-on-dark);
+  font-size: 0.66rem;
+}
+
+.filter-pane {
+  padding: 1.35rem 1.5rem 1.15rem;
+  margin-bottom: 0.5rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+}
+
+.filter-pane[hidden] {
+  display: none;
+}
+
+.filter-pane__set {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.filter-pane__set legend {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-weight: 600;
+  color: var(--color-muted);
+  padding: 0;
+  margin-bottom: 0.6rem;
+}
+
+.filter-pane__options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.15rem 1.5rem;
+}
+
+.filter-option {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.88rem;
+  cursor: pointer;
+  padding: 0.3rem 0;
+}
+
+.filter-option input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--color-burgundy);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+/* The ring carries the pale pigments — Lead White on paper is otherwise a dot
+   you cannot see. */
+.filter-option i {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(27, 23, 20, 0.38);
+}
+
+.filter-option__count {
+  margin-left: auto;
+  font-size: 0.76rem;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.filter-pane__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-line);
+}
+
+.filter-clear {
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--color-muted);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.filter-clear:hover {
+  color: var(--color-burgundy);
+}
+
+.archive__empty {
+  margin: 3rem 0 0;
+  padding: 2.5rem 0;
+  border-top: 1px solid var(--color-line);
+  border-bottom: 1px solid var(--color-line);
+  text-align: center;
+  color: var(--color-muted);
+}
+
+.archive__empty .filter-clear {
+  margin-left: 0.4rem;
+}
+
+/* Grouped entries. The date rail is the structure: an archive's one true
+   organising fact is when things were published. */
+.group {
+  display: grid;
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  column-gap: 2.5rem;
+  margin-top: 3rem;
+}
+
+.group__label {
+  grid-column: 1;
+  position: sticky;
+  /* Clears the fixed masthead, which is 3.5rem plus its own shadow. */
+  top: 5.25rem;
+  align-self: start;
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-weight: 600;
+  color: var(--color-muted);
+  padding-top: 1.4rem;
+}
+
+.group__items {
+  grid-column: 2;
+}
+
+/* Rows are separated by their own bottom rule, so a group needs one more at
+   the top to be closed rather than to trail off into the month above. */
+.group__items > .entry:first-child {
+  border-top: 1px solid var(--color-line);
+}
+
+@media (max-width: 56rem) {
+  .group {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .group__label {
+    grid-column: 1;
+    position: static;
+    margin-bottom: 0.5rem;
+    padding-top: 1rem;
+  }
+
+  .group__items {
+    grid-column: 1;
+  }
+}
+
+/* --- Topic masthead and sibling topics ----------------------------------- */
+
+.topic-head {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding-top: clamp(2.5rem, 6vw, 5rem);
+  padding-bottom: clamp(2rem, 5vw, 3.5rem);
+}
+
+/* A wash of the topic's own pigment. The prototype paints this on canvas from
+   the same palette; a gradient reaches the same tonal effect without shipping
+   a second painter or waiting on hydration to show a page header. */
+.topic-head__wash {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background:
+    radial-gradient(
+      120% 90% at 72% 18%,
+      color-mix(in srgb, var(--pigment) 62%, transparent) 0%,
+      transparent 68%
+    ),
+    radial-gradient(
+      80% 70% at 22% 82%,
+      color-mix(in srgb, var(--pigment) 34%, transparent) 0%,
+      transparent 72%
+    );
+}
+
+.topic-head__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  /* Clears the lower band of the head so the description always lands on
+     paper rather than in the deepest part of the wash. */
+  background:
+    linear-gradient(
+      to bottom,
+      transparent 0%,
+      transparent 42%,
+      color-mix(in srgb, var(--color-paper) 82%, transparent) 68%,
+      var(--color-paper) 88%
+    ),
+    linear-gradient(
+      to right,
+      color-mix(in srgb, var(--color-paper) 55%, transparent) 0%,
+      transparent 42%
+    );
+}
+
+.topic-head__crumb {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--color-muted);
+  margin: 0 0 1.25rem;
+}
+
+.topic-head__crumb a:hover {
+  color: var(--color-ink);
+}
+
+.topic-head__kicker {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin: 0 0 0.9rem;
+}
+
+.topic-head__swatch {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(27, 23, 20, 0.35);
+}
+
+/* Sibling topics, so a tag page is a place to move on from rather than a dead
+   end. */
+.related {
+  border-top: 1px solid var(--color-line);
+  padding: clamp(2.5rem, 5vw, 3.5rem) 0;
+}
+
+.related__label {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-weight: 600;
+  color: var(--color-muted);
+  margin: 0 0 1rem;
+}
+
+.related__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+  color: var(--color-muted);
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  padding: 0.4rem 0.85rem;
+}
+
+.chip i {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(27, 23, 20, 0.38);
+}
+
+.chip:hover {
+  color: var(--color-ink);
+  border-color: var(--color-ink);
+}
+
+.chip__count {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.6;
 }
 
 /* Three slots so the status stays centered even when only one link exists. */

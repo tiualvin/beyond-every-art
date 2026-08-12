@@ -3,6 +3,9 @@ import { NextResponse } from 'next/server'
 import { searchPosts } from '@/lib/content/queries'
 import { postPath } from '@/lib/seo/site'
 
+// Rendered per request so canonical URLs, feeds and JSON-LD come from the
+// running container's environment rather than the build's; the database reads
+// behind it are cached and purged on publish (lib/cache/content.ts).
 export const dynamic = 'force-dynamic'
 
 const LIMIT = 8
@@ -13,8 +16,9 @@ const LIMIT = 8
  * The drawer needs to answer while someone is still typing, which a page
  * navigation cannot do. It reuses `searchPosts` rather than building a second
  * index, so the drawer and `/search` always agree — including the published
- * and public filters, which is what keeps drafts and members-only pieces from
- * surfacing here.
+ * filter, which is what keeps drafts from surfacing here. Members-only pieces
+ * are findable, as they are on the rest of the site; each result carries only
+ * the title and excerpt.
  */
 export async function GET(request: Request) {
   const query = new URL(request.url).searchParams.get('q')?.trim() ?? ''
@@ -28,7 +32,7 @@ export async function GET(request: Request) {
         title: post.title,
         excerpt: post.excerpt,
         href: postPath(post.slug),
-        tag: post.tag,
+        tag: post.tags[0]?.name ?? null,
         readingTime: post.readingTime,
       })),
     },

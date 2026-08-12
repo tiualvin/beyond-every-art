@@ -20,6 +20,7 @@ import { SEARCH_PATH } from '@/lib/seo/site'
 
 import { editorial, quick } from './motion/variants'
 import { SearchIcon } from './icons'
+import { SUBSCRIBE_EVENT } from './subscribe-signal'
 
 type Overlay = 'menu' | 'search' | 'subscribe' | null
 
@@ -46,6 +47,13 @@ export function SiteChrome({ links, cta }: { links: NavLink[]; cta: NavLink }) {
 
   // A link inside an overlay navigates; the overlay must not survive it.
   useEffect(() => setOverlay(null), [pathname])
+
+  // The membership gate on a restricted post opens this same modal.
+  useEffect(() => {
+    const open = () => setOverlay('subscribe')
+    window.addEventListener(SUBSCRIBE_EVENT, open)
+    return () => window.removeEventListener(SUBSCRIBE_EVENT, open)
+  }, [])
 
   useEffect(() => {
     if (!overlay) return

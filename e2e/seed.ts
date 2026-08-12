@@ -113,20 +113,39 @@ async function seed(): Promise<void> {
     ghostID: 'e2e-draft-post',
   })
 
+  // The opening paragraph is deliberately longer than the teaser allowance, so
+  // the second paragraph is always the withheld part no matter where the cut
+  // lands. Both markers are distinctive enough to assert on anywhere.
   await upsertPost(payload, fixtures.privatePost.slug, {
     title: fixtures.privatePost.title,
     slug: fixtures.privatePost.slug,
-    excerpt: 'Synthetic member content that must never appear publicly.',
+    excerpt: 'Synthetic member content whose body is gated, not hidden.',
     legacyHTML:
-      '<p>This article remains available only to editorial staff.</p>',
+      `<p>${fixtures.privatePost.teaserMarker}. Conservation notes open with a long passage about surface cleaning, consolidation, and the way a varnish yellows over the course of a century, written at length so that this opening paragraph on its own carries the teaser past the point where the rest of the body is withheld from a reader who is not yet a member, which is exactly the boundary that these browser tests exist to hold in place across the archive, the feed, the search results, and the post page itself.</p>` +
+      `<p>${fixtures.privatePost.gatedMarker}.</p>`,
     visibility: 'members',
     publishedAt: '2025-02-01T09:00:00.000Z',
     _status: 'published',
     ghostID: 'e2e-private-post',
   })
 
+  await upsertPost(payload, fixtures.duplicateTitlePost.slug, {
+    title: fixtures.duplicateTitlePost.title,
+    slug: fixtures.duplicateTitlePost.slug,
+    excerpt: 'Synthetic post whose imported body repeats its own title.',
+    legacyHTML:
+      `<h1>${fixtures.duplicateTitlePost.title}</h1>` +
+      '<p>The heading above came from Ghost and must not reach the page.</p>',
+    visibility: 'public',
+    publishedAt: '2025-02-02T09:00:00.000Z',
+    _status: 'published',
+    ghostID: 'e2e-duplicate-title-post',
+  })
+
   await upsertRedirect(payload)
-  payload.logger.info('E2E seed complete: draft, private post, and redirect.')
+  payload.logger.info(
+    'E2E seed complete: draft, members post, duplicate-title post, redirect.',
+  )
 }
 
 seed()

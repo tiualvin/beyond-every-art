@@ -10,6 +10,9 @@ import { FadeIn } from '../../components/motion/fade-in'
 import { StaggerChildren, StaggerItem } from '../../components/motion/stagger'
 import { StoryCard } from '../../components/story-card'
 
+// Rendered per request so canonical URLs, feeds and JSON-LD come from the
+// running container's environment rather than the build's; the database reads
+// behind it are cached and purged on publish (lib/cache/content.ts).
 export const dynamic = 'force-dynamic'
 
 type Params = { slug: string }

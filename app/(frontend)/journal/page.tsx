@@ -11,10 +11,12 @@ import {
 import { getPublishedPosts, getSiteSettings } from '@/lib/content/queries'
 import { absoluteUrl, getSiteUrl, JOURNAL_PATH } from '@/lib/seo/site'
 
+import { ArchiveFilter } from '../components/archive-filter'
 import { FadeIn } from '../components/motion/fade-in'
-import { StaggerChildren, StaggerItem } from '../components/motion/stagger'
-import { StoryCard } from '../components/story-card'
 
+// Rendered per request so canonical URLs, feeds and JSON-LD come from the
+// running container's environment rather than the build's; the database reads
+// behind it are cached and purged on publish (lib/cache/content.ts).
 export const dynamic = 'force-dynamic'
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>
@@ -64,26 +66,20 @@ export default async function JournalPage({
 
   return (
     <main>
-      <section className="section">
+      <section className="archive">
         <div className="container">
           <FadeIn>
-            <div className="archive__head">
-              <p className="eyebrow">Journal</p>
-              <h1>Every story, newest first</h1>
-              <p className="muted" style={{ maxWidth: '40rem' }}>
-                The full archive of writing on materials, art history, and
-                creative practice.
+            <div className="archive__head archive__head--wide">
+              <p className="eyebrow">The archive</p>
+              <h1 className="archive__title">Journal</h1>
+              <p className="archive__intro">
+                Everything published on materials, colour, technique, art
+                history, exhibitions, and conservation — newest first.
               </p>
             </div>
           </FadeIn>
 
-          <StaggerChildren className="card-grid">
-            {archive.posts.map((post) => (
-              <StaggerItem key={post.id}>
-                <StoryCard post={post} />
-              </StaggerItem>
-            ))}
-          </StaggerChildren>
+          <ArchiveFilter posts={archive.posts} />
 
           {pagination.totalPages > 1 && (
             <nav className="pagination" aria-label="Journal pages">

@@ -2,10 +2,11 @@ import Image from 'next/image'
 import Link from 'next/link'
 
 import type { MediaImage } from '@/lib/content/media'
-import type { PostDetail } from '@/lib/content/queries'
+import type { AuthorSummary, PostDetail } from '@/lib/content/queries'
 import { formatDate } from '@/lib/format'
-import { tagPath } from '@/lib/seo/site'
+import { authorPath, tagPath } from '@/lib/seo/site'
 
+import { MembershipGate } from './membership-gate'
 import { FadeIn } from './motion/fade-in'
 import { ShareRow } from './share-row'
 import { Reveal } from './motion/reveal'
@@ -15,6 +16,7 @@ const FIGURE_SIZES = '(max-width: 47rem) 100vw, 44rem'
 
 export function Article({ post }: { post: PostDetail }) {
   const primaryTag = post.tags[0]
+  const author = post.authors[0]
   const byline = [
     post.authors.map((a) => a.name).join(', '),
     formatDate(post.publishedAt),
@@ -60,12 +62,16 @@ export function Article({ post }: { post: PostDetail }) {
 
           {post.bodyHtml ? (
             <div
-              className="prose"
+              className={post.restricted ? 'prose prose--teaser' : 'prose'}
               dangerouslySetInnerHTML={{ __html: post.bodyHtml }}
             />
           ) : (
-            <p className="muted">This story has no body content yet.</p>
+            !post.restricted && (
+              <p className="muted">This story has no body content yet.</p>
+            )
           )}
+
+          {post.restricted && <MembershipGate visibility={post.visibility} />}
 
           {post.tags.length > 0 && (
             <Reveal>
@@ -82,9 +88,49 @@ export function Article({ post }: { post: PostDetail }) {
               </footer>
             </Reveal>
           )}
+
+          {author && (
+            <Reveal>
+              <AuthorCard author={author} />
+            </Reveal>
+          )}
         </div>
       </article>
     </main>
+  )
+}
+
+/**
+ * Who wrote the piece, below it.
+ *
+ * The rail byline from the prototype is not ported: the rail exists to hold
+ * the specimen card, which this content model has no fields for, and the share
+ * controls it also carried already sit in the article header.
+ */
+function AuthorCard({ author }: { author: AuthorSummary }) {
+  return (
+    <div className="author-card">
+      {author.image && (
+        <span className="author-card__avatar">
+          <Image
+            src={author.image.url}
+            alt=""
+            fill
+            sizes="3.5rem"
+            style={{ objectFit: 'cover' }}
+          />
+        </span>
+      )}
+      <div>
+        <h3>{author.name}</h3>
+        {author.bio && <p>{author.bio}</p>}
+        {author.slug && (
+          <Link href={authorPath(author.slug)} className="author-card__link">
+            All pieces by {author.name.split(' ')[0]} &rarr;
+          </Link>
+        )}
+      </div>
+    </div>
   )
 }
 

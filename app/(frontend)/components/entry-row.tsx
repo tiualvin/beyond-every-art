@@ -3,6 +3,7 @@ import Link from 'next/link'
 
 import type { PostCard } from '@/lib/content/queries'
 import { formatDate } from '@/lib/format'
+import { visibilityLabel } from '@/lib/membership'
 import { postPath } from '@/lib/seo/site'
 
 const THUMB_SIZES = '(max-width: 51rem) 4rem, 5.5rem'
@@ -14,8 +15,12 @@ const THUMB_SIZES = '(max-width: 51rem) 4rem, 5.5rem'
  * unlike a hover preview it works the same on touch as it does with a cursor.
  */
 export function EntryRow({ post }: { post: PostCard }) {
-  const meta = [post.publishedAt ? formatDate(post.publishedAt) : null]
-    .concat(`${post.readingTime} min`)
+  const primaryTag = post.tags[0]
+  const meta = [
+    visibilityLabel(post.visibility),
+    post.publishedAt ? formatDate(post.publishedAt) : null,
+    `${post.readingTime} min`,
+  ]
     .filter(Boolean)
     .join(' · ')
 
@@ -38,7 +43,11 @@ export function EntryRow({ post }: { post: PostCard }) {
         {post.excerpt && <p className="entry__excerpt">{post.excerpt}</p>}
       </div>
 
-      {post.tag ? <span className="entry__tag">{post.tag}</span> : <span />}
+      {primaryTag ? (
+        <span className="entry__tag">{primaryTag.name}</span>
+      ) : (
+        <span />
+      )}
       <span className="entry__meta">{meta}</span>
     </Link>
   )

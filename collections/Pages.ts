@@ -1,6 +1,8 @@
 import type { CollectionConfig } from 'payload'
 
 import { editorsAndAdmins, publishedOrEditors } from '../access/roles'
+import { CONTENT_TAGS } from '../lib/cache/content'
+import { purgeOnChange, purgeOnDelete } from '../lib/cache/purge'
 import { recordMcpWrite } from '../lib/mcp/audit'
 import { refuseMcpPublish } from '../lib/mcp/publish-guard'
 import { buildPreviewUrl } from '../lib/preview/live-preview'
@@ -20,7 +22,8 @@ export const Pages: CollectionConfig = {
   },
   hooks: {
     beforeChange: [refuseMcpPublish],
-    afterChange: [recordMcpWrite],
+    afterChange: [recordMcpWrite, purgeOnChange(CONTENT_TAGS.pages)],
+    afterDelete: [purgeOnDelete(CONTENT_TAGS.pages)],
   },
   // See the note in Posts.ts: autosave drives Live Preview, maxPerDoc keeps the
   // version table it fills from growing without bound.

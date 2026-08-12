@@ -170,3 +170,12 @@ switched off.
 Phase 1's obligations are already met: member records, their Stripe
 identifiers, and each post's `visibility` (`public`, `members`, `paid`) are all
 preserved, and non-public posts are withheld from anonymous API readers.
+
+On the website those posts are listed, searched and syndicated like any other
+published post, and their URLs serve the opening paragraphs followed by a
+membership gate — the teaser Ghost served, which is what keeps the pages and
+their rankings through cutover. The rest of the body is left out of the
+response rather than hidden in it. Until sign-in exists the gate says
+membership is coming rather than offering a way in, because there is not one
+yet: `lib/billing` reconciles Stripe webhooks but nothing here authenticates a
+member or sells them anything.

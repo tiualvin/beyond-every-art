@@ -1,10 +1,13 @@
 import type { GlobalConfig } from 'payload'
 
 import { globalPublicReadAdminUpdate } from '../access/roles'
+import { CONTENT_TAGS } from '../lib/cache/content'
+import { purgeGlobalOnChange } from '../lib/cache/purge'
 
 export const Header: GlobalConfig = {
   slug: 'header',
   access: globalPublicReadAdminUpdate,
+  hooks: { afterChange: [purgeGlobalOnChange(CONTENT_TAGS.globals)] },
   fields: [
     {
       name: 'links',

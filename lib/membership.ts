@@ -1,3 +1,17 @@
+import type { PostVisibility } from '@/lib/content/queries'
+
+/**
+ * How a restricted post is marked in a list, or `null` for a public one.
+ *
+ * Listings include members-only pieces, so a reader who clicks one meets a
+ * teaser. Saying so up front is the difference between a gate and a bait.
+ */
+export function visibilityLabel(visibility: PostVisibility): string | null {
+  if (visibility === 'members') return 'Members'
+  if (visibility === 'paid') return 'Subscribers'
+  return null
+}
+
 // The two memberships offered in the subscribe modal.
 //
 // These map onto structures the product already has rather than inventing new
