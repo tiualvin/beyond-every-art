@@ -1856,6 +1856,52 @@ img {
   color: var(--color-muted);
 }
 
+/* --- Membership gate (members-only and subscriber-only posts) ------------ */
+
+/* The teaser is a whole number of paragraphs, so it ends on a clean line
+   rather than mid-sentence. The fade says "this continues" where the cut
+   itself would otherwise read as the end of a very short piece. */
+.prose--teaser {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    #000 60%,
+    color-mix(in srgb, #000 12%, transparent)
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    #000 60%,
+    color-mix(in srgb, #000 12%, transparent)
+  );
+}
+
+.gate {
+  margin-top: 2rem;
+  padding: 2.25rem 1.75rem;
+  text-align: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-top: 2px solid var(--color-rule);
+  border-radius: var(--radius);
+}
+
+.gate__title {
+  font-size: 1.6rem;
+  margin: 0.4rem 0 0;
+}
+
+.gate__body {
+  margin: 0.9rem auto 1.5rem;
+  max-width: 34rem;
+  color: var(--color-muted);
+  line-height: 1.7;
+}
+
+.gate__small {
+  margin: 0.9rem 0 0;
+  font-size: 0.8rem;
+  color: var(--color-muted);
+}
+
 .article__tags {
   margin-top: 3rem;
   padding-top: 1.5rem;

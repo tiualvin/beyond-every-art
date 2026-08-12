@@ -9,6 +9,12 @@ export type ArticleJsonLdInput = {
   image?: string | null
   siteName: string
   siteUrl: string
+  /**
+   * False for a post whose body is withheld from anonymous readers. Google
+   * asks paywalled pages to say so, which is what separates a teaser from
+   * cloaking — serving a crawler more than a reader gets.
+   */
+  isAccessibleForFree?: boolean
 }
 
 /**
@@ -31,6 +37,7 @@ export function buildArticleJsonLd(
     },
   }
 
+  if (input.isAccessibleForFree === false) jsonLd.isAccessibleForFree = false
   if (input.description) jsonLd.description = input.description
   if (input.datePublished) jsonLd.datePublished = input.datePublished
   if (input.dateModified) jsonLd.dateModified = input.dateModified

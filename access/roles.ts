@@ -31,9 +31,11 @@ export const publishedOrEditors: Access = ({ req }) =>
  * Posts a request may read through the API.
  *
  * Ghost gated `members` and `paid` posts behind a subscription, so migrated
- * posts that carry those visibilities must not become public just because they
- * are published: the frontend, feed, and sitemap all query for
- * `visibility: public`, and this keeps the REST and GraphQL APIs in step.
+ * posts that carry those visibilities must not become readable in full just
+ * because they are published. The website lists them and serves a teaser, but
+ * it renders through `overrideAccess` and withholds the body itself; this rule
+ * is what stops an anonymous REST or GraphQL client from fetching the whole
+ * document and reading what the page would not show.
  * Editors see everything; an author additionally sees their own posts.
  */
 export const postsRead: Access = ({ req }) => {

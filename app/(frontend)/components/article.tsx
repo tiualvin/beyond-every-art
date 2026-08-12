@@ -6,6 +6,7 @@ import type { PostDetail } from '@/lib/content/queries'
 import { formatDate } from '@/lib/format'
 import { tagPath } from '@/lib/seo/site'
 
+import { MembershipGate } from './membership-gate'
 import { FadeIn } from './motion/fade-in'
 import { ShareRow } from './share-row'
 import { Reveal } from './motion/reveal'
@@ -60,12 +61,16 @@ export function Article({ post }: { post: PostDetail }) {
 
           {post.bodyHtml ? (
             <div
-              className="prose"
+              className={post.restricted ? 'prose prose--teaser' : 'prose'}
               dangerouslySetInnerHTML={{ __html: post.bodyHtml }}
             />
           ) : (
-            <p className="muted">This story has no body content yet.</p>
+            !post.restricted && (
+              <p className="muted">This story has no body content yet.</p>
+            )
           )}
+
+          {post.restricted && <MembershipGate visibility={post.visibility} />}
 
           {post.tags.length > 0 && (
             <Reveal>

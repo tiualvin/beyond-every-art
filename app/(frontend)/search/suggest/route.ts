@@ -13,8 +13,9 @@ const LIMIT = 8
  * The drawer needs to answer while someone is still typing, which a page
  * navigation cannot do. It reuses `searchPosts` rather than building a second
  * index, so the drawer and `/search` always agree — including the published
- * and public filters, which is what keeps drafts and members-only pieces from
- * surfacing here.
+ * filter, which is what keeps drafts from surfacing here. Members-only pieces
+ * are findable, as they are on the rest of the site; each result carries only
+ * the title and excerpt.
  */
 export async function GET(request: Request) {
   const query = new URL(request.url).searchParams.get('q')?.trim() ?? ''

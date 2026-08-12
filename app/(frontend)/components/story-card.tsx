@@ -3,6 +3,7 @@ import Link from 'next/link'
 
 import type { PostCard } from '@/lib/content/queries'
 import { formatDate } from '@/lib/format'
+import { visibilityLabel } from '@/lib/membership'
 import { postPath } from '@/lib/seo/site'
 
 const THUMB_SIZES_DEFAULT =
@@ -52,6 +53,7 @@ export function StoryCard({
       )}
       <p className="story-card__meta">
         {[
+          visibilityLabel(post.visibility),
           post.authors.map((a) => a.name).join(', '),
           `${post.readingTime} min read`,
           formatDate(post.publishedAt),

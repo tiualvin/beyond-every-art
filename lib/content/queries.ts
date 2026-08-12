@@ -2,7 +2,7 @@ import type { Where } from 'payload'
 
 import { toMediaImage, type MediaImage } from '@/lib/content/media'
 import { ARCHIVE_PAGE_SIZE } from '@/lib/content/pagination'
-import { toBodyHtml } from '@/lib/content/richtext'
+import { toBodyHtml, toTeaserHtml } from '@/lib/content/richtext'
 import { readingTimeMinutes } from '@/lib/format'
 import { getPayloadClient } from '@/lib/payload'
 import type { PreviewUser } from '@/lib/preview/session'
@@ -16,6 +16,9 @@ export type SiteSettings = {
 
 export type AuthorSummary = { name: string; slug?: string }
 
+/** What `Posts.visibility` holds, mirroring the levels Ghost had. */
+export type PostVisibility = 'public' | 'members' | 'paid'
+
 export type PostCard = {
   id: string
   slug: string
@@ -27,6 +30,7 @@ export type PostCard = {
   tag: string | null
   image: MediaImage | null
   readingTime: number
+  visibility: PostVisibility
 }
 
 const DEFAULT_SETTINGS: SiteSettings = {
@@ -34,11 +38,19 @@ const DEFAULT_SETTINGS: SiteSettings = {
   description: 'Art, color, materials, exhibitions, and creative practice.',
 }
 
-const publishedPublic: Where = {
-  and: [
-    { _status: { equals: 'published' } },
-    { visibility: { equals: 'public' } },
-  ],
+/**
+ * Every published post, whatever its visibility.
+ *
+ * Members-only and subscriber-only posts are listed, searched, syndicated and
+ * routed exactly like public ones; what changes is how much of the body a
+ * reader is given. Filtering them out here instead is what made them vanish
+ * from the site after the Ghost import, taking their URLs and rankings with
+ * them. Withholding happens in one place, `toPostDetail`.
+ */
+const published: Where = { _status: { equals: 'published' } }
+
+function toVisibility(value: unknown): PostVisibility {
+  return value === 'members' || value === 'paid' ? value : 'public'
 }
 
 type RawAuthor = { name?: string; slug?: string }
@@ -55,6 +67,7 @@ type RawPost = {
   featuredImage?: unknown
   legacyHTML?: string
   content?: unknown
+  visibility?: string
 }
 
 function toAuthorSummaries(authors: RawPost['authors']): AuthorSummary[] {
@@ -95,6 +108,7 @@ function toPostCard(doc: RawPost): PostCard | null {
     tag: firstTagName(doc.tags),
     image: toMediaImage(doc.featuredImage),
     readingTime: readingTimeMinutes(estimateWordCount(doc)),
+    visibility: toVisibility(doc.visibility),
   }
 }
 
@@ -171,7 +185,7 @@ const EMPTY_POST_PAGE: PostPage = {
   totalPosts: 0,
 }
 
-/** One page of published public posts, newest first, for the journal archive. */
+/** One page of published posts, newest first, for the journal archive. */
 export async function getPublishedPosts({
   page = 1,
   limit = ARCHIVE_PAGE_SIZE,
@@ -185,7 +199,7 @@ export async function getPublishedPosts({
       page,
       limit,
       sort: '-publishedAt',
-      where: publishedPublic,
+      where: published,
     })
     return {
       posts: (result.docs as RawPost[])
@@ -200,7 +214,7 @@ export async function getPublishedPosts({
   }
 }
 
-/** Most recent published public posts, newest first. */
+/** Most recent published posts, newest first. */
 export async function getRecentPosts(limit = 6): Promise<PostCard[]> {
   try {
     const payload = await getPayloadClient()
@@ -210,7 +224,7 @@ export async function getRecentPosts(limit = 6): Promise<PostCard[]> {
       depth: 1,
       limit,
       sort: '-publishedAt',
-      where: publishedPublic,
+      where: published,
     })
     return (result.docs as RawPost[])
       .map(toPostCard)
@@ -220,7 +234,7 @@ export async function getRecentPosts(limit = 6): Promise<PostCard[]> {
   }
 }
 
-/** Published, public posts whose title or excerpt matches the query text. */
+/** Published posts whose title or excerpt matches the query text. */
 export async function searchPosts(
   query: string,
   limit = 20,
@@ -237,7 +251,7 @@ export async function searchPosts(
       sort: '-publishedAt',
       where: {
         and: [
-          publishedPublic,
+          published,
           {
             or: [
               { title: { contains: term } },
@@ -272,6 +286,13 @@ export type PostDetail = {
   metaTitle: string | null
   metaDescription: string | null
   canonicalURL: string | null
+  visibility: PostVisibility
+  /**
+   * Whether `bodyHtml` is a teaser rather than the piece. True for a
+   * members-only or subscriber-only post read by anyone but a previewing
+   * editor; the withheld part of the body is never put in the response.
+   */
+  restricted: boolean
 }
 
 export type PageDetail = {
@@ -308,6 +329,7 @@ type RawContentDoc = {
   metaTitle?: string
   metaDescription?: string
   canonicalURL?: string
+  visibility?: string
 }
 
 function toTagRefs(tags: RawContentDoc['tags']): TagRef[] {
@@ -322,9 +344,42 @@ function toTagRefs(tags: RawContentDoc['tags']): TagRef[] {
 }
 
 /**
- * A post by slug. By default only a published, public post is returned; pass
- * `draft: true` (gated behind the /api/preview route) to fetch the latest
- * draft or private version regardless of status or visibility.
+ * Turns a post document into what the article page renders.
+ *
+ * A members-only or subscriber-only post keeps its title, dek, cover, byline
+ * and tags — everything Ghost showed a signed-out reader — but its body is
+ * replaced by the opening paragraphs. The full text is dropped here rather
+ * than hidden in the markup, so it is not in the page source, the streamed
+ * RSC payload, or a "view source". An editor previewing a draft reads it all:
+ * that path is authenticated.
+ */
+function toPostDetail(doc: RawContentDoc, preview: boolean): PostDetail {
+  const visibility = toVisibility(doc.visibility)
+  const restricted = visibility !== 'public' && !preview
+  const body = toBodyHtml(doc)
+
+  return {
+    slug: doc.slug ?? '',
+    title: doc.title ?? doc.slug ?? '',
+    excerpt: doc.excerpt ?? '',
+    bodyHtml: restricted ? toTeaserHtml(body) : body,
+    publishedAt: doc.publishedAt ?? null,
+    updatedAt: doc.updatedAt ?? null,
+    authors: toAuthorSummaries(doc.authors),
+    tags: toTagRefs(doc.tags),
+    image: toMediaImage(doc.featuredImage),
+    metaTitle: doc.metaTitle ?? null,
+    metaDescription: doc.metaDescription ?? null,
+    canonicalURL: doc.canonicalURL ?? null,
+    visibility,
+    restricted,
+  }
+}
+
+/**
+ * A post by slug. By default only a published post is returned, with a
+ * restricted one reduced to a teaser; pass `draft: true` (gated behind the
+ * /api/preview route) to fetch the latest draft in full regardless of status.
  */
 export async function getPostBySlug(
   slug: string,
@@ -343,24 +398,11 @@ export async function getPostBySlug(
       draft: options.draft,
       where: options.draft
         ? { slug: { equals: slug } }
-        : { and: [{ slug: { equals: slug } }, publishedPublic] },
+        : { and: [{ slug: { equals: slug } }, published] },
     })
     const doc = result.docs[0] as RawContentDoc | undefined
     if (!doc?.slug) return null
-    return {
-      slug: doc.slug,
-      title: doc.title ?? doc.slug,
-      excerpt: doc.excerpt ?? '',
-      bodyHtml: toBodyHtml(doc),
-      publishedAt: doc.publishedAt ?? null,
-      updatedAt: doc.updatedAt ?? null,
-      authors: toAuthorSummaries(doc.authors),
-      tags: toTagRefs(doc.tags),
-      image: toMediaImage(doc.featuredImage),
-      metaTitle: doc.metaTitle ?? null,
-      metaDescription: doc.metaDescription ?? null,
-      canonicalURL: doc.canonicalURL ?? null,
-    }
+    return toPostDetail(doc, Boolean(options.draft))
   } catch {
     return null
   }
@@ -444,7 +486,7 @@ async function getArchive(
       depth: 1,
       limit: 100,
       sort: '-publishedAt',
-      where: { and: [{ [relationField]: { in: [doc.id] } }, publishedPublic] },
+      where: { and: [{ [relationField]: { in: [doc.id] } }, published] },
     })
 
     return {
@@ -531,7 +573,7 @@ export async function getTagsWithCounts(limit = 6): Promise<TopicCard[]> {
         collection: 'posts',
         overrideAccess: true,
         where: {
-          and: [{ tags: { in: [tag.id] } }, publishedPublic],
+          and: [{ tags: { in: [tag.id] } }, published],
         },
       })
       results.push({

@@ -34,12 +34,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         depth: 0,
         pagination: false,
         limit: 0,
-        where: {
-          and: [
-            { _status: { equals: 'published' } },
-            { visibility: { equals: 'public' } },
-          ],
-        },
+        // Restricted posts have real, indexable URLs that serve a teaser, so
+        // they are listed like any other published post.
+        where: { _status: { equals: 'published' } },
         select: { slug: true, updatedAt: true, publishedAt: true },
       }),
       payload.find({

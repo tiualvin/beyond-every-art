@@ -45,12 +45,11 @@ export async function GET(): Promise<Response> {
       depth: 1,
       limit: FEED_LIMIT,
       sort: '-publishedAt',
-      where: {
-        and: [
-          { _status: { equals: 'published' } },
-          { visibility: { equals: 'public' } },
-        ],
-      },
+      // Members-only posts belong in the feed as much as they belong in the
+      // archive: an item is a title, a link and an excerpt, which is exactly
+      // what a signed-out reader gets on the post itself. No body is rendered
+      // here, so nothing gated escapes through the feed.
+      where: { _status: { equals: 'published' } },
     })
 
     const settingsRecord = settings as {

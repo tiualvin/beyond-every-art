@@ -151,6 +151,7 @@ export default async function SlugPage({
       image: post.image ? absoluteUrl(post.image.url, siteUrl) : null,
       siteName: settings.title,
       siteUrl,
+      isAccessibleForFree: !post.restricted,
     }),
   )
 
