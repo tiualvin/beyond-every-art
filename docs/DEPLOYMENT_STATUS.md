@@ -135,7 +135,16 @@ Related: [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md),
    a quick `docker compose run --rm migrate pnpm migrate:db:status` check
    before treating it as closed.
 
-0.4. **Re-import the media after the next deploy (operator action).**
+0.4. **Set up R2, then re-import the media (operator action).** The runbook's
+pre-cutover checklist expects R2, and object storage is still not configured —
+so this is also why **database backups are not running**: `buildBackupPlan`
+requires `S3_BUCKET` and throws before dumping anything, so the nightly
+container fails every run on a missing variable. One bucket fixes both. Steps
+are in
+[`BACKUP_AND_RESTORE.md`](BACKUP_AND_RESTORE.md#creating-the-r2-bucket-first-time-setup);
+free tier covers this project's scale. Do it before anything else on the launch
+list — right now a host loss takes the images and the backups together.
+
 Uploads are stored on local disk — no object storage is configured, so
 `useR2` in `payload.config.ts` is false and Payload writes to `/app/media`
 inside the app container. Until the `media_data` volume was added there was

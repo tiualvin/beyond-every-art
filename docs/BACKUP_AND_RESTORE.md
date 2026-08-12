@@ -7,8 +7,13 @@ restoration procedure. It satisfies the Phase 1 acceptance criteria:
 - A database backup has been successfully restored.
 - A documented restoration procedure exists.
 
-Media lives in Cloudflare R2 and is backed up by object storage independently;
-this pipeline covers the Postgres database only.
+Media is intended to live in Cloudflare R2, backed up by object storage
+independently; this pipeline covers the Postgres database only. Both depend on
+the same credentials — see
+[Creating the R2 bucket](#creating-the-r2-bucket-first-time-setup) if they are
+not set yet, because **until they are, this pipeline does not run at all**:
+`buildBackupPlan` requires `S3_BUCKET` and throws on the missing variable
+before anything is dumped.
 
 ## How it works
 
@@ -36,6 +41,84 @@ you want backups in a bucket separate from media. Relevant variables (see
 | `BACKUP_CRON`                                                          | `0 3 * * *`  | Schedule (backup container only)         |
 | `BACKUP_ON_START`                                                      | `false`      | Run one backup when the container starts |
 
+## Creating the R2 bucket (first-time setup)
+
+One bucket serves both media and these backups. Nothing in the application
+needs changing — `useR2` in `payload.config.ts` is
+`Boolean(S3_BUCKET && S3_ENDPOINT)`, and every service that needs the
+credentials (`app`, `migrate`, `backup`) already loads `.env`.
+
+At this project's scale the free tier covers it: 10 GB-month of storage, 1
+million writes and 10 million reads per month, and no egress charge. The Ghost
+archive is around 1,374 media files, which would each have to average over 7 MB
+to breach the storage allowance.
+
+1. **Create the bucket.** Cloudflare dashboard → R2 → Create bucket, e.g.
+   `beyond-every-art-media`. Location hint EU, matching the VPS. Enabling R2
+   may require a payment method on the account even for free-tier use.
+2. **Create a scoped API token.** R2 → Manage API Tokens → Create API token,
+   permission **Object Read & Write**, scoped to that one bucket rather than
+   all of them. Copy the secret access key immediately; it is shown once.
+3. **Find the endpoint.** Take the Account ID from the R2 overview page:
+   `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`.
+4. **Set them in `.env` on the VPS** — never in git, and never in
+   `.env.example`, which keeps placeholders only:
+
+   ```bash
+   S3_ENDPOINT=https://<ACCOUNT_ID>.r2.cloudflarestorage.com
+   S3_REGION=auto
+   S3_BUCKET=beyond-every-art-media
+   S3_ACCESS_KEY_ID=<access key id>
+   S3_SECRET_ACCESS_KEY=<secret access key>
+   ```
+
+   `S3_BUCKET` and `S3_ENDPOINT` are what switch storage over; the two
+   credentials are then asserted non-null immediately after, so all four have
+   to arrive together or the app throws at boot.
+
+   Leave `S3_PUBLIC_URL` unset unless you are serving the bucket publicly. This
+   configuration does not set `disablePayloadAccessControl`, so Payload keeps
+   serving media through its own `/api/media/file/<name>` route with R2 behind
+   it. The variable exists to add a public media origin to `next/image`'s
+   `remotePatterns` and to the CSP's `img-src`, `connect-src` and `media-src`
+   — pointing it at a bucket that is not actually public just widens the policy
+   for no reason.
+
+5. **Recreate the containers**, since an `.env` change does not reach a running
+   one:
+
+   ```bash
+   docker compose up -d
+   ```
+
+6. **Verify backups before media.** This is the step that was silently failing,
+   and it is the more serious of the two:
+
+   ```bash
+   docker compose run --rm backup pnpm backup:db
+   ```
+
+   An object should appear in R2 under `db-backups/`. If it names a missing
+   variable instead, that variable did not reach the container.
+
+7. **Re-import the media** so the files land in the bucket:
+
+   ```bash
+   docker compose run --rm migrate pnpm migrate:ghost --input <export.json>
+   ```
+
+   It re-downloads from the still-live Ghost site and is idempotent, keyed on
+   `ghostURL`. It restores only what the export contains — anything uploaded
+   through Payload Admin since the original import is not in that file and will
+   not come back, so check for such files before relying on this.
+
+8. **Confirm.** Images render on the site, and
+   `docker compose logs app | grep media` no longer reports files missing on
+   disk.
+
+Keep the `media_data` volume until R2 is proven. It costs nothing and it is the
+fallback if a credential is wrong.
+
 ## Scheduled backups (production)
 
 The `backup` service in `docker-compose.yml` runs the script on a cron schedule
@@ -47,7 +130,10 @@ docker compose up -d
 docker compose logs -f backup   # watch each nightly run
 ```
 
-Set the R2 and `BACKUP_*` variables in `.env` before starting. To take an
+Set the R2 and `BACKUP_*` variables in `.env` before starting — see
+[Creating the R2 bucket](#creating-the-r2-bucket-first-time-setup). Without
+them the container starts, wakes on schedule, and fails every run on the
+missing variable, which looks like nothing happening at all. To take an
 immediate backup for verification, set `BACKUP_ON_START=true` (or run the
 on-demand command below).
 
