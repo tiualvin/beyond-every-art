@@ -1,0 +1,2565 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Beyond Every Art — Apps</title>
+  </head>
+  <body>
+<style>
+  /* ==========================================================================
+     Tokens — identical to the homepage and article mockups.
+     ========================================================================== */
+  :root {
+    --color-paper: #f6f2eb;
+    --color-surface: #fffdf9;
+    --color-ink: #1b1714;
+    --color-muted: #6f665c;
+    --color-burgundy: #6d1f2c;
+    --color-burgundy-deep: #4c1420;
+    --color-dark: #141110;
+    --color-on-dark: #f3ede4;
+    --color-line: #e4ddd2;
+    --color-rule: color-mix(in srgb, var(--color-ink) 26%, var(--color-paper));
+
+    --font-serif: 'Playfair Display', Georgia, 'Times New Roman', serif;
+    --font-sans: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+    --maxw: 78rem;
+    --radius: 2px;
+
+    --pig-ultramarine: #1f3a93;
+    --pig-sienna: #8a3a1e;
+    --pig-viridian: #2e6b52;
+    --pig-cadmium: #c9820a;
+    --pig-lead-white: #efe9dd;
+    --pig-bone-black: #20211f;
+
+    color-scheme: light;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 1.0625rem;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0.4;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.32'/%3E%3C/svg%3E");
+  }
+
+  h1, h2, h3 {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-weight: 600;
+    line-height: 1.12;
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  a { color: inherit; text-decoration: none; }
+  img { max-width: 100%; display: block; }
+
+  :focus-visible { outline: 2px solid var(--color-burgundy); outline-offset: 3px; }
+
+  .container {
+    width: 100%;
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: 0 1.75rem;
+  }
+
+  .eyebrow {
+    font-family: var(--font-sans);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: var(--color-burgundy);
+    margin: 0;
+  }
+
+  .num { font-variant-numeric: tabular-nums; }
+
+  .button {
+    display: inline-block;
+    font-family: var(--font-sans);
+    font-size: 0.76rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 0.9rem 1.5rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .button:hover { text-decoration: none; }
+
+  .button--primary {
+    background: var(--color-burgundy);
+    border-color: var(--color-burgundy);
+    color: var(--color-on-dark);
+  }
+
+  .button--primary:hover {
+    background: var(--color-burgundy-deep);
+    border-color: var(--color-burgundy-deep);
+  }
+
+  .button--on-dark {
+    background: var(--color-on-dark);
+    border-color: var(--color-on-dark);
+    color: var(--color-burgundy-deep);
+  }
+
+  .button--on-dark:hover { background: transparent; color: var(--color-on-dark); }
+
+  .button--ghost { border-color: var(--color-line); color: var(--color-ink); }
+
+  .button--ghost:hover { border-color: var(--color-ink); }
+
+  .button--compact { padding: 0.55rem 1.05rem; font-size: 0.72rem; }
+
+  /* ==========================================================================
+     Masthead + mobile menu
+     ========================================================================== */
+  .masthead {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    padding: 0.85rem 1.75rem;
+    background: var(--color-paper);
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .masthead__wordmark { font-family: var(--font-serif); font-size: 1.05rem; white-space: nowrap; }
+
+  .masthead__nav {
+    display: flex;
+    gap: 1.75rem;
+    font-size: 0.78rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    font-weight: 500;
+    color: var(--color-muted);
+  }
+
+  .masthead__nav a { position: relative; padding-bottom: 2px; }
+
+  .masthead__nav a::after {
+    content: '';
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 1px;
+    background: var(--color-burgundy);
+    transform: scaleX(0);
+    transform-origin: left;
+  }
+
+  .masthead__nav a:hover { color: var(--color-ink); }
+  .masthead__nav a:hover::after { transform: scaleX(1); }
+
+  /* Current section stays marked while you are inside it. */
+  .masthead__nav a[aria-current='page'] { color: var(--color-ink); }
+  .masthead__nav a[aria-current='page']::after { transform: scaleX(1); }
+
+  .masthead__actions { display: flex; align-items: center; gap: 1.1rem; }
+
+  .icon-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem; height: 2rem;
+    padding: 0; border: 0;
+    background: none;
+    color: var(--color-muted);
+    cursor: pointer;
+    border-radius: 50%;
+  }
+
+  .icon-button:hover { color: var(--color-ink); }
+
+  .masthead__signin {
+    font-size: 0.78rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    font-weight: 500;
+    color: var(--color-muted);
+    white-space: nowrap;
+  }
+
+  .masthead__signin:hover { color: var(--color-ink); }
+
+  .nav-toggle {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    width: 2rem; height: 2rem;
+    padding: 0; border: 0;
+    background: none;
+    cursor: pointer;
+  }
+
+  .nav-toggle span {
+    display: block;
+    width: 1.15rem; height: 1.5px;
+    background: var(--color-ink);
+    transform-origin: center;
+  }
+
+  .nav-toggle[aria-expanded='true'] span:first-child { transform: translateY(3.25px) rotate(45deg); }
+  .nav-toggle[aria-expanded='true'] span:last-child { transform: translateY(-3.25px) rotate(-45deg); }
+
+  .mobile-nav {
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    padding-top: var(--masthead-h, 3.5rem);
+    background: var(--color-paper);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    opacity: 0;
+  }
+
+  .mobile-nav.is-open { opacity: 1; }
+  .mobile-nav[hidden] { display: none; }
+
+  .mobile-nav__search,
+  .mobile-nav__links a,
+  .mobile-nav__foot { opacity: 0; transform: translateY(14px); }
+
+  .mobile-nav.is-open .mobile-nav__search,
+  .mobile-nav.is-open .mobile-nav__links a,
+  .mobile-nav.is-open .mobile-nav__foot { opacity: 1; transform: none; }
+
+  .mobile-nav__search { --i: 0; }
+  .mobile-nav__links a:nth-child(1) { --i: 1; }
+  .mobile-nav__links a:nth-child(2) { --i: 2; }
+  .mobile-nav__links a:nth-child(3) { --i: 3; }
+  .mobile-nav__links a:nth-child(4) { --i: 4; }
+  .mobile-nav__foot { --i: 5; }
+
+  .mobile-nav__search {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    margin: 1.75rem 1.75rem 0;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    color: var(--color-muted);
+  }
+
+  .mobile-nav__search input {
+    flex: 1; min-width: 0;
+    border: 0; background: none;
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    color: var(--color-ink);
+  }
+
+  .mobile-nav__search input:focus { outline: none; }
+  .mobile-nav__search:focus-within { border-color: var(--color-burgundy); }
+
+  .mobile-nav__links { display: flex; flex-direction: column; padding: 1.5rem 1.75rem; }
+
+  .mobile-nav__links a {
+    font-family: var(--font-serif);
+    font-size: clamp(1.9rem, 8vw, 2.6rem);
+    letter-spacing: -0.025em;
+    padding: 0.55rem 0;
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .mobile-nav__links a:hover { color: var(--color-burgundy); padding-left: 0.5rem; }
+
+  .mobile-nav__foot {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    padding: 1.75rem;
+    border-top: 1px solid var(--color-line);
+    flex-shrink: 0;
+  }
+
+  .mobile-nav__foot .button { text-align: center; }
+
+  .mobile-nav__signin {
+    font-size: 0.8rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--color-muted);
+    text-align: center;
+  }
+
+  @media (max-width: 980px) {
+    .masthead__nav { display: none; }
+    .nav-toggle { display: flex; }
+  }
+
+  @media (max-width: 620px) {
+    .masthead__signin { display: none; }
+    .masthead .button--compact { display: none; }
+    .masthead { padding: 0.75rem 1.1rem; }
+    .masthead__actions { gap: 0.4rem; }
+  }
+
+  @media (min-width: 981px) { .mobile-nav { display: none; } }
+
+  /* The deep end of two pigment families. The shared token block carries the
+     surface tones; the status badges need the darker pair to stay legible as
+     small uppercase text on paper. */
+  :root {
+    --pig-cadmium-deep: #6b4103;
+    --pig-viridian-deep: #123227;
+  }
+
+  /* ==========================================================================
+     Page header. Same shape as the journal archive head, so /apps does not
+     invent a second way of opening a page.
+     ========================================================================== */
+  .apps {
+    padding-top: calc(var(--masthead-h, 3.5rem) + clamp(2.5rem, 5vw, 4rem));
+    padding-bottom: clamp(2rem, 5vw, 3.5rem);
+  }
+
+  .apps__head { max-width: 62rem; }
+
+  .apps__title {
+    font-size: clamp(2.2rem, 5vw, 3.4rem);
+    letter-spacing: -0.03em;
+    margin: 0.6rem 0 0.9rem;
+  }
+
+  .apps__intro {
+    margin: 0;
+    font-size: clamp(1.02rem, 1.6vw, 1.2rem);
+    color: var(--color-muted);
+    max-width: 54ch;
+  }
+
+  .apps__intro strong { color: var(--color-ink); font-weight: 600; }
+
+  /* ==========================================================================
+     Status key. The page has to read as a roadmap, so the vocabulary is
+     declared once, up front, instead of leaving four unexplained badges
+     scattered down the page. Mirrors Apps.status in the collection:
+     concept | in_development | coming_soon | available.
+     ========================================================================== */
+  .key {
+    margin-top: clamp(2rem, 4vw, 3rem);
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--color-rule);
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1.25rem 2rem;
+  }
+
+  .key__item { display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-start; }
+
+  .key__note {
+    margin: 0;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    color: var(--color-muted);
+    max-width: 26ch;
+  }
+
+  .status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-family: var(--font-sans);
+    font-size: 0.64rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    padding: 0.36rem 0.66rem;
+    border: 1px solid;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+
+  .status::before {
+    content: '';
+    width: 0.4rem;
+    height: 0.4rem;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+  }
+
+  /* Every badge colour is taken from the deep end of the pigment family so the
+     small uppercase text clears 4.5:1 on paper. */
+  .status--concept {
+    color: var(--color-muted);
+    border-color: var(--color-line);
+    background: var(--color-surface);
+  }
+
+  .status--dev {
+    color: var(--pig-cadmium-deep);
+    border-color: color-mix(in srgb, var(--pig-cadmium-deep) 34%, var(--color-line));
+    background: color-mix(in srgb, var(--pig-cadmium) 10%, var(--color-surface));
+  }
+
+  .status--soon {
+    color: var(--color-burgundy);
+    border-color: color-mix(in srgb, var(--color-burgundy) 34%, var(--color-line));
+    background: color-mix(in srgb, var(--color-burgundy) 7%, var(--color-surface));
+  }
+
+  .status--live {
+    color: var(--pig-viridian-deep);
+    border-color: color-mix(in srgb, var(--pig-viridian-deep) 34%, var(--color-line));
+    background: color-mix(in srgb, var(--pig-viridian) 10%, var(--color-surface));
+  }
+
+  /* ==========================================================================
+     App entries. Deliberately not a card grid — PRODUCT.md lists the
+     identical icon+heading+text grid as an anti-reference. Each app gets an
+     editorial spread with a plate, the way featured stories do on the
+     homepage, and the plate side alternates to keep a rhythm down the page.
+     ========================================================================== */
+  .roster { padding-bottom: clamp(2.5rem, 6vw, 4rem); }
+
+  .app {
+    display: grid;
+    grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+    gap: clamp(1.5rem, 5vw, 4rem);
+    align-items: center;
+    padding: clamp(2.5rem, 6vw, 4.25rem) 0;
+    border-top: 1px solid var(--color-rule);
+  }
+
+  /* Flipping the spread has to flip the track widths with it, or the plate
+     inherits the text column and the prose gets squeezed into the narrow one. */
+  .app--flip { grid-template-columns: minmax(0, 1.18fr) minmax(0, 0.82fr); }
+  .app--flip .app__plate { grid-column: 2; grid-row: 1; }
+  .app--flip .app__body { grid-column: 1; grid-row: 1; }
+
+  .app__plate {
+    position: relative;
+    aspect-ratio: 4 / 5;
+    overflow: hidden;
+    border-radius: var(--radius);
+    background: var(--color-dark);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 1.5rem;
+  }
+
+  .app__plate canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* A scrim, not decoration: the wash is generated, so the plate mark needs a
+     guaranteed floor to sit on rather than whatever tone the seed produced.
+     The pool is centred on the type and falls away fast, so cadmium and
+     ultramarine keep their brightness at the edges where nothing sits on
+     them. Measured against composited pixels, not declared colour. */
+  .app__plate::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(
+        ellipse 76% 44% at 50% 50%,
+        color-mix(in srgb, var(--color-dark) 82%, transparent),
+        color-mix(in srgb, var(--color-dark) 62%, transparent) 55%,
+        transparent 100%
+      ),
+      linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--color-dark) 14%, transparent),
+        color-mix(in srgb, var(--color-dark) 46%, transparent)
+      );
+  }
+
+  .app__mark {
+    position: relative;
+    z-index: 1;
+    color: var(--color-on-dark);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.7rem;
+  }
+
+  .app__mark-name {
+    font-family: var(--font-serif);
+    font-size: clamp(1.5rem, 3.2vw, 2.1rem);
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+
+  .app__mark-rule {
+    width: 2.25rem;
+    height: 1px;
+    background: color-mix(in srgb, var(--color-on-dark) 55%, transparent);
+  }
+
+  .app__mark-platforms {
+    font-size: 0.66rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: color-mix(in srgb, var(--color-on-dark) 82%, transparent);
+  }
+
+  .app__body { display: flex; flex-direction: column; align-items: flex-start; }
+
+  .app__index {
+    font-family: var(--font-sans);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    color: var(--color-muted);
+  }
+
+  .app__name {
+    font-size: clamp(1.9rem, 4vw, 2.9rem);
+    letter-spacing: -0.03em;
+    margin: 0.55rem 0 0;
+  }
+
+  .app__tagline {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: clamp(1.1rem, 2vw, 1.35rem);
+    line-height: 1.4;
+    color: var(--color-burgundy);
+    margin: 0.5rem 0 0;
+  }
+
+  .app__summary {
+    margin: 1.1rem 0 0;
+    max-width: 56ch;
+    color: color-mix(in srgb, var(--color-ink) 82%, var(--color-paper));
+  }
+
+  .app__summary + .app__summary { margin-top: 0.85rem; }
+
+  .app__features {
+    list-style: none;
+    margin: 1.5rem 0 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem 1.75rem;
+    max-width: 46rem;
+    font-size: 0.92rem;
+    color: var(--color-muted);
+  }
+
+  .app__features li {
+    position: relative;
+    padding-left: 0.95rem;
+    line-height: 1.5;
+  }
+
+  .app__features li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.62em;
+    width: 0.3rem;
+    height: 1px;
+    background: var(--color-burgundy);
+  }
+
+  .app__meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.85rem 1.25rem;
+    margin-top: 1.75rem;
+  }
+
+  .app__sequence {
+    font-size: 0.82rem;
+    color: var(--color-muted);
+  }
+
+  .app__link {
+    margin-top: 1.5rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-burgundy);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-bottom: 1px solid transparent;
+    padding-bottom: 2px;
+  }
+
+  .app__link:hover { border-bottom-color: var(--color-burgundy); }
+  .app__link svg { flex-shrink: 0; }
+
+  /* ==========================================================================
+     How they connect. Straight out of the app-strategy handoff's cross-linking
+     table: publication moment on the left, the app it hands off to on the
+     right.
+     ========================================================================== */
+  .thread {
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-line);
+    border-bottom: 1px solid var(--color-line);
+    padding: clamp(3rem, 7vw, 4.5rem) 0;
+  }
+
+  .thread__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+    gap: clamp(2rem, 6vw, 4.5rem);
+    align-items: start;
+  }
+
+  .thread h2 {
+    font-size: clamp(1.6rem, 3vw, 2.2rem);
+    letter-spacing: -0.028em;
+    margin: 0.75rem 0 0.9rem;
+    max-width: 16ch;
+  }
+
+  .thread__lede {
+    margin: 0;
+    color: var(--color-muted);
+    max-width: 44ch;
+  }
+
+  .thread__list { list-style: none; margin: 0; padding: 0; }
+
+  .thread__list li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 0;
+    border-top: 1px solid var(--color-line);
+  }
+
+  .thread__list li:first-child { border-top: 0; padding-top: 0; }
+
+  .thread__from { margin: 0; font-size: 0.95rem; }
+
+  .thread__to {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+
+  .thread__arrow { color: var(--color-burgundy); display: flex; }
+
+  /* ==========================================================================
+     Waitlist. One form, one email, many apps — which is exactly the shape of
+     the AppWaitlist collection: a row per (email, app) pair.
+     ========================================================================== */
+  .waitlist { padding: clamp(3rem, 7vw, 4.5rem) 0; }
+
+  .waitlist__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: clamp(2rem, 6vw, 4.5rem);
+    align-items: start;
+  }
+
+  .waitlist h2 {
+    font-size: clamp(1.6rem, 3vw, 2.2rem);
+    letter-spacing: -0.028em;
+    margin: 0.75rem 0 0.9rem;
+    max-width: 17ch;
+  }
+
+  .waitlist__lede { margin: 0; color: var(--color-muted); max-width: 42ch; }
+
+  .waitlist__fields { border: 0; margin: 0 0 1.25rem; padding: 0; }
+
+  .waitlist__fields legend {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--color-muted);
+    padding: 0;
+    margin-bottom: 0.75rem;
+  }
+
+  .waitlist__options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; }
+
+  .pick {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.7rem 0.85rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+
+  .pick:hover { border-color: var(--color-muted); }
+  .pick:has(input:focus-visible) { outline: 2px solid var(--color-burgundy); outline-offset: 2px; }
+  .pick.is-picked { border-color: var(--color-burgundy); background: color-mix(in srgb, var(--color-burgundy) 6%, var(--color-surface)); }
+
+  .pick input {
+    appearance: none;
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+    flex-shrink: 0;
+    border: 1px solid var(--color-muted);
+    border-radius: 2px;
+    background: var(--color-surface);
+    display: grid;
+    place-content: center;
+    cursor: pointer;
+  }
+
+  .pick input:checked { border-color: var(--color-burgundy); background: var(--color-burgundy); }
+
+  .pick input:checked::after {
+    content: '';
+    width: 0.52rem;
+    height: 0.28rem;
+    border-left: 2px solid var(--color-on-dark);
+    border-bottom: 2px solid var(--color-on-dark);
+    transform: translateY(-1px) rotate(-45deg);
+  }
+
+  .waitlist__row { display: flex; gap: 0.6rem; }
+
+  .waitlist__row input[type='email'] {
+    flex: 1;
+    min-width: 0;
+    padding: 0.9rem 1rem;
+    font-family: var(--font-sans);
+    font-size: 0.92rem;
+    color: var(--color-ink);
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius);
+  }
+
+  .waitlist__row input[type='email']:focus { outline: none; border-color: var(--color-burgundy); }
+
+  .waitlist__error {
+    margin: 0.7rem 0 0;
+    font-size: 0.82rem;
+    color: var(--color-burgundy);
+  }
+
+  .waitlist__small { margin: 0.85rem 0 0; font-size: 0.78rem; color: var(--color-muted); max-width: 44ch; }
+
+  .waitlist__done {
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    padding: 1.5rem;
+  }
+
+  .waitlist__done h3 {
+    font-family: var(--font-serif);
+    font-size: 1.35rem;
+    margin: 0 0 0.5rem;
+  }
+
+  .waitlist__done p { margin: 0; color: var(--color-muted); font-size: 0.95rem; }
+
+  /* ==========================================================================
+     Breakpoints
+     ========================================================================== */
+  @media (max-width: 900px) {
+    .key { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+    .app,
+    .app--flip { grid-template-columns: minmax(0, 1fr); }
+
+    .app--flip .app__plate,
+    .app--flip .app__body { grid-column: 1; grid-row: auto; }
+
+    .app__plate { aspect-ratio: 16 / 10; max-width: 26rem; }
+    .thread__grid,
+    .waitlist__grid { grid-template-columns: minmax(0, 1fr); }
+  }
+
+  @media (max-width: 560px) {
+    .key { grid-template-columns: minmax(0, 1fr); }
+    .app__features { grid-template-columns: minmax(0, 1fr); }
+    .waitlist__options { grid-template-columns: minmax(0, 1fr); }
+    .waitlist__row { flex-direction: column; }
+
+    .thread__list li { grid-template-columns: minmax(0, 1fr); gap: 0.35rem; }
+    .thread__arrow { transform: rotate(90deg); }
+  }
+
+  /* ==========================================================================
+     Subscribe + footer
+     ========================================================================== */
+  .subscribe {
+    background: var(--color-burgundy-deep);
+    color: var(--color-on-dark);
+    padding: clamp(3.5rem, 8vh, 5.5rem) 0;
+  }
+
+  .subscribe__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.85fr);
+    gap: clamp(2rem, 6vw, 5rem);
+    align-items: center;
+  }
+
+  .subscribe h2 {
+    color: var(--color-on-dark);
+    font-size: clamp(1.7rem, 3.5vw, 2.6rem);
+    letter-spacing: -0.028em;
+    margin: 0.85rem 0 0.9rem;
+    max-width: 18ch;
+  }
+
+  .subscribe p {
+    color: color-mix(in srgb, var(--color-on-dark) 78%, transparent);
+    margin: 0;
+    max-width: 42ch;
+    font-size: 0.98rem;
+  }
+
+  .subscribe .eyebrow { color: color-mix(in srgb, var(--color-on-dark) 80%, transparent); }
+
+  .signup { display: flex; flex-direction: column; gap: 0.75rem; }
+  .signup__row { display: flex; gap: 0.6rem; }
+
+  .signup input {
+    flex: 1; min-width: 0;
+    padding: 0.9rem 1rem;
+    font-family: var(--font-sans);
+    font-size: 0.92rem;
+    color: var(--color-on-dark);
+    background: color-mix(in srgb, var(--color-on-dark) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-on-dark) 32%, transparent);
+    border-radius: var(--radius);
+  }
+
+  .signup input::placeholder { color: color-mix(in srgb, var(--color-on-dark) 52%, transparent); }
+  .signup input:focus { outline: none; border-color: var(--color-on-dark); }
+  .signup small { font-size: 0.72rem; color: color-mix(in srgb, var(--color-on-dark) 62%, transparent); }
+
+  .footer {
+    background: var(--color-dark);
+    color: color-mix(in srgb, var(--color-on-dark) 70%, transparent);
+    padding: 3rem 0;
+    font-size: 0.82rem;
+  }
+
+  .footer__grid {
+    display: flex;
+    justify-content: space-between;
+    gap: 2rem;
+    flex-wrap: wrap;
+    align-items: baseline;
+  }
+
+  .footer__wordmark { font-family: var(--font-serif); font-size: 1.15rem; color: var(--color-on-dark); }
+  .footer nav { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+  .footer a:hover { color: var(--color-on-dark); }
+
+  @media (max-width: 640px) {
+    .subscribe__grid { grid-template-columns: 1fr; }
+    .signup__row { flex-direction: column; }
+  }
+
+  /* ==========================================================================
+     Motion
+     ========================================================================== */
+  .reveal { opacity: 0; transform: translateY(16px); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal {
+      transition: opacity 0.65s cubic-bezier(0.22, 1, 0.36, 1),
+                  transform 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .reveal.is-in { opacity: 1; transform: none; }
+
+    .masthead__nav a::after { transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1); }
+    .masthead__nav a, .masthead__signin, .app__link { transition: color 0.22s ease, border-color 0.22s ease; }
+
+    .app__plate canvas { transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1); }
+    .app:hover .app__plate canvas { transform: scale(1.04); }
+
+    .button, .icon-button, .signup input, .pick, .waitlist__row input[type='email'] {
+      transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+    }
+
+    .mobile-nav { transition: opacity 0.3s ease; }
+    .mobile-nav.is-open { transition-duration: 0.16s; }
+    .mobile-nav__search,
+    .mobile-nav__links a,
+    .mobile-nav__foot {
+      transition: opacity 0.3s ease,
+                  transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+                  color 0.2s ease,
+                  padding-left 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .mobile-nav.is-open .mobile-nav__search,
+    .mobile-nav.is-open .mobile-nav__links a,
+    .mobile-nav.is-open .mobile-nav__foot { transition-delay: calc(0.05s * var(--i) + 0.06s); }
+    .nav-toggle span { transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reveal { opacity: 1; transform: none; }
+    .mobile-nav,
+    .mobile-nav__search,
+    .mobile-nav__links a,
+    .mobile-nav__foot { opacity: 1; transform: none; }
+  }
+
+  /* ==========================================================================
+     Search panel — drops from under the masthead. Not a modal: the page stays
+     visible behind it, so searching feels like opening a drawer on the site
+     rather than leaving it.
+     ========================================================================== */
+  .search-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 49;
+    background: color-mix(in srgb, var(--color-dark) 38%, transparent);
+    opacity: 0;
+  }
+
+  .search-scrim[hidden] { display: none; }
+  .search-scrim.is-open { opacity: 1; }
+
+  .search-panel {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 50;
+    max-height: 100dvh;
+    overflow-y: auto;
+    padding-top: var(--masthead-h, 3.5rem);
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-line);
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  .search-panel[hidden] { display: none; }
+  .search-panel.is-open { opacity: 1; transform: none; }
+
+  .search__field {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.4rem 0 1.1rem;
+    border-bottom: 2px solid var(--color-ink);
+  }
+
+  .search__field > svg { color: var(--color-burgundy); flex-shrink: 0; }
+
+  .search__field input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: none;
+    padding: 0;
+    font-family: var(--font-serif);
+    font-size: clamp(1.35rem, 3.5vw, 2rem);
+    letter-spacing: -0.022em;
+    color: var(--color-ink);
+  }
+
+  .search__field input::-webkit-search-cancel-button,
+  .search__field input::-webkit-search-decoration { -webkit-appearance: none; }
+
+  .search__field input:focus { outline: none; }
+  .search__field input::placeholder { color: color-mix(in srgb, var(--color-muted) 55%, transparent); }
+
+  .search__meta {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding: 0.9rem 0 0.3rem;
+    font-size: 0.66rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--color-muted);
+  }
+
+  .search__hint kbd {
+    font-family: var(--font-sans);
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius);
+    padding: 0.1rem 0.35rem;
+    margin: 0 0.15rem;
+  }
+
+  .search__results { list-style: none; margin: 0; padding: 0 0 2rem; }
+
+  .search__result {
+    display: grid;
+    grid-template-columns: 0.6rem minmax(0, 1fr) auto;
+    gap: 0.9rem;
+    align-items: baseline;
+    padding: 0.85rem 0;
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .search__result i {
+    width: 0.55rem; height: 0.55rem;
+    border-radius: 50%;
+    align-self: start;
+    margin-top: 0.42rem;
+    box-shadow: inset 0 0 0 1px rgba(27, 23, 20, 0.38);
+  }
+
+  .search__result h3 {
+    font-family: var(--font-serif);
+    font-size: 1.15rem;
+    font-weight: 500;
+    letter-spacing: -0.018em;
+    line-height: 1.25;
+    margin: 0;
+  }
+
+  .search__result mark {
+    background: color-mix(in srgb, var(--color-burgundy) 16%, transparent);
+    color: inherit;
+    border-radius: 1px;
+  }
+
+  .search__result p {
+    margin: 0.2rem 0 0;
+    font-size: 0.85rem;
+    color: var(--color-muted);
+  }
+
+  .search__result-meta {
+    font-size: 0.7rem;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--color-muted);
+    white-space: nowrap;
+  }
+
+  .search__result:hover h3,
+  .search__result:focus-visible h3 { color: var(--color-burgundy); }
+
+  @media (hover: none), (pointer: coarse) {
+    .search__hint { display: none; }
+  }
+
+  .search__empty { padding: 2rem 0 3rem; color: var(--color-muted); }
+  .search__empty b { color: var(--color-ink); font-weight: 600; }
+
+  @media (max-width: 640px) {
+    .search__result { grid-template-columns: 0.6rem minmax(0, 1fr); }
+    .search__result-meta { grid-column: 2; }
+  }
+
+  /* ==========================================================================
+     Subscribe modal
+     ========================================================================== */
+  .modal-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    display: grid;
+    justify-items: center;
+    align-items: start;
+    padding: 1.5rem;
+    background: color-mix(in srgb, var(--color-dark) 58%, transparent);
+    opacity: 0;
+    overflow-y: auto;
+  }
+
+  .modal-scrim[hidden] { display: none; }
+  .modal-scrim.is-open { opacity: 1; }
+
+  .modal:focus { outline: none; }
+
+  .modal {
+    position: relative;
+    margin: auto 0;
+    width: min(29rem, 100%);
+    background: var(--color-paper);
+    border-radius: var(--radius);
+    overflow: hidden;
+    box-shadow: 0 32px 80px -24px rgba(20, 17, 16, 0.55);
+    opacity: 0;
+    transform: translateY(16px) scale(0.985);
+  }
+
+  .modal-scrim.is-open .modal { opacity: 1; transform: none; }
+
+  .modal__close {
+    position: absolute;
+    top: 0.85rem; right: 0.85rem;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem; height: 2rem;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: none;
+    color: var(--color-muted);
+    cursor: pointer;
+  }
+
+  .modal__close:hover { color: var(--color-ink); }
+
+  .modal__body { padding: 1.9rem 1.75rem 1.75rem; }
+
+  .modal__body h2 {
+    font-size: 1.6rem;
+    letter-spacing: -0.025em;
+    margin: 0.6rem 0 0.6rem;
+  }
+
+  .modal__body > p {
+    margin: 0 0 1.25rem;
+    font-size: 0.95rem;
+    color: var(--color-muted);
+  }
+
+  .modal__form { display: flex; flex-direction: column; gap: 0.7rem; }
+
+  .modal__form input {
+    width: 100%;
+    padding: 0.85rem 1rem;
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    color: var(--color-ink);
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius);
+  }
+
+  .modal__form input:focus { outline: none; border-color: var(--color-burgundy); }
+  .modal__form .button { width: 100%; text-align: center; }
+
+  .modal__small { margin: 0; font-size: 0.72rem; color: var(--color-muted); }
+
+  .modal__error {
+    margin: 0;
+    font-size: 0.78rem;
+    color: var(--color-burgundy);
+    font-weight: 600;
+  }
+
+  .modal__error[hidden] { display: none; }
+
+  .modal__done { text-align: center; padding: 0.5rem 0 0.25rem; }
+  .modal__done[hidden] { display: none; }
+  .modal__done h2 { margin-bottom: 0.5rem; }
+  .modal__done p { color: var(--color-muted); font-size: 0.92rem; margin: 0 0 1.25rem; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .search-scrim, .modal-scrim { transition: opacity 0.25s ease; }
+    .search-panel {
+      transition: opacity 0.22s ease,
+                  transform 0.36s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .modal {
+      transition: opacity 0.28s ease,
+                  transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .search__result { animation: bea-rise 0.4s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+    .search__result h3, .modal__close, .modal__form input { transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease; }
+  }
+
+  @keyframes bea-rise {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .search-panel, .modal { opacity: 1; transform: none; }
+    .search-scrim, .modal-scrim { opacity: 1; }
+    .search__result { animation: none; }
+  }
+
+  /* ==========================================================================
+     Membership plans inside the subscribe modal. Free and paid map to the two
+     member states the product already has, and to the three post visibility
+     levels: public, members, paid.
+     ========================================================================== */
+  .modal { width: min(34rem, 100%); }
+
+  /* A tall modal on a short viewport must not have its head cut off, which is
+     what centred grid alignment does once the item overflows. */
+  .modal__lede {
+    margin: 0 0 1.15rem;
+    font-size: 0.92rem;
+    color: var(--color-muted);
+  }
+
+  .plans {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.7rem;
+    margin: 0 0 1rem;
+  }
+
+  .plan {
+    position: relative;
+    display: block;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius);
+    background: var(--color-surface);
+    padding: 0.85rem 0.9rem 0.95rem;
+    cursor: pointer;
+  }
+
+  /* Selection is driven by a class rather than :has(), so the state does not
+     depend on selector support. */
+  .plan.is-selected {
+    border-color: var(--color-burgundy);
+    box-shadow: inset 0 0 0 1px var(--color-burgundy);
+  }
+
+  .plan input {
+    position: absolute;
+    opacity: 0;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+  }
+
+  .plan.is-focused { outline: 2px solid var(--color-burgundy); outline-offset: 2px; }
+
+  .plan__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding-bottom: 0.55rem;
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .plan__name {
+    font-family: var(--font-serif);
+    font-size: 1.05rem;
+    letter-spacing: -0.015em;
+  }
+
+  .plan__price {
+    font-size: 0.74rem;
+    color: var(--color-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .plan__price b {
+    font-family: var(--font-serif);
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--color-ink);
+  }
+
+  .plan__list {
+    list-style: none;
+    margin: 0.6rem 0 0;
+    padding: 0;
+    display: grid;
+    gap: 0.32rem;
+    font-size: 0.79rem;
+    line-height: 1.4;
+    color: var(--color-muted);
+  }
+
+  .plan__list li {
+    display: grid;
+    grid-template-columns: 0.75rem minmax(0, 1fr);
+    gap: 0.45rem;
+    align-items: start;
+  }
+
+  .plan__list svg { color: var(--color-burgundy); margin-top: 0.28rem; }
+
+  .plan__badge {
+    position: absolute;
+    top: -0.5rem;
+    right: 0.7rem;
+    background: var(--color-burgundy);
+    color: var(--color-on-dark);
+    font-size: 0.55rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 600;
+    padding: 0.18rem 0.45rem;
+    border-radius: 999px;
+  }
+
+  .billing {
+    display: flex;
+    gap: 0.4rem;
+    margin: 0 0 1rem;
+  }
+
+  .billing[hidden] { display: none; }
+
+  .billing button {
+    flex: 1;
+    font-family: var(--font-sans);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    color: var(--color-muted);
+    background: none;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius);
+    padding: 0.5rem 0.6rem;
+    cursor: pointer;
+  }
+
+  .billing button:hover { color: var(--color-ink); border-color: var(--color-ink); }
+
+  .billing button[aria-pressed='true'] {
+    background: var(--color-burgundy);
+    border-color: var(--color-burgundy);
+    color: var(--color-on-dark);
+  }
+
+  .billing button span {
+    display: block;
+    font-size: 0.6rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.75;
+    margin-top: 0.1rem;
+  }
+
+  .modal__signin {
+    margin: 1rem 0 0;
+    padding-top: 0.9rem;
+    border-top: 1px solid var(--color-line);
+    font-size: 0.8rem;
+    color: var(--color-muted);
+    text-align: center;
+  }
+
+  .modal__signin a { color: var(--color-burgundy); font-weight: 600; }
+
+  @media (max-width: 560px) {
+    .plans { grid-template-columns: 1fr; }
+    .modal__body { padding: 1.4rem 1.25rem 1.5rem; }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .plan, .billing button { transition: border-color 0.2s ease, box-shadow 0.2s ease, color 0.2s ease, background-color 0.2s ease; }
+  }
+</style>
+
+<header class="masthead">
+  <a class="masthead__wordmark" href="#">Beyond&nbsp;Every&nbsp;Art</a>
+  <nav class="masthead__nav" aria-label="Primary">
+    <a href="#">Journal</a>
+    <a href="#">Topics</a>
+    <a href="#" aria-current="page">Apps</a>
+    <a href="#">About</a>
+  </nav>
+  <div class="masthead__actions">
+    <button class="icon-button" type="button" aria-label="Search">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" /><path d="M20.5 20.5 16.7 16.7" />
+      </svg>
+    </button>
+    <a class="masthead__signin" href="#">Sign in</a>
+    <a class="button button--primary button--compact" href="#subscribe">Subscribe</a>
+    <button class="nav-toggle" type="button" id="nav-toggle"
+            aria-label="Open menu" aria-expanded="false" aria-controls="mobile-nav">
+      <span></span><span></span>
+    </button>
+  </div>
+</header>
+
+<div class="mobile-nav" id="mobile-nav" hidden>
+  <label class="mobile-nav__search">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2" stroke-linecap="round" aria-hidden="true">
+      <circle cx="11" cy="11" r="7" /><path d="M20.5 20.5 16.7 16.7" />
+    </svg>
+    <input type="search" placeholder="Search the archive" aria-label="Search the archive" />
+  </label>
+  <nav class="mobile-nav__links" aria-label="Mobile">
+    <a href="#">Journal</a>
+    <a href="#">Topics</a>
+    <a href="#" aria-current="page">Apps</a>
+    <a href="#">About</a>
+  </nav>
+  <div class="mobile-nav__foot">
+    <a class="button button--primary" href="#subscribe">Subscribe</a>
+    <a class="mobile-nav__signin" href="#">Sign in</a>
+  </div>
+</div>
+
+
+<!-- ── Search ───────────────────────────────────────────────────────────── -->
+<div class="search-scrim" id="search-scrim" hidden></div>
+<div class="search-panel" id="search-panel" role="search"
+     aria-label="Search the archive" hidden>
+  <div class="container">
+    <div class="search__field">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7" /><path d="M20.5 20.5 16.7 16.7" />
+      </svg>
+      <input type="search" id="search-input" placeholder="Search the archive"
+             aria-label="Search the archive" autocomplete="off" spellcheck="false" />
+      <button class="icon-button" type="button" id="search-close" aria-label="Close search">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+          <path d="M6 6l12 12M18 6L6 18" />
+        </svg>
+      </button>
+    </div>
+    <p class="search__meta">
+      <span id="search-count">All pieces</span>
+      <span class="search__hint"><kbd>↑</kbd><kbd>↓</kbd> to move <kbd>Esc</kbd> to close</span>
+    </p>
+    <ul class="search__results" id="search-results"></ul>
+    <div class="search__empty" id="search-empty" hidden></div>
+  </div>
+</div>
+
+<!-- ── Subscribe modal ──────────────────────────────────────────────────── -->
+<div class="modal-scrim" id="modal-scrim" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" id="modal" tabindex="-1">
+    <button class="modal__close" type="button" id="modal-close" aria-label="Close">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+        <path d="M6 6l12 12M18 6L6 18" />
+      </svg>
+    </button>
+    <div class="modal__body">
+      <div id="modal-offer">
+        <p class="eyebrow">Join Beyond Every Art</p>
+        <h2 id="modal-title">Two ways to read</h2>
+        <p class="modal__lede">
+          The Friday letter is free. A full membership opens the paywalled
+          pieces and the specimen sheets behind them.
+        </p>
+
+        <div class="plans" role="radiogroup" aria-label="Membership">
+          <label class="plan is-selected" data-plan="free">
+            <input type="radio" name="plan" value="free" checked />
+            <span class="plan__head">
+              <span class="plan__name">Free</span>
+              <span class="plan__price">£0</span>
+            </span>
+            <ul class="plan__list">
+              <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>The Friday letter, weekly</span></li>
+              <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>Members-only pieces</span></li>
+              <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>The full archive index</span></li>
+            </ul>
+          </label>
+
+          <label class="plan" data-plan="paid">
+            <span class="plan__badge">Full access</span>
+            <input type="radio" name="plan" value="paid" />
+            <span class="plan__head">
+              <span class="plan__name">Member</span>
+              <span class="plan__price"><b id="plan-price">£6</b><span id="plan-period">/month</span></span>
+            </span>
+            <ul class="plan__list">
+              <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>Everything in Free</span></li>
+              <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>Paywalled long reads</span></li>
+              <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>Specimen sheets for every pigment</span></li>
+              <li><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12.5l5.5 5.5L20 6.5"/></svg><span>You fund the research</span></li>
+            </ul>
+          </label>
+        </div>
+
+        <div class="billing" id="modal-billing" role="group" aria-label="Billing period" hidden>
+          <button type="button" data-cycle="monthly" aria-pressed="true">Monthly</button>
+          <button type="button" data-cycle="annual" aria-pressed="false">
+            Annual <span>Two months free</span>
+          </button>
+        </div>
+
+        <form class="modal__form" id="modal-form" novalidate>
+          <label for="modal-email" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Email address</label>
+          <input type="email" id="modal-email" placeholder="you@studio.com"
+                 autocomplete="email" required aria-describedby="modal-error" />
+          <p class="modal__error" id="modal-error" role="alert" hidden></p>
+          <button class="button button--primary" type="submit" id="modal-submit">Sign up free</button>
+          <p class="modal__small" id="modal-small">Free. One letter a week. Unsubscribe in a click.</p>
+        </form>
+
+        <p class="modal__signin">Already a member? <a href="#">Sign in</a></p>
+      </div>
+
+      <div class="modal__done" id="modal-done" hidden>
+        <h2 id="modal-done-title">You're on the list</h2>
+        <p id="modal-done-note">The first letter arrives on Friday.</p>
+        <button class="button button--primary" type="button" id="modal-dismiss">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<main>
+  <section class="apps">
+    <div class="container">
+      <div class="apps__head reveal">
+        <p class="eyebrow">From the studio</p>
+        <h1 class="apps__title">Apps</h1>
+        <p class="apps__intro">
+          Beyond Every Art is a publication, and behind it a small studio
+          building a family of art applications that share its typography,
+          its palette, and its editorial voice.
+          <strong>None of them have shipped.</strong> This page is a roadmap,
+          not a shop — it changes as the work does.
+        </p>
+      </div>
+
+      <div class="key reveal">
+        <div class="key__item">
+          <span class="status status--concept">Concept</span>
+          <p class="key__note">Written down and costed. No code yet.</p>
+        </div>
+        <div class="key__item">
+          <span class="status status--dev">In development</span>
+          <p class="key__note">Being built. Nothing to install.</p>
+        </div>
+        <div class="key__item">
+          <span class="status status--soon">Coming soon</span>
+          <p class="key__note">Feature complete, in testing, dated.</p>
+        </div>
+        <div class="key__item">
+          <span class="status status--live">Available</span>
+          <p class="key__note">On the App Store and Google Play.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── The roster ───────────────────────────────────────────────────────
+       Four entries, ordered the way the app strategy sequences them. Each one
+       stands in for an Apps document; the plate stands in for heroImage.
+       ──────────────────────────────────────────────────────────────────── -->
+  <section class="roster">
+    <div class="container">
+
+      <article class="app reveal">
+        <div class="app__plate" data-wash="bone" data-seed="19">
+          <span class="app__mark" aria-hidden="true">
+            <span class="app__mark-name">Beyond&nbsp;Every&nbsp;Art</span>
+            <span class="app__mark-rule"></span>
+            <span class="app__mark-platforms">iOS · Android</span>
+          </span>
+        </div>
+        <div class="app__body">
+          <p class="app__index">01</p>
+          <h2 class="app__name">Beyond Every Art</h2>
+          <p class="app__tagline">Art, colour, materials, exhibitions, and creative practice.</p>
+          <p class="app__summary">
+            The companion to this publication — and not a website in a
+            wrapper. A native reader that draws on the same content as the
+            site, with offline reading, saved pieces, highlights, and private
+            notes that stay yours.
+          </p>
+          <p class="app__summary">
+            It opens on Today: one featured piece, a pigment to look at, a
+            short exercise, an exhibition worth the trip. Explore turns the
+            archive sideways — by artist, artwork, pigment, palette, material
+            — and Studio is where you actually mix something.
+          </p>
+          <ul class="app__features">
+            <li>Native reader with offline articles</li>
+            <li>Highlights, notes, and reading history</li>
+            <li>Pigment, palette, and materials index</li>
+            <li>Palette builder and limited-palette challenges</li>
+            <li>Daily prompts and short exercises</li>
+            <li>The discovery hub for everything below</li>
+          </ul>
+          <div class="app__meta">
+            <span class="status status--concept">Concept</span>
+            <span class="app__sequence">First, once the site migration is done</span>
+          </div>
+          <a class="app__link" href="#">
+            More about the companion app
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M5 12h13M12.5 5.5 19 12l-6.5 6.5" />
+            </svg>
+          </a>
+        </div>
+      </article>
+
+      <article class="app app--flip reveal">
+        <div class="app__plate" data-wash="cadmium" data-seed="47">
+          <span class="app__mark" aria-hidden="true">
+            <span class="app__mark-name">Dapple</span>
+            <span class="app__mark-rule"></span>
+            <span class="app__mark-platforms">iOS · Android</span>
+          </span>
+        </div>
+        <div class="app__body">
+          <p class="app__index">02</p>
+          <h2 class="app__name">Dapple</h2>
+          <p class="app__tagline">A quiet place to colour.</p>
+          <p class="app__summary">
+            Freehand colouring for adults, built around artist-made
+            illustrations rather than colour-by-number. Watercolour, pencil,
+            pastel, marker, ink, and textured brushes that behave like the
+            real thing, with pressure support where the hardware allows it.
+          </p>
+          <p class="app__summary">
+            Staying inside the lines is optional and off by default. A page a
+            day is free, the collections are curated rather than endless, and
+            what you finish is yours to export at print resolution.
+          </p>
+          <ul class="app__features">
+            <li>Artist-made adult colouring illustrations</li>
+            <li>Realistic digital media and paper textures</li>
+            <li>Optional stay-inside-the-lines assistance</li>
+            <li>Custom, curated, and mood-based palettes</li>
+            <li>One free page every day</li>
+            <li>High-resolution and wallpaper export</li>
+          </ul>
+          <div class="app__meta">
+            <span class="status status--concept">Concept</span>
+            <span class="app__sequence">After the companion app</span>
+          </div>
+          <a class="app__link" href="#">
+            More about Dapple
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M5 12h13M12.5 5.5 19 12l-6.5 6.5" />
+            </svg>
+          </a>
+        </div>
+      </article>
+
+      <article class="app reveal">
+        <div class="app__plate" data-wash="viridian" data-seed="61">
+          <span class="app__mark" aria-hidden="true">
+            <span class="app__mark-name">Morrow</span>
+            <span class="app__mark-rule"></span>
+            <span class="app__mark-platforms">iOS · Android</span>
+          </span>
+        </div>
+        <div class="app__body">
+          <p class="app__index">03</p>
+          <h2 class="app__name">Morrow</h2>
+          <p class="app__tagline">Make a little space for yourself.</p>
+          <p class="app__summary">
+            An art planner, visual journal, and creative diary — planning,
+            handwriting, drawing, collage, and reflection in one place,
+            without the tone of a corporate productivity app.
+          </p>
+          <p class="app__summary">
+            Instead of picking an emoji for the day, you leave a mark: a
+            colour, a brushstroke, a shape, a small drawing, a photograph.
+            The marks accumulate into a month, and the months into something
+            closer to an abstract portrait of a year. Journals are private
+            user content — held on the device by default, with encrypted sync
+            only if you ask for it.
+          </p>
+          <ul class="app__features">
+            <li>Daily and weekly planning pages</li>
+            <li>Handwriting, drawing, stickers, and tape</li>
+            <li>Visual mood tracking, not emoji</li>
+            <li>Mood boards and monthly reviews</li>
+            <li>Private by default, encrypted sync optional</li>
+            <li>PDF export and printed yearly editions</li>
+          </ul>
+          <div class="app__meta">
+            <span class="status status--concept">Concept</span>
+            <span class="app__sequence">Reuses Dapple's canvas and palette work</span>
+          </div>
+          <a class="app__link" href="#">
+            More about Morrow
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M5 12h13M12.5 5.5 19 12l-6.5 6.5" />
+            </svg>
+          </a>
+        </div>
+      </article>
+
+      <article class="app app--flip reveal">
+        <div class="app__plate" data-wash="ultramarine" data-seed="88">
+          <span class="app__mark" aria-hidden="true">
+            <span class="app__mark-name">Echo Garden</span>
+            <span class="app__mark-rule"></span>
+            <span class="app__mark-platforms">iOS · Android</span>
+          </span>
+        </div>
+        <div class="app__body">
+          <p class="app__index">04</p>
+          <h2 class="app__name">Echo Garden</h2>
+          <p class="app__tagline">Paint a world that sings back.</p>
+          <p class="app__summary">
+            An atmospheric art-and-sound game. You enter somewhere quiet and
+            unfinished — an abandoned garden, a floating observatory, a
+            submerged temple — and find the thing that has lost its colour and
+            its voice.
+          </p>
+          <p class="app__summary">
+            Every mark you make answers in sound. Dots ring like bells, long
+            strokes pull strings, spirals turn vocal, a watercolour wash opens
+            into a pad. The system harmonises what you draw, so restoring a
+            place needs neither drawing nor musical training. It is the most
+            ambitious of the four, and the least certain.
+          </p>
+          <ul class="app__features">
+            <li>Paint, trace, and complete to restore a place</li>
+            <li>Marks map to instruments and harmony</li>
+            <li>Colour controls instrument family and pitch</li>
+            <li>Forgiving input — no skill prerequisite</li>
+            <li>Original world, music, and sound library</li>
+            <li>Prototype first, scope decided after</li>
+          </ul>
+          <div class="app__meta">
+            <span class="status status--concept">Concept</span>
+            <span class="app__sequence">Last, and only as a prototype to begin with</span>
+          </div>
+          <a class="app__link" href="#">
+            More about Echo Garden
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M5 12h13M12.5 5.5 19 12l-6.5 6.5" />
+            </svg>
+          </a>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ── How they connect ─────────────────────────────────────────────────── -->
+  <section class="thread">
+    <div class="container">
+      <div class="thread__grid">
+        <div class="reveal">
+          <p class="eyebrow">One account</p>
+          <h2>The publication is the way in</h2>
+          <p class="thread__lede">
+            The apps are separate products with their own names, but they run
+            on the same accounts and the same content. Reading something here
+            should be able to open the thing it describes.
+          </p>
+        </div>
+        <ul class="thread__list reveal">
+          <li>
+            <p class="thread__from">An article on limited palettes</p>
+            <span class="thread__arrow" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 12h13M12.5 5.5 19 12l-6.5 6.5" />
+              </svg>
+            </span>
+            <p class="thread__to">Opens that palette in Dapple</p>
+          </li>
+          <li>
+            <p class="thread__from">A creative exercise you finish</p>
+            <span class="thread__arrow" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 12h13M12.5 5.5 19 12l-6.5 6.5" />
+              </svg>
+            </span>
+            <p class="thread__to">Saves to Morrow</p>
+          </li>
+          <li>
+            <p class="thread__from">A piece on colour and sound</p>
+            <span class="thread__arrow" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 12h13M12.5 5.5 19 12l-6.5 6.5" />
+              </svg>
+            </span>
+            <p class="thread__to">Opens a related Echo Garden scene</p>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Waitlist ─────────────────────────────────────────────────────────
+       One email, any number of apps. Each ticked box is a row in the
+       app-waitlist collection: a (email, app) pair, one per person per app.
+       ──────────────────────────────────────────────────────────────────── -->
+  <section class="waitlist" id="notify">
+    <div class="container">
+      <div class="waitlist__grid">
+        <div class="reveal">
+          <p class="eyebrow">Notify me</p>
+          <h2>Tell us which of these you would actually use</h2>
+          <p class="waitlist__lede">
+            Pick as many as you like. We will write once, when that app opens
+            for testing — and the answers decide what gets built first.
+          </p>
+        </div>
+
+        <div class="reveal">
+          <form id="waitlist-form" novalidate>
+            <fieldset class="waitlist__fields">
+              <legend>Apps</legend>
+              <div class="waitlist__options">
+                <label class="pick">
+                  <input type="checkbox" name="app" value="beyond-every-art" />
+                  <span>Beyond Every Art</span>
+                </label>
+                <label class="pick">
+                  <input type="checkbox" name="app" value="dapple" />
+                  <span>Dapple</span>
+                </label>
+                <label class="pick">
+                  <input type="checkbox" name="app" value="morrow" />
+                  <span>Morrow</span>
+                </label>
+                <label class="pick">
+                  <input type="checkbox" name="app" value="echo-garden" />
+                  <span>Echo Garden</span>
+                </label>
+              </div>
+            </fieldset>
+
+            <label for="waitlist-email" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Email address</label>
+            <div class="waitlist__row">
+              <input type="email" id="waitlist-email" placeholder="you@studio.com"
+                     autocomplete="email" required aria-describedby="waitlist-error" />
+              <button class="button button--primary" type="submit">Notify me</button>
+            </div>
+            <p class="waitlist__error" id="waitlist-error" role="alert" hidden></p>
+            <p class="waitlist__small">
+              Separate from the Friday letter. No launch countdowns, no
+              reminders — one email per app, then nothing.
+            </p>
+          </form>
+
+          <div class="waitlist__done" id="waitlist-done" hidden>
+            <h3>Noted</h3>
+            <p id="waitlist-done-note"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="subscribe" id="subscribe">
+    <div class="container">
+      <div class="subscribe__grid">
+        <div class="reveal">
+          <p class="eyebrow">The Friday letter</p>
+          <h2>One pigment, examined, every Friday</h2>
+          <p>
+            A single material each week — where it comes from, how it behaves,
+            and which paintings depend on it. No roundups.
+          </p>
+        </div>
+        <form class="signup reveal" onsubmit="return false">
+          <label for="email" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Email address</label>
+          <div class="signup__row">
+            <input id="email" type="email" placeholder="you@studio.com" autocomplete="email" />
+            <button class="button button--on-dark" type="submit">Subscribe</button>
+          </div>
+          <small>Free. One letter a week. Unsubscribe in a click.</small>
+        </form>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="container footer__grid">
+    <span class="footer__wordmark">Beyond Every Art</span>
+    <nav aria-label="Footer">
+      <a href="#">Journal</a>
+      <a href="#">Topics</a>
+      <a href="#">Apps</a>
+      <a href="#subscribe">Subscribe</a>
+      <a href="#">Sign in</a>
+      <a href="#">About</a>
+      <a href="#">RSS</a>
+    </nav>
+    <span class="num">© 2026 Beyond Every Art</span>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    'use strict'
+
+    var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+    var PIGMENTS = {
+      ultramarine: { hex: '#1f3a93', deep: '#0f1f57' },
+      sienna:      { hex: '#8a3a1e', deep: '#4a1c0c' },
+      viridian:    { hex: '#2e6b52', deep: '#123227' },
+      cadmium:     { hex: '#c9820a', deep: '#6b4103' },
+      leadwhite:   { hex: '#efe9dd', deep: '#b6ab97' },
+      bone:        { hex: '#20211f', deep: '#000000' }
+    }
+
+    /* ------------------------------------------------------------------
+       Pigment plates — same generated art as the other pages.
+       ------------------------------------------------------------------ */
+    function rng(seed) {
+      var a = seed >>> 0
+      return function () {
+        a = (a + 0x6d2b79f5) | 0
+        var t = Math.imul(a ^ (a >>> 15), 1 | a)
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+      }
+    }
+
+    function hexA(hex, alpha) {
+      var n = parseInt(hex.replace('#', ''), 16)
+      return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + alpha + ')'
+    }
+
+    function paintPlate(canvas, pigKey, seed) {
+      var pig = PIGMENTS[pigKey] || PIGMENTS.ultramarine
+      var rect = canvas.getBoundingClientRect()
+      if (rect.width < 2 || rect.height < 2) return
+
+      var dpr = Math.min(window.devicePixelRatio || 1, 2)
+      var w = Math.round(rect.width), h = Math.round(rect.height)
+      canvas.width = w * dpr
+      canvas.height = h * dpr
+
+      var ctx = canvas.getContext('2d')
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      var r = rng(seed)
+      var cx = w * 0.5, cy = h * 0.5, reach = Math.max(w, h)
+
+      ctx.fillStyle = pig.hex
+      ctx.fillRect(0, 0, w, h)
+
+      for (var i = 0; i < 12; i++) {
+        var bx = cx + (r() - 0.5) * w * 1.6
+        var by = cy + (r() - 0.5) * h * 1.6
+        var br = (0.28 + r() * 0.55) * reach
+        var g = ctx.createRadialGradient(bx, by, 0, bx, by, br)
+        var tone = r() > 0.4 ? pig.hex : pig.deep
+        g.addColorStop(0, hexA(tone, 0.95 * (0.65 + r() * 0.35)))
+        g.addColorStop(0.5, hexA(tone, 0.28))
+        g.addColorStop(1, hexA(tone, 0))
+        ctx.fillStyle = g
+        ctx.beginPath()
+        ctx.arc(bx, by, br, 0, Math.PI * 2)
+        ctx.fill()
+      }
+
+      ctx.save()
+      ctx.globalCompositeOperation = 'screen'
+      for (var l = 0; l < 7; l++) {
+        var lx = cx + (r() - 0.5) * w * 1.3
+        var ly = cy + (r() - 0.5) * h * 1.3
+        var lr = reach * (0.18 + r() * 0.35)
+        var lg = ctx.createRadialGradient(lx, ly, 0, lx, ly, lr)
+        lg.addColorStop(0, hexA(pig.hex, 0.32 + r() * 0.3))
+        lg.addColorStop(1, hexA(pig.hex, 0))
+        ctx.fillStyle = lg
+        ctx.beginPath()
+        ctx.arc(lx, ly, lr, 0, Math.PI * 2)
+        ctx.fill()
+      }
+      ctx.restore()
+
+      var angle = -0.35 + r() * 0.7
+      for (var s = 0; s < 30; s++) {
+        ctx.save()
+        ctx.translate(cx + (r() - 0.5) * w * 1.5, cy + (r() - 0.5) * h * 1.5)
+        ctx.rotate(angle + (r() - 0.5) * 0.5)
+        ctx.globalAlpha = 0.34 * (0.3 + r() * 0.7)
+        ctx.fillStyle = r() > 0.62 ? pig.deep : pig.hex
+        ctx.beginPath()
+        ctx.ellipse(0, 0, (0.03 + r() * r() * 0.16) * w, 2 + r() * r() * 14, 0, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.restore()
+      }
+      ctx.globalAlpha = 1
+
+      ctx.save()
+      ctx.strokeStyle = pig.deep
+      ctx.lineCap = 'round'
+      for (var t = 0; t < 4; t++) {
+        var st = r() * Math.PI * 2
+        ctx.lineWidth = 0.8 + r() * 1.4
+        ctx.globalAlpha = 0.05 + r() * 0.09
+        ctx.beginPath()
+        ctx.ellipse(
+          cx + (r() - 0.5) * w * 0.5, cy + (r() - 0.5) * h * 0.6,
+          reach * (0.12 + r() * 0.3), reach * (0.1 + r() * 0.26),
+          r() * Math.PI, st, st + 0.5 + r() * 1.4
+        )
+        ctx.stroke()
+      }
+      ctx.restore()
+
+      var vg = ctx.createRadialGradient(cx, cy, reach * 0.2, cx, cy, reach * 0.78)
+      vg.addColorStop(0, 'rgba(0,0,0,0)')
+      vg.addColorStop(1, hexA(pig.deep, 0.55))
+      ctx.fillStyle = vg
+      ctx.fillRect(0, 0, w, h)
+
+      var hx = w * (0.3 + r() * 0.4), hy = h * (0.22 + r() * 0.3)
+      var hg = ctx.createRadialGradient(hx, hy, 0, hx, hy, reach * 0.5)
+      hg.addColorStop(0, 'rgba(255,255,255,0.18)')
+      hg.addColorStop(1, 'rgba(255,255,255,0)')
+      ctx.fillStyle = hg
+      ctx.fillRect(0, 0, w, h)
+    }
+
+    function mountWash(host) {
+      var canvas = host.querySelector('canvas')
+      if (!canvas) {
+        canvas = document.createElement('canvas')
+        host.appendChild(canvas)
+      }
+      paintPlate(canvas, host.dataset.wash, parseInt(host.dataset.seed, 10) || 1)
+    }
+
+    /* ------------------------------------------------------------------
+       App plates. Each one stands in for Apps.heroImage — there is no real
+       app artwork yet, so the page paints a wash rather than shipping a
+       placeholder screenshot that implies something has been built.
+       ------------------------------------------------------------------ */
+    var plates = Array.prototype.slice.call(document.querySelectorAll('.app__plate'))
+    plates.forEach(mountWash)
+
+    var repaint = null
+    window.addEventListener('resize', function () {
+      clearTimeout(repaint)
+      repaint = setTimeout(function () { plates.forEach(mountWash) }, 180)
+    })
+
+    /* ------------------------------------------------------------------
+       Waitlist. One email, any number of apps: each ticked box becomes its
+       own (email, app) row, which is how the app-waitlist collection is
+       shaped. A repeat submission for a pair already on file is a no-op
+       success, so the form has no failure state to show for it.
+       ------------------------------------------------------------------ */
+    var EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+    var form = document.getElementById('waitlist-form')
+    var emailField = document.getElementById('waitlist-email')
+    var errorEl = document.getElementById('waitlist-error')
+    var doneEl = document.getElementById('waitlist-done')
+    var doneNote = document.getElementById('waitlist-done-note')
+    var picks = Array.prototype.slice.call(form.querySelectorAll('input[name="app"]'))
+
+    function setError(message) {
+      errorEl.textContent = message || ''
+      errorEl.hidden = !message
+    }
+
+    picks.forEach(function (box) {
+      box.addEventListener('change', function () {
+        box.closest('.pick').classList.toggle('is-picked', box.checked)
+        if (box.checked) setError('')
+      })
+    })
+
+    emailField.addEventListener('input', function () { setError('') })
+
+    /* "Dapple", "Dapple and Morrow", "Dapple, Morrow, and Echo Garden" */
+    function listNames(names) {
+      if (names.length === 1) return names[0]
+      if (names.length === 2) return names[0] + ' and ' + names[1]
+      return names.slice(0, -1).join(', ') + ', and ' + names[names.length - 1]
+    }
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault()
+
+      var chosen = picks.filter(function (box) { return box.checked })
+      if (chosen.length === 0) {
+        setError('Pick at least one app.')
+        picks[0].focus()
+        return
+      }
+
+      var email = emailField.value.trim()
+      if (!EMAIL_PATTERN.test(email)) {
+        setError('That does not look like an email address.')
+        emailField.focus()
+        return
+      }
+
+      var names = chosen.map(function (box) {
+        return box.parentElement.querySelector('span').textContent
+      })
+
+      doneNote.textContent =
+        'We will write to ' + email + ' when ' + listNames(names) +
+        (names.length > 1 ? ' open' : ' opens') + ' for testing. Nothing before then.'
+
+      form.hidden = true
+      doneEl.hidden = false
+      doneEl.setAttribute('tabindex', '-1')
+      doneEl.focus()
+    })
+
+    /* ------------------------------------------------------------------
+       Mobile menu
+       ------------------------------------------------------------------ */
+    var navToggle = document.getElementById('nav-toggle')
+    var mobileNav = document.getElementById('mobile-nav')
+    var masthead = document.querySelector('.masthead')
+    var closeTimer = null
+
+    function syncMastheadHeight() {
+      document.documentElement.style.setProperty('--masthead-h', masthead.offsetHeight + 'px')
+    }
+    syncMastheadHeight()
+    window.addEventListener('resize', syncMastheadHeight)
+
+    function setMenu(open) {
+      navToggle.setAttribute('aria-expanded', String(open))
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu')
+      document.body.style.overflow = open ? 'hidden' : ''
+      clearTimeout(closeTimer)
+
+      if (open) {
+        syncMastheadHeight()
+        mobileNav.hidden = false
+        void mobileNav.offsetWidth
+        mobileNav.classList.add('is-open')
+      } else {
+        mobileNav.classList.remove('is-open')
+        if (reduced) mobileNav.hidden = true
+        else closeTimer = setTimeout(function () { mobileNav.hidden = true }, 340)
+        navToggle.focus()
+      }
+    }
+
+    navToggle.addEventListener('click', function () { setMenu(mobileNav.hidden) })
+
+    Array.prototype.forEach.call(mobileNav.querySelectorAll('a'), function (link) {
+      link.addEventListener('click', function () { setMenu(false) })
+    })
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !mobileNav.hidden) setMenu(false)
+    })
+
+    var desktop = window.matchMedia('(min-width: 981px)')
+    var onDesktop = function (e) { if (e.matches && !mobileNav.hidden) setMenu(false) }
+    if (desktop.addEventListener) desktop.addEventListener('change', onDesktop)
+    else desktop.addListener(onDesktop)
+
+    /* ------------------------------------------------------------------
+       Reveals
+       ------------------------------------------------------------------ */
+    var targets = document.querySelectorAll('.reveal')
+
+    if (reduced || !('IntersectionObserver' in window)) {
+      Array.prototype.forEach.call(targets, function (el) { el.classList.add('is-in') })
+    } else {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return
+          var el = entry.target
+          var siblings = Array.prototype.slice.call(
+            el.parentElement ? el.parentElement.children : []
+          ).filter(function (n) { return n.classList.contains('reveal') })
+          var i = Math.max(0, siblings.indexOf(el))
+          setTimeout(function () { el.classList.add('is-in') }, Math.min(i, 5) * 60)
+          io.unobserve(el)
+        })
+      }, { threshold: 0.08, rootMargin: '0px 0px -5% 0px' })
+
+      Array.prototype.forEach.call(targets, function (el) { io.observe(el) })
+    }
+  })()
+</script>
+
+<script>
+  /* Shared masthead chrome: search panel + subscribe modal. Kept out of the
+     page IIFE so every page carries an identical copy. */
+  (function () {
+    'use strict'
+
+    var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+    var PIG_HEX = {
+      ultramarine: '#1f3a93', sienna: '#8a3a1e', viridian: '#2e6b52',
+      cadmium: '#c9820a', leadwhite: '#efe9dd', bone: '#20211f'
+    }
+
+    /* Stands in for a real search index. Each entry is what a PostCard
+       carries, so wiring this to the search route is a swap, not a rewrite. */
+    var INDEX = [
+      { t: 'The Chemical Symphony of Ultramarine', g: 'Materials', p: 'ultramarine', m: '14 min', d: 'Ground lapis cost more than gold — and the reason is still in the crystal structure.' },
+      { t: 'What Raking Light Reveals About a Painting\u2019s Surface', g: 'Conservation', p: 'viridian', m: '12 min', d: 'Turn the lamp sideways and the brushwork, the losses, and the retouching all show.' },
+      { t: 'Why Burnt Sienna Behaves Differently in Oil Than in Watercolour', g: 'Creative practice', p: 'sienna', m: '9 min', d: 'The same earth, two binders, and a working property that reverses between them.' },
+      { t: 'How to Read a Pigment Supplier\u2019s Catalogue', g: 'Materials', p: 'cadmium', m: '7 min', d: 'Pigment index numbers, lightfastness ratings, and what the codes actually promise.' },
+      { t: 'Egg Tempera and the Problem of Drying Time', g: 'Creative practice', p: 'leadwhite', m: '10 min', d: 'A medium that sets in seconds forces a way of building an image stroke by stroke.' },
+      { t: 'Light and Shadow in Renaissance Masterpieces', g: 'Art history', p: 'bone', m: '16 min', d: 'Reading the deliberate choreography of light that gives Renaissance painting its depth.' },
+      { t: 'Why Titanium White Behaves Differently Than Lead White', g: 'Materials', p: 'leadwhite', m: '11 min', d: 'Two whites, similar in appearance but worlds apart in composition and performance.' },
+      { t: 'Verdigris, and the Green That Eats Its Own Paper', g: 'Materials', p: 'viridian', m: '13 min', d: 'A copper green so corrosive that surviving manuscripts are perforated where it was used.' },
+      { t: 'The Chemistry of Color: Pigments Through Time', g: 'Materials', p: 'cadmium', m: '13 min', d: 'How an artist\u2019s palette encodes centuries of chemistry, trade, and discovery.' },
+      { t: 'What a Craquelure Pattern Tells a Conservator', g: 'Conservation', p: 'bone', m: '11 min', d: 'The direction and spacing of the cracks record the support, the ground, and the age.' },
+      { t: 'Building Texture: From Surface to Soul', g: 'Creative practice', p: 'ultramarine', m: '8 min', d: 'Impasto, glazing, and the tactile decisions that turn a flat surface into a felt experience.' },
+      { t: 'Mummy Brown and the Ethics of a Pigment', g: 'Art history', p: 'sienna', m: '15 min', d: 'A colour that stayed on palettes for three centuries, and what happened when painters learned its source.' },
+      { t: 'Chalk, Gesso, and What a Ground Is Really For', g: 'Materials', p: 'leadwhite', m: '9 min', d: 'The layer nobody looks at decides how much of the paint above it will survive.' },
+      { t: 'Linseed, Walnut, Poppy: Choosing an Oil', g: 'Materials', p: 'cadmium', m: '10 min', d: 'Yellowing, drying rate, and flexibility pull in different directions. Pick two.' },
+      { t: 'Bone Black, Vine Black, Lamp Black', g: 'Materials', p: 'bone', m: '12 min', d: 'Three carbon blacks with three different undertones, and why the choice shows.' },
+      { t: 'What Makes a Pigment Lightfast', g: 'Materials', p: 'viridian', m: '11 min', d: 'Fading is a photochemical process, and the ratings are a shorthand for how fast.' }
+    ]
+
+    var lastFocus = null
+    var EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+    function trap(container, e) {
+      if (e.key !== 'Tab') return
+      var f = container.querySelectorAll(
+        'a[href], button:not([disabled]), input, [tabindex]:not([tabindex="-1"])'
+      )
+      var vis = Array.prototype.filter.call(f, function (el) { return el.offsetParent !== null })
+      if (!vis.length) return
+      var first = vis[0], last = vis[vis.length - 1]
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus() }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus() }
+    }
+
+    /* ---------------------------------------------------------------- Search */
+    var panel = document.getElementById('search-panel')
+    var scrim = document.getElementById('search-scrim')
+    var input = document.getElementById('search-input')
+    var listEl = document.getElementById('search-results')
+    var emptyEl = document.getElementById('search-empty')
+    var countEl = document.getElementById('search-count')
+    var searchTimer = null
+
+    function escapeHtml(s) {
+      return s.replace(/[&<>"]/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]
+      })
+    }
+
+    function highlight(text, q) {
+      var safe = escapeHtml(text)
+      if (!q) return safe
+      var i = safe.toLowerCase().indexOf(q.toLowerCase())
+      if (i === -1) return safe
+      return safe.slice(0, i) + '<mark>' + safe.slice(i, i + q.length) + '</mark>' + safe.slice(i + q.length)
+    }
+
+    function renderResults(q) {
+      var query = q.trim()
+      var hits = query
+        ? INDEX.filter(function (r) {
+            var hay = (r.t + ' ' + r.g + ' ' + r.d).toLowerCase()
+            return query.toLowerCase().split(/\s+/).every(function (w) { return hay.indexOf(w) !== -1 })
+          })
+        : INDEX.slice(0, 6)
+
+      listEl.innerHTML = ''
+      emptyEl.hidden = hits.length > 0
+      countEl.textContent = query
+        ? hits.length + (hits.length === 1 ? ' result' : ' results')
+        : 'Recent pieces'
+
+      if (!hits.length) {
+        emptyEl.innerHTML = 'No pieces match <b>' + escapeHtml(query) +
+          '</b>. Try a pigment name — ultramarine, lead white, verdigris.'
+        return
+      }
+
+      hits.forEach(function (r, i) {
+        var li = document.createElement('li')
+        var a = document.createElement('a')
+        a.className = 'search__result'
+        a.href = '#'
+        if (!reduced) a.style.animationDelay = Math.min(i, 8) * 35 + 'ms'
+
+        var dot = document.createElement('i')
+        dot.style.background = PIG_HEX[r.p] || PIG_HEX.ultramarine
+
+        var body = document.createElement('div')
+        var h = document.createElement('h3')
+        h.innerHTML = highlight(r.t, query)
+        var p = document.createElement('p')
+        p.innerHTML = highlight(r.d, query)
+        body.appendChild(h)
+        body.appendChild(p)
+
+        var meta = document.createElement('span')
+        meta.className = 'search__result-meta'
+        meta.textContent = r.g + ' · ' + r.m
+
+        a.appendChild(dot)
+        a.appendChild(body)
+        a.appendChild(meta)
+        li.appendChild(a)
+        listEl.appendChild(li)
+      })
+    }
+
+    function setSearch(open) {
+      Array.prototype.forEach.call(
+        document.querySelectorAll('.masthead .icon-button[aria-label="Search"]'),
+        function (b) { b.setAttribute('aria-expanded', String(open)) }
+      )
+      if (open) {
+        lastFocus = document.activeElement
+        scrim.hidden = false
+        panel.hidden = false
+        void panel.offsetWidth
+        scrim.classList.add('is-open')
+        panel.classList.add('is-open')
+        document.body.style.overflow = 'hidden'
+        renderResults(input.value)
+        input.focus()
+        input.select()
+      } else {
+        scrim.classList.remove('is-open')
+        panel.classList.remove('is-open')
+        document.body.style.overflow = ''
+        var done = function () { scrim.hidden = true; panel.hidden = true }
+        if (reduced) done()
+        else setTimeout(done, 260)
+        if (lastFocus && lastFocus.focus) lastFocus.focus()
+      }
+    }
+
+    input.addEventListener('input', function () {
+      // Debounced so a fast typist does not repaint the list on every keystroke.
+      clearTimeout(searchTimer)
+      searchTimer = setTimeout(function () { renderResults(input.value) }, 120)
+    })
+
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown') {
+        var first = listEl.querySelector('.search__result')
+        if (first) { e.preventDefault(); first.focus() }
+      }
+    })
+
+    listEl.addEventListener('keydown', function (e) {
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+      var items = Array.prototype.slice.call(listEl.querySelectorAll('.search__result'))
+      var i = items.indexOf(document.activeElement)
+      if (i === -1) return
+      e.preventDefault()
+      if (e.key === 'ArrowDown' && items[i + 1]) items[i + 1].focus()
+      else if (e.key === 'ArrowUp') (items[i - 1] || input).focus()
+    })
+
+    document.getElementById('search-close').addEventListener('click', function () { setSearch(false) })
+    scrim.addEventListener('click', function () { setSearch(false) })
+    panel.addEventListener('keydown', function (e) { trap(panel, e) })
+
+    // Every search affordance on the page opens the same panel.
+    Array.prototype.forEach.call(
+      document.querySelectorAll('.masthead .icon-button[aria-label="Search"]'),
+      function (btn) {
+        btn.setAttribute('aria-expanded', 'false')
+        btn.setAttribute('aria-controls', 'search-panel')
+        btn.addEventListener('click', function () { setSearch(panel.hidden) })
+      }
+    )
+
+    var menuSearch = document.querySelector('.mobile-nav__search')
+    if (menuSearch) {
+      var menuInput = menuSearch.querySelector('input')
+      if (menuInput) menuInput.readOnly = true
+      menuSearch.addEventListener('click', function (e) {
+        e.preventDefault()
+        var toggle = document.getElementById('nav-toggle')
+        if (toggle && toggle.getAttribute('aria-expanded') === 'true') toggle.click()
+        setTimeout(function () { setSearch(true) }, reduced ? 0 : 200)
+      })
+    }
+
+    /* ----------------------------------------------------------------- Modal */
+    var mScrim = document.getElementById('modal-scrim')
+    var mClose = document.getElementById('modal-close')
+    var mForm = document.getElementById('modal-form')
+    var mEmail = document.getElementById('modal-email')
+    var mError = document.getElementById('modal-error')
+    var mOffer = document.getElementById('modal-offer')
+    var mDone = document.getElementById('modal-done')
+    var mSubmit = document.getElementById('modal-submit')
+    var mSmall = document.getElementById('modal-small')
+    var billing = document.getElementById('modal-billing')
+
+    /* Placeholder pricing — there is none in the repo yet. Monthly and annual
+       are both here because the Stripe handling already assumes both. */
+    var PRICES = {
+      monthly: { price: '£6', period: '/month', note: 'Billed monthly. Cancel any time.' },
+      annual: { price: '£60', period: '/year', note: 'Billed yearly. Cancel any time.' }
+    }
+
+    var plan = 'free'
+    var cycle = 'monthly'
+
+    function syncPlan() {
+      Array.prototype.forEach.call(document.querySelectorAll('.plan'), function (el) {
+        var on = el.dataset.plan === plan
+        el.classList.toggle('is-selected', on)
+        var radio = el.querySelector('input')
+        if (radio.checked !== on) radio.checked = on
+      })
+
+      billing.hidden = plan !== 'paid'
+      document.getElementById('plan-price').textContent = PRICES[cycle].price
+      document.getElementById('plan-period').textContent = PRICES[cycle].period
+
+      Array.prototype.forEach.call(billing.querySelectorAll('button'), function (b) {
+        b.setAttribute('aria-pressed', String(b.dataset.cycle === cycle))
+      })
+
+      // The button says what happens next, and the small print matches it.
+      mSubmit.textContent = plan === 'free' ? 'Sign up free' : 'Continue to payment'
+      mSmall.textContent = plan === 'free'
+        ? 'Free. One letter a week. Unsubscribe in a click.'
+        : PRICES[cycle].note + ' Card details are taken on the next step.'
+    }
+
+    Array.prototype.forEach.call(document.querySelectorAll('.plan input'), function (radio) {
+      radio.addEventListener('change', function () { plan = radio.value; syncPlan() })
+      radio.addEventListener('focus', function () { radio.closest('.plan').classList.add('is-focused') })
+      radio.addEventListener('blur', function () { radio.closest('.plan').classList.remove('is-focused') })
+    })
+
+    Array.prototype.forEach.call(billing.querySelectorAll('button'), function (b) {
+      b.addEventListener('click', function () { cycle = b.dataset.cycle; syncPlan() })
+    })
+
+    syncPlan()
+
+    function setModal(open) {
+      if (open) {
+        lastFocus = document.activeElement
+        mScrim.hidden = false
+        void mScrim.offsetWidth
+        mScrim.classList.add('is-open')
+        document.body.style.overflow = 'hidden'
+        document.getElementById('modal').focus({ preventScroll: true })
+        mScrim.scrollTop = 0
+      } else {
+        mScrim.classList.remove('is-open')
+        document.body.style.overflow = ''
+        var done = function () {
+          mScrim.hidden = true
+          mOffer.hidden = false
+          mDone.hidden = true
+          mForm.reset()
+          mError.hidden = true
+          plan = 'free'
+          cycle = 'monthly'
+          syncPlan()
+        }
+        if (reduced) done()
+        else setTimeout(done, 280)
+        if (lastFocus && lastFocus.focus) lastFocus.focus()
+      }
+    }
+
+    mClose.addEventListener('click', function () { setModal(false) })
+    document.getElementById('modal-dismiss').addEventListener('click', function () { setModal(false) })
+    mScrim.addEventListener('click', function (e) { if (e.target === mScrim) setModal(false) })
+    mScrim.addEventListener('keydown', function (e) { trap(mScrim, e) })
+
+    mForm.addEventListener('submit', function (e) {
+      e.preventDefault()
+      var value = mEmail.value.trim()
+      if (!EMAIL.test(value)) {
+        mError.textContent = 'Enter an email address so we know where to send it.'
+        mError.hidden = false
+        mEmail.focus()
+        return
+      }
+      mError.hidden = true
+
+      if (plan === 'free') {
+        document.getElementById('modal-done-title').textContent = "You're on the list"
+        document.getElementById('modal-done-note').textContent =
+          'The first letter goes to ' + value + ' on Friday.'
+      } else {
+        document.getElementById('modal-done-title').textContent = 'One more step'
+        document.getElementById('modal-done-note').textContent =
+          'Checkout would open here to take card details for the ' +
+          (cycle === 'annual' ? 'annual' : 'monthly') + ' plan, then ' + value +
+          ' gets full access.'
+      }
+
+      mOffer.hidden = true
+      mDone.hidden = false
+      document.getElementById('modal-dismiss').focus()
+    })
+
+    // Anything pointing at the subscribe section opens the modal instead.
+    Array.prototype.forEach.call(
+      document.querySelectorAll('a[href="#subscribe"]'),
+      function (a) {
+        a.addEventListener('click', function (e) { e.preventDefault(); setModal(true) })
+      }
+    )
+
+    // The inline band keeps its own form; it just needs to answer.
+    var inline = document.querySelector('.signup')
+    if (inline) {
+      inline.addEventListener('submit', function (e) {
+        e.preventDefault()
+        var field = inline.querySelector('input')
+        var value = field.value.trim()
+        if (!EMAIL.test(value)) { field.focus(); return }
+        setModal(true)
+        mEmail.value = value
+        mForm.dispatchEvent(new Event('submit', { cancelable: true }))
+      })
+    }
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape') return
+      if (!mScrim.hidden) setModal(false)
+      else if (!panel.hidden) setSearch(false)
+    })
+  })()
+</script>
+  </body>
+</html>
