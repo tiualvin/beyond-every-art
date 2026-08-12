@@ -103,6 +103,16 @@ and follows that spec's data model rather than inventing a second one.
   concept. Per-app CTAs stay on the detail route, as the spec has them.
 - **How they connect** is the handoff's cross-linking table rendered as a list:
   the publication moment on the left, the app it hands off to on the right.
+- **It renders without script.** The reveal's hidden state is conditional on a
+  `js` class set by an inline script, so a viewer that blocks JavaScript gets
+  the page rather than a blank one, and each plate carries a CSS gradient of
+  its pigment beneath the canvas. The revealed state also sits outside the
+  motion queries: held inside `no-preference`, a browser matching neither
+  motion query would never restore the content.
+
+  The other four prototypes still gate their content on script and go blank
+  without it — sandboxed previews and in-app browsers routinely block it. The
+  same two changes port over unchanged.
 
 ## Design tokens
 

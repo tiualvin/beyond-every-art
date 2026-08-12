@@ -4,6 +4,14 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Beyond Every Art — Apps</title>
+    <!-- Runs before the body parses. Every reveal starts hidden and is opened
+         by script, so the hidden state has to be conditional on script being
+         there to open it: without this class the page renders blank in any
+         viewer that blocks JavaScript, which sandboxed previews and in-app
+         browsers routinely do. -->
+    <script>
+      document.documentElement.className += ' js'
+    </script>
   </head>
   <body>
 <style>
@@ -477,6 +485,26 @@
     padding: 1.5rem;
   }
 
+  /* The wash is painted onto a canvas, so the plate needs a ground that holds
+     the pigment on its own. Without one, a viewer with no script gets four
+     near-black rectangles instead of four colours. The canvas covers this
+     when it paints. */
+  .app__plate[data-wash='bone'] {
+    background: radial-gradient(circle at 38% 32%, #35352f, #20211f 58%, #0b0b0a);
+  }
+
+  .app__plate[data-wash='cadmium'] {
+    background: radial-gradient(circle at 38% 32%, #d8931f, #a5680a 55%, #4a2d02);
+  }
+
+  .app__plate[data-wash='viridian'] {
+    background: radial-gradient(circle at 38% 32%, #3f8465, #2e6b52 55%, #0e2a20);
+  }
+
+  .app__plate[data-wash='ultramarine'] {
+    background: radial-gradient(circle at 38% 32%, #2c4fb4, #1f3a93 55%, #0c1a4a);
+  }
+
   .app__plate canvas {
     position: absolute;
     inset: 0;
@@ -905,14 +933,20 @@
   /* ==========================================================================
      Motion
      ========================================================================== */
-  .reveal { opacity: 0; transform: translateY(16px); }
+  /* Hidden only when script is present to un-hide it. */
+  .js .reveal { opacity: 0; transform: translateY(16px); }
+
+  /* The revealed state sits outside the motion queries on purpose. Held inside
+     `no-preference`, a browser that reports no preference either way matches
+     neither query and never restores the content. Only the transition is a
+     motion concern; being visible is not. */
+  .js .reveal.is-in { opacity: 1; transform: none; }
 
   @media (prefers-reduced-motion: no-preference) {
-    .reveal {
+    .js .reveal {
       transition: opacity 0.65s cubic-bezier(0.22, 1, 0.36, 1),
                   transform 0.65s cubic-bezier(0.22, 1, 0.36, 1);
     }
-    .reveal.is-in { opacity: 1; transform: none; }
 
     .masthead__nav a::after { transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1); }
     .masthead__nav a, .masthead__signin, .app__link { transition: color 0.22s ease, border-color 0.22s ease; }
@@ -941,7 +975,7 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .reveal { opacity: 1; transform: none; }
+    .js .reveal { opacity: 1; transform: none; }
     .mobile-nav,
     .mobile-nav__search,
     .mobile-nav__links a,
