@@ -139,9 +139,18 @@ a:hover {
   }
 
   /* Covers both the hover fill and the rise to level as the row scrolls into
-     view; the per-swatch delay that staggers the row is set inline. */
+     view. */
   .swatch__fill {
     transition: height 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* Staggers the row, and only while it is rising: a permanent delay would
+     also hold up the hover fill, by up to the width of the whole row. The
+     delay belongs in here with the duration — a zero-duration transition still
+     honours a delay, so left outside it would stagger the arrival of the
+     swatches for a reader who asked for no motion. */
+  .swatches[data-drawing] .swatch__fill {
+    transition-delay: var(--stagger, 0ms);
   }
 }
 
@@ -1499,12 +1508,6 @@ img {
   background: var(--pigment);
   box-shadow: inset 0 1px 0
     color-mix(in srgb, var(--color-on-dark) 30%, transparent);
-}
-
-/* Only while the row is rising to level. A permanent delay would also hold up
-   the hover fill, by up to the width of the whole row. */
-.swatches[data-drawing] .swatch__fill {
-  transition-delay: var(--stagger, 0ms);
 }
 
 .swatch:hover .swatch__fill {
