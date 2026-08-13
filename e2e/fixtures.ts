@@ -24,6 +24,14 @@ export const fixtures = {
     slug: 'e2e-duplicate-title-heading',
     title: 'E2E Duplicate Title Heading',
   },
+  // Seeded published by `pnpm seed:dev`; the roadmap page reads from it.
+  publishedApp: { slug: 'dapple', title: 'Dapple' },
+  // An unpublished app must stay invisible to the page, the route, and the
+  // sitemap — the same rule drafts follow everywhere else.
+  draftApp: {
+    slug: 'e2e-unpublished-app',
+    title: 'E2E Unpublished App',
+  },
   redirect: {
     source: '/e2e-legacy-white-pigments/',
     destination: '/titanium-white-vs-lead-white/',

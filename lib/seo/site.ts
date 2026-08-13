@@ -54,6 +54,16 @@ export const publicationReadPath = (slug: string): string =>
 export const publicationTranscriptPath = (slug: string): string =>
   `${publicationPath(slug)}/transcript`
 
+/**
+ * The apps the studio is building, and each app's own page.
+ *
+ * No trailing slash, matching the other post-migration routes: these are new
+ * URLs with no Ghost permalink to preserve, so navigation, canonicals and the
+ * sitemap can all agree on what Next.js actually serves.
+ */
+export const APPS_PATH = '/apps'
+export const appPath = (slug: string): string => `${APPS_PATH}/${slug}`
+
 /** Path of the search page. */
 export const SEARCH_PATH = '/search/'
 

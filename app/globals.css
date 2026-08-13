@@ -2527,3 +2527,596 @@ h1.archive__title {
   background: var(--color-surface);
   color: var(--color-ink);
 }
+
+/* --- Apps ---------------------------------------------------------------- */
+
+/* The deep end of two pigment families. The palette above carries the surface
+   tones; the status badges need the darker pair to stay legible as small
+   uppercase text on paper. */
+:root {
+  --pig-cadmium: #c9820a;
+  --pig-cadmium-deep: #6b4103;
+  --pig-viridian: #2e6b52;
+  --pig-viridian-deep: #123227;
+}
+
+.apps__head {
+  max-width: 62rem;
+}
+
+.apps__head h1 {
+  font-size: clamp(2.2rem, 5vw, 3.4rem);
+  letter-spacing: -0.03em;
+  margin: 0.6rem 0 0.9rem;
+}
+
+.apps__intro {
+  margin: 0;
+  font-size: clamp(1.02rem, 1.6vw, 1.2rem);
+  color: var(--color-muted);
+  max-width: 54ch;
+}
+
+/* The page has one status on it while nothing has shipped, so it says so in a
+   sentence rather than teaching a four-value key nothing on the page uses. */
+.apps__state {
+  margin: clamp(2rem, 4vw, 3rem) 0 0;
+  padding-top: 1.35rem;
+  border-top: 1px solid var(--color-rule);
+  max-width: 60ch;
+  font-size: 0.95rem;
+  color: var(--color-muted);
+}
+
+.apps__state strong {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+/* --- Status badge --- */
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-family: var(--font-sans);
+  font-size: 0.64rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  padding: 0.36rem 0.66rem;
+  border: 1px solid;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.status::before {
+  content: '';
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.status--concept {
+  color: var(--color-muted);
+  border-color: var(--color-line);
+  background: var(--color-surface);
+}
+
+.status--in_development {
+  color: var(--pig-cadmium-deep);
+  border-color: color-mix(
+    in srgb,
+    var(--pig-cadmium-deep) 34%,
+    var(--color-line)
+  );
+  background: color-mix(in srgb, var(--pig-cadmium) 10%, var(--color-surface));
+}
+
+.status--coming_soon {
+  color: var(--color-burgundy);
+  border-color: color-mix(
+    in srgb,
+    var(--color-burgundy) 34%,
+    var(--color-line)
+  );
+  background: color-mix(
+    in srgb,
+    var(--color-burgundy) 7%,
+    var(--color-surface)
+  );
+}
+
+.status--available {
+  color: var(--pig-viridian-deep);
+  border-color: color-mix(
+    in srgb,
+    var(--pig-viridian-deep) 34%,
+    var(--color-line)
+  );
+  background: color-mix(in srgb, var(--pig-viridian) 10%, var(--color-surface));
+}
+
+/* --- The roster ---
+   Editorial spreads rather than a card grid, which PRODUCT.md lists as an
+   anti-reference. Four identical spreads would only be that grid at a larger
+   size, so the plate is drawn per app and the type scale falls from the lead
+   to the tail, in the order the work is sequenced. */
+
+.roster {
+  padding-bottom: clamp(2.5rem, 6vw, 4rem);
+}
+
+.app {
+  display: grid;
+  grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+  gap: clamp(1.5rem, 5vw, 4rem);
+  align-items: center;
+  padding: clamp(2.5rem, 6vw, 4.25rem) 0;
+  border-top: 1px solid var(--color-rule);
+}
+
+/* Flipping the spread has to flip the track widths with it, or the plate
+   inherits the text column and the prose is squeezed into the narrow one. */
+.app--flip {
+  grid-template-columns: minmax(0, 1.18fr) minmax(0, 0.82fr);
+}
+
+.app--flip .app__plate {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.app--flip .app__body {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+/* Wider than the others, but not so wide that the lead ends up with the
+   tightest measure on the page. */
+.app--lead {
+  grid-template-columns: minmax(0, 0.94fr) minmax(0, 1.06fr);
+}
+
+.app--lead .app__name {
+  font-size: clamp(2.3rem, 5vw, 3.6rem);
+}
+
+.app--lead .app__tagline {
+  font-size: clamp(1.2rem, 2.4vw, 1.6rem);
+}
+
+.app--lead .app__summary {
+  font-size: 1.08rem;
+}
+
+.app--tail {
+  padding-top: clamp(2rem, 4vw, 3rem);
+}
+
+.app--tail .app__name {
+  font-size: clamp(1.6rem, 3vw, 2.2rem);
+}
+
+/* The plate carries no type: the heading beside it already names the app. */
+.app__plate {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  border-radius: var(--radius);
+  /* Three of the four are drawn on paper, on a paper page. At --color-line
+     they dissolve into the background. */
+  border: 1px solid var(--color-rule);
+  background: var(--color-surface);
+}
+
+/* A ground for the drawing, so a plate is never an empty frame before the
+   canvas paints — or if it never does. */
+.app__plate[data-plate='echo'] {
+  border-color: color-mix(in srgb, #1f3a93 40%, var(--color-dark));
+  background: radial-gradient(
+    ellipse 90% 70% at 50% 42%,
+    #16255c,
+    #0d1636 60%,
+    #080d20
+  );
+}
+
+.app__plate canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.app__body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.app__index {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--color-muted);
+}
+
+.app__name {
+  font-size: clamp(1.9rem, 4vw, 2.9rem);
+  letter-spacing: -0.03em;
+  margin: 0.55rem 0 0;
+}
+
+.app__tagline {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: clamp(1.1rem, 2vw, 1.35rem);
+  line-height: 1.4;
+  color: var(--color-burgundy);
+  margin: 0.5rem 0 0;
+}
+
+.app__summary {
+  margin: 1.1rem 0 0;
+  max-width: 56ch;
+  color: color-mix(in srgb, var(--color-ink) 82%, var(--color-paper));
+}
+
+.app__summary + .app__summary {
+  margin-top: 0.85rem;
+}
+
+/* One line of concrete nouns, in place of a ticked feature list: six bullets
+   an app is proof-point grammar, and four identical lists flatten four
+   different products into one shape. */
+.app__detail {
+  margin: 1.25rem 0 0;
+  max-width: 52ch;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-line);
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: var(--color-muted);
+}
+
+.app__detail b {
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.app__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.85rem 1.25rem;
+  margin-top: 1.75rem;
+}
+
+.app__sequence {
+  font-size: 0.82rem;
+  color: var(--color-muted);
+}
+
+.app__platforms {
+  font-size: 0.66rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--color-muted);
+}
+
+.app__link {
+  margin-top: 1.5rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-burgundy);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-bottom: 1px solid transparent;
+  padding-bottom: 2px;
+}
+
+.app__link:hover {
+  border-bottom-color: var(--color-burgundy);
+  text-decoration: none;
+}
+
+/* --- One app's own page --- */
+
+.app-detail__name {
+  font-size: clamp(2.2rem, 5vw, 3.4rem);
+  letter-spacing: -0.03em;
+  margin: 0.4rem 0 0.6rem;
+}
+
+.app-detail__tagline {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: clamp(1.2rem, 2.4vw, 1.6rem);
+  color: var(--color-burgundy);
+  margin: 0 0 0.5rem;
+}
+
+.app-detail__meta {
+  margin-top: 1rem;
+}
+
+.app-detail__plate {
+  aspect-ratio: 16 / 9;
+  margin: clamp(2rem, 4vw, 3rem) 0;
+}
+
+.app-detail__body {
+  max-width: 42rem;
+}
+
+.app-detail__standfirst {
+  font-size: clamp(1.1rem, 2vw, 1.3rem);
+  line-height: 1.6;
+  color: color-mix(in srgb, var(--color-ink) 84%, var(--color-paper));
+  margin: 0 0 1.5rem;
+}
+
+.app-detail__shots {
+  list-style: none;
+  margin: clamp(2rem, 4vw, 3rem) 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 1.5rem;
+}
+
+.app-detail__shots img {
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+}
+
+.app-detail__shots p {
+  margin: 0.6rem 0 0;
+  font-size: 0.85rem;
+  color: var(--color-muted);
+}
+
+.app-detail__stores {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 0;
+}
+
+/* --- Waitlist ---
+   One email against any number of apps, which is the shape the collection
+   already has: a row per (email, app) pair. */
+
+.waitlist {
+  padding: clamp(3rem, 7vw, 4.5rem) 0;
+  border-top: 1px solid var(--color-line);
+}
+
+.waitlist__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: clamp(2rem, 6vw, 4.5rem);
+  align-items: start;
+}
+
+.waitlist h2 {
+  font-size: clamp(1.6rem, 3vw, 2.2rem);
+  letter-spacing: -0.028em;
+  margin: 0.75rem 0 0.9rem;
+  max-width: 17ch;
+}
+
+.waitlist__lede {
+  margin: 0;
+  color: var(--color-muted);
+  max-width: 42ch;
+}
+
+.waitlist__fields {
+  border: 0;
+  margin: 0 0 1.25rem;
+  padding: 0;
+}
+
+.waitlist__fields legend {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--color-muted);
+  padding: 0;
+  margin-bottom: 0.75rem;
+}
+
+.waitlist__options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.pick {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.pick:hover {
+  border-color: var(--color-muted);
+}
+
+.pick:has(input:focus-visible) {
+  outline: 2px solid var(--color-burgundy);
+  outline-offset: 2px;
+}
+
+.pick:has(input:checked) {
+  border-color: var(--color-burgundy);
+  background: color-mix(
+    in srgb,
+    var(--color-burgundy) 6%,
+    var(--color-surface)
+  );
+}
+
+.pick input {
+  appearance: none;
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  flex-shrink: 0;
+  border: 1px solid var(--color-muted);
+  border-radius: 2px;
+  background: var(--color-surface);
+  display: grid;
+  place-content: center;
+  cursor: pointer;
+}
+
+.pick input:checked {
+  border-color: var(--color-burgundy);
+  background: var(--color-burgundy);
+}
+
+.pick input:checked::after {
+  content: '';
+  width: 0.52rem;
+  height: 0.28rem;
+  border-left: 2px solid var(--color-on-dark);
+  border-bottom: 2px solid var(--color-on-dark);
+  transform: translateY(-1px) rotate(-45deg);
+}
+
+.waitlist__row {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.waitlist__row input[type='email'] {
+  flex: 1;
+  min-width: 0;
+  padding: 0.9rem 1rem;
+  font-family: var(--font-sans);
+  font-size: 0.92rem;
+  color: var(--color-ink);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+}
+
+.waitlist__row input[type='email']:focus {
+  outline: none;
+  border-color: var(--color-burgundy);
+}
+
+.waitlist__error {
+  margin: 0.7rem 0 0;
+  font-size: 0.82rem;
+  color: var(--color-burgundy);
+}
+
+.waitlist__small {
+  margin: 0.85rem 0 0;
+  font-size: 0.78rem;
+  color: var(--color-muted);
+  max-width: 44ch;
+}
+
+.waitlist__done {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  padding: 1.5rem;
+}
+
+.waitlist__done h3 {
+  font-family: var(--font-serif);
+  font-size: 1.35rem;
+  margin: 0 0 0.5rem;
+}
+
+.waitlist__done p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.95rem;
+}
+
+@media (max-width: 56rem) {
+  .app,
+  .app--flip,
+  .app--lead {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app--flip .app__plate,
+  .app--flip .app__body {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  /* Nearer square than the desktop crop: the plates are drawings, and a
+     letterbox would cut the compositions rather than reframe them. */
+  .app__plate {
+    aspect-ratio: 5 / 4;
+    max-width: 28rem;
+  }
+
+  .app-detail__plate {
+    aspect-ratio: 4 / 3;
+    max-width: none;
+  }
+
+  .waitlist__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 34rem) {
+  .waitlist__options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .waitlist__row {
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .app__link,
+  .pick,
+  .waitlist__row input[type='email'] {
+    transition:
+      color 0.2s ease,
+      border-color 0.2s ease,
+      background-color 0.2s ease;
+  }
+
+  .app__plate canvas {
+    transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .app:hover .app__plate canvas {
+    transform: scale(1.04);
+  }
+}
+
+.app-detail__para {
+  margin: 0 0 1.2rem;
+  color: color-mix(in srgb, var(--color-ink) 82%, var(--color-paper));
+}

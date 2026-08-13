@@ -1,5 +1,7 @@
 import {
   absoluteUrl,
+  appPath,
+  APPS_PATH,
   authorPath,
   JOURNAL_PATH,
   pagePath,
@@ -38,12 +40,14 @@ export function buildSitemapEntries({
   pages = [],
   tags = [],
   authors = [],
+  apps = [],
 }: {
   siteUrl: string
   posts?: readonly SitemapDoc[]
   pages?: readonly SitemapDoc[]
   tags?: readonly SitemapDoc[]
   authors?: readonly SitemapDoc[]
+  apps?: readonly SitemapDoc[]
 }): SitemapEntry[] {
   const entries: SitemapEntry[] = [
     { url: `${siteUrl}/`, changeFrequency: 'daily', priority: 1 },
@@ -55,6 +59,17 @@ export function buildSitemapEntries({
       priority: 0.8,
     },
   ]
+
+  // The apps overview is a route rather than a document. It is listed only
+  // when an app has actually been published, so an empty /apps never enters
+  // the index.
+  if (apps.length > 0) {
+    entries.push({
+      url: absoluteUrl(APPS_PATH, siteUrl),
+      changeFrequency: 'monthly',
+      priority: 0.6,
+    })
+  }
 
   for (const post of posts) {
     if (!post.slug) continue
@@ -93,6 +108,16 @@ export function buildSitemapEntries({
       lastModified: toIso(author.updatedAt) ?? toIso(author.publishedAt),
       changeFrequency: 'monthly',
       priority: 0.3,
+    })
+  }
+
+  for (const app of apps) {
+    if (!app.slug) continue
+    entries.push({
+      url: absoluteUrl(appPath(app.slug), siteUrl),
+      lastModified: toIso(app.updatedAt) ?? toIso(app.publishedAt),
+      changeFrequency: 'monthly',
+      priority: 0.4,
     })
   }
 

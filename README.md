@@ -62,6 +62,31 @@ not rebuild subscriber access, so those posts remain visible to staff only.
 subscriptions are meant to work when that is built, and the one Stripe item that
 must be settled before Ghost is cancelled.
 
+## Apps
+
+`/apps` presents the app ecosystem described in
+[`docs/GHOST_TO_PAYLOAD_HANDOFF_WITH_APP_STRATEGY.md`](docs/GHOST_TO_PAYLOAD_HANDOFF_WITH_APP_STRATEGY.md)
+— the companion app, Dapple, Morrow, and Echo Garden. None of them have
+shipped, so the page reads as a roadmap rather than a shop: it says outright
+that nothing exists yet, and the only claim it makes is the order.
+
+Apps are documents in the `apps` collection, drafted and published like pages.
+An editor writes the copy, sets the status (Concept, In development, Coming
+soon, Available), and orders them; nothing needs a deploy. An app with no hero
+image gets a drawing of what it does — a page of set type, an outline being
+coloured, a month of daily marks, marks sounding on night — chosen per app.
+There are deliberately no mocked screenshots: nothing has been designed, and a
+mocked interface would say otherwise.
+
+Readers can ask to hear when one opens. The form takes one address against any
+number of apps and writes a row per `(email, app)` pair into `app-waitlist`, an
+administrator-only collection the public API cannot read or write. Once an app
+reaches Available and has store URLs, its page offers those instead of the
+form.
+
+Add "Apps" to the header nav under **Globals → Header** to surface the route;
+the built-in fallback nav already includes it.
+
 ## Migration dry run
 
 Only synthetic fixtures belong in Git. Never commit Ghost exports, member CSVs, database dumps, site archives, or credentials.

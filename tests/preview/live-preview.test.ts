@@ -104,3 +104,16 @@ describe('buildPreviewUrl', () => {
     expect(url).toBe(`${siteUrl}/api/preview?collection=posts&slug=a%26b%3Dc`)
   })
 })
+
+describe('apps preview', () => {
+  it('is previewable, so an editor can see a draft app on the real page', () => {
+    expect(isPreviewCollection('apps')).toBe(true)
+  })
+
+  it('targets the app route rather than a root slug', () => {
+    expect(previewTargetPath('apps', 'dapple')).toBe('/apps/dapple')
+    expect(
+      buildPreviewUrl({ collection: 'apps', slug: 'dapple', siteUrl }),
+    ).toBe(`${siteUrl}/api/preview?collection=apps&slug=dapple`)
+  })
+})

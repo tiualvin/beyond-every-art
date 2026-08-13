@@ -33,6 +33,49 @@ function assertSafeDatabase(): void {
   }
 }
 
+/**
+ * An app left unpublished. `pnpm seed:dev` supplies the published ones; this
+ * is the counterpart the roadmap page must not show.
+ */
+async function upsertDraftApp(payload: Payload): Promise<void> {
+  const data = {
+    name: fixtures.draftApp.title,
+    slug: fixtures.draftApp.slug,
+    tagline: 'Synthetic draft, never visible to a reader.',
+    summary: 'Seeded unpublished so the page and the route can be checked.',
+    stage: 'concept',
+    plate: 'reader',
+    order: 99,
+    _status: 'draft',
+  }
+
+  const existing = await payload.find({
+    collection: 'apps',
+    where: { slug: { equals: fixtures.draftApp.slug } },
+    limit: 1,
+    depth: 0,
+    overrideAccess: true,
+  })
+
+  if (existing.docs.length > 0) {
+    await payload.update({
+      collection: 'apps',
+      id: existing.docs[0].id,
+      data,
+      draft: true,
+      overrideAccess: true,
+    } as unknown as UpdateOptions)
+    return
+  }
+
+  await payload.create({
+    collection: 'apps',
+    data,
+    draft: true,
+    overrideAccess: true,
+  } as unknown as CreateOptions)
+}
+
 async function upsertPost(
   payload: Payload,
   slug: string,
@@ -142,9 +185,11 @@ async function seed(): Promise<void> {
     ghostID: 'e2e-duplicate-title-post',
   })
 
+  await upsertDraftApp(payload)
   await upsertRedirect(payload)
   payload.logger.info(
-    'E2E seed complete: draft, members post, duplicate-title post, redirect.',
+    'E2E seed complete: draft, members post, duplicate-title post, ' +
+      'draft app, redirect.',
   )
 }
 

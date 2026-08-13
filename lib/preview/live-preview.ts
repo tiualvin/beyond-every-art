@@ -1,7 +1,7 @@
-import { getSiteUrl, pagePath, postPath } from '../seo/site'
+import { appPath, getSiteUrl, pagePath, postPath } from '../seo/site'
 
 /** Collections an editor can preview on the public site. */
-export const PREVIEW_COLLECTIONS = ['posts', 'pages'] as const
+export const PREVIEW_COLLECTIONS = ['posts', 'pages', 'apps'] as const
 
 export type PreviewCollection = (typeof PREVIEW_COLLECTIONS)[number]
 
@@ -44,7 +44,9 @@ export function previewTargetPath(
   collection: PreviewCollection,
   slug: string,
 ): string {
-  return collection === 'pages' ? pagePath(slug) : postPath(slug)
+  if (collection === 'pages') return pagePath(slug)
+  if (collection === 'apps') return appPath(slug)
+  return postPath(slug)
 }
 
 type PreviewUrlArgs = {

@@ -24,6 +24,7 @@ browser, or serve the folder.
 | [`assets/redesign-prototypes/article.html`](assets/redesign-prototypes/article.html)   | `app/(frontend)/[slug]/page.tsx`     |
 | [`assets/redesign-prototypes/journal.html`](assets/redesign-prototypes/journal.html)   | `app/(frontend)/journal/page.tsx`    |
 | [`assets/redesign-prototypes/topic.html`](assets/redesign-prototypes/topic.html)       | `app/(frontend)/tag/[slug]/page.tsx` |
+| [`assets/redesign-prototypes/apps.html`](assets/redesign-prototypes/apps.html)         | `app/(frontend)/apps/page.tsx`       |
 
 ## What they establish
 
@@ -77,6 +78,64 @@ browser, or serve the folder.
 - The topic page reuses the same list under a masthead stained with that
   topic's pigment, and closes with sibling topics so it is not a dead end.
 
+### Apps
+
+Stands in for the overview route in
+[`superpowers/specs/2026-07-26-apps-page-design.md`](superpowers/specs/2026-07-26-apps-page-design.md),
+and follows that spec's data model rather than inventing a second one.
+
+- **It reads as a roadmap, not a store.** The intro says outright that nothing
+  has shipped, and a line under it states the one thing the page actually
+  claims: the order. Every entry sits at `concept`, because that is where all
+  four are.
+- **The copy is written for a reader, not for the project.** An earlier pass
+  described each app the way the handoff does — build order, what it borrows
+  from what, "user content, not CMS content", which repository it might end up
+  in. That is the internal case for the work, and a reader has no use for it.
+  Each app is now described by what it would be like to use: paint that blooms
+  into damp paper, a month of marks you can read at a glance, a signal-free
+  train journey. The sequencing survives, because a roadmap has to be ordered,
+  but as plain language — "after Dapple", not "reuses Dapple's canvas work".
+- **Entries are editorial spreads, not a card grid** — `PRODUCT.md` lists the
+  identical icon+heading+text grid as an anti-reference. Each app gets a plate,
+  a serif name, a tagline, prose, and a single line of concrete detail, with
+  the plate side alternating down the page.
+- **The four spreads are not identical**, which was the flaw in the first pass:
+  four of the same spread is a card grid at a larger size. Two things vary with
+  the product. The plate is drawn per app rather than shared. And the type
+  scale falls from the lead to the tail, so the sequence is legible before the
+  captions are read — the companion app is next and near-certain, Echo Garden
+  is a distant prototype the handoff calls the highest-risk of the set, and an
+  even weighting across all four denied that.
+- **Each plate is drawn from what its app does**, standing in for
+  `Apps.heroImage`: a page of set type with a pigment specimen in the margin; a
+  botanical outline with the colour going in, one petal deliberately past its
+  line; six weeks of daily marks, each a different kind; marks ringing outward
+  on night. No device frames and no invented screenshots — nothing has been
+  designed yet, and a mocked interface would imply otherwise. A drawing of the
+  idea is a claim the page can support.
+- **Status badges take their colour from the deep end of each pigment family**
+  so small uppercase text clears 4.5:1 on paper. The four styles are all
+  defined, but only `concept` appears; an earlier pass opened the page with a
+  four-column key explaining all four states, which is a legend for a chart
+  that is not there.
+- **One waitlist form covers every app.** Ticking several boxes matches the
+  `AppWaitlist` shape exactly — a row per `(email, app)` pair, one signup per
+  person per app — so the form maps onto the collection without a second
+  concept. Per-app CTAs stay on the detail route, as the spec has them.
+- **How they connect** is the handoff's cross-linking table rendered as a list:
+  the publication moment on the left, the app it hands off to on the right.
+- **It renders without script.** The reveal's hidden state is conditional on a
+  `js` class set by an inline script, so a viewer that blocks JavaScript gets
+  the page rather than a blank one, and the plates keep a CSS ground beneath
+  the canvas rather than collapsing to empty rectangles. The revealed state
+  also sits outside the motion queries: held inside `no-preference`, a browser
+  matching neither motion query would never restore the content.
+
+  The other four prototypes still gate their content on script and go blank
+  without it — sandboxed previews and in-app browsers routinely block it. The
+  same two changes port over unchanged.
+
 ## Design tokens
 
 The prototypes use the palette and type pairing already in `app/globals.css`
@@ -88,6 +147,16 @@ unchanged. One token is added:
 
 A hairline with more presence than `--color-line`, used for section openers so
 they outrank row separators without a heavy black bar.
+
+The apps page adds two more, local to that file:
+
+```css
+--pig-cadmium-deep: #6b4103;
+--pig-viridian-deep: #123227;
+```
+
+The shared block carries each pigment's surface tone, which is too light for
+small uppercase text on paper. The status badges need the darker pair.
 
 ## What is placeholder
 
@@ -108,6 +177,12 @@ Read this before treating anything here as a specification.
 - **Fonts fall back** to Georgia and `system-ui`. The prototypes load no
   webfont; production self-hosts Playfair Display and Inter through
   `next/font`.
+- **No app has shipped, and the apps page says so.** Positioning, taglines,
+  and the detail lines are drawn from the app strategy in the handoff; the
+  sequencing lines under each entry paraphrase its phase order. There are no
+  dates, no store links, and no download counts, because none exist. The
+  waitlist form writes nothing — it validates, then renders its own success
+  state.
 - **Motion is CSS transitions.** `framer-motion` is already a dependency and
   the repo has `app/(frontend)/components/motion/`; the prototypes' variants,
   stagger, and easing (`cubic-bezier(0.22, 1, 0.36, 1)`) are written to port
@@ -119,6 +194,14 @@ Read this before treating anything here as a specification.
   because the animated field and the stained topic masthead sit behind text.
   Cover type measures ~16.8:1; swatch labels compute their colour per pigment
   against both brand text colours rather than assuming one works.
+- The apps page carries no type on its plates at all. An earlier pass centred
+  each app's name over its artwork, which needed a scrim measured against
+  composited pixels to stay legible — and had to be hidden from assistive tech,
+  because the heading beside it already said the same words. Removing it took
+  the contrast question with it and freed the plate to be a drawing. Status
+  badges run 5.5:1 to 11.9:1; the lowest contrast anywhere on the page is
+  5.0:1, the shared muted token the rest of the site already uses for
+  secondary text.
 - Every overlay closes by Escape, backdrop, and its own control; scroll lock is
   always released; focus returns to whatever opened it.
 - `prefers-reduced-motion` is honoured throughout. The animated cover paints a

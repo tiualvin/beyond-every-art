@@ -6,6 +6,8 @@ import { buildConfig } from 'payload'
 import sharp from 'sharp'
 import { fileURLToPath } from 'node:url'
 
+import { AppWaitlist } from './collections/AppWaitlist'
+import { Apps } from './collections/Apps'
 import { Authors } from './collections/Authors'
 import { BillingEvents } from './collections/BillingEvents'
 import { Media } from './collections/Media'
@@ -60,6 +62,8 @@ export default buildConfig({
     Media,
     Posts,
     Pages,
+    Apps,
+    AppWaitlist,
     Redirects,
     Members,
     NewsletterSignups,
