@@ -88,6 +88,14 @@ and follows that spec's data model rather than inventing a second one.
   has shipped, and a line under it states the one thing the page actually
   claims: the order. Every entry sits at `concept`, because that is where all
   four are.
+- **The copy is written for a reader, not for the project.** An earlier pass
+  described each app the way the handoff does — build order, what it borrows
+  from what, "user content, not CMS content", which repository it might end up
+  in. That is the internal case for the work, and a reader has no use for it.
+  Each app is now described by what it would be like to use: paint that blooms
+  into damp paper, a month of marks you can read at a glance, a signal-free
+  train journey. The sequencing survives, because a roadmap has to be ordered,
+  but as plain language — "after Dapple", not "reuses Dapple's canvas work".
 - **Entries are editorial spreads, not a card grid** — `PRODUCT.md` lists the
   identical icon+heading+text grid as an anti-reference. Each app gets a plate,
   a serif name, a tagline, prose, and a single line of concrete detail, with

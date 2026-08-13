@@ -372,7 +372,8 @@
     max-width: 54ch;
   }
 
-  .apps__intro strong { color: var(--color-ink); font-weight: 600; }
+  .apps__intro strong,
+  .apps__state strong { color: var(--color-ink); font-weight: 600; }
 
   /* Where the four-column status key used to be. One state, one sentence. */
   .apps__state {
@@ -1531,26 +1532,26 @@
         <p class="eyebrow">From the studio</p>
         <h1 class="apps__title">Apps</h1>
         <p class="apps__intro">
-          Beyond Every Art is a publication, and behind it a small studio
-          building a family of art applications that share its typography,
-          its palette, and its editorial voice.
-          <strong>None of them have shipped.</strong> This page is a roadmap,
-          not a shop — it changes as the work does.
+          Beyond Every Art is a magazine about colour, materials, and how
+          things are made. These are the apps we want to make to go alongside
+          it — for the moment you finish a piece about a limited palette and
+          want to go and mix one yourself.
         </p>
       </div>
 
       <p class="apps__state reveal">
-        All four are concepts. Nothing is in testing, nothing has a date, and
-        the order below is the order we intend to build them in — which is the
-        only claim on this page.
+        <strong>None of them exist yet.</strong> Nothing here can be
+        downloaded and nothing has a date. If you would like to hear when one
+        opens, there is a form at the bottom of this page — and which ones you
+        tick is honestly how we will decide what to make first.
       </p>
     </div>
   </section>
 
   <!-- ── The roster ───────────────────────────────────────────────────────
-       Four entries, ordered the way the app strategy sequences them. Each one
-       stands in for an Apps document; the plate stands in for heroImage and is
-       drawn from what the app does, not from a shared wash.
+       Four entries, in the order the work is sequenced. Each one stands in
+       for an Apps document; the plate stands in for heroImage and is drawn
+       from what the app does.
        ──────────────────────────────────────────────────────────────────── -->
   <section class="roster">
     <div class="container">
@@ -1562,29 +1563,30 @@
           <h2 class="app__name">Beyond Every Art</h2>
           <p class="app__tagline">Art, colour, materials, exhibitions, and creative practice.</p>
           <p class="app__summary">
-            The companion to this publication — and not a website in a wrapper.
-            A native reader on the same content as the site, which means the
-            archive works on a train: pieces saved, read offline, highlighted,
-            annotated in private notes that stay yours.
+            The magazine in your pocket, made for reading rather than
+            scrolling. Save a piece for the train and it is there without a
+            signal. Underline a paragraph, keep a note next to it, and find
+            both again a year later.
           </p>
           <p class="app__summary">
-            It opens on Today rather than on a feed — one piece, one pigment to
-            look at, one short exercise. Explore turns the archive sideways, by
-            artist and artwork and material instead of by date, and Studio is
-            where you stop reading about a limited palette and go mix one.
+            It opens on one thing instead of a feed: a piece worth your
+            morning, a pigment to look at, a small exercise you could finish
+            before the coffee goes cold. And when you want to wander, you can
+            go by artist or by material rather than by date — everything we
+            have written about lapis, or about egg tempera, gathered in one
+            place.
           </p>
           <p class="app__detail">
-            <b>The one to build first.</b> Everything below borrows from it:
-            the account, the entitlements, the media pipeline, and the way
-            people find the other three.
+            <b>The one we are making first.</b> If you only ever use one of
+            these, it should probably be this one.
           </p>
           <div class="app__meta">
             <span class="status status--concept">Concept</span>
-            <span class="app__sequence">First, once the site migration is done</span>
-            <span class="app__platforms">iOS · Android</span>
+            <span class="app__sequence">Making this one first</span>
+            <span class="app__platforms">iPhone · Android</span>
           </div>
           <a class="app__link" href="#">
-            More about the companion app
+            More about this one
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M5 12h13M12.5 5.5 19 12l-6.5 6.5" />
@@ -1600,25 +1602,27 @@
           <h2 class="app__name">Dapple</h2>
           <p class="app__tagline">A quiet place to colour.</p>
           <p class="app__summary">
-            Freehand colouring for adults, on illustrations drawn by artists
-            rather than generated by numbers. The media behave: watercolour
-            blooms into damp paper, pencil catches on the tooth, marker pools
-            where you pause.
+            Colouring for grown-ups, on drawings made by artists rather than
+            generated by a machine. The paint behaves like paint: watercolour
+            blooms out into damp paper, pencil catches on the grain, marker
+            pools where you rest your hand.
           </p>
           <p class="app__summary">
-            Staying inside the lines is optional, and off by default. The
-            collections are curated rather than endless, a page a day is free,
-            and what you finish exports at a size worth printing.
+            Nothing hurries you. There is no streak to keep and no timer
+            running. Stay inside the lines if you like — the app will help you
+            — or do not, and let the colour run over the edge. A new page each
+            day is free, and anything you finish comes out big enough to
+            frame.
           </p>
           <p class="app__detail">
-            <b>Watercolour, pencil, pastel, marker, ink.</b> Custom palettes,
-            artist-curated palettes, paper and canvas textures, and pressure
-            support where the hardware offers it.
+            <b>Watercolour, pencil, pastel, marker, ink.</b> Palettes you mix
+            yourself, palettes chosen by the artist who drew the page, and
+            paper that behaves like paper under the brush.
           </p>
           <div class="app__meta">
             <span class="status status--concept">Concept</span>
-            <span class="app__sequence">After the companion app</span>
-            <span class="app__platforms">iOS · Android</span>
+            <span class="app__sequence">After the first one</span>
+            <span class="app__platforms">iPhone · Android</span>
           </div>
           <a class="app__link" href="#">
             More about Dapple
@@ -1637,26 +1641,28 @@
           <h2 class="app__name">Morrow</h2>
           <p class="app__tagline">Make a little space for yourself.</p>
           <p class="app__summary">
-            An art planner, visual journal, and creative diary — planning,
-            handwriting, drawing, collage, and reflection in one place, without
-            the tone of a corporate productivity app.
+            Part planner, part sketchbook, part diary — somewhere to lay out a
+            week, write by hand, stick things in, and think. A notebook rather
+            than a productivity system: nothing scores you, and nothing turns
+            red when you skip a day.
           </p>
           <p class="app__summary">
-            Its one real idea is the mark. Instead of picking an emoji for the
-            day you leave a colour, a brushstroke, a shape, a small drawing, a
-            photograph. Thirty of them make a month you can read at a glance,
-            and twelve of those make something closer to an abstract portrait
-            of a year — which is the plate beside this.
+            Its one real idea is the mark. Instead of picking a face for how
+            the day went, you leave a colour, a brushstroke, a shape, a small
+            drawing, a photograph. Thirty of them make a month you can read at
+            a glance, and a year of them makes something closer to a painting
+            — which is the picture on this page.
           </p>
           <p class="app__detail">
-            <b>Private by default.</b> Journals are user content, not CMS
-            content: held on the device unless you ask for sync, encrypted when
-            you do, exportable and deletable on demand.
+            <b>Yours, and nobody else's.</b> What you write and draw stays on
+            your own device unless you ask it to sync, it travels encrypted
+            when it does, and you can take all of it out, or delete it, at any
+            point.
           </p>
           <div class="app__meta">
             <span class="status status--concept">Concept</span>
-            <span class="app__sequence">Reuses Dapple's canvas and palette work</span>
-            <span class="app__platforms">iOS · Android</span>
+            <span class="app__sequence">After Dapple</span>
+            <span class="app__platforms">iPhone · Android</span>
           </div>
           <a class="app__link" href="#">
             More about Morrow
@@ -1675,22 +1681,23 @@
           <h2 class="app__name">Echo Garden</h2>
           <p class="app__tagline">Paint a world that sings back.</p>
           <p class="app__summary">
-            An atmospheric art-and-sound game. You arrive somewhere quiet and
-            unfinished — an abandoned garden, a floating observatory, a
-            submerged temple — and find the thing that has lost its colour and
-            its voice. Every mark you make answers in sound: dots ring, long
-            strokes pull strings, spirals turn vocal, a wash opens into a pad.
+            A game, more or less. You arrive somewhere quiet and half-finished
+            — an overgrown garden, an observatory adrift, a temple under water
+            — and find the thing that has lost its colour and its voice. Then
+            you draw, and it answers back. Dots ring like small bells, long
+            strokes pull at strings, a spiral turns into a voice, a wash of
+            colour opens out into something like weather.
           </p>
           <p class="app__detail">
-            <b>The least certain thing on this page.</b> The handoff calls it
-            the highest-risk of the four, and it starts as a prototype with the
-            scope decided afterwards — possibly in another engine, possibly in
-            another repository.
+            <b>You do not need to be able to draw.</b> The game tunes whatever
+            you make, so it comes out sounding right either way. It is also
+            the furthest off of the four, and the one most likely to change
+            shape before you see it.
           </p>
           <div class="app__meta">
             <span class="status status--concept">Concept</span>
-            <span class="app__sequence">Last, and only as a prototype to begin with</span>
-            <span class="app__platforms">iOS · Android</span>
+            <span class="app__sequence">Furthest off, and least certain</span>
+            <span class="app__platforms">iPhone · Android</span>
           </div>
           <a class="app__link" href="#">
             More about Echo Garden
@@ -1711,43 +1718,43 @@
       <div class="thread__grid">
         <div class="reveal">
           <p class="eyebrow">One account</p>
-          <h2>The publication is the way in</h2>
+          <h2>Reading here, making there</h2>
           <p class="thread__lede">
-            The apps are separate products with their own names, but they run
-            on the same accounts and the same content. Reading something here
-            should be able to open the thing it describes.
+            Four separate apps with their own names, but one account covers
+            all of them, and they know what you have been reading. Finish
+            something here and the thing it describes is a tap away.
           </p>
         </div>
         <ul class="thread__list reveal">
           <li>
-            <p class="thread__from">An article on limited palettes</p>
+            <p class="thread__from">You read a piece on limited palettes</p>
             <span class="thread__arrow" aria-hidden="true">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                    stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M5 12h13M12.5 5.5 19 12l-6.5 6.5" />
               </svg>
             </span>
-            <p class="thread__to">Opens that palette in Dapple</p>
+            <p class="thread__to">Open that palette in Dapple</p>
           </li>
           <li>
-            <p class="thread__from">A creative exercise you finish</p>
+            <p class="thread__from">You finish one of the exercises</p>
             <span class="thread__arrow" aria-hidden="true">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                    stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M5 12h13M12.5 5.5 19 12l-6.5 6.5" />
               </svg>
             </span>
-            <p class="thread__to">Saves to Morrow</p>
+            <p class="thread__to">Keep it in Morrow</p>
           </li>
           <li>
-            <p class="thread__from">A piece on colour and sound</p>
+            <p class="thread__from">You read about colour and sound</p>
             <span class="thread__arrow" aria-hidden="true">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                    stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M5 12h13M12.5 5.5 19 12l-6.5 6.5" />
               </svg>
             </span>
-            <p class="thread__to">Opens a related Echo Garden scene</p>
+            <p class="thread__to">Hear it in Echo Garden</p>
           </li>
         </ul>
       </div>
@@ -1763,10 +1770,11 @@
       <div class="waitlist__grid">
         <div class="reveal">
           <p class="eyebrow">Notify me</p>
-          <h2>Tell us which of these you would actually use</h2>
+          <h2>Which of these would you actually use?</h2>
           <p class="waitlist__lede">
-            Pick as many as you like. We will write once, when that app opens
-            for testing — and the answers decide what gets built first.
+            Tick as many as you like. We will write once, when that one is
+            ready for people to try — and what gets ticked is how we decide
+            what to make first.
           </p>
         </div>
 
@@ -1802,13 +1810,14 @@
             </div>
             <p class="waitlist__error" id="waitlist-error" role="alert" hidden></p>
             <p class="waitlist__small">
-              Separate from the Friday letter. No launch countdowns, no
-              reminders — one email per app, then nothing.
+              This is separate from the Friday letter, so it will not sign you
+              up for that. No countdowns and no reminders — one email per app,
+              then nothing.
             </p>
           </form>
 
           <div class="waitlist__done" id="waitlist-done" hidden>
-            <h3>Noted</h3>
+            <h3>Thank you</h3>
             <p id="waitlist-done-note"></p>
           </div>
         </div>
@@ -2394,7 +2403,7 @@
 
       var chosen = picks.filter(function (box) { return box.checked })
       if (chosen.length === 0) {
-        setError('Pick at least one app.')
+        setError('Tick at least one of them first.')
         picks[0].focus()
         return
       }
@@ -2412,7 +2421,7 @@
 
       doneNote.textContent =
         'We will write to ' + email + ' when ' + listNames(names) +
-        (names.length > 1 ? ' open' : ' opens') + ' for testing. Nothing before then.'
+        (names.length > 1 ? ' are' : ' is') + ' ready to try. Nothing until then.'
 
       form.hidden = true
       doneEl.hidden = false
