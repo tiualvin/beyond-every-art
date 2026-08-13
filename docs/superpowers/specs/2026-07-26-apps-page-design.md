@@ -198,3 +198,65 @@ editor publishes the doc and advances `status`; when an app reaches
 `available`, its detail page switches from the waitlist form to real store
 links. Nothing here touches the Ghost migration's data model, redirects, or
 deployment pipeline.
+
+---
+
+## As built
+
+Shipped as `/apps` and `/apps/[slug]`, with the collections, waitlist action,
+reserved slug, sitemap entries, and nav entry above. Where the implementation
+departs from this spec, it is for a reason worth recording.
+
+### `Apps.status` is a column called `stage`
+
+Payload adds a `_status` column for a drafts-enabled collection, and names its
+enum `enum_apps_status`. A select field literally called `status` wants the
+same name: the generated migration typed the field with the draft enum
+(`'draft' | 'published'`) and defaulted it to `'concept'`, which that enum does
+not contain, so the migration refused to apply.
+
+The field is therefore `stage`, labelled **Status**. Editors and the frontend
+still speak of a status; only the column differs. `tests/content/apps.test.ts`
+asserts no field is named `status`, so the collision cannot come back.
+
+### Fields this spec did not have
+
+- **`plate`** — every app is unbuilt, so `heroImage` is empty for all of them,
+  and four empty frames would say less than nothing. The page falls back to a
+  generated drawing of what the app does; `plate` is how an editor picks which
+  one, rather than the frontend matching on slugs it should not know about. It
+  is used only while `heroImage` is empty.
+- **`detail`** — one line of concrete specifics, opening with a short bold
+  lead-in. It replaces the ticked feature list the first design used, which
+  was proof-point grammar of the kind `PRODUCT.md` lists as an anti-reference.
+- **`sequence`** — where the app sits in the order, in plain words ("After
+  Dapple"). The page is a roadmap, so the order is the thing it claims, and a
+  numeric `order` alone does not say it to a reader.
+- **`metaTitle` / `metaDescription`** — the same SEO pair posts and pages
+  carry, so an app's own page can be tuned without renaming it.
+
+### The waitlist is on the overview as well as the detail page
+
+The spec puts the waitlist on `/apps/[slug]`, and it is still there. The
+overview also carries one, because a reader deciding between four unbuilt apps
+is exactly the person whose answer is worth having, and the collection already
+models it: ticking several boxes writes a row per `(email, app)` pair, which is
+the shape `AppWaitlist` has. Sending them to four separate pages to say so
+would lose most of them.
+
+### Apps are previewable
+
+`PREVIEW_COLLECTIONS` gains `'apps'` and `previewTargetPath` routes it, so the
+admin's Preview button and Live Preview open a draft app on its real page —
+the "same way they preview a `Page`" this spec asks for.
+
+### Verified
+
+- `pnpm typecheck`, `pnpm lint`, `pnpm test` (425), `pnpm build`.
+- `pnpm migrate:db` applies the new migration to an empty database, and
+  `pnpm migrate:db:create --skip-empty` then generates nothing, which is the
+  check CI runs.
+- `e2e/apps.spec.ts` covers the six journeys: published apps listed, drafts
+  hidden, a draft slug 404s, an unknown slug 404s, the link through to an
+  app's own page, and both waitlist outcomes. The whole Playwright suite
+  passes (29).

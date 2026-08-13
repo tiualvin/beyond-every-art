@@ -749,3 +749,231 @@ export const getTagsWithCounts = cachedRead(
   readTagsWithCounts,
   [CONTENT_TAGS.posts, CONTENT_TAGS.tags, CONTENT_TAGS.media],
 )
+
+// --- Apps -----------------------------------------------------------------
+
+/** Mirrors `Apps.status`. Anything below `available` has nothing to link to. */
+export type AppStatus =
+  'concept' | 'in_development' | 'coming_soon' | 'available'
+
+/** Mirrors `Apps.platforms`. */
+export type AppPlatform = 'ios' | 'android' | 'web'
+
+/** Which stand-in drawing the page renders while `heroImage` is empty. */
+export type AppPlate = 'reader' | 'colouring' | 'year' | 'echo'
+
+export type AppCard = {
+  id: string
+  slug: string
+  name: string
+  tagline: string
+  summary: string
+  detail: string
+  status: AppStatus
+  sequence: string
+  platforms: AppPlatform[]
+  image: MediaImage | null
+  plate: AppPlate
+}
+
+export type AppDetail = AppCard & {
+  bodyHtml: string
+  updatedAt: string | null
+  screenshots: Array<{ image: MediaImage; caption: string }>
+  appStoreURL: string | null
+  playStoreURL: string | null
+  metaTitle: string | null
+  metaDescription: string | null
+}
+
+type RawApp = {
+  id?: string | number
+  slug?: string
+  name?: string
+  tagline?: string
+  summary?: string
+  detail?: string
+  /** The collection calls this `stage`; see the note in collections/Apps.ts. */
+  stage?: string
+  sequence?: string
+  platforms?: unknown
+  heroImage?: unknown
+  plate?: string
+  screenshots?: Array<{ image?: unknown; caption?: string }>
+  appStoreURL?: string
+  playStoreURL?: string
+  content?: unknown
+  description?: unknown
+  legacyHTML?: string
+  updatedAt?: string
+  metaTitle?: string
+  metaDescription?: string
+}
+
+const APP_STATUSES = new Set<AppStatus>([
+  'concept',
+  'in_development',
+  'coming_soon',
+  'available',
+])
+const APP_PLATFORMS = new Set<AppPlatform>(['ios', 'android', 'web'])
+const APP_PLATES = new Set<AppPlate>(['reader', 'colouring', 'year', 'echo'])
+
+/**
+ * An unrecognised status falls back to `concept` rather than being dropped.
+ *
+ * The page is a roadmap: an app whose status went missing is still an app the
+ * studio intends to build, and "concept" is the claim that promises least.
+ */
+function toAppStatus(value: unknown): AppStatus {
+  return APP_STATUSES.has(value as AppStatus) ? (value as AppStatus) : 'concept'
+}
+
+function toPlatforms(value: unknown): AppPlatform[] {
+  if (!Array.isArray(value)) return []
+  return value.filter((v): v is AppPlatform =>
+    APP_PLATFORMS.has(v as AppPlatform),
+  )
+}
+
+function toPlate(value: unknown): AppPlate {
+  return APP_PLATES.has(value as AppPlate) ? (value as AppPlate) : 'reader'
+}
+
+function toAppCard(doc: RawApp): AppCard | null {
+  if (!doc?.slug || !doc.name) return null
+  return {
+    id: String(doc.id ?? doc.slug),
+    slug: doc.slug,
+    name: doc.name,
+    tagline: doc.tagline ?? '',
+    summary: doc.summary ?? '',
+    detail: doc.detail ?? '',
+    status: toAppStatus(doc.stage),
+    sequence: doc.sequence ?? '',
+    platforms: toPlatforms(doc.platforms),
+    image: toMediaImage(doc.heroImage),
+    plate: toPlate(doc.plate),
+  }
+}
+
+async function readApps(): Promise<AppCard[]> {
+  try {
+    const payload = await getPayloadClient()
+    const result = await payload.find({
+      collection: 'apps',
+      overrideAccess: true,
+      depth: 1,
+      pagination: false,
+      limit: 0,
+      sort: ['order', 'name'],
+      where: published,
+    })
+    return (result.docs as RawApp[])
+      .map(toAppCard)
+      .filter((app): app is AppCard => app !== null)
+  } catch {
+    return []
+  }
+}
+
+/** Published apps, in editor order. Drafts never reach the public page. */
+export const getApps = cachedRead('apps', readApps, [
+  CONTENT_TAGS.apps,
+  CONTENT_TAGS.media,
+])
+
+async function readAppBySlug(
+  slug: string,
+  options: { draft?: boolean; user?: PreviewUser | null } = {},
+): Promise<AppDetail | null> {
+  try {
+    const payload = await getPayloadClient()
+    const result = await payload.find({
+      collection: 'apps',
+      // A draft read carries the editor's own access, the way pages do.
+      overrideAccess: !options.draft,
+      user: options.draft ? (options.user ?? undefined) : undefined,
+      depth: 1,
+      limit: 1,
+      draft: options.draft,
+      where: options.draft
+        ? { slug: { equals: slug } }
+        : { and: [{ slug: { equals: slug } }, published] },
+    })
+
+    const doc = result.docs[0] as RawApp | undefined
+    const card = doc ? toAppCard(doc) : null
+    if (!doc || !card) return null
+
+    const screenshots = (doc.screenshots ?? [])
+      .map((shot) => ({
+        image: toMediaImage(shot?.image),
+        caption: shot?.caption ?? '',
+      }))
+      .filter(
+        (shot): shot is { image: MediaImage; caption: string } =>
+          shot.image !== null,
+      )
+
+    return {
+      ...card,
+      // `toBodyHtml` reads `content`; the field here is `description`.
+      bodyHtml: toBodyHtml({ content: doc.description }),
+      updatedAt: doc.updatedAt ?? null,
+      screenshots,
+      appStoreURL: doc.appStoreURL || null,
+      playStoreURL: doc.playStoreURL || null,
+      metaTitle: doc.metaTitle ?? null,
+      metaDescription: doc.metaDescription ?? null,
+    }
+  } catch {
+    return null
+  }
+}
+
+const getPublishedAppBySlug = cachedRead(
+  'app-by-slug',
+  (slug: string) => readAppBySlug(slug),
+  [CONTENT_TAGS.apps, CONTENT_TAGS.media],
+)
+
+/**
+ * One app by slug. Published only, unless a preview session asks for the
+ * draft — in which case the read runs as that editor rather than cached.
+ */
+export function getAppBySlug(
+  slug: string,
+  options: { draft?: boolean; user?: PreviewUser | null } = {},
+): Promise<AppDetail | null> {
+  return options.draft
+    ? readAppBySlug(slug, options)
+    : getPublishedAppBySlug(slug)
+}
+
+/** All published app slugs (for the sitemap). */
+export const getAppSlugs = cachedRead(
+  'app-slugs',
+  async (): Promise<SlugRef[]> => {
+    try {
+      const payload = await getPayloadClient()
+      const result = await payload.find({
+        collection: 'apps',
+        overrideAccess: true,
+        depth: 0,
+        pagination: false,
+        limit: 0,
+        where: published,
+        select: { slug: true, updatedAt: true },
+      })
+      return (result.docs as Array<{ slug?: string; updatedAt?: string }>)
+        .filter((d): d is { slug: string; updatedAt?: string } =>
+          Boolean(d.slug),
+        )
+        .map((d) => ({ slug: d.slug, updatedAt: d.updatedAt ?? null }))
+    } catch {
+      return []
+    }
+  },
+  [CONTENT_TAGS.apps],
+)

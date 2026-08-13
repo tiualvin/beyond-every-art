@@ -12,6 +12,7 @@ import { revalidateTag, unstable_cache } from 'next/cache'
 export const CONTENT_TAGS = {
   posts: 'content:posts',
   pages: 'content:pages',
+  apps: 'content:apps',
   tags: 'content:tags',
   authors: 'content:authors',
   media: 'content:media',

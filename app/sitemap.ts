@@ -37,7 +37,7 @@ const readSlugs = cachedRead(
   'sitemap-slugs',
   async () => {
     const payload = await getPayloadClient()
-    const [posts, pages, tags, authors] = await Promise.all([
+    const [posts, pages, tags, authors, apps] = await Promise.all([
       payload.find({
         collection: 'posts',
         overrideAccess: true,
@@ -74,6 +74,15 @@ const readSlugs = cachedRead(
         limit: 0,
         select: { slug: true, updatedAt: true },
       }),
+      payload.find({
+        collection: 'apps',
+        overrideAccess: true,
+        depth: 0,
+        pagination: false,
+        limit: 0,
+        where: { _status: { equals: 'published' } },
+        select: { slug: true, updatedAt: true },
+      }),
     ])
 
     return {
@@ -81,6 +90,7 @@ const readSlugs = cachedRead(
       pages: toDocs(pages.docs as PublishedDoc[]),
       tags: toDocs(tags.docs as PublishedDoc[]),
       authors: toDocs(authors.docs as PublishedDoc[]),
+      apps: toDocs(apps.docs as PublishedDoc[]),
     }
   },
   [
@@ -88,6 +98,7 @@ const readSlugs = cachedRead(
     CONTENT_TAGS.pages,
     CONTENT_TAGS.tags,
     CONTENT_TAGS.authors,
+    CONTENT_TAGS.apps,
   ],
 )
 

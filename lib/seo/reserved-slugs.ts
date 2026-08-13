@@ -10,6 +10,7 @@
 export const RESERVED_ROOT_SLUGS = [
   'admin',
   'api',
+  'apps',
   'author',
   'csp-report',
   'health',
