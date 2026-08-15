@@ -23,6 +23,7 @@ import { Header } from './globals/Header'
 import { SiteSettings } from './globals/SiteSettings'
 import { resendAdapter } from './lib/email/resend'
 import { mcp } from './lib/mcp/plugin'
+import { resolvePayloadSecret } from './lib/security/secret'
 import {
   buildPreviewUrl,
   PREVIEW_COLLECTIONS,
@@ -115,7 +116,10 @@ export default buildConfig({
         ]
       : []),
   ],
-  secret: process.env.PAYLOAD_SECRET || '',
+  // Throws rather than defaulting when this is missing or is one of the
+  // placeholder values published in this repository — see lib/security/secret.ts
+  // for why a quiet fallback here was a real incident, not a hypothetical one.
+  secret: resolvePayloadSecret(),
   sharp,
   typescript: { outputFile: path.resolve(dirname, 'payload-types.ts') },
 })

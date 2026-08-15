@@ -53,6 +53,14 @@ services:
         condition: service_healthy
     # Production secrets (PAYLOAD_SECRET, S3_*, RESEND_*, ...) load from .env.
     # The file is optional so `docker compose config` works without one.
+    #
+    # PAYLOAD_SECRET is passed through with no default on purpose. It used to
+    # fall back to a value written in this file, which meant a missing .env
+    # produced a working stack signing its sessions with a string published in
+    # a public repository — and that is exactly what happened here for several
+    # weeks (docs/DEPLOYMENT_STATUS.md). Unset, the app now refuses to start
+    # and says why (lib/security/secret.ts), so the failure is a failed deploy
+    # rather than a silent one.
     env_file:
       - path: .env
         required: false
@@ -60,7 +68,7 @@ services:
       DATABASE_URI: ${DATABASE_URI:-postgresql://payload:payload@postgres:5432/beyond_every_art}
       NEXT_PUBLIC_SERVER_URL: ${NEXT_PUBLIC_SERVER_URL:-http://localhost:3000}
       PAYLOAD_PUBLIC_SERVER_URL: ${PAYLOAD_PUBLIC_SERVER_URL:-http://localhost:3000}
-      PAYLOAD_SECRET: ${PAYLOAD_SECRET:-development-only-change-me}
+      PAYLOAD_SECRET: ${PAYLOAD_SECRET}
     healthcheck:
       test:
         [
@@ -130,7 +138,7 @@ services:
         required: false
     environment:
       DATABASE_URI: ${DATABASE_URI:-postgresql://payload:payload@postgres:5432/beyond_every_art}
-      PAYLOAD_SECRET: ${PAYLOAD_SECRET:-development-only-change-me}
+      PAYLOAD_SECRET: ${PAYLOAD_SECRET}
     restart: 'no'
     volumes:
       # The same volume as `app`. This image is also what runs `migrate:ghost`,

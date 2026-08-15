@@ -2,10 +2,13 @@ import { withPayload } from '@payloadcms/next/withPayload'
 
 import type { NextConfig } from 'next'
 
-import { buildCspHeaders } from './lib/security/csp'
+import { buildSecurityHeaders } from './lib/security/headers'
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  // `X-Powered-By: Next.js, Payload` otherwise names the framework and the CMS
+  // on every response, which is free reconnaissance and buys nothing.
+  poweredByHeader: false,
   // The policy is attached here rather than in `middleware.ts` because the
   // middleware matcher deliberately skips `/admin`, `/api`, and `/webhooks`,
   // and the Payload admin is exactly the surface that must not be left
@@ -15,7 +18,7 @@ const nextConfig: NextConfig = {
   // per-request nonce. That is what keeps `'unsafe-inline'` in `script-src`
   // today; docs/CONTENT_SECURITY_POLICY.md covers the move to nonces.
   async headers() {
-    const headers = buildCspHeaders({
+    const headers = buildSecurityHeaders({
       isDevelopment: process.env.NODE_ENV === 'development',
     })
     if (headers.length === 0) return []

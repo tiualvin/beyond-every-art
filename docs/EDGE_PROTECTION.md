@@ -130,3 +130,17 @@ concerns already handled in the repo, and nothing about these:
   is configured). Every image occupies an app worker. Caching at the edge hides
   this rather than fixing it; moving media to R2 is the actual fix, and R2 has
   no egress charge.
+- **Uploads through the admin panel have no size ceiling.** Payload v3's
+  `UploadConfig` has no option for one, so `collections/Media.ts` restricts the
+  format but not the size, and a single upload is bounded only by disk. The MCP
+  path caps itself at 8MB in code (`lib/mcp/upload.ts`). Closing this properly
+  means a request body limit in front of Payload's route — Caddy's
+  `request_body max_size` on `/api/media*` is the obvious place, once the
+  Cloudflare work above settles what sits in front of the origin.
+- **Backups are unencrypted.** `pg_dump | gzip` uploads to R2 as-is, and the
+  dump contains the whole `members` archive: addresses, Stripe customer and
+  subscription identifiers, internal notes, engagement statistics. Retention is
+  bounded and the bucket is credentialed, but that is personal data at rest in
+  the clear. The same `S3_*` credentials serve media and backups, so one leaked
+  key exposes both — `BACKUP_S3_BUCKET` already exists to separate the buckets,
+  and separate credentials should follow.

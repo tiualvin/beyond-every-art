@@ -23,9 +23,15 @@ jobs:
     env:
       DATABASE_URI: postgresql://payload:payload@localhost:5432/beyond_every_art
       NEXT_PUBLIC_SERVER_URL: http://localhost:3000
-      PAYLOAD_SECRET: synthetic-ci-secret-that-is-not-used-in-production
     steps:
       - uses: actions/checkout@v4
+      # A fresh secret per run, rather than a literal in this file. The app
+      # refuses to start in production on any value published in this
+      # repository (lib/security/secret.ts), and a CI secret committed here
+      # would be exactly that — while also being one copy-paste away from a
+      # real deployment.
+      - name: Generate a PAYLOAD_SECRET for this run
+        run: echo "PAYLOAD_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
       - uses: pnpm/action-setup@v4
         with: { run_install: false }
       - uses: actions/setup-node@v4
@@ -125,9 +131,15 @@ jobs:
       CI: 'true'
       DATABASE_URI: postgresql://payload:payload@localhost:5432/beyond_every_art
       NEXT_PUBLIC_SERVER_URL: http://127.0.0.1:3000
-      PAYLOAD_SECRET: synthetic-ci-secret-that-is-not-used-in-production
     steps:
       - uses: actions/checkout@v4
+      # A fresh secret per run, rather than a literal in this file. The app
+      # refuses to start in production on any value published in this
+      # repository (lib/security/secret.ts), and a CI secret committed here
+      # would be exactly that — while also being one copy-paste away from a
+      # real deployment.
+      - name: Generate a PAYLOAD_SECRET for this run
+        run: echo "PAYLOAD_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
       - uses: pnpm/action-setup@v4
         with: { run_install: false }
       - uses: actions/setup-node@v4
