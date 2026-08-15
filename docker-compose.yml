@@ -16,6 +16,16 @@ services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    # Container logs are a fixed-size resource on this box. Docker's json-file
+    # driver keeps them forever by default, so a noisy loop — or an
+    # unauthenticated endpoint that emits a line per request — fills the disk
+    # and takes down every service on it, including the database. Capped and
+    # rotated instead.
+    logging:
+      driver: json-file
+      options:
+        max-size: ${LOG_MAX_SIZE:-10m}
+        max-file: '${LOG_MAX_FILES:-3}'
     deploy:
       resources:
         limits:
@@ -42,6 +52,16 @@ services:
   app:
     build: .
     restart: unless-stopped
+    # Container logs are a fixed-size resource on this box. Docker's json-file
+    # driver keeps them forever by default, so a noisy loop — or an
+    # unauthenticated endpoint that emits a line per request — fills the disk
+    # and takes down every service on it, including the database. Capped and
+    # rotated instead.
+    logging:
+      driver: json-file
+      options:
+        max-size: ${LOG_MAX_SIZE:-10m}
+        max-file: '${LOG_MAX_FILES:-3}'
     # The highest ceiling of the four: this is the only service that renders
     # pages, and `sharp` processes images in-process, which spikes.
     deploy:
@@ -94,6 +114,16 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    # Container logs are a fixed-size resource on this box. Docker's json-file
+    # driver keeps them forever by default, so a noisy loop — or an
+    # unauthenticated endpoint that emits a line per request — fills the disk
+    # and takes down every service on it, including the database. Capped and
+    # rotated instead.
+    logging:
+      driver: json-file
+      options:
+        max-size: ${LOG_MAX_SIZE:-10m}
+        max-file: '${LOG_MAX_FILES:-3}'
     # Caddy proxies and terminates TLS; it holds no page in memory. The point of
     # a ceiling here is that it is the last service that should ever be starved,
     # since it is what answers at all when the app behind it is struggling.
@@ -151,6 +181,16 @@ services:
       context: .
       dockerfile: docker/backup/Dockerfile
     restart: unless-stopped
+    # Container logs are a fixed-size resource on this box. Docker's json-file
+    # driver keeps them forever by default, so a noisy loop — or an
+    # unauthenticated endpoint that emits a line per request — fills the disk
+    # and takes down every service on it, including the database. Capped and
+    # rotated instead.
+    logging:
+      driver: json-file
+      options:
+        max-size: ${LOG_MAX_SIZE:-10m}
+        max-file: '${LOG_MAX_FILES:-3}'
     # `pg_dump | gzip` streams, so this stays flat regardless of database size.
     deploy:
       resources:

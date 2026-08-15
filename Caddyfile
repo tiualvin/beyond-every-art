@@ -24,8 +24,12 @@
   # Written as one matcher with an explicit `not` rather than as overlapping
   # `handle` blocks, so what is served here does not depend on how Caddy sorts
   # matchers by specificity — the rule reads the same way it evaluates.
+  # `/redirects-map` joins them: it exists only so the edge middleware can read
+  # the redirect table, which it does by connecting to the app's own bind
+  # address rather than through this proxy, so refusing it here costs the site
+  # nothing and stops an anonymous caller reading the migration's URL map.
   @staffOnly {
-    path /api* /admin*
+    path /api* /admin* /redirects-map*
     not path /api/media* /api/preview*
   }
 

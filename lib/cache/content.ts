@@ -17,6 +17,7 @@ export const CONTENT_TAGS = {
   authors: 'content:authors',
   media: 'content:media',
   globals: 'content:globals',
+  redirects: 'content:redirects',
 } as const
 
 export type ContentTag = (typeof CONTENT_TAGS)[keyof typeof CONTENT_TAGS]

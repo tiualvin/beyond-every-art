@@ -119,10 +119,23 @@ function isReportingApiEntry(value: unknown): value is ReportingApiEntry {
   )
 }
 
+/**
+ * How many violations one request may report.
+ *
+ * The route bounds the request body, which bounds the work of parsing it — but
+ * not the output, and the output is log lines on a disk. A browser batches a
+ * handful of reports; sixteen kilobytes of minimal hand-written ones is
+ * hundreds, from a caller who needs no credential to send them. Extra entries
+ * are dropped rather than truncating the request, because a real report beyond
+ * this count is not information anyone is missing.
+ */
+export const MAX_REPORTS_PER_REQUEST = 20
+
 /** Reporting API posts an array; `report-uri` posts one object. */
 export function parseCspPayload(payload: unknown): CspViolation[] {
   const entries = Array.isArray(payload) ? payload : [payload]
   return entries
+    .slice(0, MAX_REPORTS_PER_REQUEST)
     .map(parseCspReport)
     .filter((entry): entry is CspViolation => entry !== null)
 }
