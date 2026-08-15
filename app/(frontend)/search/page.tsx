@@ -1,6 +1,12 @@
 import type { Metadata } from 'next'
+import { headers } from 'next/headers'
 
 import { searchPosts } from '@/lib/content/queries'
+import {
+  clientKey,
+  configuredLimit,
+  FixedWindowRateLimiter,
+} from '@/lib/security/rate-limit'
 import { absoluteUrl, getSiteUrl, SEARCH_PATH } from '@/lib/seo/site'
 
 import { FadeIn } from '../components/motion/fade-in'
@@ -13,6 +19,19 @@ import { StoryCard } from '../components/story-card'
 export const dynamic = 'force-dynamic'
 
 type SearchParams = { q?: string }
+
+/**
+ * Lower than the suggestion drawer's allowance, because this is the deliberate
+ * act of submitting a search rather than the incidental traffic of typing one.
+ *
+ * Going over does not fail the page: the form, the heading and the chrome all
+ * render as usual and only the results are withheld, so a reader who is merely
+ * quick sees a message they can act on rather than an error page.
+ */
+const limiter = new FixedWindowRateLimiter(
+  configuredLimit('RATE_LIMIT_SEARCH_PER_MINUTE', 30),
+  60_000,
+)
 
 export async function generateMetadata({
   searchParams,
@@ -36,7 +55,9 @@ export default async function SearchPage({
 }) {
   const { q } = await searchParams
   const query = q?.trim() ?? ''
-  const posts = query ? await searchPosts(query) : []
+  const throttled =
+    query.length > 0 && !limiter.check(clientKey(await headers())).allowed
+  const posts = query && !throttled ? await searchPosts(query) : []
 
   return (
     <main>
@@ -61,7 +82,11 @@ export default async function SearchPage({
               </form>
             </div>
           </FadeIn>
-          {query ? (
+          {throttled ? (
+            <p className="muted">
+              That is a lot of searches at once. Give it a moment and try again.
+            </p>
+          ) : query ? (
             posts.length > 0 ? (
               <StaggerChildren className="card-grid">
                 {posts.map((post) => (

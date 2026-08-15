@@ -162,6 +162,21 @@ what they show, and only then set `CSP_MODE=enforce`.
 directive rationale, the rollout phases, and what this policy does and does not
 protect against.
 
+The public hostname serves the website and nothing else: Payload Admin, the REST
+and GraphQL collection endpoints, and the MCP endpoint are answered with a 404
+there and reachable only on `CMS_ADDRESS`. The exceptions are `/api/media`,
+which serves uploaded images, and `/api/preview`, which carries an editor's
+draft session. Public endpoints that reach the database — search, the two signup
+forms, and Payload's own login and password-reset routes — are rate limited per
+source address by `lib/security/rate-limit.ts`.
+
+Those limiters are per-container and bound one noisy source; they are not a
+defence against a distributed attacker, and nothing in front of the origin is.
+**Cloudflare is DNS-only, so the VPS currently absorbs every request directly.**
+[`docs/EDGE_PROTECTION.md`](docs/EDGE_PROTECTION.md) has the procedure, and the
+reason the Cloudflare proxy must not simply be switched on — it breaks HTTP-01
+certificate renewal and the site fails at the next renewal, not immediately.
+
 Merges to `main` deploy the exact commit that passed CI. Deployments to the VPS
 are serialized, wait for Compose health checks, and verify `/health` from inside
 the app container, so pre-DNS deployments do not depend on a public hostname or

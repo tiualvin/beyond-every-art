@@ -1,7 +1,25 @@
+# Every long-running service carries a memory ceiling.
+#
+# Without one, any single container can consume the whole VPS: a traffic spike
+# or a runaway query takes the box down rather than the service that caused it,
+# and Caddy dies with everything else, so the site stops answering instead of
+# degrading. A container that hits its ceiling is killed and restarted by
+# `restart: unless-stopped`, which is a far better outcome than an OOM killer
+# choosing a victim across the host.
+#
+# The defaults are deliberately generous, because a limit set below what a
+# healthy process actually needs causes the very outage it is meant to prevent,
+# and this file has to be safe on a VPS whose size it cannot see. Tighten them
+# to the real machine with APP_MEMORY_LIMIT and friends in `.env` — a limit
+# caps a container, it never reserves memory, so the total may exceed RAM.
 services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: ${POSTGRES_MEMORY_LIMIT:-1g}
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-beyond_every_art}
       POSTGRES_USER: ${POSTGRES_USER:-payload}
@@ -24,6 +42,12 @@ services:
   app:
     build: .
     restart: unless-stopped
+    # The highest ceiling of the four: this is the only service that renders
+    # pages, and `sharp` processes images in-process, which spikes.
+    deploy:
+      resources:
+        limits:
+          memory: ${APP_MEMORY_LIMIT:-2g}
     depends_on:
       postgres:
         condition: service_healthy
@@ -62,6 +86,13 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    # Caddy proxies and terminates TLS; it holds no page in memory. The point of
+    # a ceiling here is that it is the last service that should ever be starved,
+    # since it is what answers at all when the app behind it is struggling.
+    deploy:
+      resources:
+        limits:
+          memory: ${CADDY_MEMORY_LIMIT:-256m}
     depends_on:
       - app
     environment:
@@ -112,6 +143,11 @@ services:
       context: .
       dockerfile: docker/backup/Dockerfile
     restart: unless-stopped
+    # `pg_dump | gzip` streams, so this stays flat regardless of database size.
+    deploy:
+      resources:
+        limits:
+          memory: ${BACKUP_MEMORY_LIMIT:-512m}
     depends_on:
       postgres:
         condition: service_healthy

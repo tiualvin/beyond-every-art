@@ -84,6 +84,15 @@ Related: [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md),
 
 ## Not done yet
 
+0.1. **Edge protection — the origin is unprotected (operator action).**
+Cloudflare holds the DNS but every record is "DNS only", so there is no DDoS
+mitigation, no edge cache, and the VPS address is public. This is the largest
+open risk in the deployment and it must be closed before the public cutover.
+The procedure, the prepared Caddy image (`docker/caddy/Dockerfile`), and the
+warning about why the proxy cannot simply be toggled on — it breaks HTTP-01
+certificate renewal — are in
+[`EDGE_PROTECTION.md`](EDGE_PROTECTION.md). Blocked on a Cloudflare API token.
+
 0. **One-time migration baseline (operator action, before the next deploy).**
    Schema migrations now exist and automatic push is off. The VPS database was
    built by push, so it must be told the initial migration is already applied

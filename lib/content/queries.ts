@@ -275,13 +275,32 @@ export const getRecentPosts = cachedRead('recent-posts', readRecentPosts, [
   CONTENT_TAGS.media,
 ])
 
-/** Published posts whose title or excerpt matches the query text. */
-export async function searchPosts(
-  query: string,
-  limit = 20,
+/**
+ * The longest search term that will ever reach the database.
+ *
+ * `contains` compiles to `ILIKE '%term%'`, which no index can serve — every
+ * search is a scan of the posts table. A term long enough to be meaningful is
+ * well under this; the cap exists so the scan cannot be made arbitrarily
+ * expensive by padding the query string.
+ */
+export const MAX_SEARCH_TERM_LENGTH = 64
+
+/**
+ * Reduces a raw query string to the text actually searched for.
+ *
+ * Whitespace is collapsed and the result truncated, which bounds the work per
+ * search and — because the normalised term is the cache key below — collapses
+ * the many spellings of one search ("ultramarine", " ultramarine  ") onto a
+ * single cached entry.
+ */
+export function normaliseSearchTerm(query: string): string {
+  return query.trim().replace(/\s+/g, ' ').slice(0, MAX_SEARCH_TERM_LENGTH)
+}
+
+async function readSearchPosts(
+  term: string,
+  limit: number,
 ): Promise<PostCard[]> {
-  const term = query.trim()
-  if (!term) return []
   try {
     const payload = await getPayloadClient()
     const result = await payload.find({
@@ -308,6 +327,35 @@ export async function searchPosts(
   } catch {
     return []
   }
+}
+
+/**
+ * Cached because search was the one read on the site that was not.
+ *
+ * The suggestion drawer issues a request per keystroke, so the same few terms
+ * arrive over and over while someone types, and each one was reaching Postgres
+ * for a full scan. Caching them removes that entirely for the traffic that
+ * actually repeats.
+ *
+ * The cache is keyed on attacker-controlled text, which would be a way to fill
+ * it with junk if anything else did not bound it — the rate limiters on
+ * `/search` and `/search/suggest` are what make the number of distinct keys
+ * finite, so the two changes only work as a pair.
+ */
+const cachedSearchPosts = cachedRead('search-posts', readSearchPosts, [
+  CONTENT_TAGS.posts,
+  CONTENT_TAGS.tags,
+  CONTENT_TAGS.media,
+])
+
+/** Published posts whose title or excerpt matches the query text. */
+export async function searchPosts(
+  query: string,
+  limit = 20,
+): Promise<PostCard[]> {
+  const term = normaliseSearchTerm(query)
+  if (!term) return []
+  return cachedSearchPosts(term, limit)
 }
 
 // --- Detail + archive types --------------------------------------------

@@ -2,10 +2,34 @@
 {$SITE_ADDRESS:localhost} {
   encode zstd gzip
 
-  # The MCP endpoint is staff tooling, not part of the website. It is served
-  # only on the CMS hostname below, so the address readers and search engines
-  # use never exposes a write endpoint at all.
-  handle /api/mcp* {
+  # Staff tooling is served only on the CMS hostname below, so the address
+  # readers and search engines use exposes no write endpoint and no login form
+  # at all. Two things follow from that:
+  #
+  #   - The admin panel cannot be reached here. Payload locks an account after
+  #     five failed passwords, which stops guessing but means anyone who can
+  #     find the login form can also lock an editor out of it on demand.
+  #   - Payload's REST and GraphQL collection endpoints cannot be reached here.
+  #     Access control holds up on them — an anonymous reader sees published,
+  #     public documents and nothing else — but `?limit=0` disables pagination
+  #     (Payload treats it as "no limit"), so one short request returns every
+  #     post in the database with its full body. The website never calls them
+  #     from the browser: pages render through Payload's Local API on the
+  #     server, and the only fetch the frontend makes is to /search/suggest.
+  #
+  # The two exceptions are what the public pages genuinely need: `/api/media`
+  # serves every uploaded image, and `/api/preview` is how an editor's draft
+  # session reaches the frontend.
+  #
+  # Written as one matcher with an explicit `not` rather than as overlapping
+  # `handle` blocks, so what is served here does not depend on how Caddy sorts
+  # matchers by specificity — the rule reads the same way it evaluates.
+  @staffOnly {
+    path /api* /admin*
+    not path /api/media* /api/preview*
+  }
+
+  handle @staffOnly {
     respond "Not found" 404
   }
 

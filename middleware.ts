@@ -1,5 +1,11 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
+import {
+  clientKey,
+  FixedWindowRateLimiter,
+  TOO_MANY_REQUESTS_BODY,
+  tooManyRequestsInit,
+} from '@/lib/security/rate-limit'
 import { isAuthorized, parseBasicAuth } from '@/lib/seo/indexing'
 import {
   buildRedirectMap,
@@ -9,6 +15,40 @@ import {
 } from '@/lib/seo/redirects'
 
 const CACHE_TTL_MS = 60_000
+
+/**
+ * Password reset is the only place on this site where an anonymous request
+ * spends money.
+ *
+ * `POST /api/users/forgot-password` sends a transactional email through Resend
+ * on every call, whether or not the address belongs to anyone. Left open that
+ * is a bill, a quota (the free tier is a few thousand a month) and a sending
+ * reputation, all spendable by a stranger with a loop. Payload has no rate
+ * limiting of its own in v3, so the bound has to be here — in front of the
+ * route, since Payload owns everything under `/api`.
+ *
+ * Three an hour is a person who has genuinely lost their password twice.
+ */
+const forgotPasswordLimiter = new FixedWindowRateLimiter(3, 60 * 60_000)
+
+/**
+ * Login is bounded too, for a different reason.
+ *
+ * Payload locks an individual account after five failed attempts, which stops
+ * password guessing but does nothing about volume: each attempt still costs a
+ * user lookup and a bcrypt comparison, which is deliberately expensive. This
+ * caps how many of those a single source can buy.
+ */
+const loginLimiter = new FixedWindowRateLimiter(20, 15 * 60_000)
+
+/** The auth routes above, matched against the pathname Payload serves them on. */
+function authLimiterFor(pathname: string): FixedWindowRateLimiter | null {
+  if (pathname.startsWith('/api/users/forgot-password')) {
+    return forgotPasswordLimiter
+  }
+  if (pathname.startsWith('/api/users/login')) return loginLimiter
+  return null
+}
 
 type RedirectCache = {
   map: Map<string, ResolvedRedirect>
@@ -36,6 +76,23 @@ async function loadRedirectMap(
 }
 
 export async function middleware(request: NextRequest): Promise<NextResponse> {
+  // Payload's auth routes are matched only so they can be rate limited. They
+  // return here rather than falling through: the Basic Auth gate below has
+  // never covered `/api` and enabling it now would answer the admin panel's own
+  // login request with a 401 on staging, and the redirect map has nothing to
+  // say about an endpoint Payload owns.
+  const authLimiter = authLimiterFor(request.nextUrl.pathname)
+  if (authLimiter) {
+    const allowance = authLimiter.check(clientKey(request.headers))
+    if (!allowance.allowed) {
+      return NextResponse.json(
+        TOO_MANY_REQUESTS_BODY,
+        tooManyRequestsInit(allowance.resetAt),
+      )
+    }
+    return NextResponse.next()
+  }
+
   // Optional HTTP Basic Auth gate for staging deployments. The /health probe
   // stays open so container healthchecks and uptime monitors can reach it.
   if (request.nextUrl.pathname !== '/health') {
@@ -90,5 +147,10 @@ export const config = {
   // arrive. Each report would also pull the redirect map for nothing.
   matcher: [
     '/((?!_next/static|_next/image|favicon.ico|admin|api|webhooks|csp-report|redirects-map|sitemap.xml|robots.txt|rss|.*\\..*).*)',
+    // The one deliberate exception to the `api` exclusion above. Payload's
+    // auth routes are matched so `authLimiterFor` can throttle them, and the
+    // handler returns immediately for anything it matches, so nothing else in
+    // this middleware applies to them.
+    '/api/users/:path*',
   ],
 }

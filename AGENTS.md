@@ -41,6 +41,19 @@ collection allowlist, adding an MCP tool, or changing any agent-facing write
 path into Payload — and keep the plugin allowlist and the custom tools in step,
 so the allowlist never understates the real surface.
 
+## Open risk: the origin has no edge protection
+
+Cloudflare is DNS-only, so nothing absorbs traffic in front of the VPS and the
+origin IP is public. [`docs/EDGE_PROTECTION.md`](docs/EDGE_PROTECTION.md) has the
+full procedure, the prepared Caddy image, and the reason the Cloudflare proxy
+must not simply be switched on (it breaks HTTP-01 certificate renewal). It needs
+a Cloudflare API token, so it cannot be finished without an operator.
+
+**Close this before the public cutover.** Until it is closed, the only bounds on
+request volume are the in-process limiters in `lib/security/rate-limit.ts`, which
+are per-container and are not a defence against a distributed attacker. Do not
+build anything that assumes otherwise.
+
 ## Current priority
 
 The first priority is a safe, repeatable Ghost migration—not a redesign.
