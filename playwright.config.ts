@@ -14,13 +14,32 @@ const startsLocalServer = !process.env.PLAYWRIGHT_BASE_URL
  *
  * Local runs keep the dev server for fast iteration.
  */
+/**
+ * The suite drives every public flow from one address, and the rate limiters
+ * (`lib/security/rate-limit.ts`) key on exactly that. Loopback sends no
+ * `X-Forwarded-For`, so all of it lands in one bucket: the signup tests alone
+ * come close to the production allowance of ten an hour, and a retried run goes
+ * past it — which would fail as a rate limit rather than as the bug it looks
+ * like. Raised here rather than weakened in the code, so what ships stays tight.
+ */
+const rateLimitOverrides = {
+  RATE_LIMIT_SIGNUP_PER_HOUR: '10000',
+  RATE_LIMIT_SEARCH_PER_MINUTE: '10000',
+  RATE_LIMIT_SEARCH_SUGGEST_PER_MINUTE: '10000',
+}
+
 const productionServer = {
   command: 'node .next/standalone/server.js',
-  env: { HOSTNAME: '127.0.0.1', NODE_ENV: 'production', PORT: '3000' },
+  env: {
+    HOSTNAME: '127.0.0.1',
+    NODE_ENV: 'production',
+    PORT: '3000',
+    ...rateLimitOverrides,
+  },
 }
 const developmentServer = {
   command: 'pnpm exec next dev --hostname 127.0.0.1 --port 3000',
-  env: {},
+  env: { ...rateLimitOverrides },
 }
 
 export default defineConfig({

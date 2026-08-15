@@ -82,6 +82,13 @@ export default buildConfig({
     push: false,
   }),
   editor: lexicalEditor(),
+  // Payload's default is 10, and `?depth=10` on a public collection endpoint is
+  // a very cheap request that makes the server populate ten levels of
+  // relationships before it can answer. Nothing in this repo reads deeper than
+  // 2 (the frontend passes 0 or 1 almost everywhere), so 3 leaves real queries
+  // untouched and removes the amplification. Requests asking for more are
+  // served at this depth rather than rejected.
+  maxDepth: 3,
   // Transactional email (admin password reset, verification). Omitted when
   // RESEND_API_KEY / EMAIL_FROM_ADDRESS are unset so local dev and CI still boot.
   ...(email ? { email } : {}),

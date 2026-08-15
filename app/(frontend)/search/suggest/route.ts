@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server'
 
 import { searchPosts } from '@/lib/content/queries'
+import {
+  clientKey,
+  configuredLimit,
+  FixedWindowRateLimiter,
+  tooManyRequests,
+} from '@/lib/security/rate-limit'
 import { postPath } from '@/lib/seo/site'
 
 // Rendered per request so canonical URLs, feeds and JSON-LD come from the
@@ -9,6 +15,19 @@ import { postPath } from '@/lib/seo/site'
 export const dynamic = 'force-dynamic'
 
 const LIMIT = 8
+
+/**
+ * Generous enough for typing, small enough to be worthless as a load generator.
+ *
+ * The drawer debounces and aborts in flight requests, so a person searching
+ * hard produces a few requests a second at worst. Sixty in a rolling minute
+ * leaves that untouched while capping what a script can extract from the one
+ * endpoint on the site that reaches Postgres on every distinct term.
+ */
+const limiter = new FixedWindowRateLimiter(
+  configuredLimit('RATE_LIMIT_SEARCH_SUGGEST_PER_MINUTE', 60),
+  60_000,
+)
 
 /**
  * Results for the header's search drawer.
@@ -21,6 +40,9 @@ const LIMIT = 8
  * the title and excerpt.
  */
 export async function GET(request: Request) {
+  const allowance = limiter.check(clientKey(request.headers))
+  if (!allowance.allowed) return tooManyRequests(allowance.resetAt)
+
   const query = new URL(request.url).searchParams.get('q')?.trim() ?? ''
   if (!query) return NextResponse.json({ results: [] })
 

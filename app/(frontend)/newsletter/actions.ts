@@ -1,14 +1,33 @@
 'use server'
 
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
 import { getPayloadClient } from '@/lib/payload'
+import {
+  clientKey,
+  configuredLimit,
+  FixedWindowRateLimiter,
+} from '@/lib/security/rate-limit'
 import { NEWSLETTER_PATH } from '@/lib/seo/site'
 
 /** Basic RFC 5322-ish check; Payload's `email` field re-validates on write. */
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export type SignupStatus = 'success' | 'invalid' | 'error'
+
+/**
+ * Nobody subscribes ten times in an hour, and the write is unauthenticated.
+ *
+ * Without a bound this is an open door onto the database: every submission is a
+ * row, and the address is never verified, so the list can be filled with
+ * plausible-looking strangers as fast as requests can be made. Ten an hour is
+ * far above a person correcting a typo and far below anything worth automating.
+ */
+const limiter = new FixedWindowRateLimiter(
+  configuredLimit('RATE_LIMIT_SIGNUP_PER_HOUR', 10),
+  60 * 60_000,
+)
 
 /** Signals that a write lost to an address that is already on the list. */
 function isDuplicate(error: unknown): boolean {
@@ -28,6 +47,11 @@ function isDuplicate(error: unknown): boolean {
 
 async function record(email: string, source: string): Promise<SignupStatus> {
   if (!EMAIL_PATTERN.test(email)) return 'invalid'
+
+  // Answered as a generic failure rather than its own status: a throttled
+  // submitter is either a script, which is told nothing useful, or a person who
+  // has already subscribed several times over and is best served by stopping.
+  if (!limiter.check(clientKey(await headers())).allowed) return 'error'
 
   try {
     const payload = await getPayloadClient()

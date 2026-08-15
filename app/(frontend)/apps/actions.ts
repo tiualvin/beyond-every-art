@@ -1,12 +1,30 @@
 'use server'
 
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
 import { getPayloadClient } from '@/lib/payload'
+import {
+  clientKey,
+  configuredLimit,
+  FixedWindowRateLimiter,
+} from '@/lib/security/rate-limit'
 import { APPS_PATH } from '@/lib/seo/site'
 
 /** Same check the newsletter action uses; Payload re-validates on write. */
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+/**
+ * The same bound as the newsletter signup, for the same reason.
+ *
+ * This one writes a row per ticked app rather than one per submission, so an
+ * unbounded submitter costs several writes each time — the limit is counted per
+ * submission regardless, because that is the action a person takes.
+ */
+const limiter = new FixedWindowRateLimiter(
+  configuredLimit('RATE_LIMIT_SIGNUP_PER_HOUR', 10),
+  60 * 60_000,
+)
 
 export type WaitlistStatus = 'success' | 'invalid' | 'none' | 'error'
 
@@ -56,6 +74,9 @@ export async function joinAppWaitlist(formData: FormData): Promise<void> {
 
   if (slugs.length === 0) return redirect(`${APPS_PATH}?status=none`)
   if (!EMAIL_PATTERN.test(email)) return redirect(`${APPS_PATH}?status=invalid`)
+  if (!limiter.check(clientKey(await headers())).allowed) {
+    return redirect(`${APPS_PATH}?status=error`)
+  }
 
   let status: WaitlistStatus = 'success'
 
