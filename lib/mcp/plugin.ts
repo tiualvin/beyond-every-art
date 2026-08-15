@@ -18,15 +18,32 @@
 import { mcpPlugin, type MCPPluginConfig } from '@payloadcms/plugin-mcp'
 import type { PayloadRequest, Plugin } from 'payload'
 
-import { logMcpEvent, mcpSessionLogEntry } from './audit'
-import { FixedWindowRateLimiter, rateLimitKey } from './rate-limit'
+import {
+  logMcpEvent,
+  mcpAuthLogEntry,
+  mcpEventLogEntry,
+  mcpRefusedLogEntry,
+} from './audit'
+import {
+  configuredLimit,
+  FixedWindowRateLimiter,
+  rateLimitKey,
+  retryAfterSeconds,
+} from './rate-limit'
+import { elideArticleBodies } from './response'
 import { mcpTools } from './tools'
 
-/** Requests per key per minute. Generous for a person, bounded for a flood. */
+/**
+ * Requests per key per minute, unless `RATE_LIMIT_MCP_PER_MINUTE` says
+ * otherwise. Generous for a person, bounded for a flood.
+ */
 const RATE_LIMIT = 120
 const RATE_WINDOW_MS = 60_000
 
-const limiter = new FixedWindowRateLimiter(RATE_LIMIT, RATE_WINDOW_MS)
+const limiter = new FixedWindowRateLimiter(
+  configuredLimit('RATE_LIMIT_MCP_PER_MINUTE', RATE_LIMIT),
+  RATE_WINDOW_MS,
+)
 
 /**
  * Whether the MCP endpoint is mounted at all.
@@ -61,6 +78,11 @@ export const mcpPluginConfig: MCPPluginConfig = {
       // No `delete`: an agent that removes an article is not a workflow this
       // project wants, and the admin panel is two clicks away.
       enabled: { create: true, delete: false, find: true, update: true },
+      // The description above asks for `select`; this is what happens when an
+      // agent does not pass one. Bodies are summarised rather than returned,
+      // so an unbounded `findPosts` costs a listing instead of every migrated
+      // article's full Ghost markup.
+      overrideResponse: elideArticleBodies('posts'),
     },
     tags: {
       description: 'Tags used for article categorisation.',
@@ -69,6 +91,17 @@ export const mcpPluginConfig: MCPPluginConfig = {
   },
   disabled: !mcpEnabled(),
   mcp: {
+    handlerOptions: {
+      // The only place a tool call is visible as a tool call. `recordMcpWrite`
+      // sees writes, and `overrideAuth` below sees keys, but neither sees a
+      // read — so without this a key that does nothing but pull articles out of
+      // the database leaves no trace. Nothing here reads the call's arguments;
+      // see `mcpEventLogEntry` for why that matters.
+      onEvent: (event) => {
+        const entry = mcpEventLogEntry(event)
+        if (entry) logMcpEvent(entry)
+      },
+    },
     tools: mcpTools,
   },
   // Wraps the plugin's own key resolution rather than replacing it: the
@@ -76,26 +109,48 @@ export const mcpPluginConfig: MCPPluginConfig = {
   // before. This adds what the endpoint needs now that it is reachable from
   // the internet — a bound on request volume, and a record of which key acted.
   overrideAuth: async (req, getDefaultMcpAccessSettings) => {
-    const limit = limiter.check(rateLimitKey(req.headers.get('Authorization')))
+    const caller = rateLimitKey(req.headers.get('Authorization'))
+
+    const limit = limiter.check(caller)
     if (!limit.allowed) {
+      // The window is already computed; saying when it reopens is the
+      // difference between an agent that waits and one that retries in a loop.
+      const retryAfter = retryAfterSeconds(limit.resetAt)
+      logMcpEvent(
+        mcpRefusedLogEntry({ caller, reason: 'rate_limited', retryAfter }),
+      )
       throw new Error(
-        'Rate limit exceeded for this MCP key. Try again shortly.',
+        `Rate limit exceeded for this MCP key. Try again in ${retryAfter} seconds.`,
       )
     }
 
-    const settings = await getDefaultMcpAccessSettings()
+    let settings
+    try {
+      settings = await getDefaultMcpAccessSettings()
+    } catch (error) {
+      // A missing or unrecognised key. This throws before the MCP handler is
+      // entered, so `onEvent` never sees it either — without this line, a run
+      // of guessed keys against a publicly reachable endpoint is invisible.
+      logMcpEvent(mcpRefusedLogEntry({ caller, reason: 'unauthorized' }))
+      throw error
+    }
+
     const user = (settings as { user?: { id?: unknown; role?: unknown } }).user
 
-    // The plugin resolves the key's user and hands it to its own generated
-    // tools, but never puts it on the request. Custom tools only receive `req`,
-    // and so do collection hooks — so without this the drafting tools run
-    // anonymously and fail Posts' `authenticated` create rule, while the
-    // publish guard and the audit log see no role at all. Assigning it here is
-    // what makes `req.user` mean the same thing on every MCP path.
+    // Belt and braces. At `3.86.0` the plugin resolved the key's user, handed
+    // it to its own generated tools, and never put it on the request — so the
+    // custom tools, which receive only `req`, ran anonymously and failed Posts'
+    // `authenticated` create rule, while the publish guard and the audit log
+    // saw no role at all. `3.88.0` assigns `req.user` itself, immediately after
+    // this hook returns. Keeping the assignment costs nothing, holds if that
+    // changes again, and means the line below can read the user it logs.
     if (user) req.user = user as NonNullable<PayloadRequest['user']>
 
+    // One line per authenticated request, not per session: the endpoint is
+    // Streamable HTTP against a stateless server, so there is no session to
+    // count. See `audit.ts`.
     logMcpEvent(
-      mcpSessionLogEntry({
+      mcpAuthLogEntry({
         key: (settings as { label?: unknown }).label,
         role: user?.role,
         userId: user?.id,

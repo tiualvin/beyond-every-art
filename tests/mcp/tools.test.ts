@@ -56,6 +56,20 @@ describe('mcpPluginConfig', () => {
     expect(mcpPluginConfig.globals ?? {}).toEqual({})
   })
 
+  // Without this, one unbounded `findPosts` answers with every migrated
+  // article's full Ghost body.
+  it('keeps article bodies out of generated find responses', () => {
+    expect(mcpPluginConfig.collections?.posts?.overrideResponse).toBeTypeOf(
+      'function',
+    )
+  })
+
+  // The only place a read is visible at all: nothing else in the stack logs a
+  // tool call that did not write a document.
+  it('logs every JSON-RPC call through the handler event hook', () => {
+    expect(mcpPluginConfig.mcp?.handlerOptions?.onEvent).toBeTypeOf('function')
+  })
+
   // Collection files written to disk, `payload.config.ts` rewritten in place,
   // and password reset / account unlock tools are all things this endpoint has
   // no business offering.

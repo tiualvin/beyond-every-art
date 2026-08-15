@@ -23,8 +23,9 @@
 ## What is built
 
 Configuration lives in [`lib/mcp/`](../lib/mcp): `plugin.ts` (allowlist, rate
-limit, session logging), `tools.ts` (the drafting tools), `markdown.ts`
-(Markdown ⇄ Lexical), `publish-guard.ts`, `rate-limit.ts`, and `audit.ts`.
+limit, request logging), `tools.ts` (the drafting tools), `markdown.ts`
+(Markdown ⇄ Lexical), `response.ts` (keeping bodies out of find responses),
+`publish-guard.ts`, `rate-limit.ts`, and `audit.ts`.
 
 ### Turning it on
 
@@ -114,15 +115,48 @@ Preview shows what is going out.
 
 ### What gets logged
 
-One JSON line per MCP session (`mcp_session`: key label, user, role) and per
-MCP write (`mcp_write`: collection, document, operation, resulting status,
-user, role), alongside the existing `request_error`, `not_found`, and
-`csp_violation` lines. Read them with
-`docker compose logs app | grep mcp_`.
+Five JSON lines, alongside the existing `request_error`, `not_found`, and
+`csp_violation` ones. Read them with `docker compose logs app | grep mcp_`.
+
+| Line          | Written when               | Carries                                                       |
+| ------------- | -------------------------- | ------------------------------------------------------------- |
+| `mcp_auth`    | a request authenticates    | key label, user, role                                         |
+| `mcp_refused` | a request is turned away   | reason (`rate_limited` / `unauthorized`), caller, retry-after |
+| `mcp_request` | a JSON-RPC call completes  | method, tool name, duration, transport status                 |
+| `mcp_write`   | a document is written      | collection, document, operation, resulting status, user, role |
+| `mcp_error`   | the transport itself fails | message, context, source, severity                            |
 
 Payload's version history records what changed, never who, and autosave makes an
 agent's edits look like a person's — these lines are the only trail from a
 change back to the key that made it.
+
+Three things about them are worth knowing before reading a log:
+
+**There is no session line, because there is no session.** An earlier version of
+this document promised one line per MCP session. The endpoint is Streamable HTTP
+with SSE disabled, which `mcp-handler` serves from a single stateless server
+with no session id generator, and `overrideAuth` runs per request — so
+`mcp_auth` is per request, and is named for what it is. `SESSION_STARTED` and
+`SESSION_ENDED` are never emitted on this transport.
+
+**`mcp_auth` and `mcp_request` describe the same request from two sides.**
+`overrideAuth` knows the key and not the tool; the plugin's `onEvent` hook knows
+the tool and not the key. Neither can be reduced to the other, so a normal tool
+call writes two lines, plus a third if it wrote a document.
+
+**`mcp_request` deliberately records almost nothing about the call.**
+`mcp-handler` passes the _request body_ to `onEvent`, so the tool's arguments are
+available there — an entire 8MB base64 image on an `uploadMedia` call, the full
+text of an article on a drafting one. Only `params.name` is read. Note also that
+its `status` comes from the transport, not the tool: a handler that throws is
+caught by the MCP SDK and returned as a JSON-RPC error, which the transport
+still completes successfully. A refused publish reads as `success` here;
+`mcp_write` is what says whether anything landed.
+
+Refusals are the reason `mcp_refused` exists at all. Both the rate limit and an
+unrecognised key are rejected inside `overrideAuth`, before the MCP handler is
+entered, so neither reaches `onEvent` — without that line, a run of guessed keys
+against a publicly reachable endpoint left no evidence anywhere.
 
 ## Decision status
 
@@ -169,7 +203,7 @@ handful of tools over Payload's Local API. It was considered and rejected:
 
 The official plugin resolves all three: it derives tool schemas from the Payload
 config, authenticates over HTTP with a scoped key instead of database
-credentials, and — verified in the published `3.86.0` source — calls
+credentials, and — verified in the published `3.88.0` source — calls
 `payload.create`, `payload.update`, and `payload.delete` with
 `overrideAccess: false` and an explicit `user`.
 
@@ -179,10 +213,10 @@ article from this outline"), and the plugin covers that too through
 
 ## How the plugin works
 
-Verified against the published `@payloadcms/plugin-mcp@3.86.0` package rather
+Verified against the published `@payloadcms/plugin-mcp@3.88.0` package rather
 than the documentation, because the two disagree on the authorization header —
 the docs describe Payload's generic `<collection> API-Key <key>` form, and the
-shipped `3.86.0` endpoint reads a plain `Bearer` token.
+shipped endpoint reads a plain `Bearer` token.
 
 **Transport and endpoint.** The plugin registers `POST /api/mcp` and
 `GET /api/mcp` as Payload endpoints, served through the existing
@@ -324,20 +358,24 @@ This was the single highest-value custom piece, and it is built —
 round trip through `convertMarkdownToLexical` and back preserves headings,
 emphasis, lists, block quotes, and links.
 
-One correction to the plan: **`@payloadcms/plugin-mcp@3.86.0` exports no
-`defineTool` or `defineCollectionTool`.** Those helpers are documented on
-Payload's main branch but are a later API than the release this project pins, so
-the tools are declared as plain objects against the `mcp.tools` config type
-instead. Worth knowing before a version bump: adopting the helpers later is a
-refactor, not a config change.
+One correction to the plan: **the plugin exports no `defineTool` or
+`defineCollectionTool`** — not at `3.86.0`, where this was first written, and
+still not at `3.88.0`, which the project now pins. Those helpers are documented
+on Payload's main branch but have not shipped, so the tools are declared as
+plain objects against the `mcp.tools` config type instead. Worth re-checking on
+the next version bump: adopting the helpers is a refactor of
+[`lib/mcp/tools.ts`](../lib/mcp/tools.ts), not a config change.
 
-A second thing the plugin does not do: it resolves the key's user and hands it
-to its own generated tools, but never puts it on the request. Custom tools
-receive only `req`, and so do collection hooks — so without intervention the
-drafting tools run anonymously and fail Posts' `authenticated` create rule,
-while the publish guard and the audit log see no role at all.
+A second thing the plugin did not do, **fixed upstream since**: at `3.86.0` it
+resolved the key's user, handed it to its own generated tools, and never put it
+on the request. Custom tools receive only `req`, and so do collection hooks — so
+the drafting tools ran anonymously and failed Posts' `authenticated` create
+rule, while the publish guard and the audit log saw no role at all.
 [`lib/mcp/plugin.ts`](../lib/mcp/plugin.ts) assigns `req.user` in `overrideAuth`
-so `req.user` means the same thing on every MCP path.
+to close that. At `3.88.0` the plugin assigns it too, immediately after
+`overrideAuth` returns, so the assignment here is now belt and braces rather
+than load-bearing. It is kept: it costs nothing, it holds if that changes again,
+and the audit line needs the user in hand anyway.
 
 Note that migrated posts render from `legacyHTML`, not `content`, so a
 markdown-drafted body only appears on the public site for documents that have no
@@ -371,7 +409,12 @@ was built instead:
   returns 404 for it, so the address readers use exposes no write endpoint;
 - an in-application fixed-window rate limit, because Caddy's standard build has
   no rate limiting and every request — including one with a wrong key — costs a
-  database lookup before it can be rejected;
+  database lookup before it can be rejected. 120 requests per key per minute,
+  tunable with `RATE_LIMIT_MCP_PER_MINUTE` like the site's other limiters. It is
+  keyed on the presented credential rather than a source address, because the
+  requests arrive from a vendor's cloud and share addresses. A refusal says how
+  many seconds remain in the window, so an agent waits instead of retrying in a
+  loop;
 - keys scoped per key in the admin panel, acting as a real Payload user, unable
   to publish unless that user is an administrator;
 - `MCP_ENABLED` unset by default, so the endpoint exists only where someone
@@ -398,7 +441,7 @@ line records what actually landed rather than what was attempted — see
 [What gets logged](#what-gets-logged). The second is an operating habit, not
 code: label each key for the client that holds it.
 
-### Finding 6: response size
+### Finding 6: response size — built
 
 Auto-generated `find` tools return whole documents, and a migrated post carries
 its entire `legacyHTML` body. A handful of unbounded `findPosts` calls will fill
@@ -406,6 +449,24 @@ an agent's context with HTML nobody asked for. Configure the collection
 descriptions to steer usage, instruct agents to pass `select`, and use the
 plugin's `overrideResponse` hook on `posts` to strip `legacyHTML` from list
 responses.
+
+Built as [`lib/mcp/response.ts`](../lib/mcp/response.ts), which covers `content`
+as well as `legacyHTML` — both are article bodies, and the Lexical one is no
+cheaper to carry. Each is replaced by a note giving its size and pointing at
+`readArticleMarkdown`, so an agent can see that a body exists and ask for it
+deliberately.
+
+Two implementation notes, because the hook is easy to get wrong. The response
+text arrives **already serialised** — the plugin has built its header and one
+`json` block per document before `overrideResponse` sees it — and the second
+argument is the paginated result on a list, a bare document on `findByID`,
+`create`, and `update`, and `{}` on the error paths. So the elided response is
+rebuilt from the documents rather than edited as a string: a search-and-replace
+over the plugin's formatting would fail silently the first time that formatting
+changed. And when no document carried a body — a `select`ed query, a natively
+authored post with no `legacyHTML` — the plugin's own response is returned
+untouched, so this narrows responses without ever reformatting them for its own
+sake.
 
 ### Finding 7: publishing authority
 

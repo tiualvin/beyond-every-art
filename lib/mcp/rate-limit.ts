@@ -8,8 +8,10 @@
 // is identified, which is specific to this endpoint.
 
 export {
+  configuredLimit,
   FixedWindowRateLimiter,
   type RateLimitResult,
+  retryAfterSeconds,
 } from '../security/rate-limit'
 
 /**
