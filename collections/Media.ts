@@ -3,6 +3,7 @@ import type { CollectionConfig } from 'payload'
 import { editorsAndAdmins, publicRead } from '../access/roles'
 import { CONTENT_TAGS } from '../lib/cache/content'
 import { purgeOnChange, purgeOnDelete } from '../lib/cache/purge'
+import { refuseOversizedUpload } from '../lib/security/uploads'
 
 export const Media: CollectionConfig = {
   slug: 'media',
@@ -13,6 +14,7 @@ export const Media: CollectionConfig = {
     delete: editorsAndAdmins,
   },
   hooks: {
+    beforeOperation: [refuseOversizedUpload],
     afterChange: [purgeOnChange(CONTENT_TAGS.media)],
     afterDelete: [purgeOnDelete(CONTENT_TAGS.media)],
   },
@@ -37,9 +39,13 @@ export const Media: CollectionConfig = {
     ],
     // No size ceiling is set here because Payload v3's `UploadConfig` has no
     // option for one — `filesize` belongs to the stored file's metadata, not to
-    // the collection's rules. So the admin upload path is bounded only by disk,
-    // where the MCP path caps at 8MB in its own code. Closing that needs a body
-    // limit in front of Payload's route rather than a line in this file; it is
+    // the collection's rules. The ceiling is enforced by `refuseOversizedUpload`
+    // in the hooks above instead, which runs before Payload reads the file, so
+    // nothing oversized reaches disk or sharp.
+    //
+    // That bounds what gets stored, not what a stranger can make this server
+    // receive: the bytes have already arrived by the time a hook runs. A request
+    // body limit in front of the application is still the real defence, and is
     // recorded in docs/EDGE_PROTECTION.md as unfinished rather than left to be
     // rediscovered.
     imageSizes: [{ name: 'card', width: 768, withoutEnlargement: true }],

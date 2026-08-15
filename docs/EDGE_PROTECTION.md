@@ -130,13 +130,22 @@ concerns already handled in the repo, and nothing about these:
   is configured). Every image occupies an app worker. Caching at the edge hides
   this rather than fixing it; moving media to R2 is the actual fix, and R2 has
   no egress charge.
-- **Uploads through the admin panel have no size ceiling.** Payload v3's
-  `UploadConfig` has no option for one, so `collections/Media.ts` restricts the
-  format but not the size, and a single upload is bounded only by disk. The MCP
-  path caps itself at 8MB in code (`lib/mcp/upload.ts`). Closing this properly
-  means a request body limit in front of Payload's route — Caddy's
-  `request_body max_size` on `/api/media*` is the obvious place, once the
-  Cloudflare work above settles what sits in front of the origin.
+- **Uploads through the admin panel are capped in the application, not at the
+  edge.** Payload v3's `UploadConfig` has no size option, so `collections/Media.ts`
+  can restrict the format and nothing else, and an upload was once bounded only
+  by disk. `refuseOversizedUpload` in [`lib/security/uploads.ts`](../lib/security/uploads.ts)
+  now runs in `beforeOperation` — before Payload reads `req.file` — and refuses
+  anything over 25MB with a `413`, tunable with `MEDIA_MAX_UPLOAD_MB`. The MCP
+  path keeps its own lower ceiling of 8MB, because those bytes arrive as base64
+  through a model's context.
+
+  That bounds what gets **stored**, not what a stranger can make the server
+  **receive**: the bytes have already been buffered by the time a collection
+  hook runs. The real defence is still a request body limit in front of
+  Payload's route — Caddy's `request_body max_size` on `/api/media*` is the
+  obvious place — once the Cloudflare work above settles what sits in front of
+  the origin.
+
 - **Backups are unencrypted.** `pg_dump | gzip` uploads to R2 as-is, and the
   dump contains the whole `members` archive: addresses, Stripe customer and
   subscription identifiers, internal notes, engagement statistics. Retention is
