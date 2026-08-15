@@ -45,6 +45,14 @@ export const CONTENT_TTL_SECONDS = 600
  *
  * `keyParts` names the query; Next.js adds the arguments, so one wrapper
  * serves every slug.
+ *
+ * Only callable from inside a Next.js request. `unstable_cache` needs the
+ * incremental cache the server installs per request and throws an invariant
+ * error without one — the opposite of `revalidateContent` below, which is
+ * written to survive exactly that situation. So a script, a seed, or the Ghost
+ * importer must query Payload directly rather than reuse a reader from
+ * `lib/content/queries.ts`. Nothing does today; `tests/cache/purge.test.ts`
+ * pins both halves so the difference is discoverable before it bites.
  */
 export function cachedRead<A extends unknown[], R>(
   name: string,
