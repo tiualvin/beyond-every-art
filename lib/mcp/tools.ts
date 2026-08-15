@@ -6,9 +6,11 @@
 // so an image has no way in at all. These tools close both gaps, so an agent's
 // job is to write and illustrate the article rather than to satisfy the schema.
 //
-// `@payloadcms/plugin-mcp@3.86.0` has no `defineTool` helper — that is a later
-// API than the release this project pins — so tools are declared as plain
-// objects against the `mcp.tools` config type.
+// `@payloadcms/plugin-mcp` still has no `defineTool` helper at `3.88.0`, the
+// release this project pins — it is documented on Payload's main branch but has
+// not shipped — so tools are declared as plain objects against the `mcp.tools`
+// config type. Re-check on the next version bump: adopting the helpers is a
+// refactor of this file, not a config change.
 
 import type { MCPPluginConfig } from '@payloadcms/plugin-mcp'
 import { randomUUID } from 'node:crypto'
