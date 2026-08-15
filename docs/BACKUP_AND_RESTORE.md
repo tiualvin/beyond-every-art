@@ -33,8 +33,43 @@ you want backups in a bucket separate from media. Relevant variables (see
 | `BACKUP_S3_BUCKET`                                                     | `S3_BUCKET`  | Destination bucket                       |
 | `BACKUP_PREFIX`                                                        | `db-backups` | Key prefix backups live under            |
 | `BACKUP_RETENTION_COUNT`                                               | `14`         | Number of newest backups to keep         |
+| `BACKUP_ENCRYPTION_KEY`                                                | unset        | Passphrase to encrypt backups at rest    |
 | `BACKUP_CRON`                                                          | `0 3 * * *`  | Schedule (backup container only)         |
 | `BACKUP_ON_START`                                                      | `false`      | Run one backup when the container starts |
+
+## Encryption
+
+A dump contains the entire `members` archive — addresses, Stripe customer and
+subscription identifiers, internal notes, engagement statistics. The same
+`S3_*` credentials serve media and backups, so without encryption one leaked
+key exposes both.
+
+Set `BACKUP_ENCRYPTION_KEY` and every new backup is wrapped in AES-256-GCM,
+with the key derived from the passphrase by scrypt and a fresh salt per run.
+Encrypted objects take a `.enc` suffix:
+
+```
+db-backups/beyond_every_art-20260724T030000Z.sql.gz.enc
+```
+
+```bash
+openssl rand -base64 32   # generate one; store it outside this server
+```
+
+Four things to know before turning it on:
+
+- **Losing the passphrase loses the backups.** There is no recovery path, by
+  design. Keep a copy somewhere that is neither this VPS nor the backup bucket,
+  because both are exactly what a backup exists to survive.
+- **Rotating it does not re-encrypt anything.** Older objects still need the
+  previous value, so keep it until they have aged out of the retention window.
+- **Unset means unencrypted, and the run says so.** Every backup report carries
+  a warning while the key is missing. Refusing to run without one would turn a
+  readable backup into no backup at all, which is worse.
+- **Restore needs no flag.** Whether an archive is encrypted is read from its
+  own header, so backups taken before this existed keep restoring unchanged and
+  a mixed bucket is handled without thinking about it. Retention treats both as
+  one series.
 
 ## Scheduled backups (production)
 
@@ -78,9 +113,15 @@ database — so a real restore requires an explicit `--yes`.
 pnpm restore:db --latest --dry-run
 ```
 
-This downloads the newest backup, confirms it decompresses, and reports its
-size without touching any database. Use `--input <key>` to check a specific
-backup or `--input-file <path>` for a local archive.
+This downloads the newest backup, confirms it decrypts and decompresses, and
+reports its size without touching any database. Use `--input <key>` to check a
+specific backup or `--input-file <path>` for a local archive.
+
+Worth doing on a schedule, not only during an incident: a dry run is the only
+thing that proves `BACKUP_ENCRYPTION_KEY` is still the passphrase the bucket
+was written with. A rotated key breaks every restore silently, and the nightly
+backup keeps succeeding while it does — it only encrypts, it never reads one
+back.
 
 ### 2. Restore into a scratch database first (recommended)
 
