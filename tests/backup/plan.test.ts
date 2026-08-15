@@ -70,12 +70,30 @@ describe('backupKey', () => {
     )
     expect(key).toBe('db-backups/beyond_every_art-20260724T030000Z.sql.gz')
   })
+
+  it('marks an encrypted backup in its name', () => {
+    const key = backupKey(
+      'db-backups',
+      'beyond_every_art',
+      new Date('2026-07-24T03:00:00.000Z'),
+      true,
+    )
+    expect(key).toBe('db-backups/beyond_every_art-20260724T030000Z.sql.gz.enc')
+  })
 })
 
 describe('backupTimestamp', () => {
   it('parses the timestamp back out of a key', () => {
     expect(
       backupTimestamp('db-backups/beyond_every_art-20260724T030000Z.sql.gz'),
+    ).toBe('20260724T030000Z')
+  })
+
+  it('parses an encrypted key the same way', () => {
+    expect(
+      backupTimestamp(
+        'db-backups/beyond_every_art-20260724T030000Z.sql.gz.enc',
+      ),
     ).toBe('20260724T030000Z')
   })
 
@@ -105,5 +123,22 @@ describe('selectExpiredKeys', () => {
 
   it('ignores keys without a recognizable timestamp', () => {
     expect(selectExpiredKeys([...keys, 'db-backups/stray.txt'], 4)).toEqual([])
+  })
+
+  // The week encryption is switched on, the bucket holds both kinds. They are
+  // one series: counting them separately would keep N of each, and would prune
+  // a still-needed encrypted backup while holding an older plaintext one.
+  it('retains one series across the switch to encryption', () => {
+    const mixed = [
+      'db-backups/db-20260101T030000Z.sql.gz',
+      'db-backups/db-20260102T030000Z.sql.gz',
+      'db-backups/db-20260103T030000Z.sql.gz.enc',
+      'db-backups/db-20260104T030000Z.sql.gz.enc',
+    ]
+
+    expect(selectExpiredKeys(mixed, 2)).toEqual([
+      'db-backups/db-20260102T030000Z.sql.gz',
+      'db-backups/db-20260101T030000Z.sql.gz',
+    ])
   })
 })

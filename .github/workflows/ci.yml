@@ -110,6 +110,34 @@ jobs:
           jq -e '.ok == true' validation-report.json > /dev/null
       - run: pnpm build
 
+  audit:
+    # Its own job rather than a step inside `checks`, for two reasons. A new
+    # advisory published upstream turns this red without a commit, so it must be
+    # obvious that the code did not break — and it must be possible to see a
+    # green `checks` and ship an urgent fix while this one is red.
+    #
+    # Production dependencies only, and only `high` and above. `pnpm audit`
+    # reports the whole tree by default, including build tooling that never
+    # serves a request, and blocking on every moderate in a transitive
+    # dev dependency trains people to ignore the job entirely.
+    #
+    # Advisories against packages this project does not depend on directly are
+    # answered with `pnpm.overrides` in package.json — see the notes in
+    # tests/security/dependency-overrides.test.ts for what each one is for and
+    # when it can be removed.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { run_install: false }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --prod --audit-level high
+
   browser-smoke:
     # Browser-level launch checks against a seeded, disposable PostgreSQL
     # database. This catches route, metadata, privacy, redirect, and responsive

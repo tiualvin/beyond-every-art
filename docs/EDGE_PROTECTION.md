@@ -122,21 +122,33 @@ concerns already handled in the repo, and nothing about these:
 - The in-process rate limiters reset when the container restarts, and there is
   one container. That is a deliberate trade (`lib/security/rate-limit.ts`), not
   an oversight, but it means a deploy clears every window.
-- `/health` runs a database count on every request and is exempt from the
-  staging Basic Auth gate so that uptime monitors can reach it. Cheap
-  individually; still an uncached round-trip to Postgres from an anonymous
-  caller.
+- `/health` is exempt from the staging Basic Auth gate so uptime monitors can
+  reach it, which means an anonymous caller can too. It is now a single
+  `SELECT id FROM posts LIMIT 1` — constant time, whatever the archive grows to
+  — rather than the `COUNT(*)` it used to run
+  ([`lib/observability/health.ts`](../lib/observability/health.ts)). Still an
+  uncached round-trip to Postgres from an anonymous caller, so the endpoint
+  remains something the edge should absorb.
 - Media is served by Node from local disk (`useR2` is false — no object storage
   is configured). Every image occupies an app worker. Caching at the edge hides
   this rather than fixing it; moving media to R2 is the actual fix, and R2 has
   no egress charge.
-- **Uploads through the admin panel have no size ceiling.** Payload v3's
-  `UploadConfig` has no option for one, so `collections/Media.ts` restricts the
-  format but not the size, and a single upload is bounded only by disk. The MCP
-  path caps itself at 8MB in code (`lib/mcp/upload.ts`). Closing this properly
-  means a request body limit in front of Payload's route — Caddy's
-  `request_body max_size` on `/api/media*` is the obvious place, once the
-  Cloudflare work above settles what sits in front of the origin.
+- **Uploads through the admin panel are capped in the application, not at the
+  edge.** Payload v3's `UploadConfig` has no size option, so `collections/Media.ts`
+  can restrict the format and nothing else, and an upload was once bounded only
+  by disk. `refuseOversizedUpload` in [`lib/security/uploads.ts`](../lib/security/uploads.ts)
+  now runs in `beforeOperation` — before Payload reads `req.file` — and refuses
+  anything over 25MB with a `413`, tunable with `MEDIA_MAX_UPLOAD_MB`. The MCP
+  path keeps its own lower ceiling of 8MB, because those bytes arrive as base64
+  through a model's context.
+
+  That bounds what gets **stored**, not what a stranger can make the server
+  **receive**: the bytes have already been buffered by the time a collection
+  hook runs. The real defence is still a request body limit in front of
+  Payload's route — Caddy's `request_body max_size` on `/api/media*` is the
+  obvious place — once the Cloudflare work above settles what sits in front of
+  the origin.
+
 - **Backups are unencrypted.** `pg_dump | gzip` uploads to R2 as-is, and the
   dump contains the whole `members` archive: addresses, Stripe customer and
   subscription identifiers, internal notes, engagement statistics. Retention is

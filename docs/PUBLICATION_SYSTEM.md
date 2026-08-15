@@ -616,7 +616,8 @@ When a relationship target changes, the publication shows the current title,
 image, excerpt, price, availability, link, and metadata. Do not duplicate
 relationship content inside hotspot records.
 
-Only `posts` exists today; the other collections arrive with their own features.
+Of the collections a hotspot would point at, only `posts` and `apps` exist
+today; the rest arrive with their own features.
 Model the hotspot target as a polymorphic relationship that can grow rather than
 inventing speculative collections now — consistent with `AGENTS.md`'s rule
 against building app collections before their features are scheduled.

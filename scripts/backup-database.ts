@@ -16,6 +16,7 @@ import { writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { createGzip } from 'node:zlib'
 
+import { encryptArchive, resolveBackupPassphrase } from '../lib/backup/encrypt'
 import {
   backupKey,
   resolveBackupConfig,
@@ -108,7 +109,15 @@ async function main() {
   const cli = parseArgs(process.argv.slice(2))
   const config = resolveBackupConfig(process.env)
   const retentionCount = cli.keep ?? config.retentionCount
-  const key = backupKey(config.prefix, config.databaseName, new Date())
+  // Resolved before pg_dump runs: a passphrase that fails validation should
+  // stop the run at the first line, not after dumping the whole database.
+  const passphrase = resolveBackupPassphrase(process.env)
+  const key = backupKey(
+    config.prefix,
+    config.databaseName,
+    new Date(),
+    Boolean(passphrase),
+  )
 
   const report: Record<string, unknown> = {
     mode: cli.dryRun ? 'dry-run' : 'backup',
@@ -116,9 +125,20 @@ async function main() {
     bucket: config.s3.bucket,
     key,
     retentionCount,
+    encrypted: Boolean(passphrase),
     uploaded: false,
     pruned: [] as string[],
     errors: [] as string[],
+  }
+
+  // Said on every run, not once at setup. The dump carries the whole member
+  // archive, and an unencrypted nightly backup is the kind of thing that stops
+  // being noticed the second time you see it.
+  if (!passphrase) {
+    report.warning =
+      'Backups are NOT encrypted. Set BACKUP_ENCRYPTION_KEY (openssl rand ' +
+      '-base64 32) so the member archive is not readable by whoever holds the ' +
+      'storage credential.'
   }
 
   if (cli.dryRun) {
@@ -130,8 +150,14 @@ async function main() {
     return
   }
 
-  const archive = await dumpAndGzip(config.databaseUri)
-  report.sizeBytes = archive.byteLength
+  const dump = await dumpAndGzip(config.databaseUri)
+  report.sizeBytes = dump.byteLength
+
+  // Encrypted before it is written anywhere — including `--output`, so a local
+  // copy taken during an incident is not a plaintext member archive sitting on
+  // whichever machine happened to run the command.
+  const archive = passphrase ? encryptArchive(dump, passphrase) : dump
+  if (passphrase) report.encryptedBytes = archive.byteLength
 
   if (cli.outputPath) {
     await writeFile(resolve(cli.outputPath), archive)
