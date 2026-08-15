@@ -99,6 +99,42 @@ field needs a generated migration committed with it
 schema. Schema commands are `migrate:db*`; the unprefixed `migrate:*` scripts
 are the Ghost content migration and are unrelated.
 
+## How to work in this repository
+
+Decided with the repository owner, and recorded here because a working
+agreement that lives in a chat transcript has to be renegotiated every session.
+
+**Small fixes: make them, then say so.** A reversible, well-scoped improvement
+found while doing something else should be fixed rather than filed — with the
+reason in the commit and the finding named in the summary. What makes this safe
+is the next rule, not restraint about scope.
+
+**Decide by blast radius.** Judgment calls that are reversible in a deploy —
+configuration, tests, internal code, documentation — are yours to make; state
+the assumption where the next reader will find it. Stop and ask when a choice
+touches:
+
+- live URLs, canonical tags, redirects, or anything a crawler will cache;
+- member, billing, or credential data;
+- money, or a third party's records;
+- a secret, which must never pass through an agent session.
+
+The trailing-slash question in
+[`docs/SEO_AND_REDIRECTS.md`](docs/SEO_AND_REDIRECTS.md) is the worked example:
+it looks like a one-line config change and is actually a bet on migrated URLs
+that is expensive to reverse after a recrawl.
+
+**Package work as one pull request with one commit per change.** Related fixes
+travel together so they are reviewed in context, and each stays independently
+revertible. Drive CI to green before merging; a red `checks` job is never
+something to merge past.
+
+**Write down what you learn where it is enforced.** Prose drifts. When a fact
+matters — an invariant, a constraint, a reason a thing is not the obvious
+shape — prefer a test that fails when it stops being true.
+[`tests/docs/drift.test.ts`](tests/docs/drift.test.ts) does this for the
+documentation itself.
+
 ## Security and repository hygiene
 
 Never commit:

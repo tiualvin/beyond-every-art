@@ -122,10 +122,13 @@ concerns already handled in the repo, and nothing about these:
 - The in-process rate limiters reset when the container restarts, and there is
   one container. That is a deliberate trade (`lib/security/rate-limit.ts`), not
   an oversight, but it means a deploy clears every window.
-- `/health` runs a database count on every request and is exempt from the
-  staging Basic Auth gate so that uptime monitors can reach it. Cheap
-  individually; still an uncached round-trip to Postgres from an anonymous
-  caller.
+- `/health` is exempt from the staging Basic Auth gate so uptime monitors can
+  reach it, which means an anonymous caller can too. It is now a single
+  `SELECT id FROM posts LIMIT 1` — constant time, whatever the archive grows to
+  — rather than the `COUNT(*)` it used to run
+  ([`lib/observability/health.ts`](../lib/observability/health.ts)). Still an
+  uncached round-trip to Postgres from an anonymous caller, so the endpoint
+  remains something the edge should absorb.
 - Media is served by Node from local disk (`useR2` is false — no object storage
   is configured). Every image occupies an app worker. Caching at the edge hides
   this rather than fixing it; moving media to R2 is the actual fix, and R2 has
