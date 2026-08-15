@@ -26,8 +26,12 @@ import type { Payload } from 'payload'
  * removes it.
  *
  * The rest keeps the row narrow: `depth: 0` populates no relationships, and
- * `select` asks for one column. The result is a single
- * `SELECT id FROM posts LIMIT 1`, constant time regardless of how large the
+ * `select` asks for one column. `slug` rather than `id`, because `id` is not a
+ * selectable key — Payload returns it on every document and leaves it out of
+ * the generated `PostsSelect`, so asking for it is a type error against the
+ * real types even though it reads like the obvious choice.
+ *
+ * The result is a single narrow row, constant time regardless of how large the
  * archive grows.
  */
 export const HEALTH_PROBE_QUERY = {
@@ -35,5 +39,5 @@ export const HEALTH_PROBE_QUERY = {
   depth: 0,
   limit: 1,
   pagination: false,
-  select: { id: true },
+  select: { slug: true },
 } as const satisfies Parameters<Payload['find']>[0]

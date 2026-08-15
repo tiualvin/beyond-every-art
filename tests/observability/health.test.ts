@@ -16,9 +16,12 @@ describe('HEALTH_PROBE_QUERY', () => {
     expect(HEALTH_PROBE_QUERY.limit).toBe(1)
   })
 
+  // `id` looks like the obvious column and is a type error: Payload returns it
+  // on every document and leaves it out of the generated select type, so only
+  // a real field can be named here.
   it('populates no relationships and reads one column', () => {
     expect(HEALTH_PROBE_QUERY.depth).toBe(0)
-    expect(HEALTH_PROBE_QUERY.select).toEqual({ id: true })
+    expect(HEALTH_PROBE_QUERY.select).toEqual({ slug: true })
   })
 
   // A collection that always exists, is always migrated, and needs no auth.
