@@ -12,10 +12,29 @@ updates:
         patterns: ['react', 'react-dom', '@types/react', '@types/react-dom']
       dev-dependencies:
         dependency-type: development
-    # Major upgrades (e.g. Next, TypeScript, React) can break the Payload/Next
-    # type layer and are handled deliberately rather than automatically.
+    # Major upgrades to the framework packages can break the Payload/Next type
+    # layer and are handled deliberately rather than automatically.
+    #
+    # This used to ignore majors for *every* package, which is why the security
+    # advisories piled up: anything whose fix landed in a major release was
+    # invisible, and Next drifted several minors behind while 26 advisories
+    # accumulated against the pinned version. The blanket rule is now narrowed
+    # to the packages that actually move together, so a major bump elsewhere
+    # opens a pull request and CI decides whether it is safe.
     ignore:
-      - dependency-name: '*'
+      - dependency-name: 'next'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'eslint-config-next'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'payload'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@payloadcms/*'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'react'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'react-dom'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'typescript'
         update-types: ['version-update:semver-major']
 
   - package-ecosystem: github-actions
