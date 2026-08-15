@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   buildCspLogEntry,
+  MAX_REPORTS_PER_REQUEST,
   parseCspPayload,
   parseCspReport,
   sanitizeUri,
@@ -110,6 +111,25 @@ describe('parseCspPayload', () => {
       { nonsense: true },
     ])
     expect(batch).toHaveLength(1)
+  })
+
+  it('caps how many reports one request can turn into log lines', () => {
+    // The route bounds the request body, which bounds parsing — but a body
+    // that size still holds hundreds of minimal reports, and every one of them
+    // would otherwise be a line on a disk, from a caller with no credential.
+    const flood = Array.from({ length: MAX_REPORTS_PER_REQUEST * 10 }, () => ({
+      body: { effectiveDirective: 'script-src', blockedURL: 'inline' },
+    }))
+
+    expect(parseCspPayload(flood)).toHaveLength(MAX_REPORTS_PER_REQUEST)
+  })
+
+  it('leaves a batch under the cap untouched', () => {
+    const normal = Array.from({ length: 3 }, () => ({
+      body: { effectiveDirective: 'img-src', blockedURL: 'data:' },
+    }))
+
+    expect(parseCspPayload(normal)).toHaveLength(3)
   })
 })
 

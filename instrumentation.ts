@@ -4,36 +4,37 @@
 // `register` runs once at server start and checks the deployment for
 // configuration that must not reach production.
 
-// docker-compose.yml falls back to this value so `docker compose config` works
-// without an .env file; a real deployment must override it.
-const PLACEHOLDER_SECRET = 'development-only-change-me'
+import { resolvePayloadSecret } from '@/lib/security/secret'
 
 /**
- * Startup configuration check. PAYLOAD_SECRET signs admin sessions and reset
- * tokens, so booting production with the compose placeholder (or none at all)
- * means anyone who knows the default can mint a valid session. Loud rather
- * than fatal: refusing to boot would take the site down for a problem an
- * operator can fix in the environment file.
+ * Startup configuration check.
+ *
+ * This used to warn and carry on, on the reasoning that refusing to boot would
+ * take the site down over something an operator could fix in a file. That
+ * reasoning did not survive contact with what happened: the warning was in
+ * place for the entire period the production stack ran on the compose
+ * placeholder (docs/DEPLOYMENT_STATUS.md), and nobody saw it. A control that
+ * has already failed once in exactly the situation it exists for is not a
+ * control, and serving with forgeable admin sessions is worse than being down
+ * with a message saying why.
+ *
+ * So it is fatal now, and `lib/security/secret.ts` is the single place that
+ * decides — the same function Payload's own config calls. Running it here as
+ * well only moves the failure earlier, to boot rather than to whichever request
+ * first touches Payload.
+ *
+ * Measured, not assumed: Next catches what this throws and the process still
+ * listens, so the container does not exit. What it cannot do is serve — every
+ * Payload-backed route answers 500, `/health` among them, so the Compose
+ * healthcheck fails, `docker compose up --wait` fails, and the deploy stops
+ * with the reason in `docker compose logs app`. Nothing authenticates in that
+ * state, which is the property that matters.
  */
 export async function register(): Promise<void> {
-  const secret = process.env.PAYLOAD_SECRET
-  if (process.env.NODE_ENV !== 'production') return
-  // Next registers instrumentation once per runtime; report from the Node
-  // server only so the warning appears a single time per boot.
+  // Next registers instrumentation once per runtime; the Node server is the
+  // one that holds the environment, and checking once keeps the failure single.
   if (process.env.NEXT_RUNTIME && process.env.NEXT_RUNTIME !== 'nodejs') return
-  if (secret && secret !== PLACEHOLDER_SECRET) return
-
-  console.error(
-    JSON.stringify({
-      level: 'error',
-      event: 'insecure_config',
-      time: new Date().toISOString(),
-      setting: 'PAYLOAD_SECRET',
-      message: secret
-        ? 'PAYLOAD_SECRET is still the shared placeholder value; set a unique secret before serving production traffic.'
-        : 'PAYLOAD_SECRET is not set; admin sessions and password-reset tokens are not securely signed.',
-    }),
-  )
+  resolvePayloadSecret()
 }
 
 export async function onRequestError(

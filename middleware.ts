@@ -113,8 +113,24 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   let map: Map<string, ResolvedRedirect>
   try {
     map = await loadRedirectMap(request.nextUrl.origin)
-  } catch {
+  } catch (error) {
     // Never let redirect lookups take the site down; fall through instead.
+    //
+    // Falling through silently, though, means every migrated Ghost URL starts
+    // answering 404 with nothing anywhere saying why — an SEO failure that
+    // looks exactly like normal operation from in here. One line per failure
+    // makes it something `docker compose logs app` can find.
+    console.error(
+      JSON.stringify({
+        level: 'error',
+        event: 'redirect_map_unavailable',
+        time: new Date().toISOString(),
+        message:
+          'Could not load the redirect map; migrated URLs will not redirect ' +
+          'until this succeeds.',
+        reason: error instanceof Error ? error.message : String(error),
+      }),
+    )
     return NextResponse.next()
   }
 
