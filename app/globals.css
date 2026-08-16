@@ -1978,6 +1978,14 @@ img {
   font-size: 1rem;
 }
 
+/* Panel bodies are rendered rich text, so they arrive as `<p>` carrying the
+   browser's default 1em top *and* bottom margin. Left alone those stack with
+   the rule below and with the summary above, which reads as a gap rather than
+   as a panel. Spacing is stated here instead. */
+.accordion__panel p {
+  margin: 0;
+}
+
 .accordion__panel > * + * {
   margin-top: 1rem;
 }
@@ -1987,31 +1995,39 @@ img {
 .pull-quote {
   margin-left: 0;
   margin-right: 0;
+  text-align: left;
 }
 
 /* `.prose blockquote` styles migrated Ghost quotes with a decorative opening
-   mark and its own width. This block owns its presentation, so those are
-   reset rather than fought with per-variant overrides. */
-.pull-quote__text {
+   mark, top and bottom rules, a fixed width and centred text. This block owns
+   its presentation, so all of that is reset.
+ *
+ * The selectors double the class deliberately. `.prose blockquote` is (0,1,1)
+ * and `.prose blockquote::before` is (0,1,2), so a single `.pull-quote__text`
+ * loses to both and every variant silently rendered as the migrated-quote
+ * style instead of its own. Doubling wins on class count without scoping these
+ * rules to `.prose`, so the block still looks right anywhere it is rendered. */
+.pull-quote .pull-quote__text {
   margin: 0;
   padding: 0;
   border: 0;
   max-width: none;
+  text-align: inherit;
   font-family: var(--font-serif);
   font-style: italic;
   line-height: 1.35;
   color: var(--color-ink);
 }
 
-.pull-quote__text::before {
+.pull-quote .pull-quote__text::before {
   content: none;
 }
 
-.pull-quote__text p {
+.pull-quote .pull-quote__text p {
   margin: 0;
 }
 
-.pull-quote__by {
+.pull-quote .pull-quote__by {
   margin-top: 0.9rem;
   font-family: var(--font-sans);
   font-style: normal;
