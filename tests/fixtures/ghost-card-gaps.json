@@ -1,0 +1,31 @@
+{
+  "db": [
+    {
+      "meta": { "version": "5.0", "exported_on": 1700000000000 },
+      "data": {
+        "posts": [
+          {
+            "id": "post-1",
+            "slug": "covered-cards-only",
+            "title": "Cards that already have a block",
+            "html": "<figure class=\"kg-card kg-callout-card kg-callout-card-blue\"><div>A callout</div></figure><figure class=\"kg-card kg-bookmark-card\"><a href=\"https://example.com/\">A bookmark</a></figure>"
+          },
+          {
+            "id": "post-2",
+            "slug": "an-unhandled-card",
+            "title": "A card with nowhere to land",
+            "html": "<figure class=\"kg-card kg-audio-card\"><audio src=\"https://example.com/a.mp3\"></audio></figure>"
+          }
+        ],
+        "pages": [
+          {
+            "id": "page-1",
+            "slug": "raw-html",
+            "title": "Hand-written markup",
+            "html": "<!--kg-card-begin: html--><aside>Kept verbatim in legacyHTML.</aside><!--kg-card-end: html-->"
+          }
+        ]
+      }
+    }
+  ]
+}

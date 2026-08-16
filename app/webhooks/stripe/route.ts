@@ -46,6 +46,10 @@ import {
 } from '@/lib/billing/subscription-state'
 import { verifyStripeSignature } from '@/lib/billing/stripe-signature'
 import { logWebhookProblem } from '@/lib/observability/webhook'
+import {
+  readBoundedText,
+  RequestBodyTooLarge,
+} from '@/lib/security/request-body'
 
 // Signature verification needs node:crypto, and the response must never be
 // cached or prerendered.
@@ -53,6 +57,12 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const PROVIDER = 'stripe'
+
+// Stripe events are ordinarily far smaller than this. Enforce the ceiling
+// while streaming: this endpoint is public, and signature verification happens
+// only after the body has arrived, so `request.text()` would otherwise let an
+// unauthenticated caller choose how much memory one request allocates.
+const MAX_WEBHOOK_BODY_BYTES = 1_048_576
 
 export async function POST(request: Request): Promise<Response> {
   const secret = process.env.STRIPE_WEBHOOK_SECRET
@@ -70,7 +80,18 @@ export async function POST(request: Request): Promise<Response> {
 
   // Raw bytes, before any parsing: re-serialised JSON does not match the
   // signature Stripe computed.
-  const body = await request.text()
+  let body: string
+  try {
+    body = await readBoundedText(request, MAX_WEBHOOK_BODY_BYTES)
+  } catch (error) {
+    if (!(error instanceof RequestBodyTooLarge)) throw error
+    logWebhookProblem({
+      event: 'webhook_rejected',
+      provider: PROVIDER,
+      reason: 'request body exceeds size limit',
+    })
+    return Response.json({ error: 'Request body too large' }, { status: 413 })
+  }
 
   const verification = verifyStripeSignature({
     payload: body,

@@ -7,6 +7,7 @@ import {
   configuredLimit,
   FixedWindowRateLimiter,
 } from '@/lib/security/rate-limit'
+import { readBoundedText } from '@/lib/security/request-body'
 
 // Violation sink for the Content-Security-Policy report-only rollout.
 //
@@ -49,15 +50,7 @@ export async function POST(request: Request): Promise<Response> {
   if (!limiter.check(clientKey(request.headers)).allowed) return NO_CONTENT
 
   try {
-    const declared = Number(request.headers.get('content-length') ?? '0')
-    if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
-      return NO_CONTENT
-    }
-
-    const text = await request.text()
-    // `content-length` is a claim; check the body actually received too.
-    if (text.length > MAX_BODY_BYTES) return NO_CONTENT
-
+    const text = await readBoundedText(request, MAX_BODY_BYTES)
     logCspViolations(parseCspPayload(JSON.parse(text)))
   } catch {
     // Malformed JSON, a truncated body, a stray crawler: never worth an error
