@@ -17,6 +17,7 @@ import { buildArticleJsonLd, serializeJsonLd } from '@/lib/seo/jsonld'
 import { absoluteUrl, getSiteUrl, pagePath, postPath } from '@/lib/seo/site'
 
 import { Article } from '../components/article'
+import { ArticleBody } from '../components/body'
 import { ReadNext } from '../components/read-next'
 
 // Rendered per request so canonical URLs, feeds and JSON-LD come from the
@@ -126,14 +127,11 @@ export default async function SlugPage({
             <header className="article__header">
               <h1>{page.title}</h1>
             </header>
-            {page.bodyHtml ? (
-              <div
-                className="prose"
-                dangerouslySetInnerHTML={{ __html: page.bodyHtml }}
-              />
-            ) : (
-              <p className="muted">This page has no content yet.</p>
-            )}
+            <ArticleBody
+              body={page.body}
+              preview={draft}
+              emptyMessage="This page has no content yet."
+            />
           </div>
         </article>
       </main>
@@ -173,7 +171,7 @@ export default async function SlugPage({
         dangerouslySetInnerHTML={{ __html: jsonLd }}
       />
       {showBanner && <DraftBanner />}
-      <Article post={post} />
+      <Article post={post} preview={draft} />
       <ReadNext posts={related} topic={post.tags[0]?.name} />
     </>
   )

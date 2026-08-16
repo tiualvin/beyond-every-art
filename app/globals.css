@@ -1877,6 +1877,868 @@ img {
   color: var(--color-muted);
 }
 
+/* --- Insertable body modules --------------------------------------------
+   Blocks an editor drops into a body. Each one is a typed React component
+   (see app/(frontend)/components/blocks/), so unlike everything above these
+   rules style markup this repository controls rather than migrated Ghost HTML.
+
+   Everything here is built from the tokens at the top of this file. A block
+   that wants a colour of its own is a block that has escaped the design
+   system, which is why the variants are a fixed list rather than a field. */
+
+.module {
+  margin: 2.5rem 0;
+}
+
+/* The drop cap targets `.prose > p:first-of-type`. A module opening a body
+   would otherwise leave the cap on the first paragraph *after* it, dropping a
+   3.6em burgundy letter into the middle of the article. */
+.prose > .module:first-child + p::first-letter {
+  float: none;
+  font-size: inherit;
+  line-height: inherit;
+  font-weight: inherit;
+  color: inherit;
+  padding-right: 0;
+  margin-top: 0;
+}
+
+.module__heading {
+  font-size: 1.35rem;
+  margin-bottom: 1rem;
+}
+
+/* --- Dropdown / accordion ----------------------------------------------- */
+
+.accordion {
+  border-top: 1px solid var(--color-line);
+}
+
+.accordion__item {
+  border-bottom: 1px solid var(--color-line);
+}
+
+.accordion__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 0;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.4;
+  /* Removes the native disclosure triangle in Safari and Chrome; the marker
+     below replaces it, so the affordance is not lost. */
+  list-style: none;
+}
+
+.accordion__summary::-webkit-details-marker {
+  display: none;
+}
+
+/* The browser gives `summary` a focus ring, but only some browsers and only
+   sometimes. Stating it means keyboard users always see where they are. */
+.accordion__summary:focus-visible {
+  outline: 2px solid var(--color-burgundy);
+  outline-offset: 2px;
+}
+
+.accordion__title {
+  flex: 1;
+}
+
+.accordion__marker {
+  flex: none;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-right: 2px solid var(--color-burgundy);
+  border-bottom: 2px solid var(--color-burgundy);
+  transform: rotate(45deg);
+  transform-origin: center;
+  margin-bottom: 0.25rem;
+}
+
+.accordion__item[open] .accordion__marker {
+  transform: rotate(-135deg);
+  margin-bottom: -0.25rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .accordion__marker {
+    transition:
+      transform 0.2s ease,
+      margin 0.2s ease;
+  }
+}
+
+.accordion__panel {
+  padding: 0 0 1.25rem;
+  font-size: 1rem;
+}
+
+/* Panel bodies are rendered rich text, so they arrive as `<p>` carrying the
+   browser's default 1em top *and* bottom margin. Left alone those stack with
+   the rule below and with the summary above, which reads as a gap rather than
+   as a panel. Spacing is stated here instead. */
+.accordion__panel p {
+  margin: 0;
+}
+
+.accordion__panel > * + * {
+  margin-top: 1rem;
+}
+
+/* --- Pull quote ---------------------------------------------------------- */
+
+.pull-quote {
+  margin-left: 0;
+  margin-right: 0;
+  text-align: left;
+}
+
+/* `.prose blockquote` styles migrated Ghost quotes with a decorative opening
+   mark, top and bottom rules, a fixed width and centred text. This block owns
+   its presentation, so all of that is reset.
+ *
+ * The selectors double the class deliberately. `.prose blockquote` is (0,1,1)
+ * and `.prose blockquote::before` is (0,1,2), so a single `.pull-quote__text`
+ * loses to both and every variant silently rendered as the migrated-quote
+ * style instead of its own. Doubling wins on class count without scoping these
+ * rules to `.prose`, so the block still looks right anywhere it is rendered. */
+.pull-quote .pull-quote__text {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  max-width: none;
+  text-align: inherit;
+  font-family: var(--font-serif);
+  font-style: italic;
+  line-height: 1.35;
+  color: var(--color-ink);
+}
+
+.pull-quote .pull-quote__text::before {
+  content: none;
+}
+
+.pull-quote .pull-quote__text p {
+  margin: 0;
+}
+
+.pull-quote .pull-quote__by {
+  margin-top: 0.9rem;
+  font-family: var(--font-sans);
+  font-style: normal;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.pull-quote--centered {
+  text-align: center;
+  max-width: 36rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.pull-quote--centered .pull-quote__text {
+  font-size: 1.4rem;
+}
+
+.pull-quote--bordered {
+  padding-left: 1.5rem;
+  border-left: 3px solid var(--color-burgundy);
+}
+
+.pull-quote--bordered .pull-quote__text {
+  font-size: 1.3rem;
+}
+
+.pull-quote--large .pull-quote__text {
+  font-size: 2rem;
+  line-height: 1.2;
+  color: var(--color-burgundy);
+}
+
+/* --- Newsletter signup module -------------------------------------------- */
+
+.signup {
+  padding: 2rem 1.75rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-top: 2px solid var(--color-burgundy);
+  border-radius: var(--radius);
+}
+
+.signup__heading {
+  font-size: 1.4rem;
+  margin-bottom: 0.4rem;
+}
+
+.signup__body {
+  margin: 0 0 1.25rem;
+  color: var(--color-muted);
+  font-size: 1rem;
+}
+
+.signup__form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.signup__input {
+  flex: 1 1 14rem;
+  min-width: 0;
+  padding: 0.75rem 0.9rem;
+  font: inherit;
+  font-size: 1rem;
+  color: var(--color-ink);
+  background: var(--color-paper);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+}
+
+.signup__input:focus-visible {
+  outline: 2px solid var(--color-burgundy);
+  outline-offset: 1px;
+}
+
+.signup__btn {
+  flex: none;
+  /* 2.75rem tall at this padding — a comfortable touch target rather than a
+     desktop-sized button that a thumb misses. */
+  padding: 0.75rem 1.5rem;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-on-dark);
+  background: var(--color-burgundy);
+  border: 0;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.signup__btn:hover:not(:disabled) {
+  background: var(--color-burgundy-deep);
+}
+
+.signup__btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.signup__note {
+  margin: 0.9rem 0 0;
+  font-size: 0.82rem;
+  color: var(--color-muted);
+}
+
+.signup__note--error {
+  color: var(--color-burgundy);
+}
+
+.signup--done {
+  border-top-color: var(--color-line);
+}
+
+.signup__done-text {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 1.2rem;
+}
+
+/* --- Callout ------------------------------------------------------------- */
+
+.callout {
+  display: flex;
+  gap: 0.9rem;
+  padding: 1.25rem 1.4rem;
+  border-radius: var(--radius);
+  font-size: 1rem;
+}
+
+.callout__emoji {
+  flex: none;
+  font-size: 1.3rem;
+  line-height: 1.4;
+}
+
+.callout__body > * + * {
+  margin-top: 0.8rem;
+}
+
+.callout__body p {
+  margin: 0;
+}
+
+.callout--neutral {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+}
+
+.callout--accent {
+  background: color-mix(in srgb, var(--color-burgundy) 7%, var(--color-paper));
+  border: 1px solid color-mix(in srgb, var(--color-burgundy) 25%, transparent);
+}
+
+.callout--dark {
+  background: var(--color-dark);
+  border: 1px solid var(--color-dark);
+  color: var(--color-on-dark);
+}
+
+/* `.prose a` paints links burgundy, which on the dark tone is close to
+   unreadable against near-black. */
+.callout--dark a {
+  color: var(--color-on-dark);
+  text-decoration-color: color-mix(
+    in srgb,
+    var(--color-on-dark) 50%,
+    transparent
+  );
+}
+
+/* --- Button -------------------------------------------------------------- */
+
+.button-block {
+  display: flex;
+}
+
+.button-block--left {
+  justify-content: flex-start;
+}
+
+.button-block--center {
+  justify-content: center;
+}
+
+.button-block .button {
+  display: inline-block;
+  /* 2.75rem tall at this padding, so it is a comfortable touch target. */
+  padding: 0.75rem 1.6rem;
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.25;
+  border-radius: var(--radius);
+  text-decoration: none;
+}
+
+.button-block .button--primary {
+  color: var(--color-on-dark);
+  background: var(--color-burgundy);
+  border: 1px solid var(--color-burgundy);
+}
+
+.button-block .button--primary:hover {
+  background: var(--color-burgundy-deep);
+  border-color: var(--color-burgundy-deep);
+  text-decoration: none;
+}
+
+.button-block .button--secondary {
+  color: var(--color-burgundy);
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--color-burgundy) 45%, transparent);
+}
+
+.button-block .button--secondary:hover {
+  border-color: var(--color-burgundy);
+  text-decoration: none;
+}
+
+.button-block .button:focus-visible {
+  outline: 2px solid var(--color-burgundy);
+  outline-offset: 2px;
+}
+
+/* --- Gallery ------------------------------------------------------------- */
+
+.gallery {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.gallery__items {
+  display: grid;
+  gap: 0.75rem;
+}
+
+/* `auto-fit` with a minimum column width means the column count follows the
+   space available rather than a breakpoint list, so this needs no media query
+   and cannot end up with a one-item row of full-bleed image on a tablet. */
+.gallery--grid .gallery__items {
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+}
+
+.gallery--rows .gallery__items {
+  grid-template-columns: 1fr;
+}
+
+.gallery__item {
+  margin: 0;
+}
+
+.gallery__frame {
+  display: block;
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: var(--color-line);
+}
+
+/* `.prose img` gives every image in a body `margin: 2rem 0`, which is right for
+   an image sitting in the flow of an article and wrong for one that fills a
+   frame: the margin offsets the absolutely-positioned fill image from the top
+   of its container, so the frame shows a 2rem band of its own background and
+   the picture hangs 2rem past the bottom — over the bookmark's title, in that
+   module's case. Frame-filling images are positioned by their container. */
+.gallery__frame img,
+.bookmark__thumb img {
+  margin: 0;
+  border-radius: 0;
+  inset: 0;
+}
+
+.gallery--rows .gallery__frame {
+  aspect-ratio: 3 / 2;
+}
+
+.gallery__item-caption,
+.gallery__caption {
+  font-size: 0.85rem;
+  color: var(--color-muted);
+}
+
+.gallery__item-caption {
+  margin-top: 0.45rem;
+}
+
+.gallery__caption {
+  margin-top: 0.9rem;
+  font-style: italic;
+}
+
+/* --- Bookmark ------------------------------------------------------------ */
+
+.bookmark {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+}
+
+/* `.prose a` underlines every link in a body. On a card the underline lands
+   under the title and the description alike and reads as damage. */
+.prose .bookmark,
+.prose .bookmark:hover {
+  text-decoration: none;
+}
+
+.bookmark:hover {
+  border-color: color-mix(in srgb, var(--color-burgundy) 40%, transparent);
+}
+
+.bookmark:focus-visible {
+  outline: 2px solid var(--color-burgundy);
+  outline-offset: 2px;
+}
+
+.bookmark__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 1.1rem 1.25rem;
+}
+
+.bookmark__title {
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--color-ink);
+}
+
+.bookmark__description {
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+
+.bookmark__host {
+  margin-top: 0.15rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.bookmark__thumb {
+  display: block;
+  position: relative;
+  flex: none;
+  width: 11rem;
+  overflow: hidden;
+  background: var(--color-line);
+}
+
+/* Below this the card is narrower than the thumbnail plus readable text, so
+   the picture goes on top instead of squeezing the words into a column. */
+@media (max-width: 34rem) {
+  .bookmark {
+    flex-direction: column-reverse;
+  }
+
+  .bookmark__thumb {
+    width: 100%;
+    height: 9rem;
+  }
+}
+
+/* --- Embed --------------------------------------------------------------- */
+
+.embed {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.embed__frame {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: var(--color-dark);
+}
+
+.embed__frame iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.embed__host {
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+/* --- Members-only cut (preview only) ------------------------------------- */
+
+/* Never rendered on a published page: `toArticleBody` removes the marker from
+   the body before the page is built. This is what an editor sees in preview. */
+.paywall-marker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 1rem 1.1rem;
+  border-top: 2px dashed var(--color-burgundy);
+  border-bottom: 2px dashed var(--color-burgundy);
+  background: color-mix(in srgb, var(--color-burgundy) 4%, var(--color-paper));
+  font-family: var(--font-sans);
+}
+
+.paywall-marker__label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-burgundy);
+}
+
+.paywall-marker__hint {
+  font-size: 0.88rem;
+  color: var(--color-muted);
+}
+
+/* --- Unrecognised module (preview only) ---------------------------------- */
+
+/* Published pages render nothing for an unknown block; this is what an editor
+   sees in draft preview so the problem reaches the one person who can fix it. */
+.module--unknown {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 1.25rem;
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  color: var(--color-ink);
+  background: color-mix(in srgb, var(--color-burgundy) 6%, var(--color-paper));
+  border: 1px dashed var(--color-burgundy);
+  border-radius: var(--radius);
+}
+
+/* --- Migrated Ghost cards (legacyHTML) -----------------------------------
+   Ghost renders its cards with `kg-*` class names and ships the CSS for them
+   in its *theme*. The migration preserved the markup and left the theme
+   behind, so a body holding any structural card arrives here with the classes
+   intact and nothing styling them.
+
+   Plain image and embed cards survive that on their own, because `.prose img`
+   and `.prose figcaption` already catch them. The cards below do not: a
+   bookmark collapses into a heap of orphaned text, a callout loses the box
+   that made it an aside, a gallery becomes a vertical stack.
+
+   These rules are a floor, not a port of Ghost's theme. They exist so a
+   migrated card reads as what it was meant to be. Which of them earn a real
+   block is a question for `pnpm inventory:ghost` and the counts it prints. */
+
+.prose .kg-card {
+  margin: 2.5rem 0;
+}
+
+/* Ghost's width modifiers, which only mean anything against a constrained
+   column. `kg-width-full` breaks out of the body column entirely in Ghost;
+   here it widens to the container and no further, because a true full-bleed
+   image needs layout this stylesheet does not give the article. */
+.prose .kg-width-wide {
+  width: min(100%, 52rem);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.prose .kg-width-full {
+  width: 100%;
+}
+
+/* Bookmark card. */
+.prose .kg-bookmark-card a.kg-bookmark-container {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+}
+
+.prose .kg-bookmark-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 1.1rem 1.25rem;
+}
+
+.prose .kg-bookmark-title {
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.prose .kg-bookmark-description {
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+
+.prose .kg-bookmark-metadata {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.15rem;
+  font-size: 0.78rem;
+  color: var(--color-muted);
+}
+
+.prose .kg-bookmark-icon {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  border-radius: 2px;
+}
+
+.prose .kg-bookmark-thumbnail {
+  flex: none;
+  width: 11rem;
+}
+
+.prose .kg-bookmark-thumbnail img {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border-radius: 0;
+  object-fit: cover;
+}
+
+@media (max-width: 34rem) {
+  .prose .kg-bookmark-card a.kg-bookmark-container {
+    flex-direction: column-reverse;
+  }
+
+  .prose .kg-bookmark-thumbnail {
+    width: 100%;
+    height: 9rem;
+  }
+}
+
+/* Callout card. Ghost offers a palette of background colours per card; they
+   are collapsed to this publication's two, because the point of a design
+   system is that a migrated document cannot introduce a ninth accent colour. */
+.prose .kg-callout-card {
+  display: flex;
+  gap: 0.9rem;
+  padding: 1.25rem 1.4rem;
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+}
+
+.prose .kg-callout-card-accent {
+  background: color-mix(in srgb, var(--color-burgundy) 7%, var(--color-paper));
+  border-color: color-mix(in srgb, var(--color-burgundy) 25%, transparent);
+}
+
+.prose .kg-callout-emoji {
+  flex: none;
+  font-size: 1.3rem;
+  line-height: 1.4;
+}
+
+.prose .kg-callout-text {
+  font-size: 1rem;
+}
+
+/* Toggle card.
+ *
+ * Ghost collapses this with its own JavaScript, flipping
+ * `data-kg-toggle-state` on click. That script is not here and is not worth
+ * reimplementing for legacy markup, so the panel renders permanently open.
+ *
+ * That is the deliberate direction to fail in: a collapsed panel with no
+ * working control is content the reader can see exists and cannot reach.
+ * Expanded, the article simply reads as continuous prose — which is what it
+ * was before somebody chose to fold it. */
+.prose .kg-toggle-card {
+  padding: 1.1rem 0;
+  border-top: 1px solid var(--color-line);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.prose .kg-toggle-heading-text {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.prose .kg-toggle-content {
+  margin-top: 0.75rem;
+  font-size: 1rem;
+}
+
+/* The control Ghost's script would have driven. It does nothing here. */
+.prose .kg-toggle-card-icon {
+  display: none;
+}
+
+/* Button card. */
+.prose .kg-button-card {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.prose .kg-button-card.kg-align-center {
+  justify-content: center;
+}
+
+.prose a.kg-btn {
+  display: inline-block;
+  padding: 0.75rem 1.6rem;
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--color-on-dark);
+  background: var(--color-burgundy);
+  border-radius: var(--radius);
+  text-decoration: none;
+}
+
+.prose a.kg-btn:hover {
+  background: var(--color-burgundy-deep);
+  text-decoration: none;
+}
+
+/* Gallery card. Ghost lays each row out with flex and per-image flex ratios
+   it writes inline; without them the images stack. */
+.prose .kg-gallery-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.prose .kg-gallery-row + .kg-gallery-row {
+  margin-top: 0.75rem;
+}
+
+.prose .kg-gallery-image {
+  flex: 1 1 11rem;
+  min-width: 0;
+}
+
+.prose .kg-gallery-image img {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  object-fit: cover;
+}
+
+/* Embed card — provider iframes inside migrated bodies. These load only if
+   their origin is in `CSP_FRAME_SRC`; see lib/security/csp.ts. */
+.prose .kg-embed-card {
+  display: flex;
+  justify-content: center;
+}
+
+.prose .kg-embed-card iframe {
+  max-width: 100%;
+  border: 0;
+  border-radius: var(--radius);
+}
+
+/* Product and file cards, kept legible rather than fully rebuilt. Both are
+   candidates for a real block if the inventory finds them in use. */
+.prose .kg-product-card-container,
+.prose .kg-file-card-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1.25rem 1.4rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+}
+
+.prose .kg-product-card-title,
+.prose .kg-file-card-title {
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.prose .kg-product-card-description,
+.prose .kg-file-card-caption {
+  font-size: 0.92rem;
+  color: var(--color-muted);
+}
+
 /* --- Author card and read next ------------------------------------------ */
 
 .author-card {

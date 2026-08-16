@@ -8,6 +8,7 @@ import {
   postsRead,
 } from '../access/roles'
 import { CONTENT_TAGS } from '../lib/cache/content'
+import { contentEditor } from '../lib/content/editor'
 import { purgeOnChange, purgeOnDelete } from '../lib/cache/purge'
 import { recordMcpWrite } from '../lib/mcp/audit'
 import { refuseMcpPublish } from '../lib/mcp/publish-guard'
@@ -82,7 +83,7 @@ export const Posts: CollectionConfig = {
     { name: 'tags', type: 'relationship', relationTo: 'tags', hasMany: true },
     { name: 'featuredImage', type: 'upload', relationTo: 'media' },
     { name: 'excerpt', type: 'textarea' },
-    { name: 'content', type: 'richText' },
+    { name: 'content', type: 'richText', editor: contentEditor },
     {
       name: 'legacyHTML',
       type: 'code',

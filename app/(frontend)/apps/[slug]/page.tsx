@@ -10,6 +10,7 @@ import { getPreviewMode } from '@/lib/preview/mode'
 import { absoluteUrl, appPath, APPS_PATH, getSiteUrl } from '@/lib/seo/site'
 
 import { AppPlate } from '../../components/app-plate'
+import { ArticleBody } from '../../components/body'
 import { FadeIn } from '../../components/motion/fade-in'
 import { Reveal } from '../../components/motion/reveal'
 import { joinAppWaitlist } from '../actions'
@@ -164,12 +165,9 @@ export default async function AppDetailPage({
               </FadeIn>
             )}
 
-            {app.bodyHtml && (
+            {app.body.kind !== 'empty' && (
               <FadeIn delay={0.16}>
-                <div
-                  className="prose"
-                  dangerouslySetInnerHTML={{ __html: app.bodyHtml }}
-                />
+                <ArticleBody body={app.body} />
               </FadeIn>
             )}
 
