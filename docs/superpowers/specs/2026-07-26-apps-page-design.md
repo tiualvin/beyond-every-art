@@ -152,6 +152,12 @@ a duplicate-email error as success).
 
 ## Waitlist action
 
+> **Shipped at `app/(frontend)/apps/actions.ts`**, one level up from the path
+> proposed below: the action is shared by the index and the detail page, so it
+> does not belong under `[slug]`. The proposal is left as written — this is a
+> record of what was designed, not of what was built — with the correction
+> noted here so nobody follows it to an empty directory.
+
 `app/(frontend)/apps/[slug]/actions.ts`, mirroring
 `app/(frontend)/newsletter/actions.ts`:
 

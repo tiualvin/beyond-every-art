@@ -76,19 +76,33 @@ export function resolveBackupConfig(env: Env): BackupConfig {
  * Object key for a backup taken at `date`, e.g.
  * `db-backups/beyond_every_art-20260724T030000Z.sql.gz`. The timestamp is
  * filename-safe (no colons) and sorts chronologically as a string.
+ *
+ * Encrypted backups take a `.enc` suffix. The envelope identifies itself by its
+ * header, so nothing depends on the name — but a bucket listing is what an
+ * operator looks at first, and one that does not say which objects need a
+ * passphrase is a listing that will mislead somebody during a restore.
  */
 export function backupKey(
   prefix: string,
   databaseName: string,
   date: Date,
+  encrypted = false,
 ): string {
   const stamp = date.toISOString().replace(/[:-]|\.\d{3}/g, '')
-  return `${prefix}/${databaseName}-${stamp}.sql.gz`
+  return `${prefix}/${databaseName}-${stamp}.sql.gz${encrypted ? '.enc' : ''}`
 }
 
-/** Extract the ISO-ish timestamp segment from a backup key, or null. */
+/**
+ * Extract the ISO-ish timestamp segment from a backup key, or null.
+ *
+ * Both suffixes match, so retention and `--latest` sort one series across the
+ * point where encryption was switched on. Treating them as two would have
+ * pruned the wrong objects: the count would apply to each half separately, and
+ * `--latest` would have kept finding the newest *unencrypted* backup long after
+ * newer encrypted ones existed.
+ */
 export function backupTimestamp(key: string): string | null {
-  const match = key.match(/-(\d{8}T\d{6}Z)\.sql\.gz$/)
+  const match = key.match(/-(\d{8}T\d{6}Z)\.sql\.gz(?:\.enc)?$/)
   return match ? match[1] : null
 }
 

@@ -5,9 +5,17 @@
 // rather than from a claimed MIME type or a filename extension, and the size is
 // checked before the string is ever decoded into memory.
 
-/** Decoded ceiling. Comfortably above a generated illustration, well below
- *  anything that would be a memory problem to hold while Payload resizes it. */
-export const MAX_UPLOAD_BYTES = 8 * 1024 * 1024
+import { MAX_AGENT_UPLOAD_BYTES } from '../security/uploads'
+
+/**
+ * Decoded ceiling. Comfortably above a generated illustration, well below
+ * anything that would be a memory problem to hold while Payload resizes it.
+ *
+ * Defined in `lib/security/uploads.ts` alongside the admin panel's larger
+ * ceiling, so the two are read together and the reason they differ is visible
+ * from either one.
+ */
+export const MAX_UPLOAD_BYTES = MAX_AGENT_UPLOAD_BYTES
 
 /**
  * Formats accepted over MCP, identified by their leading bytes.

@@ -207,7 +207,10 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    # Backups reuse the media R2 credentials (S3_*) plus BACKUP_* settings.
+    # Backups reuse the media R2 credentials (S3_*) plus BACKUP_* settings,
+    # including BACKUP_ENCRYPTION_KEY — which arrives through the env file
+    # rather than being named below, so the passphrase is never written into a
+    # committed file or shown in `docker compose config`.
     env_file:
       - path: .env
         required: false

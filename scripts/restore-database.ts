@@ -16,6 +16,11 @@ import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { gunzipSync } from 'node:zlib'
 
+import {
+  decryptArchive,
+  isEncryptedArchive,
+  resolveBackupPassphrase,
+} from '../lib/backup/encrypt'
 import { backupTimestamp, resolveBackupConfig } from '../lib/backup/plan'
 import { getObject, listObjects } from '../lib/backup/s3'
 
@@ -104,13 +109,32 @@ async function main() {
     archive = await getObject(config.s3, key!)
   }
 
-  // Decompress up front so a corrupt archive fails before we touch the DB.
-  const sql = gunzipSync(archive)
+  // Decrypt and decompress up front, so a wrong passphrase or a corrupt archive
+  // fails before we touch the database. Whether an archive is encrypted is read
+  // from its own header rather than from its name: a file renamed on the way to
+  // the recovery machine still restores, and an object that was encrypted after
+  // this ran for the first time is handled without a flag.
+  const encrypted = isEncryptedArchive(archive)
+  let compressed = archive
+
+  if (encrypted) {
+    const passphrase = resolveBackupPassphrase(process.env)
+    if (!passphrase) {
+      throw new Error(
+        `${source} is encrypted, but BACKUP_ENCRYPTION_KEY is not set. ` +
+          'Set it to the passphrase this backup was written with.',
+      )
+    }
+    compressed = decryptArchive(archive, passphrase)
+  }
+
+  const sql = gunzipSync(compressed)
 
   const report: Record<string, unknown> = {
     mode: cli.dryRun ? 'dry-run' : 'restore',
     source,
     target: target.replace(/:\/\/[^@]*@/, '://***@'),
+    encrypted,
     compressedBytes: archive.byteLength,
     sqlBytes: sql.byteLength,
     restored: false,

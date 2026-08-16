@@ -87,7 +87,22 @@ unavailable. `/robots.txt` is static.
 
 ## Pending
 
-The public content routes (post, page, tag, and author pages) are not built yet;
-they arrive with the post-migration frontend. When they land they should be
-served with trailing slashes to match the URLs advertised here, and the sitemap
-can be extended with tag and author URLs.
+~~The public content routes are not built yet.~~ They shipped with the
+post-migration frontend: `app/(frontend)/[slug]` serves posts and pages,
+`app/(frontend)/tag/[slug]` and `app/(frontend)/author/[slug]` serve the
+archives, and `app/sitemap.ts` already includes tag and author URLs alongside
+posts, pages, and apps.
+
+One item from that plan is genuinely still open. **Nothing configures trailing
+slashes.** `next.config.ts` sets no `trailingSlash`, so Next.js redirects to the
+un-slashed form, while `postPath`, `pagePath`, `tagPath`, and `authorPath` in
+`lib/seo/site.ts` advertise the slashed one in canonical URLs, the sitemap, and
+the feed. Those are the Ghost permalinks, so the advertised URLs are the right
+ones — but a crawler following them lands on a redirect rather than on the page,
+which is a weaker signal than serving them directly. The normalisation redirect
+is real and already worked around in `e2e/privacy-and-redirects.spec.ts`, which
+strips the trailing slash so its assertion reaches the seeded redirect instead.
+
+Decide it before the cutover, not after: setting `trailingSlash: true` after
+search engines have recrawled means a second round of redirects on every URL
+the site has.

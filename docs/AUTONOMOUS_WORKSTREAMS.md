@@ -56,7 +56,15 @@ Shared files require one final integration pass:
 
 1. Run focused unit tests for each pure library.
 2. Run format, lint, typecheck, and all unit tests from a clean tracked tree.
-3. Generate Payload types before typecheck when schemas changed.
+3. Generate Payload types and typecheck **again** whenever a change touches a
+   Payload API, not only when a schema changed. `payload-types.ts` is generated
+   and gitignored, so `pnpm typecheck` on a clean tree checks against loose
+   fallback types while CI's `pnpm build` checks against the real ones — and
+   the real ones are stricter. A `select: { id: true }` that passes locally is
+   rejected there, because `id` is returned on every document and is not a
+   selectable key. Run `pnpm generate:types && pnpm typecheck`, then delete the
+   file and run it once more: both directions have to pass, and step 2 is the
+   one that must run last.
 4. Run the browser suite against a seeded PostgreSQL-backed application.
 5. Validate `docker compose config` and workflow YAML.
 6. Let the pull-request CI build both Docker images and run browser smoke tests.
