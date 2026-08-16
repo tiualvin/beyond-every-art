@@ -89,6 +89,14 @@ services:
       NEXT_PUBLIC_SERVER_URL: ${NEXT_PUBLIC_SERVER_URL:-http://localhost:3000}
       PAYLOAD_PUBLIC_SERVER_URL: ${PAYLOAD_PUBLIC_SERVER_URL:-http://localhost:3000}
       PAYLOAD_SECRET: ${PAYLOAD_SECRET}
+      # The app needs this too, not only Caddy: it is half of the origin
+      # allowlist Payload checks session cookies against and builds
+      # password-reset links from (`lib/security/origins.ts`). It arrives
+      # through `env_file` when it is written in `.env`, but passing it here as
+      # well means the app and the proxy cannot end up disagreeing about which
+      # hostname serves the admin panel. No default on purpose — a wrong value
+      # is worse than none, and none is handled.
+      CMS_ADDRESS: ${CMS_ADDRESS:-}
     healthcheck:
       test:
         [

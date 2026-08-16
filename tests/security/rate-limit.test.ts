@@ -35,6 +35,82 @@ describe('FixedWindowRateLimiter', () => {
     expect(limiter.check('b', 0).allowed).toBe(true)
     expect(limiter.check('a', 0).allowed).toBe(false)
   })
+
+  it('releases a key once its window has passed, without a sweep first', () => {
+    // Expiry must not depend on the periodic sweep: the sweep only reclaims
+    // memory, and a key whose window has passed is free again immediately.
+    const limiter = new FixedWindowRateLimiter(1, 1000)
+
+    expect(limiter.check('a', 0).allowed).toBe(true)
+    expect(limiter.check('a', 1001).allowed).toBe(true)
+  })
+})
+
+describe('FixedWindowRateLimiter memory ceiling', () => {
+  // The MCP limiter buckets on the credential the caller presents, so the key
+  // space belongs to the attacker: without a ceiling, a run of guessed keys is
+  // a window per guess, held for the length of the window.
+  it('stops opening new windows once the ceiling is reached', () => {
+    const limiter = new FixedWindowRateLimiter(5, 1000, 3)
+
+    for (let index = 0; index < 100; index += 1) {
+      limiter.check(`key-${index}`, 0)
+    }
+
+    expect(limiter.size).toBeLessThanOrEqual(4) // three keys plus overflow
+  })
+
+  it('counts overflow keys together rather than waving them through', () => {
+    const limiter = new FixedWindowRateLimiter(2, 1000, 1)
+
+    // The first key gets the only real bucket; everything after it shares one.
+    expect(limiter.check('first', 0).allowed).toBe(true)
+    expect(limiter.check('a', 0).allowed).toBe(true)
+    expect(limiter.check('b', 0).allowed).toBe(true)
+    expect(limiter.check('c', 0).allowed).toBe(false)
+    expect(limiter.check('d', 0).allowed).toBe(false)
+    // The key that got in first is unaffected by the flood behind it.
+    expect(limiter.check('first', 0).allowed).toBe(true)
+  })
+
+  it('reuses the ceiling for fresh keys once old windows have passed', () => {
+    const limiter = new FixedWindowRateLimiter(5, 1000, 2)
+
+    limiter.check('a', 0)
+    limiter.check('b', 0)
+    // Full at t=0; by t=2000 both windows are finished and can be reclaimed.
+    limiter.check('c', 2000)
+
+    expect(limiter.check('c', 2000).remaining).toBe(3)
+  })
+})
+
+describe('FixedWindowRateLimiter.peek', () => {
+  it('reports the verdict without spending anything', () => {
+    const limiter = new FixedWindowRateLimiter(1, 1000)
+
+    expect(limiter.peek('a', 0).allowed).toBe(true)
+    expect(limiter.peek('a', 0).allowed).toBe(true)
+    // Still unspent, so the one real request is still available.
+    expect(limiter.check('a', 0).allowed).toBe(true)
+    expect(limiter.peek('a', 0).allowed).toBe(false)
+  })
+
+  it('sees a window that check() opened', () => {
+    const limiter = new FixedWindowRateLimiter(2, 1000)
+
+    limiter.check('a', 0)
+    expect(limiter.peek('a', 0)).toMatchObject({ allowed: true, remaining: 1 })
+    limiter.check('a', 0)
+    expect(limiter.peek('a', 0)).toMatchObject({ allowed: false, remaining: 0 })
+  })
+
+  it('treats an expired window as a fresh one', () => {
+    const limiter = new FixedWindowRateLimiter(1, 1000)
+
+    limiter.check('a', 0)
+    expect(limiter.peek('a', 1000).allowed).toBe(true)
+  })
 })
 
 describe('clientKey', () => {

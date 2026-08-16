@@ -2,6 +2,11 @@ import {
   logCspViolations,
   parseCspPayload,
 } from '@/lib/observability/csp-report'
+import {
+  clientKey,
+  configuredLimit,
+  FixedWindowRateLimiter,
+} from '@/lib/security/rate-limit'
 
 // Violation sink for the Content-Security-Policy report-only rollout.
 //
@@ -21,7 +26,28 @@ const MAX_BODY_BYTES = 16_000
 
 const NO_CONTENT = new Response(null, { status: 204 })
 
+/**
+ * Reports accepted from one address per minute.
+ *
+ * Bounding the body was only half of it: an accepted report costs a log line,
+ * and the container's log file is capped and rotated
+ * (`LOG_MAX_SIZE` × `LOG_MAX_FILES` in docker-compose.yml). So a caller who can
+ * post reports as fast as they like cannot fill the disk, but can roll the
+ * window — pushing out the genuine violations this endpoint exists to collect,
+ * during precisely the report-only phase when they are the only evidence there
+ * is. A browser sends a handful per page at worst.
+ *
+ * Over the limit is still answered 204: a violation sink that starts returning
+ * a different status is a violation sink that tells a prober it is there.
+ */
+const limiter = new FixedWindowRateLimiter(
+  configuredLimit('RATE_LIMIT_CSP_REPORT_PER_MINUTE', 60),
+  60_000,
+)
+
 export async function POST(request: Request): Promise<Response> {
+  if (!limiter.check(clientKey(request.headers)).allowed) return NO_CONTENT
+
   try {
     const declared = Number(request.headers.get('content-length') ?? '0')
     if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {

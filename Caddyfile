@@ -17,20 +17,27 @@
   #     from the browser: pages render through Payload's Local API on the
   #     server, and the only fetch the frontend makes is to /search/suggest.
   #
-  # The two exceptions are what the public pages genuinely need: `/api/media`
-  # serves every uploaded image, and `/api/preview` is how an editor's draft
-  # session reaches the frontend.
+  # The two exceptions are what the public pages genuinely need: the *files*
+  # under `/api/media/file/` are every uploaded image, and `/api/preview` is how
+  # an editor's draft session reaches the frontend.
+  #
+  # `/api/media/file/*` and not `/api/media*`, because those are different
+  # things. The first is the uploads themselves. The second also includes the
+  # collection endpoint, which is `read: publicRead` — so the exception as
+  # originally written left `GET /api/media?limit=0` answerable by anyone, and
+  # that is the same unpaginated full-table read the paragraph above refuses for
+  # posts. Nothing on a page ever asks for the collection; only for files.
   #
   # Written as one matcher with an explicit `not` rather than as overlapping
   # `handle` blocks, so what is served here does not depend on how Caddy sorts
   # matchers by specificity — the rule reads the same way it evaluates.
   # `/redirects-map` joins them: it exists only so the edge middleware can read
-  # the redirect table, which it does by connecting to the app's own bind
+  # the redirect table, which it does by connecting to the app's own loopback
   # address rather than through this proxy, so refusing it here costs the site
   # nothing and stops an anonymous caller reading the migration's URL map.
   @staffOnly {
     path /api* /admin* /redirects-map*
-    not path /api/media* /api/preview*
+    not path /api/media/file/* /api/preview*
   }
 
   handle @staffOnly {
@@ -56,7 +63,67 @@
 # per key in the admin panel, acting as a real Payload user under normal access
 # control, unable to publish unless that user is an administrator, and rate
 # limited in the application because Caddy's standard build has none.
+#
+# This hostname used to proxy everything unconditionally, which quietly undid
+# the block above: both names resolve to the same VPS and serve the same
+# application, so `GET /api/posts?limit=0` was refused on the site's address and
+# answered on this one. A rule that only holds on one of two public hostnames is
+# not a rule. So the collection API is closed here too, for requests that carry
+# no credential at all.
+#
+# Credential-presence, not authentication: Payload still decides whether a
+# session or a key is valid, and answers 401 when it is not. What this removes
+# is the anonymous case — the unpaginated reads and the request volume that
+# reach Postgres before any of that is checked.
+#
+# Written inside `route` so these evaluate top to bottom as written. `handle`
+# blocks are otherwise sorted by matcher specificity, and the order is the whole
+# meaning here.
 {$CMS_ADDRESS:cms.localhost} {
   encode zstd gzip
-  reverse_proxy app:3000
+
+  route {
+    # Endpoints that have to answer without a credential, because they are how
+    # one is obtained or used: the MCP endpoint carries its own bearer key and
+    # is rate limited per key and per source in the application; the auth routes
+    # are the login form, the session check the admin makes before it knows
+    # whether anyone is signed in, and password reset; `/api/access` is what the
+    # admin asks to find out what it may render. Media files and preview match
+    # the public site's own exceptions.
+    @openApi path /api/mcp* /api/users/* /api/access* /api/media/file/* /api/preview*
+    handle @openApi {
+      reverse_proxy app:3000
+    }
+
+    # An admin session. The cookie is httpOnly and set by Payload on this
+    # hostname, so the browser attaches it to every admin request without the
+    # panel doing anything.
+    @sessionApi {
+      path /api*
+      header Cookie *payload-token=*
+    }
+    handle @sessionApi {
+      reverse_proxy app:3000
+    }
+
+    # A bearer or JWT credential, which is how a non-browser client
+    # authenticates against Payload.
+    @tokenApi {
+      path /api*
+      header Authorization *
+    }
+    handle @tokenApi {
+      reverse_proxy app:3000
+    }
+
+    # Anything else under /api is an anonymous request for collection data.
+    handle /api* {
+      respond "Not found" 404
+    }
+
+    # The admin panel itself, and everything else this hostname serves.
+    handle {
+      reverse_proxy app:3000
+    }
+  }
 }

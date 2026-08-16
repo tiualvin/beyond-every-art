@@ -34,6 +34,33 @@ export function parseBasicAuth(
 }
 
 /**
+ * Compare two strings in time that does not depend on where they first differ.
+ *
+ * `===` returns as soon as it finds a mismatched character, so the time it
+ * takes is a measurement of how much of the guess was right — which is enough,
+ * over enough samples, to recover a credential one character at a time. The
+ * whole comparison is done here instead, and the verdict read at the end.
+ *
+ * Hand-rolled because this runs in the Edge runtime, which has no
+ * `node:crypto` and therefore no `timingSafeEqual` — the function
+ * `lib/billing/stripe-signature.ts` uses for the same reason on the Node side.
+ * The lengths are folded into the accumulator rather than compared first, so an
+ * early return cannot reintroduce the leak.
+ */
+export function constantTimeEquals(a: string, b: string): boolean {
+  let mismatch = a.length ^ b.length
+  const length = Math.max(a.length, b.length)
+
+  for (let index = 0; index < length; index += 1) {
+    // Past the end of the shorter string `charCodeAt` gives NaN; `|| 0` keeps
+    // the XOR meaningful without branching on which string ran out.
+    mismatch |= (a.charCodeAt(index) || 0) ^ (b.charCodeAt(index) || 0)
+  }
+
+  return mismatch === 0
+}
+
+/**
  * Validate an `Authorization: Basic ...` header against expected credentials.
  * Uses atob, which is available in both the Edge runtime and Node.
  */
@@ -52,5 +79,9 @@ export function isAuthorized(
   if (separator < 0) return false
   const user = decoded.slice(0, separator)
   const password = decoded.slice(separator + 1)
-  return user === creds.user && password === creds.password
+  // Both halves are always compared, so the answer does not arrive sooner for
+  // a wrong username than for a wrong password.
+  const userMatches = constantTimeEquals(user, creds.user)
+  const passwordMatches = constantTimeEquals(password, creds.password)
+  return userMatches && passwordMatches
 }
