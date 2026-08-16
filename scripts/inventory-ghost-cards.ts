@@ -130,11 +130,27 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
   }
 
   const resolved = path.resolve(process.cwd(), args.exportPath)
+
+  // Missing and malformed are reported separately. Running this with no
+  // arguments on a fresh clone hits the first case every time — the export is
+  // gitignored — and "could not parse" would describe a file that was never
+  // opened, without saying where to point it instead.
+  let raw: string
+  try {
+    raw = await readFile(resolved, 'utf8')
+  } catch {
+    console.error(`Could not read a Ghost export at ${resolved}.`)
+    console.error(
+      'Point it somewhere else with --input <path>, or set GHOST_EXPORT_PATH.',
+    )
+    return 1
+  }
+
   let payload: unknown
   try {
-    payload = JSON.parse(await readFile(resolved, 'utf8'))
+    payload = JSON.parse(raw)
   } catch (error) {
-    console.error(`Could not parse a Ghost export at ${resolved}.`)
+    console.error(`Could not parse the Ghost export at ${resolved}.`)
     console.error(error instanceof Error ? error.message : String(error))
     return 1
   }
@@ -151,19 +167,43 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
   if (args.jsonPath) {
     const reportPath = path.resolve(process.cwd(), args.jsonPath)
-    await mkdir(path.dirname(reportPath), { recursive: true })
-    await writeFile(reportPath, `${JSON.stringify(inventory, null, 2)}\n`, {
-      mode: 0o600,
-    })
-    await chmod(reportPath, 0o600)
+    try {
+      await mkdir(path.dirname(reportPath), { recursive: true })
+      // The report names slugs from a private export, so it is written
+      // owner-only. `mode` applies only when `writeFile` creates the file; on a
+      // rerun over an existing report it is ignored, and `chmod` is what
+      // actually holds the permission down.
+      await writeFile(reportPath, `${JSON.stringify(inventory, null, 2)}\n`, {
+        mode: 0o600,
+      })
+      await chmod(reportPath, 0o600)
+    } catch (error) {
+      console.error(`Could not write the JSON report to ${reportPath}.`)
+      console.error(error instanceof Error ? error.message : String(error))
+      return 1
+    }
   }
 
   return args.failOnUnhandled && !inventory.ok ? 1 : 0
 }
 
-const entry = process.argv[1]
-  ? pathToFileURL(path.resolve(process.argv[1])).href
-  : ''
-if (import.meta.url === entry) {
-  process.exitCode = await main()
+// Same guard as scripts/compare-sites.ts: `main()` runs only as the entry
+// module, so `parseArgs` and `main` stay importable by the unit tests. Settling
+// the promise here rather than awaiting it at the top level keeps this file
+// free of top-level await — which esbuild refuses to transform for a CJS
+// output format — and turns an unexpected rejection into one clean line and a
+// non-zero exit instead of an unhandled-rejection stack trace.
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href
+) {
+  main().then(
+    (code) => {
+      process.exitCode = code
+    },
+    (error: unknown) => {
+      console.error(error instanceof Error ? error.message : error)
+      process.exit(1)
+    },
+  )
 }

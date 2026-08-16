@@ -132,4 +132,49 @@ describe('Ghost card inventory', () => {
     expect((await stat(report)).mode & 0o777).toBe(0o600)
     log.mockRestore()
   })
+
+  it('names the way out when the export is missing rather than blaming the parser', async () => {
+    const errors: string[] = []
+    const error = vi
+      .spyOn(console, 'error')
+      .mockImplementation((line: unknown) => {
+        errors.push(String(line))
+      })
+
+    await expect(main(['--input', 'no/such/ghost-export.json'])).resolves.toBe(
+      1,
+    )
+    expect(errors.join('\n')).toContain('Could not read a Ghost export')
+    expect(errors.join('\n')).toContain('GHOST_EXPORT_PATH')
+    error.mockRestore()
+  })
+
+  // A rehearsal gate that dies with an unhandled rejection reads as a broken
+  // run rather than an unwritable report, so the failure has to arrive as an
+  // exit code with a sentence attached.
+  it('reports an unwritable report path instead of throwing', async () => {
+    const directory = await mkdtemp(
+      path.join(tmpdir(), 'ghost-card-inventory-'),
+    )
+    const input = path.join(directory, 'ghost.json')
+    const blocker = path.join(directory, 'blocker')
+    await writeFile(
+      input,
+      JSON.stringify({ data: { posts: [{ slug: 'a', html: '<p>x</p>' }] } }),
+    )
+    // A file where the report's parent directory would go: `mkdir` cannot
+    // create a directory underneath it, whoever the test runs as.
+    await writeFile(blocker, 'not a directory')
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined)
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+    await expect(
+      main(['--input', input, '--json', path.join(blocker, 'report.json')]),
+    ).resolves.toBe(1)
+    expect(error.mock.calls[0]?.[0]).toContain(
+      'Could not write the JSON report',
+    )
+    log.mockRestore()
+    error.mockRestore()
+  })
 })
