@@ -8,6 +8,7 @@
 // is identified, which is specific to this endpoint.
 
 export {
+  clientKey,
   configuredLimit,
   FixedWindowRateLimiter,
   type RateLimitResult,
@@ -19,8 +20,14 @@ export {
  *
  * Keyed on the presented credential, not on an IP: the requests come from a
  * vendor's cloud, so their source addresses are shared and unstable. A caller
- * with no credential is bucketed as `anonymous`, which is the bucket that
- * protects the key lookup itself.
+ * with no credential is bucketed as `anonymous`.
+ *
+ * This bounds how fast a *given* credential may be spent, and nothing more.
+ * The caller chooses what it presents, so a run of guessed keys is a run of
+ * distinct buckets, each starting with a full allowance — which is why key
+ * guessing is bounded separately, by source address, in `plugin.ts`. Reading
+ * this key as a bound on unauthenticated attempts is the mistake worth naming
+ * here rather than rediscovering.
  */
 export function rateLimitKey(authorizationHeader: string | null): string {
   const token = authorizationHeader?.replace(/^Bearer\s+/i, '').trim()

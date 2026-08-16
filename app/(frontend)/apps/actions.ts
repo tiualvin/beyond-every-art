@@ -29,6 +29,18 @@ const limiter = new FixedWindowRateLimiter(
 export type WaitlistStatus = 'success' | 'invalid' | 'none' | 'error'
 
 /**
+ * Apps one submission may name.
+ *
+ * The form offers a checkbox per app and there will never be many, but the
+ * field arrives from the request, so without a ceiling the count of `app`
+ * values decides both the `IN` list and the `limit` of the query below — a
+ * single post could ask Postgres to match a hundred thousand slugs. The
+ * limiter bounds how often that can be sent; this bounds what one of them
+ * costs. A submission naming more apps than exist is a script, not a reader.
+ */
+const MAX_APPS_PER_SUBMISSION = 20
+
+/**
  * A repeat signup, or a race that lost to one.
  *
  * The collection's beforeValidate hook throws `DuplicateWaitlistEntry` for a
@@ -67,10 +79,14 @@ export async function joinAppWaitlist(formData: FormData): Promise<void> {
   const email = String(formData.get('email') ?? '')
     .trim()
     .toLowerCase()
-  const slugs = formData
-    .getAll('app')
-    .map((value) => String(value).trim())
-    .filter(Boolean)
+  const slugs = [
+    ...new Set(
+      formData
+        .getAll('app')
+        .map((value) => String(value).trim())
+        .filter(Boolean),
+    ),
+  ].slice(0, MAX_APPS_PER_SUBMISSION)
 
   if (slugs.length === 0) return redirect(`${APPS_PATH}?status=none`)
   if (!EMAIL_PATTERN.test(email)) return redirect(`${APPS_PATH}?status=invalid`)

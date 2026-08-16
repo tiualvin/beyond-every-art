@@ -24,6 +24,12 @@ ghost-members*.csv
 complete-site-archive*.zip
 *.dump
 *.sql
+# ...but schema migrations are source, and `*.sql` above was hiding them. The
+# database ones Payload generates today are `.ts` plus a `.json` snapshot, so
+# nothing has been lost yet; a hand-written SQL migration would have been
+# silently uncommitted, and CI's drift check — which looks for new files under
+# `migrations/` — would have reported everything was fine.
+!migrations/*.sql
 migration-report*.json
 /.migration-reports/
 validation-report*.json

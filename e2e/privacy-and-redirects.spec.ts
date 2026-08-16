@@ -93,7 +93,39 @@ test('legacy URLs return the seeded permanent redirect', async ({
   })
 
   expect(response.status()).toBe(301)
-  expect(response.headers().location).toMatch(
-    new RegExp(`${fixtures.redirect.destination}$`),
+  expect(new URL(response.headers().location).pathname).toBe(
+    fixtures.redirect.destination,
+  )
+})
+
+test('a legacy URL redirects to the host the reader used, not the bind address', async ({
+  request,
+}) => {
+  // The assertion the other test cannot make, and the reason this one exists.
+  //
+  // Redirects were built by resolving the destination against
+  // `request.nextUrl.origin`, which Next composes from `HOSTNAME` and the
+  // forwarded scheme rather than from the request — so in the container, where
+  // HOSTNAME is `0.0.0.0` and Caddy sends `X-Forwarded-Proto: https`, every
+  // migrated Ghost URL sent readers and crawlers to `https://0.0.0.0:3000/...`,
+  // and the middleware's own fetch of the redirect map failed the TLS handshake
+  // before that. Nothing caught it: under Playwright the bind address is the
+  // address the test dialled, so a redirect built the wrong way still points
+  // somewhere that works.
+  //
+  // Forwarding a host that is deliberately not the one the server is bound to
+  // is what separates the two. The old code ignored these headers completely.
+  const source = fixtures.redirect.source.replace(/\/$/, '')
+  const response = await request.get(source, {
+    maxRedirects: 0,
+    headers: {
+      'x-forwarded-host': 'readers.example',
+      'x-forwarded-proto': 'https',
+    },
+  })
+
+  expect(response.status()).toBe(301)
+  expect(response.headers().location).toBe(
+    `https://readers.example${fixtures.redirect.destination}`,
   )
 })

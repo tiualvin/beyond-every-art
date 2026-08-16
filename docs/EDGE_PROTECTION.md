@@ -114,6 +114,20 @@ in its own quiet deploy, not during a cutover.
    OpenAI's servers, so anything that challenges or rate-limits non-browser
    clients will break it — see `docs/MCP_SERVER.md`.
 
+   Note what that hostname used to mean for the rules on the site's address.
+   The `Caddyfile` refuses `/api*` and `/admin*` on the public hostname, with a
+   careful paragraph explaining why `?limit=0` makes an anonymous collection
+   read worth refusing — and then served the same application, with the same
+   endpoints, unconditionally on this one. Both names point at the same VPS, so
+   `GET /api/posts?limit=0` was refused on one address and answered on the
+   other. A rule that holds on one of two public hostnames is not a rule. The
+   CMS vhost now refuses `/api*` for requests carrying no credential at all,
+   allowing through the endpoints that must answer without one: `/api/mcp`, the
+   auth routes, `/api/access`, `/api/media/file/*`, and `/api/preview*`. It is a
+   credential-_presence_ check, not authentication — Payload still decides
+   whether a session or key is valid. What it removes is the anonymous case,
+   which is the one that reaches Postgres before anything is checked.
+
 ## What this does not solve
 
 Cloudflare protects the edge. It does nothing about the application-level
@@ -122,10 +136,17 @@ concerns already handled in the repo, and nothing about these:
 - The in-process rate limiters reset when the container restarts, and there is
   one container. That is a deliberate trade (`lib/security/rate-limit.ts`), not
   an oversight, but it means a deploy clears every window.
-- `/health` runs a database count on every request and is exempt from the
-  staging Basic Auth gate so that uptime monitors can reach it. Cheap
-  individually; still an uncached round-trip to Postgres from an anonymous
-  caller.
+- `/health` is exempt from the staging Basic Auth gate so that uptime monitors
+  can reach it, so it is still an uncached round-trip to Postgres from an
+  anonymous caller. It is no longer an expensive one: it read a `count`, which
+  is a sequential scan in Postgres and so grew with every article published, and
+  now reads a single row instead. It is also rate limited per address
+  (`RATE_LIMIT_HEALTH_PER_MINUTE`, 60), as is `/csp-report`
+  (`RATE_LIMIT_CSP_REPORT_PER_MINUTE`, 60) — that one always answers 204 either
+  way, so a prober learns nothing from being throttled, and the cap is there
+  because an accepted report costs a log line and the log file is rotated: a
+  flood could otherwise push genuine violations out of the window during exactly
+  the report-only phase when they are the only evidence there is.
 - Media is served by Node from local disk (`useR2` is false — no object storage
   is configured). Every image occupies an app worker. Caching at the edge hides
   this rather than fixing it; moving media to R2 is the actual fix, and R2 has

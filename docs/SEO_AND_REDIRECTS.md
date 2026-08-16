@@ -40,6 +40,36 @@ runtime and cannot reach Postgres directly, the flow is:
 Editing redirects in the CMS takes effect within the cache window without a
 redeploy.
 
+### Which origin, and why it is not the obvious one
+
+Both halves of that flow need an origin, and `request.nextUrl.origin` — the one
+Next hands the middleware — is the wrong answer for both. Next composes it from
+the server's bind address and the forwarded scheme, so in the container, where
+the Dockerfile sets `HOSTNAME=0.0.0.0` and Caddy sends
+`X-Forwarded-Proto: https`, it reads `https://0.0.0.0:3000`. That produced two
+failures at once, neither of which looked like a failure:
+
+- the fetch in step 1 opened a TLS connection to a listener that speaks plain
+  HTTP, so the map never loaded and **every migrated Ghost URL answered 404**;
+- had it loaded, step 3 resolved each on-site destination against the same
+  origin, so the `Location` header pointed readers and crawlers at
+  `https://0.0.0.0:3000/...`.
+
+So the two origins are now named separately, in `lib/security/origins.ts`:
+
+- `internalOrigin()` — `http://127.0.0.1:$PORT`, for the fetch. It must not
+  leave the container, and it must not claim a scheme the app does not serve.
+- `forwardedOrigin()` — rebuilt from `X-Forwarded-Host` / `Host` and
+  `X-Forwarded-Proto`, for the `Location` header, so a reader is redirected on
+  the hostname they actually used. Staying relative instead is not available:
+  Next's edge adapter parses the `Location` header as a URL and rejects a
+  relative one.
+
+`e2e/privacy-and-redirects.spec.ts` forwards a host that is deliberately not the
+one the server is bound to. That is the assertion the old test could not make —
+under Playwright the bind address is the address the test dialled, so a redirect
+built the wrong way still pointed somewhere that worked.
+
 ## URL structure
 
 Path builders emit the Ghost permalink structure with trailing slashes
