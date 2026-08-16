@@ -2,14 +2,32 @@ import type { JSXConverters } from '@payloadcms/richtext-lexical/react'
 
 import {
   ACCORDION_BLOCK,
+  BOOKMARK_BLOCK,
+  BUTTON_BLOCK,
+  CALLOUT_BLOCK,
+  EMBED_BLOCK,
+  GALLERY_BLOCK,
+  PAYWALL_BLOCK,
   PULL_QUOTE_BLOCK,
   SIGNUP_BLOCK,
   type AccordionData,
   type BlockSlug,
+  type BookmarkData,
+  type ButtonData,
+  type CalloutData,
+  type EmbedData,
+  type GalleryData,
+  type PaywallData,
   type PullQuoteData,
   type SignupData,
 } from '@/blocks/schema'
 import { Accordion } from './accordion'
+import { Bookmark } from './bookmark'
+import { ActionButton } from './button'
+import { Callout } from './callout'
+import { Embed } from './embed'
+import { Gallery } from './gallery'
+import { PaywallMarker } from './paywall'
 import { PullQuote } from './pull-quote'
 import { Signup } from './signup'
 import { UnknownNode } from './unknown'
@@ -33,6 +51,14 @@ const renderers: BlockRenderers = {
   ),
   [PULL_QUOTE_BLOCK]: (fields) => <PullQuote data={fields as PullQuoteData} />,
   [SIGNUP_BLOCK]: (fields) => <Signup data={fields as SignupData} />,
+  [CALLOUT_BLOCK]: (fields) => <Callout data={fields as CalloutData} />,
+  [BUTTON_BLOCK]: (fields) => <ActionButton data={fields as ButtonData} />,
+  [GALLERY_BLOCK]: (fields) => <Gallery data={fields as GalleryData} />,
+  [BOOKMARK_BLOCK]: (fields) => <Bookmark data={fields as BookmarkData} />,
+  [EMBED_BLOCK]: (fields) => <Embed data={fields as EmbedData} />,
+  // Reaching a renderer at all means the body kept the marker, which only
+  // happens in preview — `toArticleBody` strips it everywhere else.
+  [PAYWALL_BLOCK]: (fields) => <PaywallMarker data={fields as PaywallData} />,
 }
 
 type UnknownNodeShape = {

@@ -17,6 +17,7 @@
 // bodies keep rendering through exactly the code path they rendered through
 // before, byte for byte. Blocks only ever reach the `lexical` branch.
 
+import { PAYWALL_BLOCK } from '../../blocks/schema'
 import {
   isEmptyRichText,
   stripLeadingTitleHeading,
@@ -129,6 +130,27 @@ type BodySource = {
 export type BodyOptions = {
   /** Withhold all but the opening paragraphs. Gated posts, read by non-members. */
   restricted?: boolean
+  /**
+   * An editor is looking at a draft. Keeps editorial markers that a reader
+   * never sees — currently the members-only cut.
+   */
+  preview?: boolean
+}
+
+/** True for the block that marks where a gated post stops. */
+function isPaywallNode(node: BodyNode): boolean {
+  return node.type === 'block' && node.fields?.blockType === PAYWALL_BLOCK
+}
+
+/**
+ * Where the editor put the members-only cut, or -1.
+ *
+ * Only the first one counts. A body with two markers is an editing mistake,
+ * and the safe reading of it is the earlier cut — withholding more than was
+ * intended is recoverable, publishing more than was intended is not.
+ */
+export function paywallIndex(nodes: BodyNode[]): number {
+  return nodes.findIndex(isPaywallNode)
 }
 
 /**
@@ -143,12 +165,24 @@ export function toArticleBody(
   doc: BodySource,
   options: BodyOptions = {},
 ): ArticleBody {
-  const { restricted = false } = options
+  const { restricted = false, preview = false } = options
 
   if (!isEmptyRichText(doc.content)) {
     const source = doc.content as BodyRoot
     let children = stripLeadingTitleNode(source.root?.children ?? [], doc.title)
-    if (restricted) children = toTeaserNodes(children)
+
+    // The editor's own cut wins over the character count. It is an explicit
+    // decision about where the piece stops being free, and a heuristic that
+    // overrode it would be publishing past a line somebody deliberately drew.
+    const cut = paywallIndex(children)
+    if (restricted) {
+      children = cut === -1 ? toTeaserNodes(children) : children.slice(0, cut)
+    } else if (!preview) {
+      // A marker is editorial, not content. It survives into preview so an
+      // editor can see where the cut falls, and never reaches a reader.
+      children = children.filter((node) => !isPaywallNode(node))
+    }
+
     if (children.length === 0) return { kind: 'empty' }
 
     return {

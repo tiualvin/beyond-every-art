@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   ACCORDION_BLOCK,
+  PAYWALL_BLOCK,
   PULL_QUOTE_BLOCK,
   SIGNUP_BLOCK,
 } from '../../blocks/schema'
@@ -235,5 +236,111 @@ describe('gated posts', () => {
     toArticleBody({ content }, { restricted: true })
 
     expect(JSON.stringify(content)).toBe(before)
+  })
+})
+
+describe('the members-only cut', () => {
+  const gated = (...children: unknown[]) =>
+    toArticleBody({ content: editorState(...children) }, { restricted: true })
+
+  const childrenOf = (body: ReturnType<typeof toArticleBody>) =>
+    body.kind === 'lexical' ? body.content.root.children : []
+
+  it('cuts where the editor put the marker, not at the character count', () => {
+    const body = gated(
+      filler(20),
+      heading('h2', 'Still free'),
+      filler(20),
+      block(PAYWALL_BLOCK),
+      paragraph(text('WITHHELD')),
+    )
+
+    // Three nodes kept, including a heading the 500-char paragraph rule would
+    // have stopped at. The editor's line is the authority.
+    expect(childrenOf(body)).toHaveLength(3)
+    expect(JSON.stringify(childrenOf(body))).not.toContain('WITHHELD')
+  })
+
+  it('keeps a marked teaser longer than the character fallback', () => {
+    const body = gated(
+      filler(400),
+      filler(400),
+      filler(400),
+      block(PAYWALL_BLOCK),
+      paragraph(text('WITHHELD')),
+    )
+
+    expect(childrenOf(body)).toHaveLength(3)
+  })
+
+  it('never publishes the marker itself to a reader', () => {
+    const body = gated(filler(20), block(PAYWALL_BLOCK), filler(20))
+
+    expect(JSON.stringify(childrenOf(body))).not.toContain(PAYWALL_BLOCK)
+  })
+
+  it('honours the earlier of two markers', () => {
+    // Two markers is an editing mistake. Withholding more than intended is
+    // recoverable; publishing more than intended is not.
+    const body = gated(
+      filler(20),
+      block(PAYWALL_BLOCK),
+      paragraph(text('WITHHELD')),
+      block(PAYWALL_BLOCK),
+      paragraph(text('ALSO WITHHELD')),
+    )
+
+    expect(childrenOf(body)).toHaveLength(1)
+    expect(JSON.stringify(childrenOf(body))).not.toContain('WITHHELD')
+  })
+
+  it('gives a non-member nothing when the marker opens the body', () => {
+    const body = gated(block(PAYWALL_BLOCK), paragraph(text('WITHHELD')))
+
+    expect(body).toEqual({ kind: 'empty' })
+  })
+
+  it('falls back to the character rule when there is no marker', () => {
+    const body = gated(filler(20), heading('h2', 'Materials'), filler(20))
+
+    expect(childrenOf(body)).toHaveLength(1)
+  })
+
+  it('strips the marker from a published body without withholding anything', () => {
+    const body = toArticleBody({
+      content: editorState(
+        paragraph(text('One')),
+        block(PAYWALL_BLOCK),
+        paragraph(text('Two')),
+      ),
+    })
+
+    expect(childrenOf(body)).toHaveLength(2)
+    expect(JSON.stringify(childrenOf(body))).not.toContain(PAYWALL_BLOCK)
+    expect(JSON.stringify(childrenOf(body))).toContain('Two')
+  })
+
+  it('keeps the marker visible to an editor in preview', () => {
+    // The cut decides what non-members read. Somebody placing that line has to
+    // be able to see where they put it.
+    const body = toArticleBody(
+      {
+        content: editorState(
+          paragraph(text('One')),
+          block(PAYWALL_BLOCK),
+          paragraph(text('Two')),
+        ),
+      },
+      { preview: true },
+    )
+
+    expect(childrenOf(body)).toHaveLength(3)
+    expect(JSON.stringify(childrenOf(body))).toContain(PAYWALL_BLOCK)
+  })
+
+  it('leaves a body that is only a marker with nothing to render', () => {
+    expect(
+      toArticleBody({ content: editorState(block(PAYWALL_BLOCK)) }),
+    ).toEqual({ kind: 'empty' })
   })
 })

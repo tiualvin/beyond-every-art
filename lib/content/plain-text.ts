@@ -16,10 +16,21 @@ import { convertLexicalToPlaintext } from '@payloadcms/richtext-lexical/plaintex
 
 import {
   ACCORDION_BLOCK,
+  BOOKMARK_BLOCK,
+  BUTTON_BLOCK,
+  CALLOUT_BLOCK,
+  EMBED_BLOCK,
+  GALLERY_BLOCK,
+  PAYWALL_BLOCK,
   PULL_QUOTE_BLOCK,
   SIGNUP_BLOCK,
   type AccordionData,
   type BlockSlug,
+  type BookmarkData,
+  type ButtonData,
+  type CalloutData,
+  type EmbedData,
+  type GalleryData,
   type PullQuoteData,
 } from '../../blocks/schema'
 import type { ArticleBody } from './body'
@@ -80,6 +91,38 @@ const blockSerializers: Record<BlockSlug, (fields: unknown) => string> = {
   // aimed at a reader on the page, which in a feed or a search result is noise
   // wrapped around a form that isn't there.
   [SIGNUP_BLOCK]: () => '',
+
+  // Editorial prose that happens to sit in a box.
+  [CALLOUT_BLOCK]: (fields) =>
+    nestedPlainText(((fields ?? {}) as CalloutData).content),
+
+  // The label only. It is often the sole description of where the link goes
+  // ("Download the pigment chart"), so dropping it loses real text — but the
+  // URL is machinery and never belongs in a feed or an index.
+  [BUTTON_BLOCK]: (fields) =>
+    ((fields ?? {}) as ButtonData).label?.trim() ?? '',
+
+  // Captions carry the editorial content of a gallery. The images cannot.
+  [GALLERY_BLOCK]: (fields) => {
+    const data = (fields ?? {}) as GalleryData
+    return join([
+      ...(data.items ?? []).map((item) => item?.caption),
+      data.caption,
+    ])
+  },
+
+  // What the editor wrote about the link, not the link.
+  [BOOKMARK_BLOCK]: (fields) => {
+    const data = (fields ?? {}) as BookmarkData
+    return join([data.title, data.description, data.publisher])
+  },
+
+  // The title is the only human-written text; the URL is machinery.
+  [EMBED_BLOCK]: (fields) => ((fields ?? {}) as EmbedData).title?.trim() ?? '',
+
+  // A marker, not content. It should never reach a serializer in the first
+  // place — `toArticleBody` strips it — and contributes nothing if it does.
+  [PAYWALL_BLOCK]: () => '',
 }
 
 const blockConverters: Converters = {

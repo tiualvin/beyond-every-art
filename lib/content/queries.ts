@@ -437,7 +437,7 @@ function toPostDetail(doc: RawContentDoc, preview: boolean): PostDetail {
     slug: doc.slug ?? '',
     title: doc.title ?? doc.slug ?? '',
     excerpt: doc.excerpt ?? '',
-    body: toArticleBody(doc, { restricted }),
+    body: toArticleBody(doc, { restricted, preview }),
     publishedAt: doc.publishedAt ?? null,
     updatedAt: doc.updatedAt ?? null,
     authors: toAuthorSummaries(doc.authors),
@@ -607,7 +607,10 @@ async function readPageBySlug(
     return {
       slug: doc.slug,
       title: doc.title ?? doc.slug,
-      body: toArticleBody(doc),
+      // Pages are never gated, so the members-only marker does nothing here —
+      // but an editor who dropped one on a page should still see it sitting
+      // there doing nothing, rather than have it silently vanish in preview.
+      body: toArticleBody(doc, { preview: Boolean(options.draft) }),
       publishedAt: doc.publishedAt ?? null,
       updatedAt: doc.updatedAt ?? null,
       metaTitle: doc.metaTitle ?? null,

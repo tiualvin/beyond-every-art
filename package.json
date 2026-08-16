@@ -27,6 +27,7 @@
     "migrate:db:baseline": "tsx scripts/baseline-migrations.ts",
     "seed:dev": "tsx scripts/seed-dev.ts",
     "seed:e2e": "tsx e2e/seed.ts",
+    "inventory:ghost": "tsx scripts/inventory-ghost-cards.ts",
     "migrate:ghost": "tsx scripts/migrate-ghost.ts",
     "migrate:redirects": "tsx scripts/migrate-redirects.ts",
     "migrate:members": "tsx scripts/migrate-members.ts",
