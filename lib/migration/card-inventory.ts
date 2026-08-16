@@ -1,3 +1,14 @@
+// Count the Ghost cards actually used across an export.
+//
+// `docs/INSERTABLE_CONTENT_MODULES.md` opens its Phase 0 with "inventory Ghost
+// cards/custom HTML and count actual module patterns", and then every later
+// phase decides what to build. Nobody could run that step, so the block
+// priorities in that document are reasoning about a typical Ghost blog rather
+// than measurements of this one.
+//
+// This measures it. Reading only — it never writes to the export, the database,
+// or anything else. `scripts/inventory-ghost-cards.ts` is the CLI over it.
+
 import {
   ACCORDION_BLOCK,
   BOOKMARK_BLOCK,
@@ -8,6 +19,14 @@ import {
   PULL_QUOTE_BLOCK,
 } from '../../blocks/schema'
 
+/**
+ * Ghost card class → the block that already renders it, or null for a gap.
+ *
+ * `kg-image-card` and `kg-code-card` carry a string rather than null and are
+ * not gaps: an image is a Lexical upload node and a code block is a Lexical
+ * code node, so both are already authorable. They are listed to keep them out
+ * of the "unhandled" count they would otherwise inflate.
+ */
 export const GHOST_CARD_COVERAGE: Readonly<Record<string, string | null>> = {
   'kg-bookmark-card': BOOKMARK_BLOCK,
   'kg-callout-card': CALLOUT_BLOCK,
@@ -47,7 +66,15 @@ export type CardInventory = {
   ok: boolean
 }
 
+// Whole class tokens only. `\b` at the end would also match the `kg-callout-
+// card` sitting inside Ghost's colour modifier `kg-callout-card-blue`, and
+// count one callout twice — the trailing lookahead is what keeps a card's own
+// modifier classes from inflating its total. The first test in
+// tests/migration/card-inventory.test.ts fails if this is loosened.
 const CARD_CLASS = /kg-[a-z0-9-]*-card(?![-\w])/g
+// Ghost writes raw editor HTML into an `<!--kg-card-begin: html-->` fence.
+// It is the one thing in an export that no block can ever replace, so it is
+// counted separately rather than as a card, and does not fail strict mode.
 const HTML_CARD = /<!--kg-card-begin:\s*html-->/g
 
 function collectDocuments(payload: unknown): GhostDocument[] {
