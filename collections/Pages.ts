@@ -2,6 +2,7 @@ import type { CollectionConfig } from 'payload'
 
 import { editorsAndAdmins, publishedOrEditors } from '../access/roles'
 import { CONTENT_TAGS } from '../lib/cache/content'
+import { contentEditor } from '../lib/content/editor'
 import { purgeOnChange, purgeOnDelete } from '../lib/cache/purge'
 import { recordMcpWrite } from '../lib/mcp/audit'
 import { refuseMcpPublish } from '../lib/mcp/publish-guard'
@@ -39,7 +40,7 @@ export const Pages: CollectionConfig = {
       validate: validateRootContentSlug,
     },
     { name: 'publishedAt', type: 'date' },
-    { name: 'content', type: 'richText' },
+    { name: 'content', type: 'richText', editor: contentEditor },
     { name: 'legacyHTML', type: 'code', admin: { language: 'html' } },
     { name: 'featuredImage', type: 'upload', relationTo: 'media' },
     { name: 'metaTitle', type: 'text' },

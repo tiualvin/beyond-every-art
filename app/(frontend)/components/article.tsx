@@ -6,6 +6,7 @@ import type { AuthorSummary, PostDetail } from '@/lib/content/queries'
 import { formatDate } from '@/lib/format'
 import { authorPath, tagPath } from '@/lib/seo/site'
 
+import { ArticleBody } from './body'
 import { MembershipGate } from './membership-gate'
 import { FadeIn } from './motion/fade-in'
 import { ShareRow } from './share-row'
@@ -14,7 +15,13 @@ import { StaggerChildren, StaggerItem } from './motion/stagger'
 
 const FIGURE_SIZES = '(max-width: 47rem) 100vw, 44rem'
 
-export function Article({ post }: { post: PostDetail }) {
+export function Article({
+  post,
+  preview = false,
+}: {
+  post: PostDetail
+  preview?: boolean
+}) {
   const primaryTag = post.tags[0]
   const author = post.authors[0]
   const byline = [
@@ -60,16 +67,16 @@ export function Article({ post }: { post: PostDetail }) {
             </FadeIn>
           )}
 
-          {post.bodyHtml ? (
-            <div
-              className={post.restricted ? 'prose prose--teaser' : 'prose'}
-              dangerouslySetInnerHTML={{ __html: post.bodyHtml }}
-            />
-          ) : (
-            !post.restricted && (
-              <p className="muted">This story has no body content yet.</p>
-            )
-          )}
+          <ArticleBody
+            body={post.body}
+            className={post.restricted ? 'prose prose--teaser' : 'prose'}
+            preview={preview}
+            emptyMessage={
+              post.restricted
+                ? undefined
+                : 'This story has no body content yet.'
+            }
+          />
 
           {post.restricted && <MembershipGate visibility={post.visibility} />}
 

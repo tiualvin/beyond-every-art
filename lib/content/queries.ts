@@ -3,7 +3,7 @@ import type { Where } from 'payload'
 import { cachedRead, CONTENT_TAGS } from '@/lib/cache/content'
 import { toMediaImage, type MediaImage } from '@/lib/content/media'
 import { ARCHIVE_PAGE_SIZE } from '@/lib/content/pagination'
-import { toBodyHtml, toTeaserHtml } from '@/lib/content/richtext'
+import { toArticleBody, type ArticleBody } from '@/lib/content/body'
 import { readingTimeMinutes } from '@/lib/format'
 import { getPayloadClient } from '@/lib/payload'
 import type { PreviewUser } from '@/lib/preview/session'
@@ -364,7 +364,7 @@ export type PostDetail = {
   slug: string
   title: string
   excerpt: string
-  bodyHtml: string
+  body: ArticleBody
   publishedAt: string | null
   updatedAt: string | null
   authors: AuthorSummary[]
@@ -375,9 +375,9 @@ export type PostDetail = {
   canonicalURL: string | null
   visibility: PostVisibility
   /**
-   * Whether `bodyHtml` is a teaser rather than the piece. True for a
-   * members-only or subscriber-only post read by anyone but a previewing
-   * editor; the withheld part of the body is never put in the response.
+   * Whether `body` is a teaser rather than the piece. True for a members-only
+   * or subscriber-only post read by anyone but a previewing editor; the
+   * withheld part of the body is never put in the response.
    */
   restricted: boolean
 }
@@ -385,7 +385,7 @@ export type PostDetail = {
 export type PageDetail = {
   slug: string
   title: string
-  bodyHtml: string
+  body: ArticleBody
   publishedAt: string | null
   updatedAt: string | null
   metaTitle: string | null
@@ -432,13 +432,12 @@ type RawContentDoc = {
 function toPostDetail(doc: RawContentDoc, preview: boolean): PostDetail {
   const visibility = toVisibility(doc.visibility)
   const restricted = visibility !== 'public' && !preview
-  const body = toBodyHtml(doc)
 
   return {
     slug: doc.slug ?? '',
     title: doc.title ?? doc.slug ?? '',
     excerpt: doc.excerpt ?? '',
-    bodyHtml: restricted ? toTeaserHtml(body) : body,
+    body: toArticleBody(doc, { restricted }),
     publishedAt: doc.publishedAt ?? null,
     updatedAt: doc.updatedAt ?? null,
     authors: toAuthorSummaries(doc.authors),
@@ -608,7 +607,7 @@ async function readPageBySlug(
     return {
       slug: doc.slug,
       title: doc.title ?? doc.slug,
-      bodyHtml: toBodyHtml(doc),
+      body: toArticleBody(doc),
       publishedAt: doc.publishedAt ?? null,
       updatedAt: doc.updatedAt ?? null,
       metaTitle: doc.metaTitle ?? null,
@@ -825,7 +824,7 @@ export type AppCard = {
 }
 
 export type AppDetail = AppCard & {
-  bodyHtml: string
+  body: ArticleBody
   updatedAt: string | null
   screenshots: Array<{ image: MediaImage; caption: string }>
   appStoreURL: string | null
@@ -966,8 +965,8 @@ async function readAppBySlug(
 
     return {
       ...card,
-      // `toBodyHtml` reads `content`; the field here is `description`.
-      bodyHtml: toBodyHtml({ content: doc.description }),
+      // `toArticleBody` reads `content`; the field here is `description`.
+      body: toArticleBody({ content: doc.description }),
       updatedAt: doc.updatedAt ?? null,
       screenshots,
       appStoreURL: doc.appStoreURL || null,

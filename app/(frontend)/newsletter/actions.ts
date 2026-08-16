@@ -107,3 +107,24 @@ export async function subscribeFromModal(
 ): Promise<SignupStatus> {
   return record(normalise(formData), 'subscribe-modal')
 }
+
+/**
+ * The same signup, for a signup module placed inside an article body.
+ *
+ * Answers in place like the modal does: this form is in the middle of a piece
+ * somebody is reading, and redirecting them to the newsletter page would throw
+ * away their position in it.
+ *
+ * The source is a constant rather than anything the block or the form supplies.
+ * A per-placement or per-campaign source is worth having, but it has to be
+ * derived server-side from a campaign record — a hidden input naming its own
+ * attribution is a value the server would be trusting the client to tell it.
+ * That record is the `signup-campaigns` collection this repository has not
+ * built; until it exists, every article placement reports the same source.
+ */
+export async function subscribeFromArticle(
+  _previous: SignupStatus | null,
+  formData: FormData,
+): Promise<SignupStatus> {
+  return record(normalise(formData), 'article-signup')
+}

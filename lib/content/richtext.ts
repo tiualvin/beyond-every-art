@@ -92,7 +92,7 @@ function decodeEntities(value: string): string {
  * smartened them inside the body while the stored title often kept the straight
  * characters that were typed, and the two spellings are the same heading.
  */
-function toComparableText(value: string): string {
+export function toComparableText(value: string): string {
   return decodeEntities(value.replace(/<[^>]*>/g, ' '))
     .replace(/[‘’‚‛′]/g, "'")
     .replace(/[“”„‟″]/g, '"')
@@ -135,7 +135,7 @@ export function stripLeadingTitleHeading(
  * their meta description. Matching the length keeps the teasers Google has
  * already indexed roughly the size they were.
  */
-const TEASER_CHARS = 500
+export const TEASER_CHARS = 500
 
 // A complete top-level paragraph opening the HTML, after whitespace or a
 // comment. Whole elements only: half a paragraph would be unbalanced markup.
