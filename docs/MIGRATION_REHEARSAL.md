@@ -32,6 +32,23 @@ Keep all of these **out of Git** (`.gitignore` already blocks them).
 
 ## 2. Bootstrap and import
 
+Inventory editor cards before importing. The command is read-only; the strict
+flag turns any known-but-unhandled or previously unknown Ghost card into a
+failing migration gate. Raw HTML cards are reported but do not fail because
+their lossless destination is `legacyHTML`. Keep the JSON report outside Git
+with the other private rehearsal evidence.
+
+```bash
+pnpm inventory:ghost -- \
+  --input ghost-export/ghost-content.json \
+  --examples \
+  --json .migration-reports/ghost-card-inventory.json \
+  --fail-on-unhandled
+```
+
+Resolve every reported gap or record why preserving it in `legacyHTML` is the
+correct migration behavior before continuing.
+
 ```bash
 pnpm bootstrap:admin                       # one administrator, then unset the vars
 pnpm migrate:ghost    --dry-run --input ghost-export/ghost-content.json
