@@ -1,204 +1,169 @@
-// Count the Ghost cards actually used across an export.
-//
-// `docs/INSERTABLE_CONTENT_MODULES.md` opens its Phase 0 with "inventory Ghost
-// cards/custom HTML and count actual module patterns", and then every later
-// phase decides what to build. Nobody could run that step, so the block
-// priorities in that document are reasoning about a typical Ghost blog rather
-// than measurements of this one.
-//
-// This prints the measurements. It reads only — it never writes to the export,
-// the database, or anything else.
-//
-//   pnpm inventory:ghost
-//   pnpm inventory:ghost -- --export ./somewhere/else.json --examples
-//
-// Cards already covered by a block are marked so, which turns the output into
-// a work list rather than a table to interpret.
+// Inventory Ghost editor cards without writing to the export or database.
 
-import { readFile } from 'node:fs/promises'
+import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 import {
-  ACCORDION_BLOCK,
-  BOOKMARK_BLOCK,
-  BUTTON_BLOCK,
-  CALLOUT_BLOCK,
-  EMBED_BLOCK,
-  GALLERY_BLOCK,
-  PULL_QUOTE_BLOCK,
-} from '../blocks/schema'
+  inventoryGhostCards,
+  type CardInventory,
+} from '../lib/migration/card-inventory'
 
 const DEFAULT_EXPORT =
   process.env.GHOST_EXPORT_PATH || './ghost-export/ghost-content.json'
 
-/**
- * Ghost card class → the block that already renders it, or null.
- *
- * `kg-image-card` and `kg-code-card` map to `null` but are not gaps: an image
- * is a Lexical upload node and a code block is a Lexical code node, so both are
- * already authorable. They are listed to keep them out of the "unhandled"
- * count they would otherwise inflate.
- */
-const COVERAGE: Record<string, string | null> = {
-  'kg-bookmark-card': BOOKMARK_BLOCK,
-  'kg-callout-card': CALLOUT_BLOCK,
-  'kg-toggle-card': ACCORDION_BLOCK,
-  'kg-button-card': BUTTON_BLOCK,
-  'kg-gallery-card': GALLERY_BLOCK,
-  'kg-embed-card': EMBED_BLOCK,
-  'kg-blockquote-card': PULL_QUOTE_BLOCK,
-  'kg-image-card': 'built-in (upload node)',
-  'kg-code-card': 'built-in (code node)',
-  'kg-audio-card': null,
-  'kg-video-card': null,
-  'kg-file-card': null,
-  'kg-product-card': null,
-  'kg-header-card': null,
-  'kg-nft-card': null,
+type Args = {
+  exportPath: string
+  examples: boolean
+  failOnUnhandled: boolean
+  jsonPath?: string
+  help: boolean
 }
 
-type Args = { exportPath: string; examples: boolean }
+export function parseArgs(argv: string[]): Args {
+  const args: Args = {
+    exportPath: DEFAULT_EXPORT,
+    examples: false,
+    failOnUnhandled: false,
+    help: false,
+  }
 
-function parseArgs(argv: string[]): Args {
-  const args: Args = { exportPath: DEFAULT_EXPORT, examples: false }
-  for (let i = 0; i < argv.length; i += 1) {
-    if (argv[i] === '--export' && argv[i + 1]) {
-      args.exportPath = argv[i + 1]
-      i += 1
-    } else if (argv[i] === '--examples') {
+  for (let index = 0; index < argv.length; index += 1) {
+    const argument = argv[index]
+    if (
+      (argument === '--export' || argument === '--input') &&
+      argv[index + 1]
+    ) {
+      args.exportPath = argv[++index]
+    } else if (argument === '--json' && argv[index + 1]) {
+      args.jsonPath = argv[++index]
+    } else if (argument === '--examples') {
       args.examples = true
+    } else if (argument === '--fail-on-unhandled') {
+      args.failOnUnhandled = true
+    } else if (argument === '--help' || argument === '-h') {
+      args.help = true
+    } else if (argument === '--') {
+      // pnpm may forward its conventional argument separator to the script.
+      continue
+    } else {
+      throw new Error(`Unknown or incomplete argument: ${argument}`)
     }
   }
   return args
 }
 
-type Doc = { slug?: string; title?: string; html?: string | null }
+function usage(): string {
+  return `Usage: pnpm inventory:ghost -- [options]
 
-/** Every posts/pages row in a Ghost export, whichever shape it arrived in. */
-function collectDocs(payload: unknown): Doc[] {
-  const root = payload as { db?: Array<{ data?: Record<string, unknown> }> }
-  const data = root?.db?.[0]?.data ?? (payload as Record<string, unknown>)
-  const docs: Doc[] = []
-
-  for (const key of ['posts', 'pages']) {
-    const rows = (data as Record<string, unknown>)?.[key]
-    if (Array.isArray(rows)) docs.push(...(rows as Doc[]))
-  }
-
-  return docs
+Options:
+  --input, --export <path>  Ghost JSON export (default: GHOST_EXPORT_PATH or ghost-export/ghost-content.json)
+  --examples                Print one example slug for each card
+  --json <path>             Write a deterministic, owner-readable JSON report
+  --fail-on-unhandled       Exit 1 when an unhandled or unknown card is present
+  -h, --help                Show this help`
 }
 
-// Whole class tokens only. `\b` at the end would also match the `kg-callout-
-// card` sitting inside Ghost's colour modifier `kg-callout-card-blue`, and
-// count one callout twice — the trailing lookahead is what keeps a card's own
-// modifier classes from inflating its total.
-const CARD_CLASS = /kg-[a-z0-9-]*-card(?![-\w])/g
-// Ghost writes raw editor HTML into an `<!--kg-card-begin: html-->` fence.
-// It is the one thing in an export that no block can ever replace, so it is
-// counted separately rather than as a card.
-const HTML_CARD = /<!--kg-card-begin:\s*html-->/g
-
-function countMatches(html: string, pattern: RegExp): string[] {
-  return html.match(pattern) ?? []
-}
-
-async function main(): Promise<void> {
-  const args = parseArgs(process.argv.slice(2))
-  const resolved = path.resolve(process.cwd(), args.exportPath)
-
-  let raw: string
-  try {
-    raw = await readFile(resolved, 'utf8')
-  } catch {
-    console.error(`Could not read a Ghost export at ${resolved}.`)
-    console.error(
-      'Point it somewhere else with --export <path>, or set GHOST_EXPORT_PATH.',
-    )
-    process.exitCode = 1
-    return
-  }
-
-  const docs = collectDocs(JSON.parse(raw))
-  if (docs.length === 0) {
-    console.error('That file parsed, but held no posts or pages.')
-    process.exitCode = 1
-    return
-  }
-
-  const totals = new Map<string, number>()
-  const docsWith = new Map<string, Set<string>>()
-  const examples = new Map<string, string>()
-  let rawHtmlCards = 0
-  let docsWithCards = 0
-
-  for (const doc of docs) {
-    const html = doc.html ?? ''
-    if (!html) continue
-
-    const cards = countMatches(html, CARD_CLASS)
-    rawHtmlCards += countMatches(html, HTML_CARD).length
-    if (cards.length > 0) docsWithCards += 1
-
-    for (const card of cards) {
-      totals.set(card, (totals.get(card) ?? 0) + 1)
-      const seen = docsWith.get(card) ?? new Set<string>()
-      seen.add(doc.slug ?? doc.title ?? '(untitled)')
-      docsWith.set(card, seen)
-      if (!examples.has(card)) examples.set(card, doc.slug ?? '(untitled)')
-    }
-  }
-
-  const rows = [...totals.entries()].sort((a, b) => b[1] - a[1])
-
+function printInventory(
+  inventory: CardInventory,
+  resolved: string,
+  examples: boolean,
+): void {
   console.log(`\nGhost card inventory — ${resolved}`)
-  console.log(`${docs.length} documents, ${docsWithCards} containing cards\n`)
+  console.log(
+    `${inventory.documents} documents, ${inventory.documentsWithCards} containing cards\n`,
+  )
 
-  if (rows.length === 0) {
+  if (inventory.cards.length === 0) {
     console.log('No Ghost cards found. Every body is plain prose and images.')
   } else {
-    const width = Math.max(...rows.map(([card]) => card.length))
+    const width = Math.max(...inventory.cards.map(({ card }) => card.length))
     console.log(
       `${'card'.padEnd(width)}  ${'uses'.padStart(5)}  ${'docs'.padStart(4)}  covered by`,
     )
     console.log('-'.repeat(width + 30))
-
-    for (const [card, count] of rows) {
-      const covered =
-        card in COVERAGE
-          ? (COVERAGE[card] ?? '— NOT HANDLED')
-          : '— unknown card'
-      const docCount = docsWith.get(card)?.size ?? 0
+    for (const row of inventory.cards) {
+      const coverage =
+        row.status === 'covered'
+          ? row.coverage
+          : row.status === 'unknown'
+            ? '— unknown card'
+            : '— NOT HANDLED'
       console.log(
-        `${card.padEnd(width)}  ${String(count).padStart(5)}  ${String(docCount).padStart(4)}  ${covered}`,
+        `${row.card.padEnd(width)}  ${String(row.uses).padStart(5)}  ${String(row.documents).padStart(4)}  ${coverage}`,
       )
-      if (args.examples) {
-        console.log(`${' '.repeat(width)}         e.g. /${examples.get(card)}`)
-      }
+      if (examples)
+        console.log(`${' '.repeat(width)}         e.g. /${row.exampleSlug}`)
     }
   }
 
-  if (rawHtmlCards > 0) {
+  if (inventory.rawHTMLCards > 0) {
     console.log(
-      `\n${rawHtmlCards} raw HTML card(s). These hold hand-written markup and no` +
+      `\n${inventory.rawHTMLCards} raw HTML card(s). These hold hand-written markup and no` +
         '\nblock can replace them — they stay in legacyHTML.',
     )
   }
 
-  const unhandled = rows.filter(
-    ([card]) => card in COVERAGE && COVERAGE[card] === null,
-  )
-  const unknown = rows.filter(([card]) => !(card in COVERAGE))
-
-  if (unhandled.length > 0 || unknown.length > 0) {
+  const gaps = inventory.cards.filter(({ status }) => status !== 'covered')
+  if (gaps.length > 0) {
     console.log('\nWorth a block, in order of use:')
-    for (const [card, count] of [...unhandled, ...unknown]) {
-      console.log(`  ${card} — ${count} use(s)`)
-    }
+    for (const row of gaps) console.log(`  ${row.card} — ${row.uses} use(s)`)
   } else {
     console.log('\nEvery card found is already handled by a block.')
   }
-
   console.log('')
 }
 
-void main()
+export async function main(argv = process.argv.slice(2)): Promise<number> {
+  let args: Args
+  try {
+    args = parseArgs(argv)
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error))
+    console.error(usage())
+    return 1
+  }
+
+  if (args.help) {
+    console.log(usage())
+    return 0
+  }
+
+  const resolved = path.resolve(process.cwd(), args.exportPath)
+  let payload: unknown
+  try {
+    payload = JSON.parse(await readFile(resolved, 'utf8'))
+  } catch (error) {
+    console.error(`Could not parse a Ghost export at ${resolved}.`)
+    console.error(error instanceof Error ? error.message : String(error))
+    return 1
+  }
+
+  let inventory: CardInventory
+  try {
+    inventory = inventoryGhostCards(payload)
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error))
+    return 1
+  }
+
+  printInventory(inventory, resolved, args.examples)
+
+  if (args.jsonPath) {
+    const reportPath = path.resolve(process.cwd(), args.jsonPath)
+    await mkdir(path.dirname(reportPath), { recursive: true })
+    await writeFile(reportPath, `${JSON.stringify(inventory, null, 2)}\n`, {
+      mode: 0o600,
+    })
+    await chmod(reportPath, 0o600)
+  }
+
+  return args.failOnUnhandled && !inventory.ok ? 1 : 0
+}
+
+const entry = process.argv[1]
+  ? pathToFileURL(path.resolve(process.argv[1])).href
+  : ''
+if (import.meta.url === entry) {
+  process.exitCode = await main()
+}
