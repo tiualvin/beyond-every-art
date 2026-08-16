@@ -6,10 +6,12 @@ import {
   TOO_MANY_REQUESTS_BODY,
   tooManyRequestsInit,
 } from '@/lib/security/rate-limit'
+import { forwardedOrigin, internalOrigin } from '@/lib/security/origins'
 import { isAuthorized, parseBasicAuth } from '@/lib/seo/indexing'
 import {
   buildRedirectMap,
   matchRedirect,
+  redirectLocation,
   type RedirectRecord,
   type ResolvedRedirect,
 } from '@/lib/seo/redirects'
@@ -112,7 +114,10 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 
   let map: Map<string, ResolvedRedirect>
   try {
-    map = await loadRedirectMap(request.nextUrl.origin)
+    // Not `request.nextUrl.origin`: that is the bind address wearing the
+    // forwarded scheme, which behind Caddy is `https://0.0.0.0:3000` and fails
+    // the TLS handshake against a plain-HTTP listener. See `internalOrigin`.
+    map = await loadRedirectMap(internalOrigin())
   } catch (error) {
     // Never let redirect lookups take the site down; fall through instead.
     //
@@ -137,11 +142,17 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   const hit = matchRedirect(map, request.nextUrl.pathname)
   if (!hit) return NextResponse.next()
 
-  const destination = /^https?:\/\//i.test(hit.destination)
-    ? hit.destination
-    : new URL(hit.destination, request.nextUrl.origin).toString()
+  // Resolved against the origin the reader used, not `request.nextUrl.origin`
+  // — which is the bind address wearing the forwarded scheme, and sent every
+  // migrated URL to `https://0.0.0.0:3000`. `nextUrl.origin` remains the last
+  // resort for a request that arrived with no host at all, which HTTP/1.1 and
+  // HTTP/2 both require and so should not happen.
+  const location = redirectLocation(
+    hit.destination,
+    forwardedOrigin(request.headers, request.nextUrl.origin),
+  )
 
-  return NextResponse.redirect(destination, hit.statusCode)
+  return NextResponse.redirect(location, hit.statusCode)
 }
 
 export const config = {

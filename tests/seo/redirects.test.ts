@@ -4,6 +4,7 @@ import {
   buildRedirectMap,
   matchRedirect,
   normalizePath,
+  redirectLocation,
   type RedirectRecord,
 } from '../../lib/seo/redirects'
 
@@ -82,5 +83,54 @@ describe('matchRedirect', () => {
 
   it('returns null when there is no matching rule', () => {
     expect(matchRedirect(map, '/unknown')).toBeNull()
+  })
+})
+
+describe('redirectLocation', () => {
+  const origin = 'https://beyondeveryart.com'
+
+  // The origin is passed in because middleware must not use the one Next
+  // offers: `request.nextUrl.origin` is the bind address wearing the forwarded
+  // scheme — `https://0.0.0.0:3000` behind Caddy — so every migrated Ghost URL
+  // redirected readers and crawlers somewhere unroutable.
+  it('resolves an on-site destination against the reader’s own origin', () => {
+    expect(redirectLocation('/new-post/', origin)).toBe(
+      'https://beyondeveryart.com/new-post/',
+    )
+  })
+
+  it('keeps the query string an editor stored on the destination', () => {
+    expect(redirectLocation('/new-post/?ref=legacy', origin)).toBe(
+      'https://beyondeveryart.com/new-post/?ref=legacy',
+    )
+  })
+
+  it('passes an off-site destination through untouched', () => {
+    expect(redirectLocation('https://example.com/x', origin)).toBe(
+      'https://example.com/x',
+    )
+    expect(redirectLocation('http://example.com/x', origin)).toBe(
+      'http://example.com/x',
+    )
+  })
+
+  it('leaves a protocol-relative destination alone, being already absolute', () => {
+    expect(redirectLocation('//cdn.example.com/x', origin)).toBe(
+      '//cdn.example.com/x',
+    )
+  })
+
+  it('gives a rootless path a leading slash rather than a host', () => {
+    // `foo/bar` resolved as a URL would otherwise attach to the current
+    // directory, which is not what an editor typing a path means.
+    expect(redirectLocation('new-post/', origin)).toBe(
+      'https://beyondeveryart.com/new-post/',
+    )
+  })
+
+  it('falls back to the path rather than throwing on an unusable origin', () => {
+    // A 500 from middleware would take out every page on the site, not just
+    // the redirect.
+    expect(redirectLocation('/new-post/', 'not-an-origin')).toBe('/new-post/')
   })
 })

@@ -249,17 +249,41 @@ jobs:
       group: production-deploy
       cancel-in-progress: false
     steps:
+      # The host key decides who the deploy key is handed to.
+      #
+      # `ssh-keyscan` on its own asks the host at the other end of the
+      # connection to introduce itself and then believes the answer, which is
+      # the thing host key verification exists to not do: whoever answers for
+      # VPS_HOST at deploy time — a hijacked DNS record, anything on the path —
+      # is trusted, and receives an SSH key with production access. Pinning the
+      # expected key in VPS_SSH_HOST_KEY makes the check mean something.
+      #
+      # Scanning remains as a fallback so setting the secret is a change the
+      # repository owner makes deliberately rather than one a failed deploy
+      # forces at a bad moment. Get the value with
+      # `ssh-keyscan -t ed25519 <host>` run from somewhere you trust, or read it
+      # off the VPS itself with `cat /etc/ssh/ssh_host_ed25519_key.pub`, and the
+      # fallback stops being used from the next deploy on.
       - name: Configure SSH
         env:
           DEPLOY_KEY: ${{ runner.temp }}/deploy-ssh/deploy_key
           KNOWN_HOSTS: ${{ runner.temp }}/deploy-ssh/known_hosts
           VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_SSH_HOST_KEY: ${{ secrets.VPS_SSH_HOST_KEY }}
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
         run: |
           install -d -m 700 "$(dirname "$DEPLOY_KEY")"
           umask 077
           printf '%s\n' "$VPS_SSH_KEY" > "$DEPLOY_KEY"
-          ssh-keyscan -T 10 -H "$VPS_HOST" > "$KNOWN_HOSTS"
+          if [ -n "$VPS_SSH_HOST_KEY" ]; then
+            printf '%s\n' "$VPS_SSH_HOST_KEY" > "$KNOWN_HOSTS"
+            echo "Pinned the VPS host key from VPS_SSH_HOST_KEY."
+          else
+            echo "::warning::VPS_SSH_HOST_KEY is not set, so this deploy trusts" \
+              "whatever host key answers for the VPS. Set the secret to" \
+              "'ssh-keyscan -t ed25519 <host>' output taken from a trusted network."
+            ssh-keyscan -T 10 -H "$VPS_HOST" > "$KNOWN_HOSTS"
+          fi
       - name: Deploy the tested commit and verify readiness
         env:
           DEPLOY_KEY: ${{ runner.temp }}/deploy-ssh/deploy_key
@@ -279,6 +303,7 @@ jobs:
             -o IdentitiesOnly=yes \
             -o ServerAliveInterval=15 \
             -o ServerAliveCountMax=4 \
+            -o StrictHostKeyChecking=yes \
             -o UserKnownHostsFile="$KNOWN_HOSTS" \
             "$VPS_USER@$VPS_HOST" \
             "DEPLOY_PATH=$remote_path DEPLOY_SHA=$remote_sha sh -s" <<'REMOTE'

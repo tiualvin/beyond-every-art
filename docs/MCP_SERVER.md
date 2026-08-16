@@ -415,6 +415,25 @@ was built instead:
   requests arrive from a vendor's cloud and share addresses. A refusal says how
   many seconds remain in the window, so an agent waits instead of retrying in a
   loop;
+- **a second limit on failed authentications, keyed by source address.** The
+  limit above cannot bound key guessing, and reading it as though it could was a
+  hole rather than a subtlety: it buckets on what the caller presents, and the
+  caller chooses that, so every guess arrived in a fresh bucket with a full
+  allowance of 120 and still bought the key lookup the limit exists to protect.
+  A thousand guesses were a thousand lookups and a thousand tracked windows.
+  Ten failures per address per fifteen minutes now bounds it
+  (`RATE_LIMIT_MCP_AUTH_FAILURES`), counted only on failure, so a caller holding
+  a working key never touches it however much traffic it sends. Addresses are
+  shared between MCP callers, so a client looping on a revoked key can spend the
+  budget for another caller behind the same address — accepted, because the cost
+  is a second misconfigured client waiting fifteen minutes and the alternative is
+  unlimited guessing against the endpoint's only credential;
+- a ceiling on how many windows any limiter will track
+  (`lib/security/rate-limit.ts`), for the same reason. A caller-chosen key space
+  is a caller-chosen number of `Map` entries, and the eviction pass ran over
+  every entry on every request, so a flood of distinct keys cost quadratic work
+  on top of the memory. Keys past the ceiling share one overflow bucket and the
+  sweep runs once per window;
 - keys scoped per key in the admin panel, acting as a real Payload user, unable
   to publish unless that user is an administrator;
 - `MCP_ENABLED` unset by default, so the endpoint exists only where someone

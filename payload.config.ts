@@ -23,6 +23,7 @@ import { Header } from './globals/Header'
 import { SiteSettings } from './globals/SiteSettings'
 import { resendAdapter } from './lib/email/resend'
 import { mcp } from './lib/mcp/plugin'
+import { trustedOrigins } from './lib/security/origins'
 import { resolvePayloadSecret } from './lib/security/secret'
 import {
   buildPreviewUrl,
@@ -56,6 +57,16 @@ export default buildConfig({
         }),
     },
   },
+  // Which origins may spend a session cookie, and which `Host` header Payload
+  // will believe when it builds a password-reset link. Empty — the default —
+  // means the first check does not run and the second gives up; see
+  // `lib/security/origins.ts` for what each of those costs.
+  //
+  // `cors` is deliberately left at its default. Nothing in the browser calls
+  // this API cross-origin (the site renders through the Local API and the only
+  // fetch it makes is same-origin, to /search/suggest), so there is no reason
+  // to answer a cross-origin read with permission to read it.
+  csrf: trustedOrigins(),
   collections: [
     Users,
     Authors,

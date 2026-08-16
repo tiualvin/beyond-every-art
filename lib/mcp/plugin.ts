@@ -25,6 +25,7 @@ import {
   mcpRefusedLogEntry,
 } from './audit'
 import {
+  clientKey,
   configuredLimit,
   FixedWindowRateLimiter,
   rateLimitKey,
@@ -43,6 +44,35 @@ const RATE_WINDOW_MS = 60_000
 const limiter = new FixedWindowRateLimiter(
   configuredLimit('RATE_LIMIT_MCP_PER_MINUTE', RATE_LIMIT),
   RATE_WINDOW_MS,
+)
+
+/**
+ * Failed authentications per source address per fifteen minutes.
+ *
+ * The limiter above cannot bound key guessing, and reading it as though it
+ * could was the gap this closes: it buckets on the credential the caller
+ * presents, so every guess arrives in a fresh bucket holding a full allowance,
+ * and each one still buys the database lookup that resolves a key. A thousand
+ * guesses were a thousand lookups and a thousand windows.
+ *
+ * So guessing is bounded by where the request came from instead, and only
+ * failures are counted — a caller holding a working key never touches this,
+ * however much traffic it sends. Ten is far more wrong keys than a
+ * misconfigured client produces and far fewer than a search needs.
+ *
+ * Source addresses are shared between MCP callers (the requests come from a
+ * vendor's cloud), so a client looping on a revoked key can spend this budget
+ * for another caller behind the same address. That trade is deliberate: the
+ * cost is that a *second* misconfigured client waits fifteen minutes, and the
+ * alternative is leaving the endpoint's only credential open to unlimited
+ * guessing.
+ */
+const AUTH_FAILURE_LIMIT = 10
+const AUTH_FAILURE_WINDOW_MS = 15 * 60_000
+
+const failedAuthLimiter = new FixedWindowRateLimiter(
+  configuredLimit('RATE_LIMIT_MCP_AUTH_FAILURES', AUTH_FAILURE_LIMIT),
+  AUTH_FAILURE_WINDOW_MS,
 )
 
 /**
@@ -110,6 +140,7 @@ export const mcpPluginConfig: MCPPluginConfig = {
   // the internet — a bound on request volume, and a record of which key acted.
   overrideAuth: async (req, getDefaultMcpAccessSettings) => {
     const caller = rateLimitKey(req.headers.get('Authorization'))
+    const source = clientKey(req.headers)
 
     const limit = limiter.check(caller)
     if (!limit.allowed) {
@@ -124,6 +155,20 @@ export const mcpPluginConfig: MCPPluginConfig = {
       )
     }
 
+    // Checked, not spent: a request that turns out to hold a working key must
+    // not count against the guessing budget. Only the failure path below
+    // records anything.
+    const failures = failedAuthLimiter.peek(source)
+    if (!failures.allowed) {
+      const retryAfter = retryAfterSeconds(failures.resetAt)
+      logMcpEvent(
+        mcpRefusedLogEntry({ caller, reason: 'rate_limited', retryAfter }),
+      )
+      throw new Error(
+        `Too many failed MCP authentications from this address. Try again in ${retryAfter} seconds.`,
+      )
+    }
+
     let settings
     try {
       settings = await getDefaultMcpAccessSettings()
@@ -131,6 +176,7 @@ export const mcpPluginConfig: MCPPluginConfig = {
       // A missing or unrecognised key. This throws before the MCP handler is
       // entered, so `onEvent` never sees it either — without this line, a run
       // of guessed keys against a publicly reachable endpoint is invisible.
+      failedAuthLimiter.check(source)
       logMcpEvent(mcpRefusedLogEntry({ caller, reason: 'unauthorized' }))
       throw error
     }
