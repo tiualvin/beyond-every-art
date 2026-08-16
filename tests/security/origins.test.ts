@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   cmsOrigin,
+  csrfProtectionIsUnconfigured,
   forwardedOrigin,
   internalOrigin,
   siteOrigin,
@@ -108,6 +109,62 @@ describe('trustedOrigins', () => {
 
   it('is empty rather than wrong when nothing is configured', () => {
     expect(trustedOrigins({})).toEqual([])
+  })
+
+  // A non-empty list is enforced by Payload; an empty one is not. So a list
+  // holding only the compose default would reject the admin's own cookie on
+  // every write while reads carried on working — worse than listing nothing.
+  it('drops a localhost origin in production rather than locking the admin out', () => {
+    expect(
+      trustedOrigins({
+        NODE_ENV: 'production',
+        NEXT_PUBLIC_SERVER_URL: 'http://localhost:3000',
+      }),
+    ).toEqual([])
+  })
+
+  it('keeps the real origin when production has one, local default and all', () => {
+    expect(
+      trustedOrigins({
+        CMS_ADDRESS: 'cms.beyondeveryart.com',
+        NEXT_PUBLIC_SERVER_URL: 'http://localhost:3000',
+        NODE_ENV: 'production',
+      }),
+    ).toEqual([
+      'https://cms.beyondeveryart.com',
+      'http://cms.beyondeveryart.com',
+    ])
+  })
+
+  it('still trusts localhost outside production, where it is the real origin', () => {
+    expect(
+      trustedOrigins({ NEXT_PUBLIC_SERVER_URL: 'http://localhost:3000' }),
+    ).toEqual(['http://localhost:3000'])
+  })
+})
+
+describe('csrfProtectionIsUnconfigured', () => {
+  it('is true when production has named no origin of its own', () => {
+    expect(csrfProtectionIsUnconfigured({ NODE_ENV: 'production' })).toBe(true)
+    expect(
+      csrfProtectionIsUnconfigured({
+        NODE_ENV: 'production',
+        NEXT_PUBLIC_SERVER_URL: 'http://localhost:3000',
+      }),
+    ).toBe(true)
+  })
+
+  it('is false once a real origin is configured', () => {
+    expect(
+      csrfProtectionIsUnconfigured({
+        CMS_ADDRESS: 'cms.beyondeveryart.com',
+        NODE_ENV: 'production',
+      }),
+    ).toBe(false)
+  })
+
+  it('says nothing outside production, which is not protecting anything', () => {
+    expect(csrfProtectionIsUnconfigured({})).toBe(false)
   })
 })
 

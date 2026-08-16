@@ -4,6 +4,7 @@
 // `register` runs once at server start and checks the deployment for
 // configuration that must not reach production.
 
+import { csrfProtectionIsUnconfigured } from '@/lib/security/origins'
 import { resolvePayloadSecret } from '@/lib/security/secret'
 
 /**
@@ -35,6 +36,25 @@ export async function register(): Promise<void> {
   // one that holds the environment, and checking once keeps the failure single.
   if (process.env.NEXT_RUNTIME && process.env.NEXT_RUNTIME !== 'nodejs') return
   resolvePayloadSecret()
+
+  // Warned about rather than refused, because an unconfigured allowlist is the
+  // state that has been serving traffic all along — see
+  // `csrfProtectionIsUnconfigured`. What it costs is Payload's cross-origin
+  // check on session cookies, and a working link in a password-reset email.
+  if (csrfProtectionIsUnconfigured()) {
+    console.warn(
+      JSON.stringify({
+        level: 'warn',
+        event: 'csrf_origins_unconfigured',
+        time: new Date().toISOString(),
+        message:
+          'No public origin is configured, so Payload accepts a session ' +
+          'cookie from any origin and cannot build an absolute password-reset ' +
+          'link. Set CMS_ADDRESS (and NEXT_PUBLIC_SITE_URL) in the production ' +
+          'environment file. See lib/security/origins.ts.',
+      }),
+    )
+  }
 }
 
 export async function onRequestError(

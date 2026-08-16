@@ -153,9 +153,26 @@ export function forwardedOrigin(headers: Headers, fallback: string): string {
  */
 export function trustedOrigins(env: Env = process.env): string[] {
   const origins = new Set<string>()
+  const production = env.NODE_ENV === 'production'
 
   for (const origin of [siteOrigin(env), cmsOrigin(env)]) {
     if (!origin) continue
+
+    // A localhost origin in production is a leftover default, never the real
+    // one — `docker-compose.yml` supplies `NEXT_PUBLIC_SERVER_URL` as
+    // `http://localhost:3000` when `.env` does not, and `CMS_ADDRESS` reaches
+    // Caddy whether or not it reaches the app.
+    //
+    // Listing it would be worse than listing nothing, which is the trap worth
+    // spelling out: Payload treats an empty list as "no allowlist to enforce"
+    // and lets the cookie through, but a *non-empty* list rejects every origin
+    // outside it. So a list containing only the compose default would turn
+    // every save in the admin panel into a silent authentication failure —
+    // reads would keep working, because a same-origin GET carries no `Origin`
+    // header, and only writes would fail. Dropping these leaves the list empty
+    // instead, which is exactly the behaviour that shipped before this existed.
+    if (production && isLocal(new URL(origin).hostname)) continue
+
     origins.add(origin)
     if (origin.startsWith('https://')) {
       origins.add(`http://${origin.slice('https://'.length)}`)
@@ -163,4 +180,18 @@ export function trustedOrigins(env: Env = process.env): string[] {
   }
 
   return [...origins]
+}
+
+/**
+ * Whether this deployment is serving production traffic without having said
+ * which origins are its own.
+ *
+ * Not fatal, unlike a published `PAYLOAD_SECRET`: an empty list is the
+ * behaviour that has been running all along, so refusing to boot over it would
+ * turn a missing improvement into an outage. But it is silent, and silence is
+ * what let the same gap sit unnoticed long enough to break password resets, so
+ * `instrumentation.ts` says so once at startup.
+ */
+export function csrfProtectionIsUnconfigured(env: Env = process.env): boolean {
+  return env.NODE_ENV === 'production' && trustedOrigins(env).length === 0
 }
