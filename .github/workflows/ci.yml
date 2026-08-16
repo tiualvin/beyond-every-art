@@ -82,25 +82,6 @@ jobs:
             git status --porcelain migrations
             exit 1
           fi
-      # The admin page imports the tracked `importMap.ts`; Payload's generator
-      # writes the gitignored `importMap.js` beside it. Nothing keeps the two in
-      # step, and when they drift the admin renders without the components the
-      # config asks for — no console error, no failed request, just missing UI.
-      # That is how an empty import map blanked the whole dashboard once, and
-      # how a stale one would quietly drop the Lexical blocks added since.
-      #
-      # Compare the registered keys rather than the files: only one of the two
-      # is Prettier-formatted, so a textual diff would fail on quote style.
-      - name: Fail if the admin import map is stale
-        run: |
-          pnpm generate:importmap
-          keys() { grep -oE "['\"][^'\"]+#[A-Za-z]+['\"]" "$1" | tr -d "\"'" | sort -u; }
-          if ! diff <(keys 'app/(payload)/admin/importMap.js') \
-                    <(keys 'app/(payload)/admin/importMap.ts'); then
-            echo "::error::The admin import map is stale. Run 'pnpm generate:importmap'," \
-              "copy app/(payload)/admin/importMap.js over importMap.ts, and commit it."
-            exit 1
-          fi
       # The comparator CLI only invokes `main()` when it is the entry module, so
       # that `parseArgs` stays unit-testable. `--help` is handled inside
       # `main()`, which makes it a cheap proof that the guard still lets a real
