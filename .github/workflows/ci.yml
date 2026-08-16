@@ -89,6 +89,24 @@ jobs:
       # look like a clean rehearsal run.
       - name: Smoke test the migration comparator entry point
         run: pnpm migration:compare --help | grep -q -- '--target-max-pages'
+      # Same guard, same reason, for the Ghost card inventory: `parseArgs` and
+      # `main` are unit-tested through imports, so only a real invocation proves
+      # the entry check still fires. This one also gates a rehearsal step —
+      # `--fail-on-unhandled` is meant to stop a migration when a card has
+      # nowhere to land — and a guard that never runs `main()` would exit 0 and
+      # report a clean inventory for an export it never opened.
+      - name: Smoke test the Ghost card inventory entry point
+        run: pnpm inventory:ghost --help | grep -q -- '--fail-on-unhandled'
+      # The strict flag has to fail a real export, not just a unit test: the
+      # fixture carries an unhandled card, so a zero exit here means the gate
+      # would wave a lossy migration through.
+      - name: Verify the inventory gate fails on an unhandled card
+        run: |
+          if pnpm inventory:ghost --input tests/fixtures/ghost-card-gaps.json \
+            --fail-on-unhandled; then
+            echo "::error::inventory:ghost --fail-on-unhandled exited 0 despite an unhandled card"
+            exit 1
+          fi
       # Conflict fixture: duplicate slugs and missing authors/tags must still be
       # detected and reported, which is a dry-run-only expectation.
       - run: pnpm migrate:ghost --dry-run --input tests/fixtures/ghost-export.json
