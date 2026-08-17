@@ -45,7 +45,7 @@ export const Pages: CollectionConfig = {
     { name: 'featuredImage', type: 'upload', relationTo: 'media' },
     { name: 'metaTitle', type: 'text' },
     { name: 'metaDescription', type: 'textarea' },
-    { name: 'canonicalURL', type: 'text' },
+    { name: 'canonicalURL', label: 'Canonical URL', type: 'text' },
     {
       name: 'ghostID',
       type: 'text',

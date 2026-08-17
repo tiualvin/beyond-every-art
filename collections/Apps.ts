@@ -11,7 +11,7 @@ import { buildPreviewUrl } from '../lib/preview/live-preview'
  * Editorial content, not product data: an app is a document an editor writes
  * and advances, the same way they would a page. Nothing here has shipped, so
  * the collection has to be able to describe something that does not exist yet
- * — hence `status`, and hence store URLs that stay empty until there is
+ * — hence `stage`, and hence store URLs that stay empty until there is
  * somewhere to point them.
  *
  * `slug` deliberately skips `validateRootContentSlug`. These live under
@@ -152,11 +152,13 @@ export const Apps: CollectionConfig = {
     },
     {
       name: 'appStoreURL',
+      label: 'App Store URL',
       type: 'text',
       admin: { condition: (data) => data?.stage === 'available' },
     },
     {
       name: 'playStoreURL',
+      label: 'Play Store URL',
       type: 'text',
       admin: { condition: (data) => data?.stage === 'available' },
     },
