@@ -193,6 +193,44 @@ services:
       # the media rows in the database with no files behind them.
       - media_data:/app/media
 
+  # Nightly sweep that asks Stripe what it is actually billing and records the
+  # answer. Webhooks are an optimisation over polling, not a guarantee, and once
+  # Ghost is switched off nothing else is listening — so the cutover runbook
+  # requires this to be scheduled before Ghost's Stripe connection is removed.
+  #
+  # It stays inert, and says so in its log, until STRIPE_SECRET_KEY exists. That
+  # key arrives through the env file rather than being named below, so the
+  # secret is never written into a committed file or shown by
+  # `docker compose config`.
+  reconcile:
+    build:
+      context: .
+      target: reconciler
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: ${LOG_MAX_SIZE:-10m}
+        max-file: '${LOG_MAX_FILES:-3}'
+    # One short-lived Node process a day, holding a page of subscriptions and a
+    # page of members. It boots Payload, so it needs more than the backup job's
+    # `pg_dump | gzip` pipeline and much less than the app's image processing.
+    deploy:
+      resources:
+        limits:
+          memory: ${RECONCILE_MEMORY_LIMIT:-1g}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URI: ${DATABASE_URI:-postgresql://payload:payload@postgres:5432/beyond_every_art}
+      PAYLOAD_SECRET: ${PAYLOAD_SECRET}
+      RECONCILE_CRON: ${RECONCILE_CRON:-0 4 * * *}
+      RECONCILE_ON_START: ${RECONCILE_ON_START:-false}
+
   backup:
     build:
       context: .

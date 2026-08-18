@@ -98,12 +98,13 @@ one exclusion keeps covering it. Do not rely on the in-handler exemption that
 Follow the split the repo already uses for the backup pipeline (pure logic in
 `lib/`, I/O at the edges, a CLI for operational work):
 
-| Piece                                                   | Where                          |
-| ------------------------------------------------------- | ------------------------------ |
-| Signature verification, provider status → account state | `lib/billing/*.ts` (pure)      |
-| Unit tests for the above                                | `tests/billing/*.test.ts`      |
-| HTTP entry points                                       | `app/webhooks/*/route.ts`      |
-| Backfill and daily reconciliation                       | `scripts/reconcile-billing.ts` |
+| Piece                                                   | Where                            |
+| ------------------------------------------------------- | -------------------------------- |
+| Signature verification, provider status → account state | `lib/billing/*.ts` (pure)        |
+| Unit tests for the above                                | `tests/billing/*.test.ts`        |
+| HTTP entry points                                       | `app/webhooks/*/route.ts`        |
+| Backfill and daily reconciliation                       | `scripts/reconcile-billing.ts`   |
+| The schedule that runs it nightly                       | `docker/reconcile/entrypoint.sh` |
 
 The reconciliation script should take `--dry-run` and be safe to rerun, like
 `scripts/backup-database.ts` and the migration scripts.

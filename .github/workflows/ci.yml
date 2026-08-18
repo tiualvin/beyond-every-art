@@ -337,6 +337,24 @@ jobs:
       # discover it.
       - name: Build the migration image
         run: docker build --target migrator --tag beyond-every-art-migrator:ci .
+      # Same reasoning again for the reconciliation scheduler, which sits on top
+      # of the migrator stage and is likewise not reached by either build above.
+      # A container that only runs its entrypoint at 04:00 is one whose failures
+      # are easy to miss, so at least prove the image assembles.
+      - name: Build the reconciliation image
+        run: |
+          docker build --target reconciler --tag beyond-every-art-reconciler:ci .
+          docker run --rm --entrypoint sh beyond-every-art-reconciler:ci \
+            -c 'sh -n /usr/local/bin/reconcile-entrypoint.sh'
+      # The images are only half of it: the deploy runs `docker compose up`, so
+      # a service that names a stage that does not exist, or mistypes a key,
+      # fails on the VPS rather than here. Interpolation is checked too, which
+      # is why a placeholder secret is supplied — `config` renders the file, it
+      # does not start anything.
+      - name: Validate the Compose file
+        env:
+          PAYLOAD_SECRET: not-a-real-secret-compose-render-only
+        run: docker compose config --quiet
 
   deploy:
     # Only after all builds are proven good, and only for real pushes to main
