@@ -6,8 +6,10 @@
 // It builds the expected migration plan from a Ghost export, queries what
 // actually landed in Payload, and reports any discrepancy: missing posts,
 // pages, tags, or authors; drafts that became published (or vice versa); lost
-// feature images; changed slugs; or changed publication dates. Exits non-zero
-// when any discrepancy is found, so it can gate a cutover.
+// feature images; changed slugs; changed publication dates; or SEO metadata
+// (meta title, meta description, canonical URL, excerpt) the export carried and
+// the import did not preserve. Exits non-zero when any discrepancy is found, so
+// it can gate a cutover.
 //
 // Unlike the importer, validation must read the database, so there is no
 // --dry-run: it is already read-only.
@@ -52,6 +54,10 @@ interface RawDoc {
   _status?: string | null
   publishedAt?: string | null
   featuredImage?: unknown
+  metaTitle?: string | null
+  metaDescription?: string | null
+  canonicalURL?: string | null
+  excerpt?: string | null
 }
 
 function statusOf(doc: RawDoc): ContentStatus {
@@ -67,6 +73,10 @@ function toActualContent(docs: RawDoc[]): ActualContent[] {
       status: statusOf(doc),
       hasFeatureImage: Boolean(doc.featuredImage),
       publishedAt: doc.publishedAt ?? undefined,
+      metaTitle: doc.metaTitle ?? undefined,
+      metaDescription: doc.metaDescription ?? undefined,
+      canonicalURL: doc.canonicalURL ?? undefined,
+      excerpt: doc.excerpt ?? undefined,
     }))
 }
 
@@ -90,13 +100,21 @@ async function main() {
     status: p.status,
     hasFeatureImage: Boolean(p.featureImageURL),
     publishedAt: p.data.publishedAt,
+    metaTitle: p.data.metaTitle,
+    metaDescription: p.data.metaDescription,
+    canonicalURL: p.data.canonicalURL,
+    excerpt: p.data.excerpt,
   }))
+  // Pages carry no excerpt in the Ghost export, so the plan has none to check.
   const expectedPages = plan.pages.map((p) => ({
     ghostID: p.ghostID,
     slug: p.slug,
     status: p.status,
     hasFeatureImage: Boolean(p.featureImageURL),
     publishedAt: p.data.publishedAt,
+    metaTitle: p.data.metaTitle,
+    metaDescription: p.data.metaDescription,
+    canonicalURL: p.data.canonicalURL,
   }))
   const expectedTags = plan.tags.map((t) => ({
     ghostID: t.ghostID,
