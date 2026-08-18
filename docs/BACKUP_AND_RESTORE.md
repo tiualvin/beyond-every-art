@@ -102,6 +102,12 @@ pnpm backup:db --skip-upload --output ./beyond_every_art.sql.gz
 `pg_dump` and `psql` must be on `PATH` when running these on a host. Inside the
 `backup` container they are already installed.
 
+The last form needs no storage configuration at all — only `DATABASE_URI` and,
+if you want the archive encrypted, `BACKUP_ENCRYPTION_KEY`. Same for a restore
+from `--input-file`. Those are the commands reached for during an incident, on
+whichever machine can still reach the database, so they do not ask for
+credentials they never use.
+
 ## Restore procedure
 
 Restoring is **destructive** — it runs the dump's SQL against the target
