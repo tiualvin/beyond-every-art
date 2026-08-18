@@ -50,7 +50,16 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   app:
-    build: .
+    build:
+      context: .
+      # Passed as build arguments, not only through `env_file` below: Next.js
+      # bakes `NEXT_PUBLIC_*` into the client bundle during `pnpm build`, so a
+      # value supplied at container start arrives too late for the browser.
+      # Compose substitutes these from `.env` in this directory, which is the
+      # same file `env_file` reads, so both halves stay in step from one place.
+      args:
+        NEXT_PUBLIC_CHECKOUT_URL_MONTHLY: ${NEXT_PUBLIC_CHECKOUT_URL_MONTHLY:-}
+        NEXT_PUBLIC_CHECKOUT_URL_YEARLY: ${NEXT_PUBLIC_CHECKOUT_URL_YEARLY:-}
     restart: unless-stopped
     # Container logs are a fixed-size resource on this box. Docker's json-file
     # driver keeps them forever by default, so a noisy loop — or an
