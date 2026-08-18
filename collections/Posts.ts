@@ -104,7 +104,7 @@ export const Posts: CollectionConfig = {
     },
     { name: 'metaTitle', type: 'text' },
     { name: 'metaDescription', type: 'textarea' },
-    { name: 'canonicalURL', type: 'text' },
+    { name: 'canonicalURL', label: 'Canonical URL', type: 'text' },
     { name: 'featured', type: 'checkbox', defaultValue: false },
     {
       name: 'visibility',
@@ -119,7 +119,7 @@ export const Posts: CollectionConfig = {
       unique: true,
       index: true,
     },
-    { name: 'ghostURL', type: 'text' },
+    { name: 'ghostURL', label: 'Ghost URL', type: 'text' },
     {
       name: 'migrationStatus',
       type: 'select',

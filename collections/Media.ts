@@ -67,7 +67,13 @@ export const Media: CollectionConfig = {
           'answerable — filter on this to find them.',
       },
     },
-    { name: 'ghostURL', type: 'text', unique: true, index: true },
+    {
+      name: 'ghostURL',
+      label: 'Ghost URL',
+      type: 'text',
+      unique: true,
+      index: true,
+    },
     {
       name: 'migrationStatus',
       type: 'select',
