@@ -372,6 +372,7 @@ export const BookmarkBlock: Block = {
   fields: [
     {
       name: 'url',
+      label: 'URL',
       type: 'text',
       required: true,
       validate: (value: string | null | undefined) => {
@@ -421,6 +422,7 @@ export const EmbedBlock: Block = {
   fields: [
     {
       name: 'url',
+      label: 'URL',
       type: 'text',
       required: true,
       admin: {

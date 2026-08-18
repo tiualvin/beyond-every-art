@@ -1,14 +1,27 @@
-// Payload builds a field's admin label from its name by splitting on capitals,
-// so an initialism comes apart: `canonicalURL` renders as "Canonical U R L",
-// `ghostID` as "Ghost I D", `legacyHTML` as "Legacy H T M L". The fix is a
-// one-line explicit `label`, and the only hard part is noticing — the default
-// is generated at render time, so nothing fails until an editor reads it.
+// Payload derives a field's admin label from its name, and gets initialisms
+// wrong in two different ways.
 //
-// This test does the noticing. It asks Payload itself what label each field
-// would get (`toWords`, the same helper the admin UI uses), and fails on any
-// name whose default strands a letter unless the field declares a label that
-// does not. Collections and globals are read off disk rather than listed here,
-// so a new file is covered the day it lands.
+// It splits the name on capitals, so a capitalised initialism comes apart:
+// `canonicalURL` renders as "Canonical U R L", `ghostID` as "Ghost I D",
+// `legacyHTML` as "Legacy H T M L". And it title-cases what is left, so a
+// lowercase one is quietly downcased instead: `url` renders as "Url".
+//
+// Both are fixed by an explicit `label`, and the only hard part is noticing —
+// the default is generated at render time, so nothing fails until an editor
+// reads it.
+//
+// This test does the noticing. It asks Payload itself what each field would
+// render (`toWords`, the helper the admin UI calls), falls back to that when no
+// label is declared, and holds the result to two rules:
+//
+//   1. No stranded single letters. Catches the split, including initialisms
+//      nobody has registered below — `legacyXML` would fail on the day it
+//      landed.
+//   2. Every initialism in the name survives as one uppercase word. Catches
+//      "Url", which rule 1 cannot see because nothing is stranded.
+//
+// Collections, globals and blocks are read off disk rather than listed here, so
+// a new file is covered the day it lands.
 
 import { readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -17,8 +30,17 @@ import { describe, expect, it } from 'vitest'
 
 const root = resolve(import.meta.dirname, '../..')
 
+/** Directories holding field configs. Every `.ts` file in them is scanned. */
+const SOURCES = ['collections', 'globals', 'blocks']
+
+/** Initialisms this project writes into field names. Extend as they appear. */
+const INITIALISMS = ['URL', 'ID', 'HTML']
+
 /** A lone capital between spaces — "Canonical U R L" — is a split initialism. */
 const STRANDED_LETTER = /(^|\s)[A-Z](?=\s|$)/
+
+/** `stripeCustomerID` → `['stripe', 'Customer', 'ID']`, runs of caps intact. */
+const NAME_SEGMENT = /[A-Z]+(?![a-z])|[A-Z]?[a-z]+|\d+/g
 
 type NamedField = { name: string; label?: unknown }
 
@@ -53,15 +75,29 @@ function namedFields(fields: unknown): NamedField[] {
   })
 }
 
-/** The label strings a field actually renders; `false` hides the label. */
-function labelStrings(label: unknown): string[] {
+/** The initialisms a field name contains, as whole camelCase segments. */
+function initialismsIn(name: string): string[] {
+  const segments = name.match(NAME_SEGMENT) ?? []
+  return INITIALISMS.filter((initialism) =>
+    segments.some((segment) => segment.toUpperCase() === initialism),
+  )
+}
+
+/**
+ * The label strings a field actually renders. An explicit `label` wins; without
+ * one Payload generates the label, and that generated text is what an editor
+ * reads, so it is what gets checked.
+ */
+function renderedLabels(field: NamedField): string[] {
+  const { label } = field
+  if (label === false) return [] // Deliberately unlabelled; nothing renders.
   if (typeof label === 'string') return [label]
   if (label && typeof label === 'object') {
     return Object.values(label).filter(
       (value): value is string => typeof value === 'string',
     )
   }
-  return []
+  return [toWords(field.name)]
 }
 
 async function configuredFields(): Promise<
@@ -69,7 +105,7 @@ async function configuredFields(): Promise<
 > {
   const found: Array<{ source: string; field: NamedField }> = []
 
-  for (const dir of ['collections', 'globals']) {
+  for (const dir of SOURCES) {
     for (const file of readdirSync(resolve(root, dir))) {
       if (!file.endsWith('.ts')) continue
 
@@ -96,27 +132,29 @@ async function configuredFields(): Promise<
 }
 
 describe('Payload admin field labels', () => {
-  it('never splits an initialism across the admin UI', async () => {
+  it('renders every initialism as one uppercase word', async () => {
     const fields = await configuredFields()
 
     // Guards the discovery above: an empty walk would pass the loop silently.
     expect(fields.length).toBeGreaterThan(50)
 
     for (const { source, field } of fields) {
-      const generated = toWords(field.name)
-      if (!STRANDED_LETTER.test(generated)) continue
+      const where = `${source}.${field.name}`
 
-      const labels = labelStrings(field.label)
-      expect(
-        field.label === false || labels.length > 0,
-        `${source}.${field.name} has no label, so the admin renders "${generated}"`,
-      ).toBe(true)
+      for (const label of renderedLabels(field)) {
+        const rendered = `renders as "${label}"; set an explicit label`
 
-      for (const label of labels) {
         expect(
           STRANDED_LETTER.test(label),
-          `${source}.${field.name} label "${label}" splits an initialism`,
+          `${where} ${rendered} — an initialism is split apart`,
         ).toBe(false)
+
+        for (const initialism of initialismsIn(field.name)) {
+          expect(
+            new RegExp(`\\b${initialism}\\b`).test(label),
+            `${where} ${rendered} — ${initialism} is not written as ${initialism}`,
+          ).toBe(true)
+        }
       }
     }
   })
