@@ -36,6 +36,23 @@ updates:
         update-types: ['version-update:semver-major']
       - dependency-name: 'typescript'
         update-types: ['version-update:semver-major']
+      # These two are held by something outside their own release notes, and
+      # each already has a test saying so — but nothing here was stopping
+      # Dependabot from re-proposing them, so the same rejected pull request
+      # came back the week after it was closed.
+      #
+      # `eslint`: 10 cannot start at all while `eslint-config-next` is on 15
+      # (@rushstack/eslint-patch refuses it). It unblocks with Next 16, which
+      # `next` above already gates. See tests/scripts/eslint-major.test.ts.
+      #
+      # `@types/node`: the major tracks the Node this project runs, not the
+      # newest published — types ahead of the runtime compile calls that throw
+      # in production. It moves when `.nvmrc` does. See
+      # tests/scripts/node-types.test.ts.
+      - dependency-name: 'eslint'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: github-actions
     directory: /
