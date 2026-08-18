@@ -24,6 +24,18 @@ CMD ["pnpm", "migrate:db"]
 FROM base AS builder
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
+# `NEXT_PUBLIC_*` values are read at build time, not at run time: Next.js
+# substitutes them into the client bundle during `pnpm build`, so a value that
+# only arrives later through Compose's `env_file` is never seen by the browser.
+# The checkout URLs are the case that matters — `checkoutUrl()` in
+# lib/membership.ts runs inside a client component (`site-chrome.tsx`), and
+# without these the subscribe modal silently renders "not open yet" on a
+# correctly configured host. Empty defaults keep the build working when they are
+# unset, which is the honest result: no link configured, so no button.
+ARG NEXT_PUBLIC_CHECKOUT_URL_MONTHLY=""
+ARG NEXT_PUBLIC_CHECKOUT_URL_YEARLY=""
+ENV NEXT_PUBLIC_CHECKOUT_URL_MONTHLY=$NEXT_PUBLIC_CHECKOUT_URL_MONTHLY
+ENV NEXT_PUBLIC_CHECKOUT_URL_YEARLY=$NEXT_PUBLIC_CHECKOUT_URL_YEARLY
 RUN pnpm build
 
 FROM node:20-alpine AS runner

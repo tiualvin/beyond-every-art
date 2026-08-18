@@ -6,9 +6,12 @@ was refunded — from Stripe (website), the App Store, and Google Play.
 The account model this feeds is in [`ACCOUNT_MODEL.md`](ACCOUNT_MODEL.md): every
 source below resolves to one `subscriptionStatus` on one account record.
 
-**Stripe is the urgent one.** Ghost currently receives Stripe's webhooks for the
-existing paying members. When Ghost is switched off, nothing does — see
-[Taking over from Ghost](#taking-over-from-ghost). The App Store and Play
+**Stripe is the urgent one.** Ghost currently receives Stripe's webhooks, and
+when Ghost is switched off, nothing does — see
+[Taking over from Ghost](#taking-over-from-ghost), which also records what the
+live Stripe account actually contained when last checked (as of 2026-08-18: no
+subscribers, so the handover is about not losing _future_ events rather than
+rescuing existing ones). The App Store and Play
 sections apply when the apps ship.
 
 External specifics below (retry schedules, deadlines, free-tier limits) were
@@ -174,7 +177,31 @@ Rather than trusting the payload's snapshot, re-fetch the subscription by ID and
 write the current `status` and `current_period_end` onto the account. That makes
 out-of-order delivery harmless.
 
+**Do not copy Ghost's event selection.** Ghost's endpoint subscribes to
+`invoice.payment_succeeded`; this codebase handles `invoice.paid`
+(`HANDLED_STRIPE_EVENT_TYPES` in `lib/billing/stripe-events.ts`). They are
+different event types, and picking the wrong one is silent: every renewal would
+be stored and then marked `ignored` with reason `unhandled_type`, so the
+`billing-events` collection fills up while no subscription state ever changes.
+Ghost also subscribes to neither `invoice.payment_failed` nor
+`charge.dispute.created`, so mirroring its list drops dunning and dispute
+handling too. Select the events from the table above, not from Ghost's endpoint.
+
 ### Taking over from Ghost
+
+> **Checked against the live Stripe account on 2026-08-18: there is nothing to
+> back fill.** `Beyond Every Art, LLC` (`acct_1Qi2PC...`) holds **zero
+> customers, zero subscriptions, and zero charges — no payment has ever been
+> taken.** The steps below were written expecting a book of live subscribers
+> inherited from Ghost; that book is empty, so the backfill is a no-op and the
+> "renewals keep charging customers" risk does not currently exist. Re-check
+> before cutover rather than trusting this note, but do not plan the migration
+> around a subscriber list that is not there.
+>
+> What _is_ real: the only webhook endpoint on the account is Ghost's
+> (`https://www.beyondeveryart.com/members/webhooks/stripe/`, pinned to API
+> version `2020-08-27`), and it must be replaced by ours — see the event-name
+> trap below.
 
 Ghost owns this integration today. Before Ghost is cancelled:
 

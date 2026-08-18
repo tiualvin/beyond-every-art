@@ -101,19 +101,43 @@ explained without a manual Stripe audit.
 - [ ] Webhook endpoint created in **our** Stripe account, pointing at
       `https://<domain>/webhooks/stripe`, subscribed to the events listed in
       [`SUBSCRIPTION_WEBHOOKS.md`](SUBSCRIPTION_WEBHOOKS.md#stripe-website).
+- [ ] Endpoint subscribed to `invoice.paid` — **not** `invoice.payment_succeeded`,
+      which is what Ghost's endpoint uses. They are different event types and the
+      wrong one fails silently: renewals get stored and marked `ignored`
+      (`unhandled_type`) while no subscription state ever changes. Ghost's
+      selection also omits `invoice.payment_failed` and `charge.dispute.created`.
+      Do not copy Ghost's list.
 - [ ] Endpoint verified end to end: send a test event from the Stripe dashboard
       (or `stripe trigger` via the CLI), confirm a `2xx` in Stripe's delivery
       log and a matching row in the `billing-events` collection.
-      Remember the endpoint must be publicly reachable over HTTPS — it cannot be
-      verified while `STAGING_BASIC_AUTH` gates the deployment, even though
-      middleware itself skips `/webhooks`.
-- [ ] Backfill dry run: `pnpm reconcile:billing --dry-run`. It lists Stripe's
-      active, trialing, and past-due subscriptions and matches them to members
-      by `stripeCustomerID` / `stripeSubscriptionID`.
+      The endpoint must be publicly reachable over HTTPS. `STAGING_BASIC_AUTH`
+      does _not_ block it — that gate lives in `middleware.ts`, whose matcher
+      excludes `webhooks` — so a staging host can receive real deliveries. That
+      is the reason to be careful rather than relaxed: point a live endpoint at
+      staging and live billing events land in the rehearsal database. Verify
+      against a sandbox endpoint, or after cutover, not against live-on-staging.
+- [ ] Checkout links present **at image build time**, not merely in `.env`.
+      `NEXT_PUBLIC_CHECKOUT_URL_MONTHLY` / `_YEARLY` are substituted into the
+      client bundle by `pnpm build`; docker-compose.yml passes them as build
+      arguments, so the deploy must run `docker compose up -d --build`. Setting
+      them and only restarting leaves the subscribe modal saying "paid
+      membership is not open yet" on a correctly configured host, with nothing
+      in the logs to say why.
+- [ ] Backfill dry run, via the `migrate` service:
+      `docker compose run --rm migrate pnpm reconcile:billing --dry-run`.
+      It lists Stripe's active, trialing, and past-due subscriptions and matches
+      them to members by `stripeCustomerID` / `stripeSubscriptionID`.
+      Run it through the `migrate` service rather than on the host: the script
+      loads nothing from `.env` by itself (no dotenv anywhere in `scripts/`), and
+      that service is the one image carrying tsx, the sources, and `env_file`.
+      Running `pnpm reconcile:billing` directly on the VPS fails on the missing
+      `STRIPE_SECRET_KEY` guard. Locally, `set -a; source .env; set +a` first.
 - [ ] Every difference in that report explained (`differences` is empty, or each
       entry has a written answer). It exits non-zero while any remain.
-- [ ] Backfill for real: `pnpm reconcile:billing`, which records what Stripe
-      currently says for each subscription.
+- [ ] Backfill for real: `docker compose run --rm migrate pnpm reconcile:billing`,
+      which records what Stripe currently says for each subscription. As of
+      2026-08-18 the live account has no subscriptions at all, so expect an empty
+      report and treat anything else as a surprise worth understanding.
 - [ ] Daily reconciliation scheduled (cron or the `backup` container's
       scheduler) with alerting on a non-zero exit — webhooks are an optimisation
       over polling, not a guarantee.
