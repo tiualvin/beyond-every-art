@@ -15,7 +15,7 @@ export const Footer: GlobalConfig = {
       type: 'array',
       fields: [
         { name: 'label', type: 'text', required: true },
-        { name: 'url', type: 'text', required: true },
+        { name: 'url', label: 'URL', type: 'text', required: true },
       ],
     },
   ],
