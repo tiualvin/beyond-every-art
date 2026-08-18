@@ -23,7 +23,13 @@ export const Authors: CollectionConfig = {
     { name: 'bio', type: 'textarea' },
     { name: 'profileImage', type: 'upload', relationTo: 'media' },
     { name: 'website', type: 'text' },
-    { name: 'ghostID', type: 'text', unique: true, index: true },
+    {
+      name: 'ghostID',
+      label: 'Ghost ID',
+      type: 'text',
+      unique: true,
+      index: true,
+    },
     {
       name: 'cmsUser',
       type: 'relationship',

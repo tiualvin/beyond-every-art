@@ -24,6 +24,12 @@ export const Tags: CollectionConfig = {
     { name: 'featuredImage', type: 'upload', relationTo: 'media' },
     { name: 'metaTitle', type: 'text' },
     { name: 'metaDescription', type: 'textarea' },
-    { name: 'ghostID', type: 'text', unique: true, index: true },
+    {
+      name: 'ghostID',
+      label: 'Ghost ID',
+      type: 'text',
+      unique: true,
+      index: true,
+    },
   ],
 }

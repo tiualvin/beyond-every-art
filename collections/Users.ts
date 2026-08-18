@@ -42,6 +42,12 @@ export const Users: CollectionConfig = {
     },
     { name: 'bio', type: 'textarea' },
     { name: 'website', type: 'text' },
-    { name: 'ghostID', type: 'text', unique: true, index: true },
+    {
+      name: 'ghostID',
+      label: 'Ghost ID',
+      type: 'text',
+      unique: true,
+      index: true,
+    },
   ],
 }

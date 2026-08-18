@@ -11,6 +11,6 @@ export const SiteSettings: GlobalConfig = {
   fields: [
     { name: 'title', type: 'text', required: true },
     { name: 'description', type: 'textarea' },
-    { name: 'canonicalURL', type: 'text' },
+    { name: 'canonicalURL', label: 'Canonical URL', type: 'text' },
   ],
 }
