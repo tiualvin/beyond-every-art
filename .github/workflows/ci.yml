@@ -158,6 +158,59 @@ jobs:
           jq -e '.created == 0 and .updated == 4 and (.errors | length) == 0' members-report.json > /dev/null
           test "$(psql "$DATABASE_URI" -tAc 'SELECT count(*) FROM members')" = 4
           test "$(psql "$DATABASE_URI" -tAc "SELECT count(*) FROM members WHERE status = 'paid'")" = 2
+      # "A database backup has been successfully restored" is an acceptance
+      # criterion, and it was a thing someone did once by hand. A backup nobody
+      # has restored is a hope, and the failure modes are quiet ones: a dump
+      # that streams to a truncated file, an archive that decompresses but
+      # replays with errors, a passphrase the restore cannot use.
+      #
+      # This runs the real production shape — encrypted, gzipped, restored
+      # through psql with ON_ERROR_STOP — against the database the steps above
+      # just filled, and restores into a scratch database so the source stays
+      # intact to compare against. Both scripts run fully offline here
+      # (`--skip-upload --output`, `--input-file --target`), so no bucket and no
+      # credentials are involved: what is being tested is the archive and the
+      # restore, not R2's availability today.
+      - name: Restore drill — back up, restore into a scratch database, compare
+        env:
+          RESTORE_TARGET: postgresql://payload:payload@localhost:5432/restore_drill
+        run: |
+          # A dump is a copy of every member record. Even here, where the
+          # database holds fixtures, it is written outside the checkout so the
+          # habit does not travel to a machine where it holds real ones.
+          drill="$RUNNER_TEMP/restore-drill"
+          mkdir -p "$drill"
+          export BACKUP_ENCRYPTION_KEY="$(openssl rand -base64 32)"
+          pnpm --silent backup:db --skip-upload --output "$drill/db.sql.gz.enc" \
+            > "$drill/backup-report.json"
+          jq -e '.encrypted == true and .uploaded == false' "$drill/backup-report.json" > /dev/null
+          psql "$DATABASE_URI" -q -c 'DROP DATABASE IF EXISTS restore_drill' \
+            -c 'CREATE DATABASE restore_drill OWNER payload'
+          # DATABASE_URI is dropped for this one command, and no S3_* variable
+          # exists anywhere in this job: both halves of a file-to-target restore
+          # run on nothing but the archive and the target, which is what a
+          # recovery machine will have.
+          env -u DATABASE_URI pnpm --silent restore:db --input-file "$drill/db.sql.gz.enc" \
+            --target "$RESTORE_TARGET" --yes > "$drill/restore-report.json"
+          jq -e '.encrypted == true and .restored == true' "$drill/restore-report.json" > /dev/null
+          # Every table named here is filled by the steps above, so a zero row
+          # count means the drill compared nothing and called it a match.
+          for table in posts pages tags authors members payload_migrations; do
+            source_rows=$(psql "$DATABASE_URI" -tAc "SELECT count(*) FROM $table")
+            restored_rows=$(psql "$RESTORE_TARGET" -tAc "SELECT count(*) FROM $table")
+            if [ "$source_rows" != "$restored_rows" ] || [ "$source_rows" = 0 ]; then
+              echo "::error::$table: $source_rows rows backed up, $restored_rows restored"
+              exit 1
+            fi
+          done
+          # Matching row counts say the rows arrived, not that they arrived
+          # intact. Point the validator at the restored copy and it has to
+          # reach the same verdict it reached on the original.
+          DATABASE_URI="$RESTORE_TARGET" pnpm migrate:validate \
+            --input tests/fixtures/ghost-export-clean.json \
+            --report "$drill/validation.json"
+          jq -e '.ok == true' "$drill/validation.json" > /dev/null
+          rm -rf "$drill"
       - run: pnpm build
 
   audit:
