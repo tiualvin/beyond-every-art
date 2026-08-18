@@ -1,0 +1,5 @@
+id,email,name,note,subscribed_to_emails,complimentary_plan,status,stripe_customer_id,stripe_subscription_id,created_at,updated_at,labels
+member-1,ada@example.com,Ada Lovelace,"Prefers letterpress, not screens",true,false,free,,,2023-05-01T09:00:00.000Z,2024-01-04T09:00:00.000Z,"founding, print"
+member-2,Grace@Example.com,Grace Hopper,,true,false,paid,cus_example2,sub_example2,2023-06-11T09:00:00.000Z,2024-02-01T09:00:00.000Z,supporter
+member-3,katherine@example.com,Katherine Johnson,"Said ""send the proofs first""",false,true,,,,2023-07-20T09:00:00.000Z,2024-02-14T09:00:00.000Z,
+member-4,mary@example.com,Mary Jackson,,true,false,,cus_example4,sub_example4,2023-08-02T09:00:00.000Z,2024-03-09T09:00:00.000Z,

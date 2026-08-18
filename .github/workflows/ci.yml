@@ -126,6 +126,38 @@ jobs:
         run: |
           pnpm migrate:validate --input tests/fixtures/ghost-export-clean.json
           jq -e '.ok == true' validation-report.json > /dev/null
+      # The members CSV is the one Ghost export produced by hand, at cutover
+      # time, from a live admin screen — so its write path must not be first
+      # exercised there. Both fixtures are synthetic, and named clear of
+      # `.gitignore`'s `ghost-members*.csv` rule, which is there to stop a real
+      # member export ever being committed.
+      #
+      # The conflict fixture proves the dry run names colliding CSV lines while
+      # they are still free to fix: email and ghostID are unique in the
+      # collection, so a real import that meets a collision is rejected by
+      # Postgres part-way through, with some members written and the rest not.
+      - name: Report member CSV conflicts without importing
+        run: |
+          pnpm migrate:members --dry-run --input tests/fixtures/members-conflicts.csv
+          jq -e '.conflicts.duplicateEmails == [{"rows": [2, 4]}]' members-report.json > /dev/null
+          jq -e '.conflicts.duplicateGhostIDs == [{"rows": [3, 5]}]' members-report.json > /dev/null
+          jq -e '.skipped == [{"row": 6, "reason": "missing email address"}]' members-report.json > /dev/null
+          jq -e '.warnings | length == 2' members-report.json > /dev/null
+      # And the clean fixture proves the import itself. Twice, so the upsert on
+      # `ghostID` is demonstrated to be rerunnable rather than assumed, and the
+      # unique indexes are actually met. The row counts are read back from
+      # PostgreSQL as a second opinion on the script's own report: two members
+      # are `paid` only because the mapper derived it from a Stripe customer id
+      # and an explicit status, which is the part worth proving against the
+      # real column rather than a stub.
+      - name: Import the members fixture into the CI database
+        run: |
+          pnpm migrate:members --input tests/fixtures/members-clean.csv
+          jq -e '.created == 4 and .updated == 0 and (.errors | length) == 0' members-report.json > /dev/null
+          pnpm migrate:members --input tests/fixtures/members-clean.csv
+          jq -e '.created == 0 and .updated == 4 and (.errors | length) == 0' members-report.json > /dev/null
+          test "$(psql "$DATABASE_URI" -tAc 'SELECT count(*) FROM members')" = 4
+          test "$(psql "$DATABASE_URI" -tAc "SELECT count(*) FROM members WHERE status = 'paid'")" = 2
       - run: pnpm build
 
   audit:
