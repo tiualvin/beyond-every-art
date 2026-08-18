@@ -57,7 +57,7 @@ export const BillingEvents: CollectionConfig = {
       defaultValue: 'stripe',
       options: ['stripe', 'revenuecat'],
     },
-    { name: 'eventID', type: 'text', required: true },
+    { name: 'eventID', label: 'Event ID', type: 'text', required: true },
     { name: 'type', type: 'text', required: true },
     {
       name: 'source',
@@ -82,8 +82,13 @@ export const BillingEvents: CollectionConfig = {
       defaultValue: false,
       admin: { description: 'False for test-mode events.' },
     },
-    { name: 'subscriptionID', type: 'text', index: true },
-    { name: 'customerID', type: 'text', index: true },
+    {
+      name: 'subscriptionID',
+      label: 'Subscription ID',
+      type: 'text',
+      index: true,
+    },
+    { name: 'customerID', label: 'Customer ID', type: 'text', index: true },
     {
       name: 'processingState',
       type: 'select',

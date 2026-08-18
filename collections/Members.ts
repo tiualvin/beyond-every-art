@@ -20,6 +20,7 @@ export const Members: CollectionConfig = {
   fields: [
     {
       name: 'ghostID',
+      label: 'Ghost ID',
       type: 'text',
       required: true,
       unique: true,
@@ -43,8 +44,17 @@ export const Members: CollectionConfig = {
     { name: 'ghostUpdatedAt', type: 'date' },
     { name: 'labels', type: 'json' },
     { name: 'newsletters', type: 'json' },
-    { name: 'stripeCustomerID', type: 'text', index: true },
-    { name: 'stripeSubscriptionID', type: 'text' },
+    {
+      name: 'stripeCustomerID',
+      label: 'Stripe Customer ID',
+      type: 'text',
+      index: true,
+    },
+    {
+      name: 'stripeSubscriptionID',
+      label: 'Stripe Subscription ID',
+      type: 'text',
+    },
     {
       name: 'rawGhostData',
       type: 'json',

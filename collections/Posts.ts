@@ -86,6 +86,7 @@ export const Posts: CollectionConfig = {
     { name: 'content', type: 'richText', editor: contentEditor },
     {
       name: 'legacyHTML',
+      label: 'Legacy HTML',
       type: 'code',
       admin: { language: 'html' },
       // `toBodyHtml` hands this straight to `dangerouslySetInnerHTML`, so
@@ -114,6 +115,7 @@ export const Posts: CollectionConfig = {
     },
     {
       name: 'ghostID',
+      label: 'Ghost ID',
       type: 'text',
       required: true,
       unique: true,
