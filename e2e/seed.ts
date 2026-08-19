@@ -141,6 +141,96 @@ async function upsertRedirect(payload: Payload): Promise<void> {
   } as unknown as CreateOptions)
 }
 
+/**
+ * A user and an MCP key bound to it, for the endpoint smoke suite.
+ *
+ * Written through the Local API with `overrideAccess: true`, so the field
+ * access that `adminIssuableApiKeys` governs in the admin panel does not apply
+ * here — the seed is not the path being tested. What is being tested is that
+ * the endpoint resolves the key, runs as this user, and lets `access/roles.ts`
+ * decide the rest.
+ *
+ * `apiKeyIndex` is derived by Payload from `apiKey` and `PAYLOAD_SECRET` on
+ * save, which is the same HMAC the plugin looks a presented bearer key up by —
+ * so seeding the plaintext is enough to make the key work.
+ */
+async function upsertKeyedUser(
+  payload: Payload,
+  { email, key, role }: { email: string; key: string; role: string },
+): Promise<void> {
+  const existing = await payload.find({
+    collection: 'users',
+    where: { email: { equals: email } },
+    limit: 1,
+    depth: 0,
+    overrideAccess: true,
+  })
+
+  const user =
+    existing.docs[0] ??
+    (await payload.create({
+      collection: 'users',
+      data: {
+        email,
+        name: `E2E MCP ${role}`,
+        password: fixtures.mcp.password,
+        role,
+      },
+      overrideAccess: true,
+    } as unknown as CreateOptions))
+
+  const capabilities = {
+    // Mirrors the plugin's allowlist in `lib/mcp/plugin.ts`. A capability the
+    // config does not enable has no checkbox, so ticking it here would be a
+    // field that does not exist.
+    authors: { find: true },
+    media: { find: true },
+    posts: { create: true, find: true, update: true },
+    tags: { find: true, update: true },
+    // Custom tools default to enabled on a new key; set explicitly so the
+    // suite does not depend on that default staying put.
+    'payload-mcp-tool': {
+      draftArticle: true,
+      readArticleMarkdown: true,
+      updateArticleMarkdown: true,
+      uploadMedia: true,
+    },
+  }
+
+  const keys = await payload.find({
+    collection: 'payload-mcp-api-keys',
+    where: { label: { equals: email } },
+    limit: 1,
+    depth: 0,
+    overrideAccess: true,
+  })
+
+  const data = {
+    ...capabilities,
+    apiKey: key,
+    description: 'Synthetic key for the Playwright MCP endpoint suite.',
+    enableAPIKey: true,
+    label: email,
+    user: user.id,
+  }
+
+  if (keys.docs[0]) {
+    await payload.update({
+      collection: 'payload-mcp-api-keys',
+      id: keys.docs[0].id,
+      data,
+      overrideAccess: true,
+    } as unknown as UpdateOptions)
+    return
+  }
+
+  await payload.create({
+    collection: 'payload-mcp-api-keys',
+    data,
+    overrideAccess: true,
+  } as unknown as CreateOptions)
+}
+
 async function seed(): Promise<void> {
   assertSafeDatabase()
   const payload = await getPayload({ config })
@@ -187,9 +277,21 @@ async function seed(): Promise<void> {
 
   await upsertDraftApp(payload)
   await upsertRedirect(payload)
+
+  await upsertKeyedUser(payload, {
+    email: fixtures.mcp.editorEmail,
+    key: fixtures.mcp.editorKey,
+    role: 'editor',
+  })
+  await upsertKeyedUser(payload, {
+    email: fixtures.mcp.adminEmail,
+    key: fixtures.mcp.adminKey,
+    role: 'admin',
+  })
+
   payload.logger.info(
     'E2E seed complete: draft, members post, duplicate-title post, ' +
-      'draft app, redirect.',
+      'draft app, redirect, MCP keys.',
   )
 }
 
