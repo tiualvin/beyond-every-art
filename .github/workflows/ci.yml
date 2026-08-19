@@ -2,7 +2,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main, work]
+    branches: [main]
 permissions:
   contents: read
 jobs:
@@ -255,7 +255,9 @@ jobs:
 
   deploy:
     # Only after all builds are proven good, and only for real pushes to main
-    # (not pull requests, and not the `work` branch CI also runs on).
+    # (not pull requests). When a `production` branch is added at cutover, this
+    # job and the push trigger above both need it — see
+    # docs/BRANCHING_AND_ENVIRONMENTS.md.
     needs: [checks, browser-smoke, backup-image, app-image]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
