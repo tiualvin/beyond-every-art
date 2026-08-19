@@ -155,6 +155,10 @@ to the Claude connector. See [`MCP_SERVER.md`](MCP_SERVER.md).
    `backup-image`, and `app-image` jobs and disallow bypasses appropriate to
    the team. The workflow does not mutate repository protection rules or infer
    who should have bypass authority.
+   [`BRANCHING_AND_ENVIRONMENTS.md`](BRANCHING_AND_ENVIRONMENTS.md) records the
+   settings for both branches, and the rest of the branch model this deploy
+   path implies — including what has to change in the deploy job at cutover,
+   when `main` stops being the branch that deploys to this box.
 6. **Lower priority / only if needed later:**
    - Move the image build off the production VPS (build in CI, push to a
      registry, VPS just pulls) if frequent merges start causing noticeable

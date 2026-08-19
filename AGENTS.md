@@ -127,7 +127,11 @@ that is expensive to reverse after a recrawl.
 **Package work as one pull request with one commit per change.** Related fixes
 travel together so they are reviewed in context, and each stays independently
 revertible. Drive CI to green before merging; a red `checks` job is never
-something to merge past.
+something to merge past. Branch from `main`, keep the branch short-lived, and
+delete it on merge;
+[`docs/BRANCHING_AND_ENVIRONMENTS.md`](docs/BRANCHING_AND_ENVIRONMENTS.md) has
+the promotion model, and why a schema change is expand-then-contract when a
+revert has to stay possible.
 
 **Write down what you learn where it is enforced.** Prose drifts. When a fact
 matters — an invariant, a constraint, a reason a thing is not the obvious
