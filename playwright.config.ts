@@ -26,7 +26,23 @@ const rateLimitOverrides = {
   RATE_LIMIT_SIGNUP_PER_HOUR: '10000',
   RATE_LIMIT_SEARCH_PER_MINUTE: '10000',
   RATE_LIMIT_SEARCH_SUGGEST_PER_MINUTE: '10000',
+  RATE_LIMIT_MCP_PER_MINUTE: '10000',
+  // `mcp.spec.ts` presents wrong keys on purpose, and the production allowance
+  // is ten failures per source address per fifteen minutes. Loopback sends no
+  // `X-Forwarded-For`, so the whole suite shares one bucket — and once it is
+  // spent every MCP request from this address is refused, valid key included,
+  // which would turn two retries into a cascade of unrelated failures. The
+  // limiter's own behaviour is covered in `tests/mcp/rate-limit.test.ts`.
+  RATE_LIMIT_MCP_AUTH_FAILURES: '10000',
 }
+
+/**
+ * The MCP endpoint is not mounted unless this is set, so without it the suite
+ * would assert against Payload's 404 and pass while proving nothing. Enabling
+ * it here rather than in the seed keeps it to the test server: neither the
+ * Docker image nor a deployment gains an endpoint from a test config.
+ */
+const mcpEnvironment = { MCP_ENABLED: '1' }
 
 const productionServer = {
   command: 'node .next/standalone/server.js',
@@ -34,12 +50,13 @@ const productionServer = {
     HOSTNAME: '127.0.0.1',
     NODE_ENV: 'production',
     PORT: '3000',
+    ...mcpEnvironment,
     ...rateLimitOverrides,
   },
 }
 const developmentServer = {
   command: 'pnpm exec next dev --hostname 127.0.0.1 --port 3000',
-  env: { ...rateLimitOverrides },
+  env: { ...mcpEnvironment, ...rateLimitOverrides },
 }
 
 export default defineConfig({

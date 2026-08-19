@@ -32,6 +32,28 @@ export const fixtures = {
     slug: 'e2e-unpublished-app',
     title: 'E2E Unpublished App',
   },
+  // MCP keys for the endpoint smoke suite. Both are literals rather than
+  // generated values because the spec has to present them, and the seed runs in
+  // a different process — they are only ever valid against a disposable test
+  // database that `assertSafeDatabase` refuses to leave localhost for.
+  //
+  // Two roles, because the interesting behaviour is the difference between
+  // them: the editor key may draft and may not publish, and the whole publish
+  // guard is that one distinction.
+  mcp: {
+    editorKey: 'e2e-mcp-editor-key-2f9c4a17d05b48e1',
+    editorEmail: 'e2e-mcp-editor@example.test',
+    adminKey: 'e2e-mcp-admin-key-7b1ec3d94a6f2085',
+    adminEmail: 'e2e-mcp-admin@example.test',
+    password: 'e2e-mcp-Password-1!',
+    /** Collections that must have no tool at all, whatever a key allows. */
+    forbiddenCollections: [
+      'members',
+      'billingEvents',
+      'newsletterSignups',
+      'users',
+    ],
+  },
   redirect: {
     source: '/e2e-legacy-white-pigments/',
     destination: '/titanium-white-vs-lead-white/',

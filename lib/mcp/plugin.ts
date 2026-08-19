@@ -18,12 +18,14 @@
 import { mcpPlugin, type MCPPluginConfig } from '@payloadcms/plugin-mcp'
 import type { PayloadRequest, Plugin } from 'payload'
 
+import { adminIssuableApiKeys } from './api-keys'
 import {
   logMcpEvent,
   mcpAuthLogEntry,
   mcpEventLogEntry,
   mcpRefusedLogEntry,
 } from './audit'
+import { methodNotAllowedError, rateLimitedError } from './errors'
 import {
   clientKey,
   configuredLimit,
@@ -139,6 +141,13 @@ export const mcpPluginConfig: MCPPluginConfig = {
   // before. This adds what the endpoint needs now that it is reachable from
   // the internet — a bound on request volume, and a record of which key acted.
   overrideAuth: async (req, getDefaultMcpAccessSettings) => {
+    // Refused before anything is spent on it. The plugin registers `GET` only
+    // to answer "Method not allowed", but routes it through this hook first —
+    // so an unauthenticated probe would otherwise cost a key lookup and a
+    // failed-authentication count against a source address shared by every MCP
+    // caller behind the same vendor cloud. See `methodNotAllowedError`.
+    if (req.method?.toUpperCase() === 'GET') throw methodNotAllowedError()
+
     const caller = rateLimitKey(req.headers.get('Authorization'))
     const source = clientKey(req.headers)
 
@@ -150,7 +159,7 @@ export const mcpPluginConfig: MCPPluginConfig = {
       logMcpEvent(
         mcpRefusedLogEntry({ caller, reason: 'rate_limited', retryAfter }),
       )
-      throw new Error(
+      throw rateLimitedError(
         `Rate limit exceeded for this MCP key. Try again in ${retryAfter} seconds.`,
       )
     }
@@ -164,7 +173,7 @@ export const mcpPluginConfig: MCPPluginConfig = {
       logMcpEvent(
         mcpRefusedLogEntry({ caller, reason: 'rate_limited', retryAfter }),
       )
-      throw new Error(
+      throw rateLimitedError(
         `Too many failed MCP authentications from this address. Try again in ${retryAfter} seconds.`,
       )
     }
@@ -205,6 +214,11 @@ export const mcpPluginConfig: MCPPluginConfig = {
 
     return settings
   },
+  // Without this the documented setup is impossible. The plugin binds a key to
+  // whoever creates it and hides it from everyone else; `adminIssuableApiKeys`
+  // is what lets an administrator issue an editor-bound key and revoke any key
+  // afterwards. No field is added or removed, so the schema is unchanged.
+  overrideApiKeyCollection: adminIssuableApiKeys,
   userCollection: 'users',
 }
 

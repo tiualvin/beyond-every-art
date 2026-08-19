@@ -13,10 +13,14 @@
 - **What it deliberately cannot reach:** `members`, `billing-events`,
   `newsletter-signups`, `users`, and every global. Deleting articles is off.
 - **How to turn it on:** [What is built](#what-is-built).
-- **Still open:** ChatGPT needs OAuth, which is not built —
-  [Client configuration](#client-configuration). And the `ghostID` relaxation
-  waits on the final Ghost import, though drafting no longer depends on it —
-  [Finding 2](#finding-2-ghostid-blocks-authoring-new-articles--resolved).
+- **Still open:** ChatGPT's auth options have changed since this was written and
+  the "needs OAuth" conclusion is very likely stale — it wants re-testing before
+  anyone builds anything, see [Client configuration](#client-configuration). The
+  `ghostID` relaxation waits on the final Ghost import, though drafting no longer
+  depends on it —
+  [Finding 2](#finding-2-ghostid-blocks-authoring-new-articles--resolved). And
+  no key carries an expiry or a last-used stamp —
+  [Finding 10](#finding-10-key-lifecycle--open).
 - **Unchanged constraint:** none of this may displace migration or cutover work.
   See [`docs/CUTOVER_RUNBOOK.md`](CUTOVER_RUNBOOK.md).
 
@@ -25,7 +29,17 @@
 Configuration lives in [`lib/mcp/`](../lib/mcp): `plugin.ts` (allowlist, rate
 limit, request logging), `tools.ts` (the drafting tools), `markdown.ts`
 (Markdown ⇄ Lexical), `response.ts` (keeping bodies out of find responses),
-`publish-guard.ts`, `rate-limit.ts`, and `audit.ts`.
+`api-keys.ts` (who may issue and revoke a key), `errors.ts` (the shape of a
+refusal), `publish-guard.ts`, `rate-limit.ts`, and `audit.ts`.
+
+The endpoint itself is covered end to end by
+[`e2e/mcp.spec.ts`](../e2e/mcp.spec.ts), which the `browser-smoke` CI job runs
+against a seeded disposable database: it asserts that an unauthenticated call is
+refused, that a key is offered the drafting tools and nothing outside the
+allowlist, that a Markdown body survives the round trip, and that an editor key
+is refused a publish. Everything else about MCP is unit-tested under
+[`tests/mcp/`](../tests/mcp), but none of that can tell you the endpoint is
+mounted.
 
 ### Turning it on
 
@@ -34,12 +48,46 @@ limit, request logging), `tools.ts` (the drafting tools), `markdown.ts`
 2. Set `MCP_ENABLED=1`. Unset, the plugin keeps its collection but mounts no
    endpoint, so the schema does not depend on the flag.
 3. In Payload Admin, open **MCP → API Keys**, create a key, bind it to an
-   **editor** user, tick the capabilities it needs, and copy the key once.
+   **editor** user in the **User** field, tick the capabilities it needs, and
+   copy the key once. Two details about that screen are worth knowing before
+   you use it — see [Issuing and revoking keys](#issuing-and-revoking-keys).
 4. Point a client at `https://<CMS_ADDRESS>/api/mcp` with
    `Authorization: Bearer <key>`.
 
 Keys are encrypted with `PAYLOAD_SECRET`; rotating that secret invalidates every
 key. Revoke one by deleting its document.
+
+### Issuing and revoking keys
+
+The plugin's own defaults on `payload-mcp-api-keys` made both halves of the
+recommendation below impossible, and it took using the screen to notice. Its
+`user` field refuses `create` and `update` outright, so a key always bound to
+whoever made it — an administrator following step 3 could only ever mint an
+admin-bound key, which is precisely the key
+[Decision 1](#decisions-taken) says not to make, and one that may publish. And
+`read`, `update`, and `delete` were all filtered to the requesting user's own
+keys, so "revoke by deleting its document" was something only the key's holder
+could do — backwards, since revocation matters most when that person is
+unavailable or is the reason for it.
+
+[`lib/mcp/api-keys.ts`](../lib/mcp/api-keys.ts) takes up the hook the plugin
+provides for exactly this (`overrideApiKeyCollection`) and changes two things,
+both access rules — no field moves, so the schema is untouched:
+
+- an **administrator** may set **User** when creating a key, and may read,
+  update, and delete anyone's. Everybody else still sees only their own, and
+  their keys still bind to them.
+- **rebinding stays refused for everyone, permanently.** Changing `user` on a
+  live key does not change the key's secret, so the credential already sitting
+  in an agent's configuration would silently begin acting as somebody else.
+  Issue a new key and delete the old one; that is a revocation, and it is
+  visible.
+
+One more thing about that screen, because it runs the other way from the
+collection checkboxes: **custom tools default to ticked.** `draftArticle`,
+`readArticleMarkdown`, `updateArticleMarkdown`, and `uploadMedia` are all
+enabled on a new key unless you untick them, while every collection capability
+starts unticked. That is the plugin's default, not this project's choice.
 
 ### Tools
 
@@ -384,6 +432,12 @@ says so rather than returning an empty string.
 
 ### Finding 4: the endpoint is not behind the staging gate
 
+> **Read the second half first.** The three bullets below were the original
+> conclusion and no longer hold — source IP, mTLS, and tunnels are all ruled out
+> by the decision to support mobile clients, and `disabled: true` is no longer
+> the standing instruction. They are kept because the reasoning that replaced
+> them only makes sense against them.
+
 [`middleware.ts`](../middleware.ts) excludes `api` from its matcher, so
 `STAGING_BASIC_AUTH` does not protect `/api/mcp`. On a staging deployment the
 endpoint would be reachable from the internet with the Bearer key as the only
@@ -391,12 +445,13 @@ control. That is a deliberate exclusion and correct for the REST API, but it
 means the MCP endpoint's exposure has to be decided explicitly rather than
 inherited:
 
-- for the first phase, run it only against a local development server;
-- when it does go to a deployed host, restrict `/api/mcp` at
+- ~~for the first phase, run it only against a local development server;~~
+- ~~when it does go to a deployed host, restrict `/api/mcp` at
   [`Caddyfile`](../Caddyfile) level — source IP, mTLS, or a tunnel — instead of
-  relying on the key alone;
-- keep `disabled: true` in production config until that is in place. The plugin
-  keeps its collection when disabled precisely so the schema stays stable.
+  relying on the key alone;~~
+- ~~keep `disabled: true` in production config until that is in place.~~ The
+  plugin keeps its collection when disabled precisely so the schema stays
+  stable.
 
 **Superseded in part by the mobile decision.** Source IP, mTLS, and tunnels all
 assume the client connects. Mobile connectors do not: Anthropic's and OpenAI's
@@ -412,9 +467,10 @@ was built instead:
   database lookup before it can be rejected. 120 requests per key per minute,
   tunable with `RATE_LIMIT_MCP_PER_MINUTE` like the site's other limiters. It is
   keyed on the presented credential rather than a source address, because the
-  requests arrive from a vendor's cloud and share addresses. A refusal says how
-  many seconds remain in the window, so an agent waits instead of retrying in a
-  loop;
+  requests arrive from a vendor's cloud and share addresses. A refusal answers
+  429 and says how many seconds remain in the window, so an agent waits instead
+  of retrying in a loop — neither of which was true when this was first written,
+  see [Finding 8](#finding-8-refusals-answered-500-not-429--fixed);
 - **a second limit on failed authentications, keyed by source address.** The
   limit above cannot bound key guessing, and reading it as though it could was a
   hole rather than a subtlety: it buckets on what the caller presents, and the
@@ -504,6 +560,86 @@ Decided otherwise in part — see [Decisions taken](#decisions-taken): the refus
 is conditional on role, so an admin-bound key may publish while the editor key
 may not.
 
+### Finding 8: refusals answered 500, not 429 — fixed
+
+A refusal written inside `overrideAuth` does not reach the caller the way it
+reads at the throw site. Payload's `routeError` takes the HTTP status off the
+error's own `status` property and falls back to 500, and then, unless the error
+is marked public, throws the message away and substitutes
+`Something went wrong.`:
+
+```js
+let status = err.status || httpStatus.INTERNAL_SERVER_ERROR
+if (!isErrorPublic(err, config))
+  response = formatErrors(new APIError('Something went wrong.'))
+```
+
+Both rate-limit refusals threw a plain `Error`, which carries neither property.
+So the sentence this document promised — "a refusal says how many seconds remain
+in the window, so an agent waits instead of retrying in a loop" — was not true of
+anything the caller received: it got `500 Something went wrong.` and no seconds
+at all. That is the worst available answer for an unattended client, because 500
+is exactly the status a client retries immediately and 429 is the one it backs
+off from.
+
+[`lib/mcp/errors.ts`](../lib/mcp/errors.ts) now throws `APIError`s with a real
+status and `isPublic: true`, so the text survives the trip. Nothing else changes:
+a tool that throws is caught by the MCP SDK and returned as a JSON-RPC error, and
+that path was always fine — which is why the publish guard's message always
+arrived and these never did.
+
+`Retry-After` is still not set, because Payload builds the response from the
+error and a thrown error cannot carry headers. The seconds are in the message,
+which is the part an agent reads.
+
+### Finding 9: `GET /api/mcp` spent the guessing budget — fixed
+
+The plugin registers `GET` alongside `POST` and routes it through the whole
+authentication path, only to have `mcp-handler` answer `Method not allowed`
+inside an HTTP 200. Every unauthenticated `GET` therefore cost a key lookup and,
+worse, counted against the failed-authentication budget — which is keyed by
+source address, and MCP callers arrive from a vendor's shared cloud. A crawler,
+a client probing for an SSE stream, or a connector validating a URL could spend
+another caller's allowance.
+
+`overrideAuth` now refuses `GET` before any limiter or lookup runs, with a 405 —
+which is also what the transport spec asks of a server that offers no SSE stream
+at the endpoint, so clients get a clearer answer than they did.
+
+### Finding 10: key lifecycle — open
+
+An MCP key is a standing credential that will sit in Anthropic's or OpenAI's
+cloud indefinitely, and the key document holds a label, a description, a user,
+and capability checkboxes. It holds no expiry and no last-used stamp. Two
+consequences, neither urgent and both real:
+
+- a dormant key is indistinguishable from an active one, so there is no way to
+  tell which of several keys is still in use before revoking it;
+- nothing expires on its own, so a key outlives the client that held it unless
+  somebody remembers it exists.
+
+The fix is small in code and awkward in sequencing: `overrideApiKeyCollection`
+already gives a clean place to add `lastUsedAt` and `expiresAt` fields
+([`lib/mcp/api-keys.ts`](../lib/mcp/api-keys.ts) is that hook), and
+`overrideAuth` already resolves the key document, so writing the stamp and
+checking the expiry costs one update per authenticated request. But adding
+fields is a schema change, so it needs a migration generated against a live
+database — see [`DATABASE_MIGRATIONS.md`](DATABASE_MIGRATIONS.md) — and CI fails
+a schema change that arrives without one. Sequence it with the next migration.
+
+Until then, the operating habit in
+[Finding 5](#finding-5-edits-are-not-attributable--built) is what stands in for
+it: one key per client, labelled for the client that holds it.
+
+### Finding 11: nothing watches the refusals — open
+
+`mcp_refused` with `reason: unauthorized` is the line that says somebody is
+guessing at the endpoint's only credential, and the only way it reaches a person
+is `docker compose logs app | grep mcp_`, typed by someone who already suspects
+something. [`lib/observability/webhook.ts`](../lib/observability/webhook.ts)
+exists and a threshold alert on that line is cheap. Not built, because it is a
+question about where an alert should go rather than about MCP.
+
 ## Recommended shape
 
 ### Phase 0 — prerequisites (not MCP work)
@@ -583,18 +719,50 @@ phone. That is why the endpoint has to be publicly reachable, and why it cannot
 be restricted by source IP, client certificate, or tunnel —
 [Finding 4](#finding-4-the-endpoint-is-not-behind-the-staging-gate).
 
-### ChatGPT — not supported yet
+**Two client-side defects are worth knowing before relying on a schedule**, both
+upstream and neither fixable here:
 
-ChatGPT's custom connectors expect OAuth 2.1 with PKCE and
-`/.well-known/oauth-protected-resource` discovery. The plugin has no
-authorization server: it verifies a bearer key against `payload-mcp-api-keys`
-and offers an `overrideAuth` hook, nothing more.
+- a custom connector configured with request-header auth has been reported to
+  ignore the header and start an OAuth flow against the server's origin instead,
+  using the header's _name_ as the `client_id`
+  ([`anthropics/claude-ai-mcp#644`](https://github.com/anthropics/claude-ai-mcp/issues/644)).
+  Against this endpoint that fails as a 401, because there is no authorization
+  server to answer it.
+- cloud scheduled tasks have been reported not to load MCP connectors at all
+  until a human message lands in the session
+  ([`anthropics/claude-code#43397`](https://github.com/anthropics/claude-code/issues/43397),
+  and others). The workaround people have found is to write the scheduled prompt
+  so it delegates the work to a subagent, which does get its tools initialised.
 
-Supporting it means building an OAuth layer — discovery documents, client
+Both mean an unattended schedule wants one supervised run before it is trusted.
+Neither is a reason to change anything in this repository.
+
+### ChatGPT — re-test before building anything
+
+This section used to say ChatGPT was out of reach. That was true when it was
+written: custom connectors expected OAuth 2.1 with PKCE and
+`/.well-known/oauth-protected-resource` discovery, the plugin has no
+authorization server, and building one — discovery documents, client
 registration, an authorization-code flow, token issuance and refresh, per-user
-consent — which is more work than everything in this document put together, and
-would introduce token endpoints on a host that currently exposes one credential
-check. It is a deliberate later decision, not an oversight.
+consent — is more work than everything else in this document put together.
+
+It appears no longer to be true. ChatGPT's custom connectors, added under
+Settings → Apps → Advanced → Developer mode → Connectors → Create, now offer
+three authentication modes: none, **API key**, and OAuth. An API key sent as a
+bearer header is exactly what this endpoint already verifies, which would make
+ChatGPT a connector-form exercise and no code at all.
+
+**So test it before scoping anything.** Point a connector at
+`https://<CMS_ADDRESS>/api/mcp`, choose the API-key mode, and paste a key. It
+either lists the tools or it does not, and the answer is worth fifteen minutes
+against a fortnight of OAuth. Two things to watch while testing: keys belong in
+the header, never in a URL query parameter, which ChatGPT's safety screening
+flags; and a connector has to be re-enabled per conversation, which is a
+common reason a working connector looks broken.
+
+If it does work, delete this hedging and record it as supported. If it does not,
+record what the connector dialog actually said — that is the thing this section
+got wrong by inferring it from documentation rather than from the screen.
 
 ## Risks and non-goals
 
