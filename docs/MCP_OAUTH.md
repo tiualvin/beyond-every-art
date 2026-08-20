@@ -76,7 +76,18 @@ cloud. Requiring a fresh authentication immediately before that decision, rather
 than accepting whatever session happens to be open in another tab, is the
 behaviour you would choose on purpose.
 
-`e2e/oauth.spec.ts` covers both halves so nobody "fixes" it later.
+**It depends on `csrf` being configured**, which means on `CMS_ADDRESS` being a
+real hostname. `trustedOrigins()` drops localhost origins under
+`NODE_ENV=production`, and Payload treats an empty `csrf` list as "no allowlist
+to enforce" — so on a deployment with no CMS origin the bounce does not happen
+and a live session is accepted cross-site. That is one more reason `CMS_ADDRESS`
+is not optional here; the issuer already refuses to serve without it.
+
+For the same reason there is no end-to-end test of the bounce: CI runs the
+production server on loopback, so its `csrf` list is empty by construction and
+the assertion could never fire. `e2e/oauth.spec.ts` covers the half that does not
+depend on it — no session means a redirect to the login carrying the whole
+request — and says so where the test would otherwise have gone.
 
 ## What a connector may do
 

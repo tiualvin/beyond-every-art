@@ -41,8 +41,18 @@ async function registerClient(
   return body.client_id as string
 }
 
-/** Signs in as the seeded editor, leaving the session cookie on the context. */
-async function signIn(request: APIRequestContext): Promise<void> {
+/**
+ * Signs in as the seeded editor and returns the session token.
+ *
+ * The token is carried explicitly from here on rather than left to the request
+ * context's cookie jar, because the jar cannot hold it under CI: the suite runs
+ * the production server there, `collections/Users.ts` marks the cookie `Secure`
+ * outside development, and the suite speaks plain http to loopback — so the
+ * cookie is set and then never sent back. Building the `Cookie` header by hand
+ * sends exactly what a browser would and keeps the tests honest about which
+ * header decides what.
+ */
+async function signIn(request: APIRequestContext): Promise<string> {
   const response = await request.post('/api/users/login', {
     data: {
       email: fixtures.mcp.editorEmail,
@@ -50,27 +60,32 @@ async function signIn(request: APIRequestContext): Promise<void> {
     },
   })
   expect(response.status()).toBe(200)
+  const token = (await response.json()).token as string
+  expect(token, 'login returned no token').toBeTruthy()
+  return token
 }
 
 /**
- * Headers a browser sends once it is on this origin.
+ * What a browser sends once it is on this origin, with a session.
  *
- * `Sec-Fetch-Site` is not decoration here. Payload refuses to read its session
- * cookie off a request that is cross-site or that carries no `Sec-Fetch-Site`
- * at all (`extractJWT`, when `csrf` is configured — and this deployment
- * configures it). A browser arriving from claude.ai sends `cross-site` on that
- * first navigation, is bounced to the admin login, and comes back `same-origin`
- * — which is what these requests stand in for. Omitting it here does not make
- * the test stricter; it makes it test a non-browser client that could never
- * complete this flow anyway.
+ * `Sec-Fetch-Site` is not decoration. Payload refuses to read its session cookie
+ * off a request that is cross-site, or that carries no `Sec-Fetch-Site` at all,
+ * whenever `csrf` is configured — and this deployment configures it. A browser
+ * arriving from claude.ai sends `cross-site` on that first navigation, is
+ * bounced to the admin login, and comes back `same-origin`, which is what these
+ * requests stand in for.
  */
-const BROWSER_HEADERS = { 'Sec-Fetch-Site': 'same-origin' }
+const sessionHeaders = (token: string): Record<string, string> => ({
+  Cookie: `payload-token=${token}`,
+  'Sec-Fetch-Site': 'same-origin',
+})
 
 /** Walks consent to a redirect, returning the authorization code. */
 async function authorize(
   request: APIRequestContext,
   clientId: string,
   challenge: string,
+  token: string,
   capabilities: string[] = ['tool.draftArticle'],
 ): Promise<string> {
   const url =
@@ -78,7 +93,7 @@ async function authorize(
     `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
     `&code_challenge=${challenge}&code_challenge_method=S256&state=xyz`
 
-  const page = await request.get(url, { headers: BROWSER_HEADERS })
+  const page = await request.get(url, { headers: sessionHeaders(token) })
   expect(page.status()).toBe(200)
   const html = await page.text()
 
@@ -98,7 +113,7 @@ async function authorize(
       ]),
     ]).toString(),
     headers: {
-      ...BROWSER_HEADERS,
+      ...sessionHeaders(token),
       'Content-Type': 'application/x-www-form-urlencoded',
     },
     maxRedirects: 0,
@@ -152,12 +167,13 @@ test.describe('OAuth authorization server', () => {
   test.describe.configure({ mode: 'serial' })
 
   let session: APIRequestContext
+  let token: string
 
   test.beforeAll(async ({ playwright }) => {
     session = await playwright.request.newContext({
       baseURL: 'http://127.0.0.1:3000',
     })
-    await signIn(session)
+    token = await signIn(session)
   })
 
   test.afterAll(async () => {
@@ -242,31 +258,22 @@ test.describe('OAuth authorization server', () => {
     expect(decodeURIComponent(location)).toContain('code_challenge')
   })
 
-  // The case every real connector hits first. A browser following claude.ai's
-  // redirect sends `Sec-Fetch-Site: cross-site`, Payload declines to read its
-  // session cookie on such a request, and this endpoint therefore bounces even
-  // an already-signed-in administrator to the login form. That is worth having:
-  // a standing grant of authority should be preceded by a fresh authentication,
-  // not by whatever session happened to be open in another tab.
-  test('bounces a cross-site arrival to login even with a live session', async () => {
-    const request = session
+  // There is deliberately no test here for the cross-site bounce described in
+  // `docs/MCP_OAUTH.md` — a browser arriving from claude.ai being sent to log in
+  // even with a live session. It cannot be exercised in this harness, and the
+  // reason is worth writing down rather than rediscovering.
+  //
+  // That behaviour depends on Payload's `csrf` list being non-empty: with an
+  // empty list `extractJWT` treats the cookie as unconditionally acceptable and
+  // never consults `Sec-Fetch-Site`. `trustedOrigins()` drops localhost origins
+  // when `NODE_ENV=production`, on purpose (see `lib/security/origins.ts`) — and
+  // CI runs the production server on loopback, so the list is empty there by
+  // construction. A test written against it would pass locally, where the dev
+  // server keeps the origins, and assert nothing at all in CI.
+  //
+  // What is covered below is the half that does not depend on it: no session
+  // means a redirect to the admin login carrying the whole request.
 
-    const clientId = await registerClient(request)
-    const { challenge } = pkce()
-
-    const response = await request.get(
-      `/oauth/authorize?response_type=code&client_id=${clientId}` +
-        `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
-        `&code_challenge=${challenge}&code_challenge_method=S256`,
-      { headers: { 'Sec-Fetch-Site': 'cross-site' }, maxRedirects: 0 },
-    )
-
-    expect(response.status()).toBe(302)
-    expect(response.headers()['location']).toContain('/admin/login')
-  })
-
-  // An unvalidated redirect URI must never be redirected to, even to report an
-  // error: that is what turns an authorization server into an open redirect.
   test('answers an unregistered redirect with a page, never a redirect', async ({
     request,
   }) => {
@@ -307,7 +314,7 @@ test.describe('OAuth authorization server', () => {
     const clientId = await registerClient(request)
     const { challenge, verifier } = pkce()
 
-    const code = await authorize(request, clientId, challenge)
+    const code = await authorize(request, clientId, challenge, token)
     const { body, status } = await exchange(request, code, verifier)
 
     expect(status).toBe(200)
@@ -343,7 +350,7 @@ test.describe('OAuth authorization server', () => {
     // absent and this test would pass for the wrong reason — proving the
     // capability grid works, not the publish guard. With it, `updatePosts` is
     // available to the grant and the refusal has to come from the guard.
-    const code = await authorize(request, clientId, challenge, [
+    const code = await authorize(request, clientId, challenge, token, [
       'posts.update',
       'posts.find',
     ])
@@ -379,7 +386,7 @@ test.describe('OAuth authorization server', () => {
 
     const clientId = await registerClient(request)
     const { challenge, verifier } = pkce()
-    const code = await authorize(request, clientId, challenge)
+    const code = await authorize(request, clientId, challenge, token)
     const first = (await exchange(request, code, verifier)).body
 
     const refreshed = await request.post('/oauth/token', {
@@ -404,7 +411,7 @@ test.describe('OAuth authorization server', () => {
 
     const clientId = await registerClient(request)
     const { challenge, verifier } = pkce()
-    const code = await authorize(request, clientId, challenge)
+    const code = await authorize(request, clientId, challenge, token)
 
     expect((await exchange(request, code, verifier)).status).toBe(200)
 
@@ -418,7 +425,7 @@ test.describe('OAuth authorization server', () => {
 
     const clientId = await registerClient(request)
     const { challenge } = pkce()
-    const code = await authorize(request, clientId, challenge)
+    const code = await authorize(request, clientId, challenge, token)
 
     // A stolen code, redeemed by someone who never had the verifier.
     const stolen = await exchange(request, code, pkce().verifier)
@@ -431,7 +438,7 @@ test.describe('OAuth authorization server', () => {
 
     const clientId = await registerClient(request)
     const { challenge, verifier } = pkce()
-    const code = await authorize(request, clientId, challenge)
+    const code = await authorize(request, clientId, challenge, token)
     const { body } = await exchange(request, code, verifier)
 
     const before = await request.post('/api/mcp', {

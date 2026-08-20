@@ -39,6 +39,12 @@ const rateLimitOverrides = {
   // per address per fifteen minutes and fails as a rate limit rather than as
   // the bug it looks like.
   RATE_LIMIT_LOGIN_PER_15M: '10000',
+  // `oauth.spec.ts` registers a client per test, and a retried run registers
+  // them again. The production allowance is twenty an hour per address, which
+  // one retried suite goes straight past — and the failure surfaces as a 429 in
+  // the middle of an unrelated assertion.
+  RATE_LIMIT_OAUTH_REGISTER_PER_HOUR: '10000',
+  RATE_LIMIT_OAUTH_TOKEN_PER_MINUTE: '10000',
 }
 
 /**
