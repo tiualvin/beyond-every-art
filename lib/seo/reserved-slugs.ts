@@ -8,6 +8,11 @@
  * an editor can choose an explicit redirect and replacement slug.
  */
 export const RESERVED_ROOT_SLUGS = [
+  // Not a route segment anyone browses, but a real one: the OAuth discovery
+  // documents live under it, and a post that claimed this slug would shadow
+  // them and quietly break every connector's ability to find the
+  // authorization server.
+  '.well-known',
   'admin',
   'api',
   'apps',
@@ -16,6 +21,7 @@ export const RESERVED_ROOT_SLUGS = [
   'health',
   'journal',
   'newsletter',
+  'oauth',
   'publication',
   'redirects-map',
   'robots.txt',

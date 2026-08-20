@@ -16,7 +16,7 @@
 // See `docs/MCP_SERVER.md`.
 
 import { mcpPlugin, type MCPPluginConfig } from '@payloadcms/plugin-mcp'
-import type { PayloadRequest, Plugin } from 'payload'
+import { UnauthorizedError, type PayloadRequest, type Plugin } from 'payload'
 
 import { adminIssuableApiKeys } from './api-keys'
 import {
@@ -26,6 +26,9 @@ import {
   mcpRefusedLogEntry,
 } from './audit'
 import { methodNotAllowedError, rateLimitedError } from './errors'
+import { oauthEnabled } from '../oauth/config'
+import { resolveAccessToken } from '../oauth/grants'
+import { isAccessToken } from '../oauth/tokens'
 import {
   clientKey,
   configuredLimit,
@@ -176,6 +179,59 @@ export const mcpPluginConfig: MCPPluginConfig = {
       throw rateLimitedError(
         `Too many failed MCP authentications from this address. Try again in ${retryAfter} seconds.`,
       )
+    }
+
+    // An OAuth access token, resolved here rather than by the plugin.
+    //
+    // Both credentials arrive as `Authorization: Bearer <x>`, so something has
+    // to tell them apart, and the token's prefix does it without a speculative
+    // lookup against a second collection on every request. What resolution
+    // returns is the same `payload-mcp-api-keys` document an API key resolves
+    // to — which is the point of building consent on that record: everything
+    // downstream (capabilities, the publish guard, the audit line, revocation)
+    // sees a grant and a key as the same shape and needs no second code path.
+    const bearer = req.headers
+      .get('Authorization')
+      ?.replace(/^Bearer\s+/i, '')
+      .trim()
+    if (bearer && isAccessToken(bearer)) {
+      if (!oauthEnabled()) {
+        failedAuthLimiter.check(source)
+        logMcpEvent(mcpRefusedLogEntry({ caller, reason: 'unauthorized' }))
+        throw new UnauthorizedError()
+      }
+
+      const grant = await resolveAccessToken(req.payload, bearer)
+      if (!grant) {
+        failedAuthLimiter.check(source)
+        logMcpEvent(mcpRefusedLogEntry({ caller, reason: 'unauthorized' }))
+        throw new UnauthorizedError()
+      }
+
+      const grantUser = grant.apiKey.user as
+        { collection?: string; id?: unknown; role?: unknown } | undefined
+
+      if (grantUser) {
+        // The plugin's own resolver stamps these onto the user it returns, and
+        // Payload's access control reads both: without `collection` the user is
+        // not recognised as belonging to `users` at all.
+        grantUser.collection = 'users'
+        ;(grantUser as { _strategy?: string })._strategy = 'mcp-oauth'
+        req.user = grantUser as NonNullable<PayloadRequest['user']>
+      }
+
+      // Read by `refuseMcpPublish`. An OAuth connector never publishes.
+      req.context = { ...(req.context ?? {}), mcpViaOAuth: true }
+
+      logMcpEvent(
+        mcpAuthLogEntry({
+          key: `oauth:${grant.clientName}`,
+          role: grantUser?.role,
+          userId: grantUser?.id,
+        }),
+      )
+
+      return grant.apiKey as never
     }
 
     let settings

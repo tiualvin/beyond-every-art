@@ -13,9 +13,11 @@
 - **What it deliberately cannot reach:** `members`, `billing-events`,
   `newsletter-signups`, `users`, and every global. Deleting articles is off.
 - **How to turn it on:** [What is built](#what-is-built).
-- **Still open:** ChatGPT's auth options have changed since this was written and
-  the "needs OAuth" conclusion is very likely stale — it wants re-testing before
-  anyone builds anything, see [Client configuration](#client-configuration). The
+- **OAuth is built.** The connector dialogs that cannot send a bearer header now
+  have an authorization server to talk to — see
+  [`MCP_OAUTH.md`](MCP_OAUTH.md). It is off by default and separate from
+  `MCP_ENABLED`.
+- **Still open:** the
   `ghostID` relaxation waits on the final Ghost import, though drafting no longer
   depends on it —
   [Finding 2](#finding-2-ghostid-blocks-authoring-new-articles--resolved). And
@@ -706,13 +708,20 @@ is to leave client config out of the repository entirely.
 `~/.codex/config.toml`, or a project-scoped `.codex/config.toml`, via
 `codex mcp add` or a `url` plus `bearer_token_env_var` entry.
 
-### Claude mobile — works, subject to a beta
+### Claude mobile and web
 
-Add a custom connector pointing at `https://<CMS_ADDRESS>/api/mcp` and put the
-key in the **Request headers** section as `Authorization: Bearer <key>`. That
-section is a beta rolling out gradually; if the connector dialog does not offer
-it, this route is not available on the account yet and nothing in the repository
-can change that.
+Two routes, and which one you need depends on what the connector dialog offers.
+
+**If it has a Request headers section** (a beta, rolled out per account): point
+a custom connector at `https://<CMS_ADDRESS>/api/mcp` and put the key there as
+`Authorization: Bearer <key>`. Simplest, and no OAuth involved.
+
+**If it only offers OAuth Client ID and Client Secret** — which is what most
+accounts see — leave both fields empty and let the connector register itself.
+That works because the OAuth layer exists now; see
+[`MCP_OAUTH.md`](MCP_OAUTH.md). Do not paste an API key into the client secret
+field: it is not a place for one, and the dialog will reject a secret with no
+matching id.
 
 Worth understanding: the connection is made by Anthropic's servers, not by the
 phone. That is why the endpoint has to be publicly reachable, and why it cannot
@@ -737,32 +746,20 @@ upstream and neither fixable here:
 Both mean an unattended schedule wants one supervised run before it is trusted.
 Neither is a reason to change anything in this repository.
 
-### ChatGPT — re-test before building anything
+### ChatGPT
 
-This section used to say ChatGPT was out of reach. That was true when it was
-written: custom connectors expected OAuth 2.1 with PKCE and
-`/.well-known/oauth-protected-resource` discovery, the plugin has no
-authorization server, and building one — discovery documents, client
-registration, an authorization-code flow, token issuance and refresh, per-user
-consent — is more work than everything else in this document put together.
+Settings → Apps → Advanced → Developer mode, then Connectors → Create. Its
+dialog offers three authentication modes — none, API key, and OAuth — so either
+credential works: paste a key in the API-key mode, or choose OAuth and let it
+register itself against [`MCP_OAUTH.md`](MCP_OAUTH.md).
 
-It appears no longer to be true. ChatGPT's custom connectors, added under
-Settings → Apps → Advanced → Developer mode → Connectors → Create, now offer
-three authentication modes: none, **API key**, and OAuth. An API key sent as a
-bearer header is exactly what this endpoint already verifies, which would make
-ChatGPT a connector-form exercise and no code at all.
+Two things worth knowing while testing. Keys belong in a header, never a URL
+query parameter, which ChatGPT's safety screening flags. And a connector has to
+be re-enabled per conversation, which is a common reason a working connector
+looks broken.
 
-**So test it before scoping anything.** Point a connector at
-`https://<CMS_ADDRESS>/api/mcp`, choose the API-key mode, and paste a key. It
-either lists the tools or it does not, and the answer is worth fifteen minutes
-against a fortnight of OAuth. Two things to watch while testing: keys belong in
-the header, never in a URL query parameter, which ChatGPT's safety screening
-flags; and a connector has to be re-enabled per conversation, which is a
-common reason a working connector looks broken.
-
-If it does work, delete this hedging and record it as supported. If it does not,
-record what the connector dialog actually said — that is the thing this section
-got wrong by inferring it from documentation rather than from the screen.
+This section previously said ChatGPT was out of reach because it required OAuth
+and none existed. Both halves of that have since stopped being true.
 
 ## Risks and non-goals
 

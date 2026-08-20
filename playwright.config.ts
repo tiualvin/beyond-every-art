@@ -34,6 +34,11 @@ const rateLimitOverrides = {
   // which would turn two retries into a cascade of unrelated failures. The
   // limiter's own behaviour is covered in `tests/mcp/rate-limit.test.ts`.
   RATE_LIMIT_MCP_AUTH_FAILURES: '10000',
+  // `oauth.spec.ts` signs in once per test to reach the consent screen, and CI
+  // retries twice — which goes past the production allowance of twenty logins
+  // per address per fifteen minutes and fails as a rate limit rather than as
+  // the bug it looks like.
+  RATE_LIMIT_LOGIN_PER_15M: '10000',
 }
 
 /**
@@ -42,7 +47,16 @@ const rateLimitOverrides = {
  * it here rather than in the seed keeps it to the test server: neither the
  * Docker image nor a deployment gains an endpoint from a test config.
  */
-const mcpEnvironment = { MCP_ENABLED: '1' }
+const mcpEnvironment = {
+  MCP_ENABLED: '1',
+  MCP_OAUTH_ENABLED: '1',
+  // The OAuth layer derives its issuer from CMS_ADDRESS and refuses to serve
+  // anything without one — deliberately, so that a misconfigured deployment
+  // advertises nothing rather than advertising a `Host` header an attacker
+  // chose. The suite drives the app directly, so the issuer is the loopback
+  // address the test server actually answers on.
+  CMS_ADDRESS: '127.0.0.1:3000',
+}
 
 const productionServer = {
   command: 'node .next/standalone/server.js',
