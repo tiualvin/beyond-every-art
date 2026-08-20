@@ -33,10 +33,31 @@ import { getPayloadClient } from '@/lib/payload'
 // unvalidated URI is how an authorization server becomes an open redirect.
 export const dynamic = 'force-dynamic'
 
+/**
+ * Every HTML response this endpoint produces, with the headers a consent screen
+ * needs.
+ *
+ * The framing headers are set here rather than left to the site-wide policy
+ * because that policy is report-only until the rollout in
+ * `docs/CONTENT_SECURITY_POLICY.md` reaches `CSP_MODE=enforce`, and
+ * `lib/security/headers.ts` deliberately omits `X-Frame-Options` globally for
+ * Live Preview's sake. Neither reason applies to this page: it is never
+ * legitimately framed, and it is a decision surface with an Approve button on a
+ * page carrying a staff session — the one page on the deployment where a
+ * UI-redress overlay would be worth building. Both headers are sent so the
+ * protection does not depend on which the browser honours.
+ *
+ * `no-store` because the page carries a sealed authorization request.
+ */
 const html = (body: string, status = 200) =>
   new NextResponse(body, {
     status,
-    headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    headers: {
+      'Cache-Control': 'no-store',
+      'Content-Security-Policy': "frame-ancestors 'none'",
+      'Content-Type': 'text/html; charset=utf-8',
+      'X-Frame-Options': 'DENY',
+    },
   })
 
 /** Sends the client its error through the redirect, as RFC 6749 §4.1.2.1 asks. */
@@ -137,13 +158,25 @@ export async function GET(request: Request): Promise<NextResponse> {
   // RFC 8707. A client naming a resource this server does not serve is asking
   // for a token to use somewhere else, and must not be given one.
   const resource = params.get('resource') ?? undefined
-  if (resource && new URL(resource).href !== `${origin}${MCP_PATH}`) {
-    return redirectError(
-      redirectUri,
-      'invalid_target',
-      `This server only issues tokens for ${origin}${MCP_PATH}.`,
-      state,
-    )
+  if (resource) {
+    // Parsed inside the guard: `new URL` throws on anything that is not a URL,
+    // and an unhandled throw here would answer a malformed query parameter with
+    // a 500 rather than telling the client what was wrong with its request.
+    let requested: string | null = null
+    try {
+      requested = new URL(resource).href
+    } catch {
+      requested = null
+    }
+
+    if (requested !== `${origin}${MCP_PATH}`) {
+      return redirectError(
+        redirectUri,
+        'invalid_target',
+        `This server only issues tokens for ${origin}${MCP_PATH}.`,
+        state,
+      )
+    }
   }
 
   // Who is approving. Payload's session cookie is set on this origin by the
@@ -166,6 +199,7 @@ export async function GET(request: Request): Promise<NextResponse> {
       redirectUri,
       resource,
       state,
+      userId: user.id,
     },
     payload.secret,
   )
@@ -226,6 +260,20 @@ export async function POST(request: Request): Promise<NextResponse> {
         'Sign in to the admin panel and start the connection again.',
       ),
       401,
+    )
+  }
+
+  // The seal names who the consent screen was rendered for; this is the same
+  // person pressing Approve, or the approval does not count. Without this a seal
+  // is transferable — obtained by one account, spent in another's browser, with
+  // the grant written against whoever's cookie arrived.
+  if (String(approval.userId) !== String(user.id)) {
+    return html(
+      renderErrorPage(
+        'This approval belongs to a different account',
+        'Sign in as the account that started this connection and try again.',
+      ),
+      403,
     )
   }
 

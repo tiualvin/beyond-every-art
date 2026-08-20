@@ -16,6 +16,7 @@ const request = (over: Partial<AuthorizeRequest> = {}): AuthorizeRequest => ({
   expiresAt: Date.now() + SEAL_TTL_MS,
   redirectUri: 'https://claude.ai/api/mcp/auth_callback',
   state: 'xyz',
+  userId: 7,
   ...over,
 })
 
@@ -65,8 +66,26 @@ describe('sealRequest / openRequest', () => {
     },
   )
 
-  // A cross-site POST cannot mint one of these, which is what makes the consent
-  // form safe without a separate CSRF token.
+  // The binding that stops a seal being spent in somebody else's browser. It
+  // travels inside the signed payload, so it cannot be edited on the way.
+  it('carries the user the consent screen was rendered for', () => {
+    const opened = openRequest(
+      sealRequest(request({ userId: 7 }), SECRET),
+      SECRET,
+    )
+    expect(opened?.userId).toBe(7)
+  })
+
+  it('refuses a seal whose userId was swapped for another account', () => {
+    const sealed = sealRequest(request({ userId: 7 }), SECRET)
+    const [payload, signature] = sealed.split('.')
+    const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString())
+    decoded.userId = 1
+    const forged = Buffer.from(JSON.stringify(decoded)).toString('base64url')
+
+    expect(openRequest(`${forged}.${signature}`, SECRET)).toBeNull()
+  })
+
   it('cannot be produced without the secret', () => {
     const guessed = Buffer.from(JSON.stringify(request())).toString('base64url')
     expect(openRequest(`${guessed}.${'a'.repeat(43)}`, SECRET)).toBeNull()

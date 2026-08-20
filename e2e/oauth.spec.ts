@@ -383,7 +383,6 @@ test.describe('OAuth authorization server', () => {
 
   test('rotates refresh tokens and revokes the grant on replay', async () => {
     const request = session
-
     const clientId = await registerClient(request)
     const { challenge, verifier } = pkce()
     const code = await authorize(request, clientId, challenge, token)
@@ -396,6 +395,13 @@ test.describe('OAuth authorization server', () => {
     const second = await refreshed.json()
     expect(second.refresh_token).not.toBe(first.refresh_token)
 
+    // The rotated pair works.
+    const live = await request.post('/api/mcp', {
+      headers: mcpHeaders(second.access_token),
+      data: { id: 1, jsonrpc: '2.0', method: 'tools/list' },
+    })
+    expect(live.status()).toBe(200)
+
     // The old one is spent. A caller presenting it is either a thief or a
     // client that lost the rotation — and the two cannot be told apart, so the
     // grant is burned rather than merely refused.
@@ -404,20 +410,49 @@ test.describe('OAuth authorization server', () => {
     })
     expect(replay.status()).toBe(400)
     expect((await replay.json()).error).toBe('invalid_grant')
+
+    // The assertions that matter, and that were missing while the behaviour
+    // was too: refusing the replay is not the point — killing the grant is.
+    // Everything issued under it has to stop, including the pair the *rotation*
+    // produced, which is what a thief would be holding.
+    const afterAccess = await request.post('/api/mcp', {
+      headers: mcpHeaders(second.access_token),
+      data: { id: 1, jsonrpc: '2.0', method: 'tools/list' },
+    })
+    expect(afterAccess.status()).toBe(401)
+
+    const afterRefresh = await request.post('/oauth/token', {
+      form: {
+        grant_type: 'refresh_token',
+        refresh_token: second.refresh_token,
+      },
+    })
+    expect(afterRefresh.status()).toBe(400)
+    expect((await afterRefresh.json()).error).toBe('invalid_grant')
   })
 
   test('a redeemed authorization code cannot be redeemed twice', async () => {
     const request = session
-
     const clientId = await registerClient(request)
     const { challenge, verifier } = pkce()
     const code = await authorize(request, clientId, challenge, token)
 
-    expect((await exchange(request, code, verifier)).status).toBe(200)
+    const first = await exchange(request, code, verifier)
+    expect(first.status).toBe(200)
 
     const replay = await exchange(request, code, verifier)
     expect(replay.status).toBe(400)
     expect(replay.body.error).toBe('invalid_grant')
+
+    // Same point as the refresh replay: a reused code means the code leaked
+    // from the redirect, so the tokens the first redemption produced are no
+    // longer trustworthy either. This assertion is what proves the grant was
+    // burned rather than the second attempt merely declined.
+    const after = await request.post('/api/mcp', {
+      headers: mcpHeaders(first.body.access_token),
+      data: { id: 1, jsonrpc: '2.0', method: 'tools/list' },
+    })
+    expect(after.status()).toBe(401)
   })
 
   test('refuses the exchange when PKCE does not match', async () => {

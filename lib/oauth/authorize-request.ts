@@ -13,9 +13,16 @@
 // request from inside it, ignoring every other field on the form. A tampered
 // value fails the signature; a value from another deployment fails it too.
 //
-// This doubles as the CSRF defence for the consent form. A forged cross-site
-// POST cannot produce a valid sealed request, because producing one requires a
-// GET that already passed validation and the secret to sign it with.
+// **This is not the CSRF defence, and an earlier version of this comment said
+// it was.** A seal is a bearer value, not a per-session token: anyone who can
+// load the consent page can obtain one, and until `userId` was added below,
+// nothing stopped a seal minted for one person being posted with somebody
+// else's cookie. What actually holds that door shut is Payload's `SameSite=Lax`
+// session cookie and its `csrf` origin allowlist, both of which refuse a forged
+// cross-site POST before this code runs. The seal's jobs are narrower and worth
+// stating exactly: it makes the request tamper-evident, it expires, and — with
+// `userId` — it binds the approval to the person the consent screen was
+// rendered for.
 
 import { createHmac, timingSafeEqual } from 'node:crypto'
 
@@ -28,6 +35,15 @@ export type AuthorizeRequest = {
   redirectUri: string
   resource?: string
   state?: string
+  /**
+   * The user the consent screen was rendered for.
+   *
+   * Compared against the session on the POST, so a seal cannot be carried to
+   * another person's browser and approved there. Without it the grant is
+   * written against whoever's cookie arrives with the form, which is not what
+   * the person who started the flow agreed to.
+   */
+  userId: number | string
 }
 
 /** A consent page left open for longer than this has to be started again. */

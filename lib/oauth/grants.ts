@@ -12,6 +12,7 @@ import type { Payload } from 'payload'
 import {
   ACCESS_TOKEN_TTL_MS,
   CODE_TTL_MS,
+  GRANT_ABSOLUTE_TTL_MS,
   REFRESH_TOKEN_TTL_MS,
   digestsMatch,
   hashToken,
@@ -81,6 +82,11 @@ export async function resolveAccessToken(
     return null
   }
 
+  // Checked here too, not only at refresh: an access token minted in the last
+  // hour before the ceiling would otherwise keep working past it.
+  const absolute = grant.absoluteExpiresAt
+  if (typeof absolute === 'string' && Date.parse(absolute) <= now()) return null
+
   const apiKeyRef = grant.apiKey
   const apiKeyId =
     typeof apiKeyRef === 'object' && apiKeyRef !== null
@@ -139,6 +145,7 @@ export async function createGrant(
       apiKey: input.apiKeyId,
       client: input.clientId,
       codeChallenge: input.codeChallenge,
+      absoluteExpiresAt: iso(now() + GRANT_ABSOLUTE_TTL_MS),
       codeExpiresAt: iso(now() + CODE_TTL_MS),
       codeHash: hashToken(code, payload.secret),
       codeRedeemed: false,
@@ -159,10 +166,17 @@ export type TokenPair = {
   refreshToken: string
 }
 
-/** Mints a fresh pair onto an existing grant, replacing whatever it held. */
+/**
+ * Mints a fresh pair onto an existing grant, replacing whatever it held.
+ *
+ * `supersedes` is the refresh-token hash being rotated away from, and storing it
+ * is what makes replay detectable at all — see `refreshGrant`. It is null on the
+ * first issuance, where there is nothing to supersede.
+ */
 async function issueTokens(
   payload: Payload,
   grantId: number | string,
+  supersedes: string | null,
   extra: Record<string, unknown> = {},
 ): Promise<TokenPair> {
   const accessToken = mintAccessToken()
@@ -174,6 +188,8 @@ async function issueTokens(
     data: {
       accessTokenExpiresAt: iso(now() + ACCESS_TOKEN_TTL_MS),
       accessTokenHash: hashToken(accessToken, payload.secret),
+      previousRefreshTokenHash: supersedes,
+      // Deliberately not extended: `absoluteExpiresAt` is set once, at consent.
       refreshTokenExpiresAt: iso(now() + REFRESH_TOKEN_TTL_MS),
       refreshTokenHash: hashToken(refreshToken, payload.secret),
       ...extra,
@@ -189,6 +205,31 @@ async function issueTokens(
 }
 
 export type RedeemFailure = { error: string; description: string }
+
+/**
+ * Kills a grant and everything issued under it.
+ *
+ * Reached from both replay paths. A replayed code or refresh token means the
+ * secret reached somebody it should not have, and at that point the legitimate
+ * client and the thief are indistinguishable — so access stops for both rather
+ * than continuing for whichever one asks next.
+ */
+async function burnGrant(
+  payload: Payload,
+  grantId: number | string,
+): Promise<void> {
+  await payload.update({
+    collection: 'oauth-grants',
+    id: grantId,
+    data: {
+      accessTokenHash: null,
+      previousRefreshTokenHash: null,
+      refreshTokenHash: null,
+      revoked: true,
+    },
+    overrideAccess: true,
+  } as unknown as UpdateOptions)
+}
 
 /**
  * Trades an authorization code for tokens.
@@ -234,16 +275,7 @@ export async function redeemCode(
 
   if (grant.codeRedeemed === true || grant.revoked === true) {
     // Replay. Burn the grant rather than merely refusing this attempt.
-    await payload.update({
-      collection: 'oauth-grants',
-      id: grant.id as number | string,
-      data: {
-        accessTokenHash: null,
-        refreshTokenHash: null,
-        revoked: true,
-      },
-      overrideAccess: true,
-    } as unknown as UpdateOptions)
+    await burnGrant(payload, grant.id as number | string)
     return invalid
   }
 
@@ -265,22 +297,37 @@ export async function redeemCode(
     return invalid
   }
 
-  return issueTokens(payload, grant.id as number | string, {
-    codeHash: null,
+  // `codeHash` is deliberately *kept*. Nulling it on success looked tidy and
+  // quietly disabled the branch above: a replayed code would hash to a value no
+  // row held, so the lookup missed, the grant was never burned, and the
+  // single-use rule degraded from "burn on reuse" to "politely decline".
+  // `codeRedeemed` is what enforces single use; the hash is what lets a second
+  // attempt be recognised as a replay of *this* grant.
+  return issueTokens(payload, grant.id as number | string, null, {
     codeRedeemed: true,
   })
 }
 
 /**
- * Exchanges a refresh token for a new pair, rotating both.
+ * Exchanges a refresh token for a new pair, rotating both, and detects replay.
  *
- * Rotation means the presented refresh token stops working the moment a new one
- * is issued, which turns a stolen refresh token into a detectable event: either
- * the thief uses it first and the real client's next refresh fails, or the real
- * client uses it first and the thief's fails. Either way one of them presents a
- * token this grant no longer holds, and that is what the replay branch below is
- * for — it revokes rather than merely refusing, because at that point the two
- * parties cannot be told apart and only one of them should keep access.
+ * Rotation means the presented token stops working the moment a new one is
+ * issued. On its own that only *refuses* the old token, which is not much: a
+ * thief and the legitimate client both keep trying, one of them succeeds each
+ * time, and nothing anywhere records that a secret leaked.
+ *
+ * What makes it a control is remembering one generation back. The lookup below
+ * matches either the current hash or the superseded one, so presenting a
+ * rotated-away token is distinguishable from presenting a token that never
+ * existed — and the first case is the signature of a stolen credential. It
+ * cannot be told apart from a client that lost the rotation to a dropped
+ * response, and that ambiguity is precisely why the grant is burned rather than
+ * merely refused: one of the two parties should not keep access, and there is
+ * no way to know which.
+ *
+ * This is the half that was documented and missing. Without the superseded hash
+ * the replayed token matched no row at all, the function returned `invalid`, and
+ * the grant carried on serving the thief indefinitely.
  */
 export async function refreshGrant(
   payload: Payload,
@@ -294,7 +341,12 @@ export async function refreshGrant(
   const presented = hashToken(refreshToken, payload.secret)
   const { docs } = await payload.find({
     collection: 'oauth-grants',
-    where: { refreshTokenHash: { equals: presented } },
+    where: {
+      or: [
+        { refreshTokenHash: { equals: presented } },
+        { previousRefreshTokenHash: { equals: presented } },
+      ],
+    },
     limit: 1,
     depth: 0,
     overrideAccess: true,
@@ -305,8 +357,21 @@ export async function refreshGrant(
   if (!grant) return invalid
   if (grant.revoked === true) return invalid
 
-  const stored = grant.refreshTokenHash
-  if (typeof stored !== 'string' || !digestsMatch(stored, presented)) {
+  const grantId = grant.id as number | string
+  const current = grant.refreshTokenHash
+  const previous = grant.previousRefreshTokenHash
+
+  // Replay. The row was found on the superseded hash, so this token was already
+  // rotated away from — somebody is presenting a spent secret.
+  if (typeof previous === 'string' && digestsMatch(previous, presented)) {
+    await burnGrant(payload, grantId)
+    return invalid
+  }
+
+  // Belt and braces: the lookup matched one of two columns, so reaching here
+  // means it was the current one. Checked rather than assumed, because a future
+  // change to the query above should fail closed instead of silently accepting.
+  if (typeof current !== 'string' || !digestsMatch(current, presented)) {
     return invalid
   }
 
@@ -315,7 +380,19 @@ export async function refreshGrant(
     return invalid
   }
 
-  return issueTokens(payload, grant.id as number | string)
+  // The ceiling rotation cannot push. A grant past it is finished however fresh
+  // its refresh token is; the connector has to be approved again.
+  const absolute = grant.absoluteExpiresAt
+  if (typeof absolute === 'string' && Date.parse(absolute) <= now()) {
+    return {
+      error: 'invalid_grant',
+      description:
+        'This authorization has reached its maximum lifetime. Reconnect the ' +
+        'application to approve it again.',
+    }
+  }
+
+  return issueTokens(payload, grantId, current)
 }
 
 /**

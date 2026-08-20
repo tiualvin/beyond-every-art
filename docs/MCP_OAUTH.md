@@ -134,16 +134,38 @@ Each of these is a decision rather than a default, and the tests under
   error. Those cases get a dead-end page.
 - **The authorization request is sealed, not hidden.** The consent form carries
   one signed opaque field rather than the OAuth parameters, so the POST cannot
-  read a `redirect_uri` a user edited in the DOM. This doubles as the form's
-  CSRF defence.
+  read a `redirect_uri` a user edited in the DOM. The seal also names the user
+  it was rendered for and the POST refuses a mismatch, so it cannot be obtained
+  by one account and spent in another's browser. It is _not_ the CSRF defence —
+  an earlier version of this document said it was. A seal is a bearer value, not
+  a per-session token; what stops a forged cross-site POST is Payload's
+  `SameSite=Lax` session cookie and its `csrf` origin allowlist.
+- **The consent page refuses to be framed.** `X-Frame-Options: DENY` and
+  `frame-ancestors 'none'` are set on the response itself rather than left to
+  the site-wide policy, which is report-only until `CSP_MODE=enforce` and which
+  omits `X-Frame-Options` globally for Live Preview's sake. Neither reason
+  applies to a page with an Approve button on it.
 - **Nothing is stored in a replayable form.** Codes and both token kinds are
   kept as HMACs under `PAYLOAD_SECRET`, so rotating that secret revokes every
   connector — the same property the API keys already have.
-- **Refresh tokens rotate, and a replay burns the grant.** A presented token the
-  grant no longer holds means either a thief or a client that lost the rotation,
-  and the two cannot be told apart — so access stops for both rather than
-  continuing for one.
-- **A replayed authorization code burns the grant** for the same reason.
+- **Refresh tokens rotate, and a replay burns the grant.** The grant remembers
+  one generation back (`previousRefreshTokenHash`), which is what makes replay
+  detectable at all: without it a rotated-away token hashes to a value no row
+  holds, so presenting a stolen secret is indistinguishable from presenting a
+  made-up one and the grant carries on serving the thief. Matching the
+  superseded hash means the secret leaked, so everything issued under that grant
+  stops — including the pair the rotation just produced, which is what a thief
+  would be holding.
+- **A replayed authorization code burns the grant** for the same reason. The
+  code hash is deliberately kept after redemption rather than nulled; nulling it
+  looked tidy and quietly disabled this, because the replayed code then matched
+  no row.
+- **A grant has an absolute lifetime of ninety days**, set at consent and never
+  extended by a refresh. Rotation alone gives a stolen chain an indefinite life,
+  since every refresh pushes the expiry out again. The cost is real and stated
+  here rather than left as a surprise: **a connector stops working after ninety
+  days until somebody approves it again**, and an unattended one will simply
+  stop. See [Revoking](#revoking) for what that looks like.
 - **The client name is attacker-controlled** and is escaped everywhere it is
   rendered. It is the one string on the consent page that anybody can choose,
   and it sits next to an Approve button on a page carrying an admin session.
@@ -169,6 +191,12 @@ error, which is why they are not.
 
 An access token already issued stays valid until it expires (one hour) unless
 the grant is revoked, which takes effect on the next request.
+
+Grants also expire on their own after ninety days, whatever their tokens say.
+When that happens the connector's next refresh fails with `invalid_grant` and
+the client asks to be authorized again — reconnect it and approve the consent
+screen. Nothing is lost; a new grant replaces the old one. If a scheduled task
+goes quiet, this is the first thing to check.
 
 ## What is not built
 

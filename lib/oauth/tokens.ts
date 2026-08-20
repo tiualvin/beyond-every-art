@@ -89,3 +89,20 @@ export function digestsMatch(a: string, b: string): boolean {
 export const CODE_TTL_MS = 60_000
 export const ACCESS_TOKEN_TTL_MS = 60 * 60_000
 export const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60_000
+
+/**
+ * The ceiling that rotation cannot push.
+ *
+ * Every refresh moves `REFRESH_TOKEN_TTL_MS` another thirty days out, so on its
+ * own a chain never ages out — a thief who keeps refreshing keeps access for as
+ * long as they bother to. This is measured from the moment consent was given
+ * and is never extended, so a grant has a definite end whatever happens to its
+ * tokens.
+ *
+ * Ninety days is chosen to be long enough that re-approving is a chore rather
+ * than an interruption, and short enough that an abandoned connector does not
+ * outlive the person who set it up. The consequence is real and belongs in the
+ * documentation rather than in a surprise: an unattended connector stops
+ * working at ninety days until somebody approves it again.
+ */
+export const GRANT_ABSOLUTE_TTL_MS = 90 * 24 * 60 * 60_000

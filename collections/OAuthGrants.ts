@@ -126,7 +126,39 @@ export const OAuthGrants: CollectionConfig = {
       index: true,
       admin: { readOnly: true },
     },
+    {
+      // The hash of the refresh token this grant last rotated away from.
+      //
+      // Kept for exactly one reason: without it, replay is undetectable. A
+      // rotated-away token hashes to a value no row holds, so presenting it
+      // looks identical to presenting a token that never existed — the lookup
+      // simply misses and the grant is left running. Remembering one generation
+      // is what turns "unknown token" into "this grant's previous token", which
+      // is the signature of a stolen one.
+      name: 'previousRefreshTokenHash',
+      type: 'text',
+      index: true,
+      admin: { readOnly: true },
+    },
     { name: 'refreshTokenExpiresAt', type: 'date', admin: { readOnly: true } },
+    {
+      // When this grant stops working however diligently it is refreshed.
+      //
+      // Rotation alone gives a stolen chain an indefinite life: every refresh
+      // pushes the expiry another thirty days out, so a thief who keeps
+      // refreshing is never timed out. This is the ceiling that does not move.
+      // The cost is honest and worth stating — a connector has to be approved
+      // again when it is reached, and an unattended one will stop until
+      // somebody does.
+      name: 'absoluteExpiresAt',
+      type: 'date',
+      admin: {
+        readOnly: true,
+        description:
+          'The grant stops working after this, whatever its tokens say. ' +
+          'Re-approve the connector to continue.',
+      },
+    },
     {
       name: 'revoked',
       type: 'checkbox',
@@ -135,8 +167,8 @@ export const OAuthGrants: CollectionConfig = {
       admin: {
         readOnly: true,
         description:
-          'Set when a refresh token is replayed, which is the signature of a ' +
-          'stolen token — see `lib/oauth/grants.ts`.',
+          'Set when a refresh token or authorization code is replayed, which ' +
+          'is the signature of a stolen one — see `lib/oauth/grants.ts`.',
       },
     },
   ],
