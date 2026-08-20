@@ -34,7 +34,7 @@ const root = resolve(import.meta.dirname, '../..')
 const SOURCES = ['collections', 'globals', 'blocks']
 
 /** Initialisms this project writes into field names. Extend as they appear. */
-const INITIALISMS = ['URL', 'ID', 'HTML']
+const INITIALISMS = ['URL', 'URI', 'ID', 'HTML', 'API']
 
 /** A lone capital between spaces — "Canonical U R L" — is a split initialism. */
 const STRANDED_LETTER = /(^|\s)[A-Z](?=\s|$)/

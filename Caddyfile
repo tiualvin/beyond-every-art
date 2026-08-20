@@ -21,6 +21,14 @@
   # under `/api/media/file/` are every uploaded image, and `/api/preview` is how
   # an editor's draft session reaches the frontend.
   #
+  # `/oauth*` and `/.well-known/oauth-*` join them for the same reason as the
+  # admin panel. Both hostnames resolve to the same VPS and serve the same
+  # application, so without this the authorization server would answer on the
+  # address readers use — a consent screen and a token endpoint on the public
+  # site, and a discovery document advertising them. The issuer is the CMS
+  # origin (`lib/oauth/config.ts` derives it from CMS_ADDRESS, never from the
+  # request's Host), so nothing legitimate ever asks for these here.
+  #
   # `/api/media/file/*` and not `/api/media*`, because those are different
   # things. The first is the uploads themselves. The second also includes the
   # collection endpoint, which is `read: publicRead` — so the exception as
@@ -36,7 +44,7 @@
   # address rather than through this proxy, so refusing it here costs the site
   # nothing and stops an anonymous caller reading the migration's URL map.
   @staffOnly {
-    path /api* /admin* /redirects-map*
+    path /api* /admin* /redirects-map* /oauth* /.well-known/oauth-*
     not path /api/media/file/* /api/preview*
   }
 

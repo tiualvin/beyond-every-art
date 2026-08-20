@@ -17,6 +17,8 @@ import { Pages } from './collections/Pages'
 import { Posts } from './collections/Posts'
 import { Redirects } from './collections/Redirects'
 import { Tags } from './collections/Tags'
+import { OAuthClients } from './collections/OAuthClients'
+import { OAuthGrants } from './collections/OAuthGrants'
 import { Users } from './collections/Users'
 import { Footer } from './globals/Footer'
 import { Header } from './globals/Header'
@@ -80,6 +82,12 @@ export default buildConfig({
     Members,
     NewsletterSignups,
     BillingEvents,
+    // The OAuth layer's storage. Registered unconditionally, like the MCP
+    // plugin's own key collection and for the same reason: the database schema
+    // must not depend on whether an environment variable is set, or turning the
+    // feature on becomes a migration rather than a restart.
+    OAuthClients,
+    OAuthGrants,
   ],
   // Schema changes ship as reviewed SQL in `migrations/`, never as an implicit
   // push. `push` defaults to on outside production, which would let a developer

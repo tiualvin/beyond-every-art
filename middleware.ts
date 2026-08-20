@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 
 import {
+  configuredLimit,
   clientKey,
   FixedWindowRateLimiter,
   TOO_MANY_REQUESTS_BODY,
@@ -40,8 +41,17 @@ const forgotPasswordLimiter = new FixedWindowRateLimiter(3, 60 * 60_000)
  * password guessing but does nothing about volume: each attempt still costs a
  * user lookup and a bcrypt comparison, which is deliberately expensive. This
  * caps how many of those a single source can buy.
+ *
+ * Configurable for the same reason the other limiters are: the end-to-end suite
+ * drives every flow from one address, and the OAuth spec signs in once per test
+ * — which, with CI's retries, goes past a production-tight allowance and fails
+ * as a rate limit rather than as the bug it looks like. Twenty stays the policy;
+ * `playwright.config.ts` raises it for the suite only.
  */
-const loginLimiter = new FixedWindowRateLimiter(20, 15 * 60_000)
+const loginLimiter = new FixedWindowRateLimiter(
+  configuredLimit('RATE_LIMIT_LOGIN_PER_15M', 20),
+  15 * 60_000,
+)
 
 /** The auth routes above, matched against the pathname Payload serves them on. */
 function authLimiterFor(pathname: string): FixedWindowRateLimiter | null {
@@ -167,13 +177,22 @@ export const config = {
   // endpoint — and every call would also trigger a redirect-map fetch it has no
   // use for. The endpoints authenticate themselves by signature instead.
   //
+  // `oauth` is excluded for a third instance of the same shape. The
+  // authorization endpoints are how a credential is *obtained*, so a gate in
+  // front of them has nothing to check yet: with STAGING_BASIC_AUTH set, a
+  // connector's registration and token calls would be answered 401 by the
+  // staging gate rather than by the OAuth layer, and the consent page would
+  // prompt for a second, unrelated password before the person could approve
+  // anything. `/.well-known/*` needs no entry — it contains a dot, so the
+  // asset rule at the end of this matcher already excludes it.
+  //
   // `csp-report` is excluded for the same shape of reason. Browsers post
   // violation reports with no credentials, so on a staging deployment the Basic
   // Auth gate would answer every report with a 401 — and staging, where the
   // policy is tuned before enforcement, is precisely where the reports need to
   // arrive. Each report would also pull the redirect map for nothing.
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|admin|api|webhooks|csp-report|redirects-map|sitemap.xml|robots.txt|rss|.*\\..*).*)',
+    '/((?!_next/static|_next/image|favicon.ico|admin|api|oauth|webhooks|csp-report|redirects-map|sitemap.xml|robots.txt|rss|.*\\..*).*)',
     // The one deliberate exception to the `api` exclusion above. Payload's
     // auth routes are matched so `authLimiterFor` can throttle them, and the
     // handler returns immediately for anything it matches, so nothing else in
