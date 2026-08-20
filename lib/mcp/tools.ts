@@ -23,7 +23,12 @@ import {
   markdownToLexical,
   type MarkdownCollection,
 } from './markdown'
-import { decodeImageUpload } from './upload'
+import { decodeImageUpload, vetImageBytes } from './upload'
+import { MAX_AGENT_UPLOAD_BYTES } from '../security/uploads'
+import {
+  fetchPublicBytes,
+  OutboundFetchError,
+} from '../security/outbound-fetch'
 
 type McpTool = NonNullable<NonNullable<MCPPluginConfig['mcp']>['tools']>[number]
 
@@ -382,6 +387,114 @@ export const mcpTools: McpTool[] = [
         .describe(
           'Preferred filename. Sanitised, and its extension is replaced with ' +
             'the real format. Defaults to something derived from the alt text.',
+        ),
+    },
+  },
+  {
+    description:
+      'Add an image to the Media library by giving its https address, and ' +
+      "return its id for use as a post's featuredImage via `updatePosts`. " +
+      'Use this rather than `uploadMedia` from any client that cannot hold a ' +
+      'whole file in a message — a phone connector, a scheduled run. Accepts ' +
+      'PNG, JPEG and WebP up to 8MB; SVG is refused. Only public https ' +
+      'addresses are fetched. Images are marked as generated unless told ' +
+      'otherwise, so the archive stays auditable.',
+    handler: async (args: Record<string, unknown>, req: PayloadRequest) => {
+      const {
+        aiGenerated = true,
+        alt,
+        caption,
+        credit,
+        filename,
+        url,
+      } = args as {
+        aiGenerated?: boolean
+        alt: string
+        caption?: string
+        credit?: string
+        filename?: string
+        url: string
+      }
+
+      let fetched
+      try {
+        fetched = await fetchPublicBytes(url, MAX_AGENT_UPLOAD_BYTES)
+      } catch (error) {
+        // The guard's refusals are written for a model to act on, so they are
+        // passed through rather than flattened into a generic failure. Anything
+        // else is not: an unexpected error here describes this server's
+        // internals to a caller who chose the address.
+        if (error instanceof OutboundFetchError) throw error
+        throw new Error('The image could not be downloaded.')
+      }
+
+      // Nothing the response said about the bytes is trusted. The format comes
+      // from the file's own leading bytes, exactly as on the base64 path — a
+      // `Content-Type: image/png` on an SVG buys nothing.
+      const file = vetImageBytes(fetched.bytes, filename ?? alt)
+
+      const created = await req.payload.create({
+        collection: 'media',
+        data: { aiGenerated, alt, caption, credit },
+        file,
+        overrideAccess: false,
+        req,
+        user: req.user as TypedUser,
+      })
+
+      return text({
+        aiGenerated: created.aiGenerated ?? false,
+        alt: created.alt,
+        filename: created.filename,
+        id: created.id,
+        mimetype: file.mimetype,
+        sizeBytes: file.size,
+        sourceUrl: fetched.url,
+        url: created.url,
+      })
+    },
+    name: 'uploadMediaFromUrl',
+    parameters: {
+      aiGenerated: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether the image was generated rather than photographed or drawn. ' +
+            'Defaults to true, which is the safe assumption on this path: an ' +
+            'unmarked generated image is the failure worth avoiding. Pass ' +
+            'false only when relaying a real photograph of a real work.',
+        ),
+      alt: z
+        .string()
+        .min(1)
+        .describe(
+          'Alternative text describing what the image shows. Required.',
+        ),
+      caption: z
+        .string()
+        .optional()
+        .describe('Caption shown under the image, when it has one.'),
+      credit: z
+        .string()
+        .optional()
+        .describe(
+          'Credit line shown after the caption. Say where a generated image ' +
+            'came from here, so a reader sees it and not just an editor.',
+        ),
+      filename: z
+        .string()
+        .optional()
+        .describe(
+          'Preferred filename. Sanitised, and its extension is replaced with ' +
+            'the real format. Defaults to something derived from the alt text.',
+        ),
+      url: z
+        .string()
+        .min(1)
+        .describe(
+          'The https address of the image. Must be publicly reachable: ' +
+            'private, loopback and link-local addresses are refused, at every ' +
+            'redirect.',
         ),
     },
   },

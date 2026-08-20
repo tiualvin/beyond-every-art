@@ -4,6 +4,7 @@ import * as migration_20260812_045137_add_media_ai_generated_and_upload_tool fro
 import * as migration_20260813_060733_add_apps_and_waitlist from './20260813_060733_add_apps_and_waitlist';
 import * as migration_20260820_005134_add_oauth_clients_and_grants from './20260820_005134_add_oauth_clients_and_grants';
 import * as migration_20260820_050554_add_oauth_replay_detection from './20260820_050554_add_oauth_replay_detection';
+import * as migration_20260820_122559_add_upload_media_from_url_capability from './20260820_122559_add_upload_media_from_url_capability';
 
 export const migrations = [
   {
@@ -34,6 +35,11 @@ export const migrations = [
   {
     up: migration_20260820_050554_add_oauth_replay_detection.up,
     down: migration_20260820_050554_add_oauth_replay_detection.down,
-    name: '20260820_050554_add_oauth_replay_detection'
+    name: '20260820_050554_add_oauth_replay_detection',
+  },
+  {
+    up: migration_20260820_122559_add_upload_media_from_url_capability.up,
+    down: migration_20260820_122559_add_upload_media_from_url_capability.down,
+    name: '20260820_122559_add_upload_media_from_url_capability'
   },
 ];
