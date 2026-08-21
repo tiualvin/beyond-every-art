@@ -197,6 +197,45 @@ test.describe('MCP endpoint', () => {
     expect(read).toContain('emphasis')
   })
 
+  // The guard on `uploadMediaFromUrl`, over the wire rather than in isolation.
+  // This tool makes the server fetch an address its caller chose, and the server
+  // can reach a database, sibling containers by name, and on some hosts a
+  // metadata service that hands out credentials. The unit tests cover the
+  // address rules; this proves those rules are wired into the tool a client can
+  // actually call, which is the part a refactor could quietly break.
+  test('refuses to fetch anything that is not a public https address', async ({
+    request,
+  }) => {
+    const refused = [
+      'http://127.0.0.1:3000/health',
+      'https://127.0.0.1/x.png',
+      'https://169.254.169.254/latest/meta-data/',
+      'https://[::1]/x.png',
+      'https://localhost/x.png',
+      'file:///etc/passwd',
+    ]
+
+    for (const url of refused) {
+      const result = await callTool(
+        request,
+        fixtures.mcp.editorKey,
+        'uploadMediaFromUrl',
+        { alt: 'A probe that must never be fetched.', url },
+      )
+
+      // The refusal has to name the reason — the caller is a model, and a
+      // generic failure invites it to retry the same way.
+      expect(result, url).toMatch(
+        /not a public address|Only https URLs|not a valid URL/,
+      )
+      // And nothing may have been stored. `sourceUrl` is only in the success
+      // response, so its absence is the check — `id` appears in the JSON-RPC
+      // envelope of every reply, error or not.
+      expect(result, url).toContain('"isError":true')
+      expect(result, url).not.toContain('sourceUrl')
+    }
+  })
+
   test('refuses an editor key trying to publish', async ({ request }) => {
     const slug = `e2e-mcp-guard-${Date.now()}-${Math.floor(Math.random() * 1e6)}`
 

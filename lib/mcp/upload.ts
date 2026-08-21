@@ -121,12 +121,27 @@ export function decodeImageUpload(input: {
     )
   }
 
-  const data = Buffer.from(encoded, 'base64')
+  return vetImageBytes(Buffer.from(encoded, 'base64'), input.filename)
+}
+
+/**
+ * Vets decoded bytes and names the file, whatever route they arrived by.
+ *
+ * Shared by the base64 tool and the URL one, and that sharing is the point: the
+ * format is read from the file's own leading bytes rather than from anything
+ * the caller said about it, so a `Content-Type: image/png` on a downloaded SVG
+ * is worth exactly as much as a claimed MIME type in a tool call — nothing.
+ * Two code paths agreeing on that by construction is better than two remembering
+ * to.
+ */
+export function vetImageBytes(data: Buffer, filename?: string): DecodedUpload {
   if (data.length > MAX_UPLOAD_BYTES) {
     throw new Error(
       `The image is larger than the ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)}MB limit for MCP uploads.`,
     )
   }
+
+  if (data.length === 0) throw new Error('No image data was supplied.')
 
   const signature = SIGNATURES.find((candidate) => candidate.matches(data))
   if (!signature) {
@@ -139,7 +154,7 @@ export function decodeImageUpload(input: {
   return {
     data,
     mimetype: signature.mimetype,
-    name: safeUploadName(input.filename, signature.extension),
+    name: safeUploadName(filename, signature.extension),
     size: data.length,
   }
 }

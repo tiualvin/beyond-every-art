@@ -26,6 +26,7 @@ import {
   mcpRefusedLogEntry,
 } from './audit'
 import { methodNotAllowedError, rateLimitedError } from './errors'
+import { recordMcpAuthFailure } from '../observability/alert'
 import { oauthEnabled } from '../oauth/config'
 import { resolveAccessToken } from '../oauth/grants'
 import { isAccessToken } from '../oauth/tokens'
@@ -198,6 +199,7 @@ export const mcpPluginConfig: MCPPluginConfig = {
       if (!oauthEnabled()) {
         failedAuthLimiter.check(source)
         logMcpEvent(mcpRefusedLogEntry({ caller, reason: 'unauthorized' }))
+        recordMcpAuthFailure(req.headers)
         throw new UnauthorizedError()
       }
 
@@ -205,6 +207,7 @@ export const mcpPluginConfig: MCPPluginConfig = {
       if (!grant) {
         failedAuthLimiter.check(source)
         logMcpEvent(mcpRefusedLogEntry({ caller, reason: 'unauthorized' }))
+        recordMcpAuthFailure(req.headers)
         throw new UnauthorizedError()
       }
 
@@ -243,6 +246,8 @@ export const mcpPluginConfig: MCPPluginConfig = {
       // of guessed keys against a publicly reachable endpoint is invisible.
       failedAuthLimiter.check(source)
       logMcpEvent(mcpRefusedLogEntry({ caller, reason: 'unauthorized' }))
+      // And without this one it is visible only to whoever goes looking.
+      recordMcpAuthFailure(req.headers)
       throw error
     }
 

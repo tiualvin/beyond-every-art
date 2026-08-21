@@ -26,7 +26,19 @@ describe('mcpTools', () => {
       'readArticleMarkdown',
       'updateArticleMarkdown',
       'uploadMedia',
+      'uploadMediaFromUrl',
     ])
+  })
+
+  // The base64 tool cannot be called from a connector — the bytes would have to
+  // pass through the model's context — so a client that can only hand over a
+  // link needs the URL one to exist and to say so in its description. This
+  // asserts the pair stays a pair.
+  it('offers a way to illustrate that does not go through the model', () => {
+    const fromUrl = mcpTools.find((tool) => tool.name === 'uploadMediaFromUrl')
+    expect(fromUrl).toBeDefined()
+    expect(fromUrl!.description).toMatch(/https/)
+    expect(fromUrl!.description).toMatch(/phone|scheduled/)
   })
 
   it('describes every tool, since that is what a client selects on', () => {

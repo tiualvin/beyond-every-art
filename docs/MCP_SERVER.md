@@ -22,7 +22,9 @@
   depends on it —
   [Finding 2](#finding-2-ghostid-blocks-authoring-new-articles--resolved). And
   no key carries an expiry or a last-used stamp —
-  [Finding 10](#finding-10-key-lifecycle--open).
+  [Finding 10](#finding-10-key-lifecycle--open). Note that an _OAuth_ grant does
+  expire, after ninety days — see [`MCP_OAUTH.md`](MCP_OAUTH.md); this is about
+  the bearer API keys.
 - **Unchanged constraint:** none of this may displace migration or cutover work.
   See [`docs/CUTOVER_RUNBOOK.md`](CUTOVER_RUNBOOK.md).
 
@@ -106,6 +108,7 @@ Written for this project, because the generated ones cannot do the job:
 | `readArticleMarkdown`   | Reads a post back as Markdown, including the draft body. Says so plainly when the document renders from migrated `legacyHTML` instead. |
 | `updateArticleMarkdown` | Replaces a body from Markdown, saved as a draft.                                                                                       |
 | `uploadMedia`           | Adds an image to the Media library from base64 and returns its id, for `updatePosts` to set as a `featuredImage`.                      |
+| `uploadMediaFromUrl`    | The same, from an https address the server fetches itself. The only one of the two that works from a phone or a scheduled run.         |
 
 ### Images
 
@@ -127,7 +130,42 @@ would be a stored cross-site scripting vector. No image generator emits SVG, so
 nothing is lost on this path; uploading one through the admin panel, where a
 person chose the file, is unchanged.
 
-Uploading is one call; attaching is the next one. `uploadMedia` returns the new
+**`uploadMedia` cannot be used from a chat client, and `uploadMediaFromUrl`
+exists because of it.** Base64 arrives inside the tool call, which means the
+bytes pass through the model's context: eight megabytes of image is roughly
+eleven megabytes of text, which no connector will ever emit and no model should
+be asked to. The base64 path is for a CLI agent that already holds the file. Any
+client that has a _link_ to an image — which is every client that just generated
+one — should use the URL tool instead.
+
+That tool makes this server fetch an address its caller chose, which is the
+classic server-side request forgery shape: the process sits inside a private
+network with a database, containers reachable by name, and on some hosts a
+metadata service that hands credentials to anything that asks.
+[`lib/security/outbound-fetch.ts`](../lib/security/outbound-fetch.ts) is the
+guard, and four things hold:
+
+- **https only.** `file:`, `data:` and plain `http:` are refused rather than
+  upgraded — anyone who can answer for a name on the local network can answer
+  plaintext.
+- **Every resolved address is checked, not the hostname.** A name is not an
+  address: `localtest.me` resolves to `127.0.0.1`, and anybody can publish a
+  record pointing anywhere. All answers are checked, so a name resolving to one
+  public and one private address is refused rather than gambled on.
+- **The checked address is the one connected to.** Validating a name and then
+  handing the name to an HTTP client re-resolves it, and a DNS server under the
+  caller's control can answer differently the second time. The address is pinned
+  through a custom `lookup`; TLS still verifies against the hostname, so pinning
+  costs no certificate checking.
+- **Redirects are followed by hand**, three at most, each re-validated. A public
+  first hop redirecting to a private second one is exactly what automatic
+  following would have missed.
+
+Nothing the response says about the bytes is trusted either. Both tools end at
+the same `vetImageBytes`, which reads the format from the file's leading bytes —
+a `Content-Type: image/png` on a downloaded SVG buys nothing.
+
+Uploading is one call; attaching is the next one. Either tool returns the new
 document's id, and `updatePosts` sets it as `featuredImage`.
 
 That second call only works on a **draft**. Payload sends a document's existing
@@ -633,14 +671,23 @@ Until then, the operating habit in
 [Finding 5](#finding-5-edits-are-not-attributable--built) is what stands in for
 it: one key per client, labelled for the client that holds it.
 
-### Finding 11: nothing watches the refusals — open
+### Finding 11: nothing watches the refusals — built
 
 `mcp_refused` with `reason: unauthorized` is the line that says somebody is
-guessing at the endpoint's only credential, and the only way it reaches a person
-is `docker compose logs app | grep mcp_`, typed by someone who already suspects
-something. [`lib/observability/webhook.ts`](../lib/observability/webhook.ts)
-exists and a threshold alert on that line is cheap. Not built, because it is a
-question about where an alert should go rather than about MCP.
+guessing at the endpoint's only credential, and the only way it reached a person
+was `docker compose logs app | grep mcp_`, typed by someone who already suspected
+something. The evidence existed and the alarm did not.
+
+[`lib/observability/alert.ts`](../lib/observability/alert.ts) closes it. Ten
+failed authentications from one address inside five minutes posts once to
+`ALERT_WEBHOOK_URL`, then stays quiet for fifteen minutes — an alarm that repeats
+is an alarm that gets muted. Unset the variable and nothing is sent and no
+outbound request is ever made, which is the default.
+
+The threshold sits just under the rate limiter's own (ten failures per address
+per fifteen minutes), so the refusal and the notice arrive together rather than
+the refusal arriving alone. No credential is in the body: the refusal line
+already truncates a presented key, and an alert ends up in a chat room.
 
 ## Recommended shape
 
