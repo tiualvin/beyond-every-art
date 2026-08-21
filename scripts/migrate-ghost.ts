@@ -21,6 +21,7 @@ import { resolve } from 'node:path'
 
 import { parseGhostExport } from '../lib/migration/ghost-export'
 import { buildMigrationPlan, summarizePlan } from '../lib/migration/plan'
+import { SLUG_RULE } from '../lib/seo/slug-format'
 
 interface Cli {
   dryRun: boolean
@@ -124,6 +125,11 @@ function buildWarnings(conflicts: {
     ghostID: string
     slug: string
   }>
+  malformedSlugs: Array<{
+    collection: 'posts' | 'pages'
+    ghostID: string
+    slug: string
+  }>
   missingAuthors: string[]
   missingTags: string[]
 }): string[] {
@@ -136,6 +142,13 @@ function buildWarnings(conflicts: {
   if (conflicts.reservedSlugs.length > 0) {
     warnings.push(
       `Content uses application-reserved root slugs and needs an explicit replacement slug plus redirect before import: ${conflicts.reservedSlugs
+        .map((item) => `${item.collection}:${item.ghostID} (${item.slug})`)
+        .join(', ')}`,
+    )
+  }
+  if (conflicts.malformedSlugs.length > 0) {
+    warnings.push(
+      `Slugs Payload will refuse (${SLUG_RULE}); fix them in Ghost or supply a replacement slug plus redirect before import: ${conflicts.malformedSlugs
         .map((item) => `${item.collection}:${item.ghostID} (${item.slug})`)
         .join(', ')}`,
     )

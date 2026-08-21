@@ -17,11 +17,7 @@
   have an authorization server to talk to — see
   [`MCP_OAUTH.md`](MCP_OAUTH.md). It is off by default and separate from
   `MCP_ENABLED`.
-- **Still open:** the
-  `ghostID` relaxation waits on the final Ghost import, though drafting no longer
-  depends on it —
-  [Finding 2](#finding-2-ghostid-blocks-authoring-new-articles--resolved). And
-  no key carries an expiry or a last-used stamp —
+- **Still open:** no key carries an expiry or a last-used stamp —
   [Finding 10](#finding-10-key-lifecycle--open). Note that an _OAuth_ grant does
   expire, after ninety days — see [`MCP_OAUTH.md`](MCP_OAUTH.md); this is about
   the bearer API keys.
@@ -102,13 +98,13 @@ all.
 
 Written for this project, because the generated ones cannot do the job:
 
-| Tool                    | Does                                                                                                                                   |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `draftArticle`          | Creates a post from Markdown, always as a draft. Mints the `ghostID`, resolves tag and author slugs, refuses unknown ones.             |
-| `readArticleMarkdown`   | Reads a post back as Markdown, including the draft body. Says so plainly when the document renders from migrated `legacyHTML` instead. |
-| `updateArticleMarkdown` | Replaces a body from Markdown, saved as a draft.                                                                                       |
-| `uploadMedia`           | Adds an image to the Media library from base64 and returns its id, for `updatePosts` to set as a `featuredImage`.                      |
-| `uploadMediaFromUrl`    | The same, from an https address the server fetches itself. The only one of the two that works from a phone or a scheduled run.         |
+| Tool                    | Does                                                                                                                                                 |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `draftArticle`          | Creates a post from Markdown, always as a draft. Resolves tag and author slugs, refuses unknown ones. The `ghostID` is autofilled by the collection. |
+| `readArticleMarkdown`   | Reads a post back as Markdown, including the draft body. Says so plainly when the document renders from migrated `legacyHTML` instead.               |
+| `updateArticleMarkdown` | Replaces a body from Markdown, saved as a draft.                                                                                                     |
+| `uploadMedia`           | Adds an image to the Media library from base64 and returns its id, for `updatePosts` to set as a `featuredImage`.                                    |
+| `uploadMediaFromUrl`    | The same, from an https address the server fetches itself. The only one of the two that works from a phone or a scheduled run.                       |
 
 ### Images
 
@@ -412,17 +408,29 @@ without one. That change must not happen before the final import, because
 `required: true` is currently what guarantees every migrated document carries
 its identifier.
 
-The interim answer turned out to be better than expected, and needed no schema
-change at all. `draftArticle` mints a namespaced synthetic identifier —
-`native:<uuid>` — which satisfies the field without weakening it: it cannot
-collide with a Ghost ObjectID, and `validateContent` in
-[`lib/migration/validate.ts`](../lib/migration/validate.ts) keys on the IDs the
-export actually contains, so an extra natively authored post produces no
-validation issue. `isClean` checks issues, not counts. The prefix also makes
-these documents greppable when the field is eventually relaxed.
+The interim answer needed no schema change at all. `draftArticle` minted a
+namespaced synthetic identifier — `native:<uuid>` — which satisfied the field
+without weakening it: it cannot collide with a Ghost ObjectID, and
+`validateContent` in [`lib/migration/validate.ts`](../lib/migration/validate.ts)
+keys on the IDs the export actually contains, so an extra natively authored post
+produces no validation issue. `isClean` checks issues, not counts.
 
-So drafting works today. The relaxation is still worth doing after the final
-import, but it is now a tidying task rather than a blocker.
+**The relaxation has since landed, ahead of the final import rather than after
+it, because the guard it removed could be put somewhere better.** `required` is
+now off and the field autofills the same `native:<uuid>` for any document
+created without one — so an editor writing a page in the admin panel no longer
+invents a Ghost identifier, which was the half of this finding no MCP tool could
+reach. `draftArticle` stopped minting its own; the field does it for every
+client at once.
+
+What `required: true` was actually protecting — that no _migrated_ document
+arrives without its Ghost identifier, because a rerun could not then match it
+and would duplicate rather than update — is now enforced in
+[`lib/migration/import.ts`](../lib/migration/import.ts), which refuses to upsert
+a record with an empty `ghostID`. That is a better place for it: the check runs
+where the failure means something, and it says so, instead of surfacing as a
+required-field error on a form nobody filled in. `tests/migration/import.test.ts`
+holds it.
 
 ### Finding 3: Lexical bodies need a markdown tool — built
 
@@ -697,7 +705,6 @@ already truncates a presented key, and an alert ends up in a chat room.
    [`DATABASE_MIGRATIONS.md`](DATABASE_MIGRATIONS.md). The remaining operator
    step is baselining the existing VPS database, item 0 in
    [`DEPLOYMENT_STATUS.md`](DEPLOYMENT_STATUS.md).
-2. Decide the `ghostID` relaxation and sequence it after the final Ghost import.
 
 ### Phases 1 and 2 — built
 
@@ -848,9 +855,10 @@ and none existed. Both halves of that have since stopped being true.
    not cover it. Until that gate exists, keep the plugin disabled in production
    and work against a local database.
 
-Still open: the `ghostID` relaxation in
-[Finding 2](#finding-2-ghostid-blocks-authoring-new-articles), which cannot be
-decided until the final Ghost import is done.
+Still open: nothing from this review that blocks the endpoint. The `ghostID`
+relaxation in
+[Finding 2](#finding-2-ghostid-blocks-authoring-new-articles--resolved) has
+landed; key lifecycle in [Finding 10](#finding-10-key-lifecycle--open) has not.
 
 ## References
 

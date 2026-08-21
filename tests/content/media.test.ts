@@ -52,7 +52,26 @@ describe('toMediaImage', () => {
       height: 1067,
       caption: 'Natural ultramarine, ground by hand.',
       credit: 'Photograph: studio archive',
+      cardUrl: null,
+      ogUrl: null,
     })
+  })
+
+  // Media uploaded before a size was added to the collection has no derivative
+  // for it, and the site has to keep rendering — so a missing size is null and
+  // every caller falls back to the original rather than building a broken URL.
+  it('reads generated sizes when they exist and nulls them when they do not', () => {
+    const image = toMediaImage({
+      ...record,
+      sizes: {
+        card: { url: '/api/media/file/ultramarine-768.jpg', width: 768 },
+        og: {},
+      },
+    })
+
+    expect(image?.cardUrl).toBe('/api/media/file/ultramarine-768.jpg')
+    expect(image?.ogUrl).toBeNull()
+    expect(toMediaImage({ ...record, sizes: null })?.cardUrl).toBeNull()
   })
 
   it('returns null when there is nothing to render', () => {

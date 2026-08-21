@@ -1,6 +1,8 @@
 import type { CollectionConfig } from 'payload'
 
 import { editorsAndAdmins, publishedOrEditors } from '../access/roles'
+import { seoFields } from '../fields/seo'
+import { slugField } from '../fields/slug'
 import { CONTENT_TAGS } from '../lib/cache/content'
 import { purgeOnChange, purgeOnDelete } from '../lib/cache/purge'
 import { buildPreviewUrl } from '../lib/preview/live-preview'
@@ -14,14 +16,15 @@ import { buildPreviewUrl } from '../lib/preview/live-preview'
  * — hence `stage`, and hence store URLs that stay empty until there is
  * somewhere to point them.
  *
- * `slug` deliberately skips `validateRootContentSlug`. These live under
+ * `slug` deliberately skips the reserved-route check. These live under
  * `/apps/<slug>`, not at the root, so they cannot collide with a migrated
- * Ghost post or page.
+ * Ghost post or page — see `fields/slug.ts`.
  */
 export const Apps: CollectionConfig = {
   slug: 'apps',
   labels: { singular: 'App', plural: 'Apps' },
   admin: {
+    group: 'Apps',
     useAsTitle: 'name',
     defaultColumns: ['name', 'stage', 'order', '_status'],
     description:
@@ -35,6 +38,8 @@ export const Apps: CollectionConfig = {
     update: editorsAndAdmins,
     delete: editorsAndAdmins,
   },
+  // See the note in Posts.ts. An app page is a published URL like any other.
+  trash: true,
   hooks: {
     afterChange: [purgeOnChange(CONTENT_TAGS.apps)],
     afterDelete: [purgeOnDelete(CONTENT_TAGS.apps)],
@@ -43,7 +48,7 @@ export const Apps: CollectionConfig = {
   defaultSort: 'order',
   fields: [
     { name: 'name', type: 'text', required: true },
-    { name: 'slug', type: 'text', required: true, unique: true, index: true },
+    slugField({ from: 'name' }),
     {
       name: 'tagline',
       type: 'text',
@@ -169,7 +174,6 @@ export const Apps: CollectionConfig = {
       index: true,
       admin: { description: 'Low to high. Ties fall back to name.' },
     },
-    { name: 'metaTitle', type: 'text' },
-    { name: 'metaDescription', type: 'textarea' },
+    ...seoFields(),
   ],
 }
