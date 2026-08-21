@@ -97,8 +97,8 @@ describe('AppWaitlist collection', () => {
 })
 
 describe('app paths', () => {
-  it('has no trailing slash, matching the other post-migration routes', () => {
-    expect(APPS_PATH).toBe('/apps')
-    expect(appPath('dapple')).toBe('/apps/dapple')
+  it('carries the trailing slash, like every other route the site serves', () => {
+    expect(APPS_PATH).toBe('/apps/')
+    expect(appPath('dapple')).toBe('/apps/dapple/')
   })
 })

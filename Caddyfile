@@ -57,6 +57,28 @@
   }
 }
 
+# The same site under its other name, sent to the canonical one.
+#
+# `www.beyondeveryart.com` and `beyondeveryart.com` are separate hosts to a
+# browser, a certificate authority, and a search engine. Ghost answers on both
+# and treats the `www` form as canonical, so that is the host every indexed URL
+# and every inbound link uses, and the host this deployment has to keep serving.
+# The other one still has to answer — people type it, and old links use it — but
+# it must not serve the site, because two hosts serving identical pages is a
+# duplicate of every URL the site has.
+#
+# 301 rather than 302: this is permanent, and only a permanent redirect passes
+# the accumulated ranking signal on to the destination. `{uri}` carries the path
+# and query through, so a deep link keeps working rather than landing on the
+# homepage.
+#
+# Set SITE_REDIRECT_FROM to the non-canonical host. Leaving it unset disables
+# the block, which is what a local or staging deployment wants: Caddy would
+# otherwise try, and fail, to get a certificate for a name that does not exist.
+{$SITE_REDIRECT_FROM:redirect-disabled.localhost} {
+  redir https://{$SITE_ADDRESS:localhost}{uri} permanent
+}
+
 # CMS and staff tooling: Payload Admin and the MCP endpoint.
 #
 # A separate hostname so the VPS can hold a real certificate — and a working

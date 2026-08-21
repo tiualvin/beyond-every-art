@@ -112,7 +112,7 @@ export default defineConfig({
   webServer: startsLocalServer
     ? {
         ...(process.env.CI ? productionServer : developmentServer),
-        url: `${localOrigin}/health`,
+        url: `${localOrigin}/health/`,
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,
       }

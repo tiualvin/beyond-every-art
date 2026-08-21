@@ -110,7 +110,7 @@ services:
       test:
         [
           'CMD-SHELL',
-          'node -e "fetch(''http://localhost:3000/health'').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"',
+          'node -e "fetch(''http://localhost:3000/health/'').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"',
         ]
       interval: 30s
       timeout: 5s
@@ -151,8 +151,16 @@ services:
     depends_on:
       - app
     environment:
-      # Set to your domain (e.g. beyondeveryart.com) for automatic HTTPS.
+      # Set to your domain — the exact host the site canonicalises to, `www`
+      # included if it has one (e.g. www.beyondeveryart.com) — for automatic
+      # HTTPS. SITE_REDIRECT_FROM is the other name, permanently redirected to
+      # it, and is left unset where that name does not resolve.
       SITE_ADDRESS: ${SITE_ADDRESS:-localhost}
+      # The default is a name that resolves nowhere on purpose: an unset value
+      # would make Caddy read the redirect block as a site called "" and fail to
+      # start, and a real-looking default would have it request a certificate
+      # for a domain this deployment does not own.
+      SITE_REDIRECT_FROM: ${SITE_REDIRECT_FROM:-redirect-disabled.localhost}
       # Staff hostname serving Payload Admin and the MCP endpoint, e.g.
       # cms.beyondeveryart.com. See the Caddyfile.
       CMS_ADDRESS: ${CMS_ADDRESS:-cms.localhost}
@@ -192,6 +200,44 @@ services:
       # and an import that wrote into its own throwaway container would leave
       # the media rows in the database with no files behind them.
       - media_data:/app/media
+
+  # Nightly sweep that asks Stripe what it is actually billing and records the
+  # answer. Webhooks are an optimisation over polling, not a guarantee, and once
+  # Ghost is switched off nothing else is listening — so the cutover runbook
+  # requires this to be scheduled before Ghost's Stripe connection is removed.
+  #
+  # It stays inert, and says so in its log, until STRIPE_SECRET_KEY exists. That
+  # key arrives through the env file rather than being named below, so the
+  # secret is never written into a committed file or shown by
+  # `docker compose config`.
+  reconcile:
+    build:
+      context: .
+      target: reconciler
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: ${LOG_MAX_SIZE:-10m}
+        max-file: '${LOG_MAX_FILES:-3}'
+    # One short-lived Node process a day, holding a page of subscriptions and a
+    # page of members. It boots Payload, so it needs more than the backup job's
+    # `pg_dump | gzip` pipeline and much less than the app's image processing.
+    deploy:
+      resources:
+        limits:
+          memory: ${RECONCILE_MEMORY_LIMIT:-1g}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URI: ${DATABASE_URI:-postgresql://payload:payload@postgres:5432/beyond_every_art}
+      PAYLOAD_SECRET: ${PAYLOAD_SECRET}
+      RECONCILE_CRON: ${RECONCILE_CRON:-0 4 * * *}
+      RECONCILE_ON_START: ${RECONCILE_ON_START:-false}
 
   backup:
     build:

@@ -14,6 +14,10 @@ export interface ExpectedContent {
   status: ContentStatus
   hasFeatureImage: boolean
   publishedAt?: string
+  metaTitle?: string
+  metaDescription?: string
+  canonicalURL?: string
+  excerpt?: string
 }
 
 export interface ActualContent {
@@ -22,6 +26,10 @@ export interface ActualContent {
   status: ContentStatus
   hasFeatureImage: boolean
   publishedAt?: string
+  metaTitle?: string
+  metaDescription?: string
+  canonicalURL?: string
+  excerpt?: string
 }
 
 export interface ExpectedRef {
@@ -35,7 +43,28 @@ export interface ActualRef {
 }
 
 export type IssueField =
-  'missing' | 'slug' | 'status' | 'featureImage' | 'publishedAt'
+  | 'missing'
+  | 'slug'
+  | 'status'
+  | 'featureImage'
+  | 'publishedAt'
+  | 'metaTitle'
+  | 'metaDescription'
+  | 'canonicalURL'
+  | 'excerpt'
+
+/**
+ * The text fields the acceptance criteria require to survive the migration:
+ * "SEO titles and descriptions are retained" and "canonical URLs are correct".
+ * The importer writes them, so a silent loss here is invisible until a crawler
+ * reports it.
+ */
+const TEXT_FIELDS = [
+  'metaTitle',
+  'metaDescription',
+  'canonicalURL',
+  'excerpt',
+] as const satisfies readonly IssueField[]
 
 export interface ValidationIssue {
   ghostID: string
@@ -70,10 +99,17 @@ function sameInstant(a?: string, b?: string): boolean {
   return ta === tb
 }
 
+/** Blank, whitespace-only, and absent are the same thing in a text field. */
+function text(value?: string): string | undefined {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : undefined
+}
+
 /**
  * Validate posts or pages. Reports every expected record missing from Payload
  * and every field that drifted: slug, draft/published status, loss of a feature
- * image, or a changed publication date.
+ * image, a changed publication date, or an SEO field the export set and the
+ * import failed to preserve.
  */
 export function validateContent(
   expected: ExpectedContent[],
@@ -132,6 +168,24 @@ export function validateContent(
         field: 'publishedAt',
         expected: item.publishedAt ?? null,
         actual: found.publishedAt ?? null,
+      })
+    }
+
+    // Same rule as the feature image: a value Ghost never had is not a
+    // migration failure. This runs against production after the final import,
+    // where an editor may already have filled in a description Ghost left
+    // empty, and flagging that would train everyone to ignore the report.
+    for (const field of TEXT_FIELDS) {
+      const want = text(item[field])
+      if (!want) continue
+      const got = text(found[field])
+      if (got === want) continue
+      issues.push({
+        ghostID: item.ghostID,
+        slug: item.slug,
+        field,
+        expected: want,
+        actual: got ?? null,
       })
     }
   }

@@ -14,7 +14,7 @@ describe('buildSitemapEntries', () => {
         priority: 1,
       },
       {
-        url: 'https://beyondeveryart.com/journal',
+        url: 'https://beyondeveryart.com/journal/',
         changeFrequency: 'daily',
         priority: 0.8,
       },
@@ -65,7 +65,7 @@ describe('buildSitemapEntries', () => {
     })
     expect(entries.map((e) => e.url)).toEqual([
       'https://beyondeveryart.com/',
-      'https://beyondeveryart.com/journal',
+      'https://beyondeveryart.com/journal/',
       'https://beyondeveryart.com/tag/materials/',
       'https://beyondeveryart.com/author/livia-calderon/',
     ])
@@ -77,18 +77,18 @@ describe('buildSitemapEntries — apps', () => {
 
   it('lists the overview route only once an app is published', () => {
     const empty = buildSitemapEntries({ siteUrl })
-    expect(empty.some((e) => e.url.endsWith('/apps'))).toBe(false)
+    expect(empty.some((e) => e.url.endsWith('/apps/'))).toBe(false)
 
     const withApps = buildSitemapEntries({
       siteUrl,
       apps: [{ slug: 'dapple', updatedAt: '2026-08-01T00:00:00.000Z' }],
     })
     expect(
-      withApps.some((e) => e.url === 'https://beyondeveryart.com/apps'),
+      withApps.some((e) => e.url === 'https://beyondeveryart.com/apps/'),
     ).toBe(true)
   })
 
-  it('builds app URLs without a trailing slash, matching the route', () => {
+  it('builds app URLs with the trailing slash the route serves', () => {
     const entries = buildSitemapEntries({
       siteUrl,
       apps: [
@@ -97,10 +97,10 @@ describe('buildSitemapEntries — apps', () => {
       ],
     })
 
-    const dapple = entries.find((e) => e.url.endsWith('/apps/dapple'))
-    const morrow = entries.find((e) => e.url.endsWith('/apps/morrow'))
+    const dapple = entries.find((e) => e.url.endsWith('/apps/dapple/'))
+    const morrow = entries.find((e) => e.url.endsWith('/apps/morrow/'))
 
-    expect(dapple?.url).toBe('https://beyondeveryart.com/apps/dapple')
+    expect(dapple?.url).toBe('https://beyondeveryart.com/apps/dapple/')
     expect(dapple?.lastModified).toBe('2026-08-01T00:00:00.000Z')
     // Falls back to publishedAt when updatedAt is absent, like posts do.
     expect(morrow?.lastModified).toBe('2026-07-02T00:00:00.000Z')
@@ -111,6 +111,9 @@ describe('buildSitemapEntries — apps', () => {
       siteUrl,
       apps: [{ slug: '' }, { slug: 'dapple' }],
     })
-    expect(entries.filter((e) => e.url.includes('/apps/'))).toHaveLength(1)
+    // The overview is `/apps/` now, so it shares the prefix with every app
+    // page: match a segment underneath it rather than the prefix itself.
+    const appPages = entries.filter((e) => /\/apps\/.+\//.test(e.url))
+    expect(appPages).toHaveLength(1)
   })
 })

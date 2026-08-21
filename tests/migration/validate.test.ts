@@ -91,6 +91,105 @@ describe('validateContent', () => {
     expect(fields).toEqual(['featureImage', 'publishedAt', 'slug', 'status'])
   })
 
+  it('flags SEO metadata the import failed to preserve', () => {
+    const seoExpected: ExpectedContent[] = [
+      {
+        ghostID: 'g1',
+        slug: 'hello-world',
+        status: 'published',
+        hasFeatureImage: false,
+        metaTitle: 'Hello, world',
+        metaDescription: 'A first post.',
+        canonicalURL: 'https://elsewhere.example/hello',
+        excerpt: 'The custom excerpt.',
+      },
+    ]
+    const report = validateContent(seoExpected, [
+      {
+        ghostID: 'g1',
+        slug: 'hello-world',
+        status: 'published',
+        hasFeatureImage: false,
+        metaTitle: 'Hello, world',
+        // Description and canonical dropped, excerpt rewritten.
+        excerpt: 'Something else.',
+      },
+    ])
+    expect(report.issues).toEqual([
+      {
+        ghostID: 'g1',
+        slug: 'hello-world',
+        field: 'metaDescription',
+        expected: 'A first post.',
+        actual: null,
+      },
+      {
+        ghostID: 'g1',
+        slug: 'hello-world',
+        field: 'canonicalURL',
+        expected: 'https://elsewhere.example/hello',
+        actual: null,
+      },
+      {
+        ghostID: 'g1',
+        slug: 'hello-world',
+        field: 'excerpt',
+        expected: 'The custom excerpt.',
+        actual: 'Something else.',
+      },
+    ])
+  })
+
+  it('treats blank and whitespace-only metadata as absent', () => {
+    const report = validateContent(
+      [
+        {
+          ghostID: 'g1',
+          slug: 'hello-world',
+          status: 'published',
+          hasFeatureImage: false,
+          metaTitle: '   ',
+          metaDescription: 'A first post.',
+        },
+      ],
+      [
+        {
+          ghostID: 'g1',
+          slug: 'hello-world',
+          status: 'published',
+          hasFeatureImage: false,
+          metaTitle: '',
+          // Payload's textarea keeps the text; surrounding space is noise.
+          metaDescription: '  A first post.  ',
+        },
+      ],
+    )
+    expect(report.issues).toEqual([])
+  })
+
+  it('does not flag metadata an editor added after the import', () => {
+    const report = validateContent(
+      [
+        {
+          ghostID: 'g1',
+          slug: 'hello-world',
+          status: 'published',
+          hasFeatureImage: false,
+        },
+      ],
+      [
+        {
+          ghostID: 'g1',
+          slug: 'hello-world',
+          status: 'published',
+          hasFeatureImage: false,
+          metaDescription: 'Written in Payload, not in Ghost.',
+        },
+      ],
+    )
+    expect(report.issues).toEqual([])
+  })
+
   it('does not flag a gained feature image', () => {
     const report = validateContent(
       [

@@ -66,9 +66,11 @@ pnpm migrate:validate --input ghost-export/ghost-content.json
 ```
 
 This exits non-zero and lists discrepancies if any post, page, tag, or author is
-missing, a draft flipped to published, a feature image was lost, or a slug or
-publication date changed. Fix the root cause and re-run until it reports
-`"ok": true`.
+missing, a draft flipped to published, a feature image was lost, a slug or
+publication date changed, or a meta title, meta description, canonical URL, or
+excerpt the export carried did not survive the import. Metadata added after the
+import — a description an editor wrote that Ghost never had — is not a
+discrepancy. Fix the root cause and re-run until it reports `"ok": true`.
 
 ## 4. Manual verification checklist
 

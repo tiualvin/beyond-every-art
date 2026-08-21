@@ -96,4 +96,50 @@ describe('buildMemberPlan', () => {
     expect(members).toEqual([])
     expect(skipped).toEqual([{ row: 2, reason: 'missing email address' }])
   })
+
+  it('reports rows that collide on email, including by case alone', () => {
+    const rows = parseGhostMembersCsv(
+      'email,name\n' +
+        'ada@example.com,Ada\n' +
+        'grace@example.com,Grace\n' +
+        'Ada@Example.com,Ada Again\n',
+    )
+    const { members, conflicts } = buildMemberPlan(rows)
+    // Both rows are kept: dropping a member silently is worse than a
+    // reconciliation the operator has to make.
+    expect(members).toHaveLength(3)
+    expect(conflicts.duplicateEmails).toEqual([{ rows: [2, 4] }])
+    expect(conflicts.duplicateGhostIDs).toEqual([])
+  })
+
+  it('reports rows that collide on an explicit Ghost id', () => {
+    const rows = parseGhostMembersCsv(
+      'id,email\n' +
+        'm1,ada@example.com\n' +
+        'm2,grace@example.com\n' +
+        'm1,katherine@example.com\n',
+    )
+    const { conflicts } = buildMemberPlan(rows)
+    expect(conflicts.duplicateGhostIDs).toEqual([{ rows: [2, 4] }])
+    expect(conflicts.duplicateEmails).toEqual([])
+  })
+
+  it('does not report the same rows twice when the id falls back to email', () => {
+    const rows = parseGhostMembersCsv(
+      'email\nada@example.com\nada@example.com\n',
+    )
+    const { conflicts } = buildMemberPlan(rows)
+    expect(conflicts.duplicateEmails).toEqual([{ rows: [2, 3] }])
+    expect(conflicts.duplicateGhostIDs).toEqual([])
+  })
+
+  it('reports no conflicts for a clean export', () => {
+    const rows = parseGhostMembersCsv(
+      'id,email\nm1,ada@example.com\nm2,grace@example.com\n',
+    )
+    expect(buildMemberPlan(rows).conflicts).toEqual({
+      duplicateEmails: [],
+      duplicateGhostIDs: [],
+    })
+  })
 })

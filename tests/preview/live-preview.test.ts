@@ -111,7 +111,7 @@ describe('apps preview', () => {
   })
 
   it('targets the app route rather than a root slug', () => {
-    expect(previewTargetPath('apps', 'dapple')).toBe('/apps/dapple')
+    expect(previewTargetPath('apps', 'dapple')).toBe('/apps/dapple/')
     expect(
       buildPreviewUrl({ collection: 'apps', slug: 'dapple', siteUrl }),
     ).toBe(`${siteUrl}/api/preview?collection=apps&slug=dapple`)

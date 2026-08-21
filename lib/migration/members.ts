@@ -30,10 +30,33 @@ export interface MemberPlan {
   }
 }
 
+/**
+ * Rows that collide on a field the Members collection stores as unique. Only
+ * the CSV line numbers are recorded: the operator reconciles this by opening
+ * the export at those lines, and a report without addresses in it stays safe
+ * to paste somewhere, the same rule `reconcile:billing` follows.
+ */
+export interface DuplicateRows {
+  // 1-based CSV line numbers, counting the header, earliest first.
+  rows: number[]
+}
+
+export interface MemberConflicts {
+  // Rows sharing an email address once case is normalised. Payload's unique
+  // index rejects every one after the first, so an import that meets these
+  // fails partway through with some members written and the rest not.
+  duplicateEmails: DuplicateRows[]
+  // Rows sharing an explicit Ghost id, which is unique in the collection for
+  // the same reason. Only counted when the CSV has an `id` column; without
+  // one the id falls back to the email and the conflict is already above.
+  duplicateGhostIDs: DuplicateRows[]
+}
+
 export interface MemberImportPlan {
   members: MemberPlan[]
   // Rows dropped for lacking an email address (Payload requires one).
   skipped: Array<{ row: number; reason: string }>
+  conflicts: MemberConflicts
 }
 
 const HEADER_ALIASES: Record<string, string> = {
@@ -162,12 +185,26 @@ function aliasRow(raw: Record<string, string>): Record<string, string> {
   return mapped
 }
 
+function recordRow(index: Map<string, number[]>, key: string, row: number) {
+  const existing = index.get(key)
+  if (existing) existing.push(row)
+  else index.set(key, [row])
+}
+
+function duplicates(index: Map<string, number[]>): DuplicateRows[] {
+  return [...index.values()]
+    .filter((rows) => rows.length > 1)
+    .map((rows) => ({ rows }))
+}
+
 /** Build the member import plan from parsed CSV rows. */
 export function buildMemberPlan(
   rows: Array<Record<string, string>>,
 ): MemberImportPlan {
   const members: MemberPlan[] = []
   const skipped: Array<{ row: number; reason: string }> = []
+  const emailRows = new Map<string, number[]>()
+  const ghostIDRows = new Map<string, number[]>()
 
   rows.forEach((raw, index) => {
     const mapped = aliasRow(raw)
@@ -177,6 +214,10 @@ export function buildMemberPlan(
       return
     }
 
+    const explicitID = undef(mapped.id)
+    recordRow(emailRows, email, index + 2)
+    if (explicitID) recordRow(ghostIDRows, explicitID, index + 2)
+
     const comped = toBool(mapped.comped)
     const stripeCustomerID = undef(mapped.stripeCustomerID)
     const labels = undef(mapped.labels)
@@ -185,9 +226,9 @@ export function buildMemberPlan(
       .filter(Boolean)
 
     members.push({
-      ghostID: undef(mapped.id) ?? email,
+      ghostID: explicitID ?? email,
       data: {
-        ghostID: undef(mapped.id) ?? email,
+        ghostID: explicitID ?? email,
         email,
         name: undef(mapped.name),
         note: undef(mapped.note),
@@ -204,5 +245,12 @@ export function buildMemberPlan(
     })
   })
 
-  return { members, skipped }
+  return {
+    members,
+    skipped,
+    conflicts: {
+      duplicateEmails: duplicates(emailRows),
+      duplicateGhostIDs: duplicates(ghostIDRows),
+    },
+  }
 }

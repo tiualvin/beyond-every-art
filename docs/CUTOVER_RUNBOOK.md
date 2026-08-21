@@ -69,6 +69,8 @@ Watch, via logs / Search Console / uptime monitor / `/health`:
 - Nightly backup completion (`docker compose logs backup`)
 - Rejected or unresolved billing webhooks (`webhook_rejected`,
   `webhook_unresolved` log lines), once the Stripe takeover below is live
+- The nightly reconciliation's verdict (`reconcile_failed` log lines), which is
+  what notices a subscription change no webhook ever delivered
 
 ## Rollback
 
@@ -138,11 +140,20 @@ explained without a manual Stripe audit.
       which records what Stripe currently says for each subscription. As of
       2026-08-18 the live account has no subscriptions at all, so expect an empty
       report and treat anything else as a surprise worth understanding.
-- [ ] Daily reconciliation scheduled (cron or the `backup` container's
-      scheduler) with alerting on a non-zero exit — webhooks are an optimisation
-      over polling, not a guarantee.
+- [ ] Daily reconciliation confirmed running. The `reconcile` service schedules
+      it (`RECONCILE_CRON`, 04:00 by default), but it stays inert until
+      `STRIPE_SECRET_KEY` is set — so restart it after writing the key and check
+      that its log says it scheduled rather than that it skipped:
+      `docker compose logs reconcile | tail`. Each run emits one JSON line,
+      `reconcile_ok` or `reconcile_failed`; alert on the second, the same way
+      the app's `webhook_rejected` lines are watched. Webhooks are an
+      optimisation over polling, not a guarantee.
 - [ ] Only then: remove Ghost's Stripe connection.
 
 Watch the app logs for `webhook_rejected` and `webhook_unresolved` JSON lines in
 the days around the switch:
 `docker compose logs app | grep '"event":"webhook_'`.
+
+And the sweep's own verdict, which is the one that catches what the webhooks
+missed rather than what they rejected:
+`docker compose logs reconcile | grep '"event":"reconcile_'`.

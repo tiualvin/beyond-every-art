@@ -72,11 +72,45 @@ built the wrong way still pointed somewhere that worked.
 
 ## URL structure
 
-Path builders emit the Ghost permalink structure with trailing slashes
-(`/post/`, `/about/`, `/tag/x/`, `/author/x/`) so canonical, sitemap, and feed
-URLs preserve the pre-migration URLs and their SEO value. Redirect matching is
-trailing-slash insensitive, so stored rules and inbound links resolve whether or
-not they include a trailing slash.
+### The host
+
+The site is served from **`www.beyondeveryart.com`**. Ghost answers on both
+names and canonicalises to the `www` one, so that is the host on every indexed
+URL and every inbound link, and the host this deployment has to keep answering.
+`SITE_ADDRESS` is that name — Caddy provisions its certificate from it, and a
+certificate for the wrong name means every existing link fails its TLS handshake
+rather than merely redirecting. `SITE_REDIRECT_FROM` is the bare domain, which
+Caddy answers with a 301 to the canonical host so only one host serves pages.
+
+`NEXT_PUBLIC_SITE_URL` must carry the same host, because every URL the site
+publishes about itself — canonical tags, the sitemap, the feed — is built from
+it. Naming the wrong host there tells search engines the whole site moved.
+
+### The trailing slash
+
+Ghost served every permalink with a trailing slash, so `next.config.ts` sets
+`trailingSlash: true` and the path builders emit the same shape (`/post/`,
+`/about/`, `/tag/x/`, `/author/x/`). Migrated URLs are then served directly
+rather than through a redirect, which is the whole point: the URLs search
+engines already hold keep working exactly as they are.
+
+It applies to every route, not only pages, so anything calling a route handler
+has to use the slash too. The ones that exist today:
+
+| Caller                                                                       | Address             |
+| ---------------------------------------------------------------------------- | ------------------- |
+| Container healthcheck and the deploy's readiness probe                       | `/health/`          |
+| Stripe webhook endpoint, as registered in the Stripe dashboard               | `/webhooks/stripe/` |
+| CSP violation reports (`lib/security/csp.ts`)                                | `/csp-report/`      |
+| Middleware's read of the redirect table                                      | `/redirects-map/`   |
+| Search suggestions, fetched from the browser                                 | `/search/suggest/`  |
+| Feed, as advertised in `<link rel="alternate">` and the feed's own self link | `/rss/`             |
+
+A browser posting a CSP report and Stripe delivering a webhook both treat a
+redirect as a failure rather than following it, so those two are not cosmetic.
+
+Redirect matching is trailing-slash insensitive, so stored rules and inbound
+links resolve whether or not they include a trailing slash.
 
 ## Build behavior
 
@@ -93,16 +127,8 @@ post-migration frontend: `app/(frontend)/[slug]` serves posts and pages,
 archives, and `app/sitemap.ts` already includes tag and author URLs alongside
 posts, pages, and apps.
 
-One item from that plan is genuinely still open. **Nothing configures trailing
-slashes.** `next.config.ts` sets no `trailingSlash`, so Next.js redirects to the
-un-slashed form, while `postPath`, `pagePath`, `tagPath`, and `authorPath` in
-`lib/seo/site.ts` advertise the slashed one in canonical URLs, the sitemap, and
-the feed. Those are the Ghost permalinks, so the advertised URLs are the right
-ones — but a crawler following them lands on a redirect rather than on the page,
-which is a weaker signal than serving them directly. The normalisation redirect
-is real and already worked around in `e2e/privacy-and-redirects.spec.ts`, which
-strips the trailing slash so its assertion reaches the seeded redirect instead.
-
-Decide it before the cutover, not after: setting `trailingSlash: true` after
-search engines have recrawled means a second round of redirects on every URL
-the site has.
+~~One item from that plan is genuinely still open. Nothing configures trailing
+slashes.~~ Settled: `trailingSlash: true`, matching Ghost, described under "URL
+structure" above. It was worth settling before the cutover rather than after —
+changing it once search engines have recrawled means a second round of redirects
+on every URL the site has.

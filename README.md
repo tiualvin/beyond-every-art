@@ -211,7 +211,25 @@ pnpm restore:db --latest --dry-run  # verify the newest backup
 ```
 
 See [`docs/BACKUP_AND_RESTORE.md`](docs/BACKUP_AND_RESTORE.md) for the full
-restore procedure and recovery checklist.
+restore procedure and recovery checklist. CI runs the whole drill — back up,
+restore into a scratch database, compare — on every change, so the restore path
+is exercised by something other than an emergency.
+
+## Billing reconciliation
+
+The `reconcile` service asks Stripe nightly what it is actually billing and
+records the answer, because webhooks are an optimisation over polling and not a
+guarantee. It stays inert until `STRIPE_SECRET_KEY` is set, and each run emits
+one `reconcile_ok` or `reconcile_failed` JSON line. On demand:
+
+```bash
+pnpm reconcile:billing --dry-run  # compare and report, write nothing
+pnpm reconcile:billing            # also record what Stripe currently says
+```
+
+The Stripe takeover checklist in
+[`docs/CUTOVER_RUNBOOK.md`](docs/CUTOVER_RUNBOOK.md) has to be worked through
+before Ghost's Stripe connection is removed.
 
 ## Checks
 

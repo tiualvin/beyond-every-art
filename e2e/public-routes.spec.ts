@@ -16,13 +16,13 @@ test.describe('representative public journeys', () => {
     ).toBeVisible()
     await expect(
       page.getByRole('link', { name: 'Read the journal' }),
-    ).toHaveAttribute('href', '/journal')
+    ).toHaveAttribute('href', '/journal/')
   })
 
   test('journal and article preserve the public reading path', async ({
     page,
   }) => {
-    await page.goto('/journal')
+    await page.goto('/journal/')
 
     await expect(
       page.getByRole('heading', { level: 1, name: 'Journal' }),
