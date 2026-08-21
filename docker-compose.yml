@@ -151,8 +151,16 @@ services:
     depends_on:
       - app
     environment:
-      # Set to your domain (e.g. beyondeveryart.com) for automatic HTTPS.
+      # Set to your domain — the exact host the site canonicalises to, `www`
+      # included if it has one (e.g. www.beyondeveryart.com) — for automatic
+      # HTTPS. SITE_REDIRECT_FROM is the other name, permanently redirected to
+      # it, and is left unset where that name does not resolve.
       SITE_ADDRESS: ${SITE_ADDRESS:-localhost}
+      # The default is a name that resolves nowhere on purpose: an unset value
+      # would make Caddy read the redirect block as a site called "" and fail to
+      # start, and a real-looking default would have it request a certificate
+      # for a domain this deployment does not own.
+      SITE_REDIRECT_FROM: ${SITE_REDIRECT_FROM:-redirect-disabled.localhost}
       # Staff hostname serving Payload Admin and the MCP endpoint, e.g.
       # cms.beyondeveryart.com. See the Caddyfile.
       CMS_ADDRESS: ${CMS_ADDRESS:-cms.localhost}

@@ -72,6 +72,22 @@ built the wrong way still pointed somewhere that worked.
 
 ## URL structure
 
+### The host
+
+The site is served from **`www.beyondeveryart.com`**. Ghost answers on both
+names and canonicalises to the `www` one, so that is the host on every indexed
+URL and every inbound link, and the host this deployment has to keep answering.
+`SITE_ADDRESS` is that name — Caddy provisions its certificate from it, and a
+certificate for the wrong name means every existing link fails its TLS handshake
+rather than merely redirecting. `SITE_REDIRECT_FROM` is the bare domain, which
+Caddy answers with a 301 to the canonical host so only one host serves pages.
+
+`NEXT_PUBLIC_SITE_URL` must carry the same host, because every URL the site
+publishes about itself — canonical tags, the sitemap, the feed — is built from
+it. Naming the wrong host there tells search engines the whole site moved.
+
+### The trailing slash
+
 Ghost served every permalink with a trailing slash, so `next.config.ts` sets
 `trailingSlash: true` and the path builders emit the same shape (`/post/`,
 `/about/`, `/tag/x/`, `/author/x/`). Migrated URLs are then served directly
