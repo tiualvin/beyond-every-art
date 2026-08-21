@@ -66,7 +66,8 @@ Watch, via logs / Search Console / uptime monitor / `/health`:
 - Analytics traffic vs. the pre-migration baseline
 - Form submissions and email delivery
 - Database storage, R2 usage, CPU/memory
-- Nightly backup completion (`docker compose logs backup`)
+- Nightly backup completion, and the weekly restore check that reads one back
+  (`docker compose logs backup`; a failure prints `Restore verification FAILED`)
 - Rejected or unresolved billing webhooks (`webhook_rejected`,
   `webhook_unresolved` log lines), once the Stripe takeover below is live
 
