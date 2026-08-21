@@ -32,37 +32,34 @@ export const pagePath = (slug: string): string => `/${slug}/`
 export const tagPath = (slug: string): string => `/tag/${slug}/`
 export const authorPath = (slug: string): string => `/author/${slug}/`
 
-/** Path of the RSS feed route (Ghost served this at `/rss/`). */
-export const FEED_PATH = '/rss'
+/** Path of the RSS feed route, as Ghost served it. */
+export const FEED_PATH = '/rss/'
 
 /**
  * Path of the journal archive — every published public post, newest first.
  *
- * No trailing slash. The content paths above keep theirs because they preserve
- * Ghost's permalinks; this route is new, has no pre-migration URL to protect,
- * and `/journal` is the URL Next.js actually serves, so navigation, canonical
- * tags, pagination, and the sitemap all agree without a redirect hop.
+ * Trailing slash, like everything else. This route is new and has no Ghost
+ * permalink to protect, but `trailingSlash: true` in `next.config.ts` means the
+ * slashed form is what Next.js serves, and an advertised URL that redirects is
+ * the thing that configuration exists to stop.
  */
-export const JOURNAL_PATH = '/journal'
+export const JOURNAL_PATH = '/journal/'
 
-/** New publication routes deliberately follow the no-trailing-slash style. */
-export const PUBLICATION_PATH = '/publication'
+/** New publication routes, slashed to match what Next.js serves. */
+export const PUBLICATION_PATH = '/publication/'
 export const publicationPath = (slug: string): string =>
-  `${PUBLICATION_PATH}/${slug}`
+  `${PUBLICATION_PATH}${slug}/`
 export const publicationReadPath = (slug: string): string =>
-  `${publicationPath(slug)}/read`
+  `${publicationPath(slug)}read/`
 export const publicationTranscriptPath = (slug: string): string =>
-  `${publicationPath(slug)}/transcript`
+  `${publicationPath(slug)}transcript/`
 
 /**
- * The apps the studio is building, and each app's own page.
- *
- * No trailing slash, matching the other post-migration routes: these are new
- * URLs with no Ghost permalink to preserve, so navigation, canonicals and the
- * sitemap can all agree on what Next.js actually serves.
+ * The apps the studio is building, and each app's own page. Slashed for the
+ * same reason as the journal above: it is what Next.js serves.
  */
-export const APPS_PATH = '/apps'
-export const appPath = (slug: string): string => `${APPS_PATH}/${slug}`
+export const APPS_PATH = '/apps/'
+export const appPath = (slug: string): string => `${APPS_PATH}${slug}/`
 
 /** Path of the search page. */
 export const SEARCH_PATH = '/search/'

@@ -289,7 +289,7 @@ function SearchDrawer({
     const timer = setTimeout(async () => {
       try {
         const response = await fetch(
-          `${SEARCH_PATH}suggest?q=${encodeURIComponent(query)}`,
+          `${SEARCH_PATH}suggest/?q=${encodeURIComponent(query)}`,
           { signal: controller.signal },
         )
         const data = (await response.json()) as { results: Result[] }

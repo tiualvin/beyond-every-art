@@ -470,7 +470,7 @@ jobs:
           docker compose up -d --build --wait --wait-timeout 180
           docker compose ps --all
           docker compose exec -T app node -e '
-            fetch("http://127.0.0.1:3000/health", {
+            fetch("http://127.0.0.1:3000/health/", {
               signal: AbortSignal.timeout(10000),
             })
               .then(async (response) => {

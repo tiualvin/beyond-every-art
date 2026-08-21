@@ -25,8 +25,14 @@ type Env = Record<string, string | undefined>
  */
 export type CspMode = 'report-only' | 'enforce' | 'off'
 
-/** Where violation reports are sent. Matches the route in `app/csp-report`. */
-export const CSP_REPORT_PATH = '/csp-report'
+/**
+ * Where violation reports are sent. Matches the route in `app/csp-report`.
+ *
+ * Slashed because `trailingSlash: true` makes that the address Next.js serves,
+ * and a browser posting a violation report does not follow a redirect to go
+ * looking for one.
+ */
+export const CSP_REPORT_PATH = '/csp-report/'
 
 /** The `report-to` / `Reporting-Endpoints` group name. */
 export const CSP_REPORT_GROUP = 'csp-endpoint'

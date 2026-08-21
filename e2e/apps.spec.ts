@@ -4,7 +4,7 @@ import { fixtures } from './fixtures'
 
 test.describe('the apps roadmap', () => {
   test('lists published apps and hides drafts', async ({ page }) => {
-    await page.goto('/apps')
+    await page.goto('/apps/')
 
     await expect(
       page.getByRole('heading', { level: 1, name: 'Apps' }),
@@ -36,13 +36,13 @@ test.describe('the apps roadmap', () => {
   })
 
   test('an app links through to its own page', async ({ page }) => {
-    await page.goto('/apps')
+    await page.goto('/apps/')
     await page
       .getByRole('link', { name: `More about ${fixtures.publishedApp.title}` })
       .click()
 
     await expect(page).toHaveURL(
-      new RegExp(`/apps/${fixtures.publishedApp.slug}$`),
+      new RegExp(`/apps/${fixtures.publishedApp.slug}/$`),
     )
     await expect(
       page.getByRole('heading', {
@@ -57,7 +57,7 @@ test.describe('the apps roadmap', () => {
   test('the waitlist takes one address against several apps', async ({
     page,
   }) => {
-    await page.goto('/apps')
+    await page.goto('/apps/')
 
     await page
       .getByRole('checkbox', { name: fixtures.publishedApp.title })
@@ -69,7 +69,7 @@ test.describe('the apps roadmap', () => {
   })
 
   test('the waitlist refuses an empty selection', async ({ page }) => {
-    await page.goto('/apps')
+    await page.goto('/apps/')
 
     await page.fill('#waitlist-email', 'e2e-nothing-ticked@example.test')
     await page.getByRole('button', { name: 'Notify me' }).click()

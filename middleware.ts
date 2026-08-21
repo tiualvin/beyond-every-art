@@ -75,7 +75,7 @@ async function loadRedirectMap(
   const now = Date.now()
   if (cache && cache.expiresAt > now) return cache.map
 
-  const response = await fetch(`${origin}/redirects-map`, {
+  const response = await fetch(`${origin}/redirects-map/`, {
     headers: { accept: 'application/json' },
   })
   if (!response.ok)

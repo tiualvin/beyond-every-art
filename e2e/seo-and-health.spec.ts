@@ -26,6 +26,46 @@ test('article metadata, canonical URL, and structured data agree', async ({
   expect(jsonLd.url).toMatch(new RegExp(`/${fixtures.publicPost.slug}/$`))
 })
 
+test('the URL a page advertises is the URL it serves', async ({ request }) => {
+  // The migration's central promise: a Ghost permalink keeps working as-is.
+  // Ghost served every URL with a trailing slash, so that shape must answer
+  // directly, and the unslashed one must point at it rather than the reverse.
+  //
+  // Before `trailingSlash: true` this ran backwards — the canonical tag, the
+  // sitemap, and the feed all advertised `/slug/` while `/slug/` redirected to
+  // `/slug`, so every URL the site published about itself was one that bounced,
+  // and the page a crawler landed on named a redirect as its real address.
+  const slashed = await request.get(`/${fixtures.publicPost.slug}/`, {
+    maxRedirects: 0,
+  })
+  expect(slashed.status()).toBe(200)
+
+  const unslashed = await request.get(`/${fixtures.publicPost.slug}`, {
+    maxRedirects: 0,
+  })
+  expect(unslashed.status()).toBe(308)
+  expect(
+    new URL(unslashed.headers().location, 'http://localhost').pathname,
+  ).toBe(`/${fixtures.publicPost.slug}/`)
+})
+
+test('the routes that are not pages answer on the address their callers use', async ({
+  request,
+}) => {
+  // `trailingSlash: true` applies to route handlers too, and two of these are
+  // called by something that treats a redirect as a failure rather than
+  // following it: Stripe's webhook delivery, and a browser posting a CSP
+  // violation report. Each address here is one a caller is configured with, so
+  // a redirect would be a silent outage rather than an extra hop.
+  for (const path of ['/health/', '/rss/', '/redirects-map/']) {
+    const response = await request.get(path, { maxRedirects: 0 })
+    expect(
+      response.status(),
+      `${path} should be served directly, not redirected`,
+    ).toBe(200)
+  }
+})
+
 test('robots, sitemap, and RSS expose the public launch surface', async ({
   request,
 }) => {
