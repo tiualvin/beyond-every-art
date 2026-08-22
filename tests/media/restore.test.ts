@@ -107,72 +107,91 @@ describe('isUsableDownload', () => {
 })
 
 describe('restoring from an extracted Ghost archive', () => {
-  const index = buildLocalIndex([
+  // The shape of a real Ghost site archive, including the derivative folders
+  // that reuse the originals' file names — the reason a name alone is never
+  // enough to identify a file here.
+  const archive = buildLocalIndex([
     {
-      relativePath: '/content/images/2024/02/corridor.jpg',
-      absolutePath: '/archive/content/images/2024/02/corridor.jpg',
+      relativePath: '/content/images/2026/02/corridor.jpg',
+      absolutePath: '/a/content/images/2026/02/corridor.jpg',
     },
     {
-      relativePath: '/content/images/2023/05/corridor.jpg',
-      absolutePath: '/archive/content/images/2023/05/corridor.jpg',
+      relativePath: '/content/images/size/w600/2026/02/corridor.jpg',
+      absolutePath: '/a/content/images/size/w600/2026/02/corridor.jpg',
     },
     {
-      relativePath: '/content/images/2024/02/gallery.jpg',
-      absolutePath: '/archive/content/images/2024/02/gallery.jpg',
+      relativePath: '/content/images/thumbnail/2026/02/corridor.jpg',
+      absolutePath: '/a/content/images/thumbnail/2026/02/corridor.jpg',
+    },
+    {
+      relativePath: '/content/images/2025/11/gallery.jpg',
+      absolutePath: '/a/content/images/2025/11/gallery.jpg',
     },
   ])
 
-  it('matches on the full path, which is unambiguous', () => {
+  it("finds the original, not one of Ghost's own derivatives", () => {
     expect(
       findLocalFile(
-        index,
-        'https://old.example/content/images/2024/02/corridor.jpg',
+        archive,
+        'https://beyondeveryart.com/content/images/2026/02/corridor.jpg',
       ),
-    ).toEqual({ path: '/archive/content/images/2024/02/corridor.jpg' })
+    ).toEqual({ path: '/a/content/images/2026/02/corridor.jpg' })
   })
 
-  // Ghost namespaces uploads by year and month, so the same name legitimately
-  // appears twice. Guessing would put the wrong photograph on a published page.
-  it('refuses to guess when a name appears more than once', () => {
-    const flat = buildLocalIndex([
-      { relativePath: '/a/corridor.jpg', absolutePath: '/x/a/corridor.jpg' },
-      { relativePath: '/b/corridor.jpg', absolutePath: '/x/b/corridor.jpg' },
-    ])
-
-    const result = findLocalFile(
-      flat,
-      'https://old.example/images/corridor.jpg',
-    )
-
-    expect(result).toMatchObject({ reason: expect.stringContaining('2 times') })
-  })
-
-  // The forgiving case: an operator points at `content/images` instead of the
-  // archive root, so the stored path cannot match but the name still can.
-  it('falls back to a unique file name when the path does not line up', () => {
-    const nested = buildLocalIndex([
+  // Pointing at `content/images` rather than the archive root is a reasonable
+  // thing to do, and full-path matching alone would find nothing.
+  it('works when the directory is rooted deeper than the URL path', () => {
+    const rootedAtImages = buildLocalIndex([
       {
-        relativePath: '/2024/02/gallery.jpg',
-        absolutePath: '/x/2024/02/gallery.jpg',
+        relativePath: '/2026/02/corridor.jpg',
+        absolutePath: '/i/2026/02/corridor.jpg',
+      },
+      {
+        relativePath: '/size/w600/2026/02/corridor.jpg',
+        absolutePath: '/i/size/w600/2026/02/corridor.jpg',
       },
     ])
 
     expect(
       findLocalFile(
-        nested,
-        'https://old.example/content/images/2024/02/gallery.jpg',
+        rootedAtImages,
+        'https://beyondeveryart.com/content/images/2026/02/corridor.jpg',
       ),
-    ).toEqual({ path: '/x/2024/02/gallery.jpg' })
+    ).toEqual({ path: '/i/2026/02/corridor.jpg' })
+  })
+
+  it('handles the placeholder URL form the export writes', () => {
+    expect(
+      findLocalFile(
+        archive,
+        '__GHOST_URL__/content/images/2025/11/gallery.jpg',
+      ),
+    ).toEqual({ path: '/a/content/images/2025/11/gallery.jpg' })
+  })
+
+  // Two uploads in different months can share a name. Guessing would put the
+  // wrong photograph on a published page.
+  it('refuses to guess when the path genuinely cannot distinguish them', () => {
+    const ambiguous = buildLocalIndex([
+      { relativePath: '/a/photo.jpg', absolutePath: '/x/a/photo.jpg' },
+      { relativePath: '/b/photo.jpg', absolutePath: '/x/b/photo.jpg' },
+    ])
+
+    const result = findLocalFile(ambiguous, 'https://old.example/img/photo.jpg')
+
+    expect(result).toMatchObject({
+      reason: expect.stringContaining('matches 2 files'),
+    })
   })
 
   it('says what it looked for when the archive does not have it', () => {
     const result = findLocalFile(
-      index,
-      'https://old.example/content/images/gone.jpg',
+      archive,
+      'https://beyondeveryart.com/content/images/2026/02/gone.jpg',
     )
 
     expect(result).toMatchObject({
-      reason: expect.stringContaining('/content/images/gone.jpg'),
+      reason: expect.stringContaining('/content/images/2026/02/gone.jpg'),
     })
   })
 })

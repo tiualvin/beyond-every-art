@@ -138,34 +138,52 @@ export interface LocalFile {
   absolutePath: string
 }
 
+/** A file in the index, with how deep it sits under the archive root. */
+interface IndexedFile {
+  absolutePath: string
+  depth: number
+}
+
 export interface LocalIndex {
-  byPath: Map<string, string>
-  byName: Map<string, string[]>
+  /** Every path suffix of every file, to the files carrying it. */
+  bySuffix: Map<string, IndexedFile[]>
+}
+
+/** `/content/images/2026/02/a.jpg` -> that, `/images/2026/02/a.jpg`, ... `/a.jpg` */
+function suffixes(path: string): string[] {
+  const segments = path.split('/').filter(Boolean)
+  return segments.map((_, i) => `/${segments.slice(i).join('/')}`)
 }
 
 /**
  * Index an extracted archive for lookup by URL.
  *
- * Two indexes because two things can be true: usually the archive mirrors the
- * URL path exactly and the match is unambiguous, but an operator may point this
- * at `content/images` rather than the archive root, in which case only the file
- * name survives. Ghost namespaces uploads by year and month, so a bare name can
- * legitimately appear twice — hence a list, and a refusal to guess below.
+ * Indexed by every path suffix rather than by full path alone, because the
+ * directory an operator points at is not fixed. A Ghost archive root gives
+ * `/content/images/2026/02/a.jpg`, but pointing at `content/images` — an
+ * entirely reasonable thing to do — gives `/2026/02/a.jpg` for the same file,
+ * and a full-path match would find nothing.
+ *
+ * Matching on the file name alone would find it, and would also find the wrong
+ * one. Ghost keeps its own derivatives under `images/size/w600/...` and
+ * `images/thumbnail/...` using the *same* file names as the originals, so a
+ * name is ambiguous in every real archive. A suffix keeps enough of the path to
+ * tell those apart while tolerating where the root sits.
  */
 export function buildLocalIndex(files: LocalFile[]): LocalIndex {
-  const byPath = new Map<string, string>()
-  const byName = new Map<string, string[]>()
+  const bySuffix = new Map<string, IndexedFile[]>()
 
   for (const file of files) {
-    byPath.set(file.relativePath, file.absolutePath)
-    const name = file.relativePath.split('/').pop() ?? ''
-    if (!name) continue
-    const existing = byName.get(name)
-    if (existing) existing.push(file.absolutePath)
-    else byName.set(name, [file.absolutePath])
+    const depth = file.relativePath.split('/').filter(Boolean).length
+    const entry: IndexedFile = { absolutePath: file.absolutePath, depth }
+    for (const suffix of suffixes(file.relativePath)) {
+      const existing = bySuffix.get(suffix)
+      if (existing) existing.push(entry)
+      else bySuffix.set(suffix, [entry])
+    }
   }
 
-  return { byPath, byName }
+  return { bySuffix }
 }
 
 /** The path portion of a stored media URL, however it was written. */
@@ -182,27 +200,47 @@ export function urlPath(url: string): string {
 /**
  * Locate one media file inside an indexed archive.
  *
- * The full path wins when it is there, because it is unambiguous. The file name
- * is a fallback for an archive rooted somewhere else, and it is only trusted
- * when exactly one file carries that name — two candidates means the archive
- * cannot say which article's image this is, and silently picking one would put
- * the wrong photograph on a published page.
+ * Tries the longest path suffix first and works down, taking the first that
+ * matches exactly one file. Longest-first is what makes this safe: a match on
+ * `/2026/02/a.jpg` cannot be Ghost's own `/size/w600/2026/02/a.jpg`, so the
+ * original wins over its derivatives without either being special-cased.
+ *
+ * Ambiguity is reported, never resolved. Two files can legitimately share a
+ * name — Ghost namespaces uploads by year and month — and picking one would put
+ * the wrong photograph on a published page, which is a worse outcome than the
+ * missing image it was meant to fix.
  */
 export function findLocalFile(
   index: LocalIndex,
   ghostURL: string,
 ): { path: string } | { reason: string } {
   const path = urlPath(ghostURL)
+  let ambiguousAt: { suffix: string; count: number } | undefined
 
-  const exact = index.byPath.get(path)
-  if (exact) return { path: exact }
+  for (const suffix of suffixes(path)) {
+    const matches = index.bySuffix.get(suffix)
+    if (!matches) continue
+    if (matches.length === 1) return { path: matches[0]!.absolutePath }
 
-  const name = path.split('/').pop() ?? ''
-  const candidates = name ? (index.byName.get(name) ?? []) : []
-  if (candidates.length === 1) return { path: candidates[0]! }
-  if (candidates.length > 1) {
+    // Several files end with this suffix, and one shape of that is expected
+    // rather than ambiguous: Ghost's own derivatives sit under an *extra*
+    // prefix (`size/w600/…`, `thumbnail/…`) and therefore always end with the
+    // original's path too. The original is the shallowest of them, so when
+    // exactly one match is closest to the root, it is the file being asked
+    // for and the rest are its thumbnails.
+    const shallowest = Math.min(...matches.map((m) => m.depth))
+    const closest = matches.filter((m) => m.depth === shallowest)
+    if (closest.length === 1) return { path: closest[0]!.absolutePath }
+
+    // Equal depth is a real collision — two uploads in different months with
+    // the same name. Remember it for the message and keep going; a shorter
+    // suffix can only match more files, never fewer.
+    ambiguousAt ??= { suffix, count: matches.length }
+  }
+
+  if (ambiguousAt) {
     return {
-      reason: `${name} appears ${candidates.length} times in the archive and the path ${path} matched none of them`,
+      reason: `${ambiguousAt.suffix} matches ${ambiguousAt.count} files in the archive; cannot tell which one this is`,
     }
   }
   return { reason: `not found in the archive: ${path}` }
