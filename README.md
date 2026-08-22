@@ -117,6 +117,25 @@ records, draft/published drift, lost feature images, changed slugs or dates):
 pnpm migrate:validate --input ghost-export/ghost-content.json
 ```
 
+### Regenerating image derivatives
+
+Payload generates the sizes declared in `collections/Media.ts` when a file is
+uploaded, and only then — so a size added to the collection later does not exist
+for anything already in the library. Nothing breaks (`lib/content/media.ts`
+falls back to the original), but the benefit only reaches new uploads until the
+existing ones are rewritten:
+
+```bash
+pnpm backfill:media --dry-run     # what is missing, per size
+pnpm backfill:media               # hand each original back to Payload
+```
+
+It keeps every stored filename, so no published image URL changes, and it is
+safe to rerun: a document that already has every size it can have is skipped.
+Sizes Payload would omit as too small for their source are not counted as
+missing, so a rerun does not chase them forever. Add `--base-url` when originals
+live in R2 and the media URLs are root-relative.
+
 During the staging rehearsal, compare the live Ghost surface with the migrated
 site using `pnpm migration:compare`. It records redirects, canonicals, metadata,
 robots directives, images, links, and per-URL status evidence without reading

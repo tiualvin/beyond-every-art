@@ -68,12 +68,17 @@ export const Media: CollectionConfig = {
       // producing it here is the difference between a scraper downloading a
       // 3000px original and downloading the thing it was going to make.
       //
-      // Enlargement is deliberately left on: a share card whose aspect ratio is
-      // wrong is a visibly broken preview, which costs more than upscaling a
-      // small source. Derivatives are generated at upload, so media already in
-      // the library has no `og` size until it is re-uploaded — the metadata
-      // helpers fall back to the original, which is the behaviour every
-      // document had before this existed.
+      // `withoutEnlargement` is left unset, which is not the same as leaving
+      // enlargement on: Payload's default is to omit a size entirely when the
+      // source is smaller than the target in both dimensions. So an image under
+      // 1200x630 gets no `og` derivative at all and the metadata helpers fall
+      // back to the original — which is the right answer for a small source.
+      // Upscaling it would hand a crawler the same picture, blurrier and four
+      // times the bytes, and cropped to a ratio the original never had.
+      //
+      // Derivatives are generated at upload, so media stored before this size
+      // existed has none. `pnpm backfill:media` regenerates them; the fallback
+      // means nothing is broken until it runs.
       { name: 'og', width: 1200, height: 630 },
     ],
   },
