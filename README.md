@@ -117,6 +117,27 @@ records, draft/published drift, lost feature images, changed slugs or dates):
 pnpm migrate:validate --input ghost-export/ghost-content.json
 ```
 
+### Recovering media whose files are gone
+
+Every `media` row records the URL it was migrated from. If the stored files are
+lost but the rows survive — a container rebuild that discarded an unmounted
+media directory, say — that URL is the way back:
+
+```bash
+pnpm restore:media --dry-run     # what would be refetched, and from where
+pnpm restore:media               # download and hand each file back to Payload
+```
+
+Payload rewrites the file and regenerates every derivative under the **same
+document id and the same filename**, so no post loses its featured image and no
+`<img src>` in a migrated body changes. Rows with no `ghostURL` were authored
+here rather than migrated and are reported rather than restored — only a
+database backup recovers those.
+
+`pnpm migrate:ghost` is not the tool for this: it matches on `ghostURL` and
+skips rows that already exist, so it reports everything reused and uploads
+nothing.
+
 ### Regenerating image derivatives
 
 Payload generates the sizes declared in `collections/Media.ts` when a file is
