@@ -117,12 +117,32 @@ a file that no longer existed, `/api/media/file/<name>` answered 500 with a
 JSON body, and every image on the site rendered as a broken-image icon.
 
 The volume stops it happening again but cannot bring back what was already
-discarded. Re-run the Ghost media import once, after a deploy that includes
-the volume, and the files will land in the volume and stay there:
+discarded.
+
+**Re-running the Ghost import does not recover it**, which an earlier version of
+this note got wrong. `importMedia` matches on `ghostURL` and skips every row
+that already exists, and the rows all survived — so it reports 110 reused,
+uploads nothing, and leaves the site exactly as broken as it found it.
+
+Use the recovery script instead. It reads the `ghostURL` each row already
+carries, refetches the file from the still-live Ghost site, and hands it back to
+Payload — which regenerates every derivative under the **same document id and
+the same filename**, so no post loses its featured image and no `<img src>` in a
+migrated body changes:
 
 ```
-docker compose run --rm migrate pnpm migrate:ghost --input <export.json>
+docker compose run --rm migrate pnpm restore:media --dry-run
+docker compose run --rm migrate pnpm restore:media
 ```
+
+If the site archive is still to hand, restore from it instead — it carries every
+media file under `content/images/…` and cannot 404 or rate-limit, which the live
+site can. Unpack it somewhere the `migrate` service can read and pass
+`--from-dir`.
+
+It needs no export file when the source site is up. Rows with no `ghostURL` were authored here rather than
+migrated and are reported rather than restored — the old site has nothing to
+give back for those, and only a database backup would.
 
 Worth doing before the public cutover regardless, since the same wipe would
 have taken any image uploaded through Payload Admin.

@@ -7,8 +7,17 @@ restoration procedure. It satisfies the Phase 1 acceptance criteria:
 - A database backup has been successfully restored.
 - A documented restoration procedure exists.
 
-Media lives in Cloudflare R2 and is backed up by object storage independently;
-this pipeline covers the Postgres database only.
+This pipeline covers the Postgres database only.
+
+**Media is not covered by anything here, and is not backed up by being in R2.**
+Object storage is durable, not versioned: a delete or an overwrite is final, and
+`S3_*` must actually be set for uploads to reach R2 at all — unset, Payload
+writes to a Docker volume on the VPS instead, which no backup touches. An
+earlier version of this document asserted the opposite, and the gap it hid was
+real: every migrated image was lost when a rebuild discarded the container's
+writable layer, and nothing noticed until the site rendered broken images.
+`pnpm restore:media` exists because of that, and recovers only what the old
+Ghost site can still serve.
 
 ## How it works
 
@@ -157,9 +166,14 @@ Run the command in a throwaway backup container, which already has the tools and
 environment:
 
 ```bash
-docker compose run --rm backup \
-  tsx scripts/restore-database.ts --latest --dry-run
+docker compose run --rm --entrypoint tsx backup \
+  scripts/restore-database.ts --latest --dry-run
 ```
+
+`--entrypoint` is required, not decoration. The backup image starts a cron
+scheduler and ignores anything passed after the image name, so without it this
+command silently starts the nightly scheduler in the foreground and restores
+nothing — which is a poor thing to discover during a restore.
 
 Drop `--dry-run` and add `--yes` to perform the restore. For a full-database
 restore you generally want the app stopped first (`docker compose stop app`) and
@@ -167,7 +181,8 @@ an empty target; recreate the database if needed before restoring.
 
 ## Recovery checklist
 
-- [ ] `pnpm backup:db` completes and the object appears in R2.
+- [ ] A backup completes and the object appears in R2:
+      `docker compose run --rm --entrypoint tsx backup scripts/backup-database.ts`
 - [ ] `pnpm restore:db --latest --dry-run` reports a valid, decompressible archive.
 - [ ] A restore into a scratch database reproduces expected content and counts.
 - [ ] Retention pruning keeps exactly `BACKUP_RETENTION_COUNT` backups.
