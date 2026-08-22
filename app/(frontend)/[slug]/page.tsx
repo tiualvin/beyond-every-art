@@ -11,6 +11,7 @@ import {
   type PageDetail,
   type PostDetail,
 } from '@/lib/content/queries'
+import { shareImageSrc } from '@/lib/content/media'
 import { logMissingRoute } from '@/lib/observability/missing-route'
 import { getPreviewMode } from '@/lib/preview/mode'
 import { buildArticleJsonLd, serializeJsonLd } from '@/lib/seo/jsonld'
@@ -74,7 +75,12 @@ export async function generateMetadata({
   // Ghost emitted og:image for every post with a featured image; sharing cards
   // stay intact after the migration only if this one does too.
   const images = post.image
-    ? [{ url: absoluteUrl(post.image.url, siteUrl), alt: post.image.alt }]
+    ? [
+        {
+          url: absoluteUrl(shareImageSrc(post.image), siteUrl),
+          alt: post.image.alt,
+        },
+      ]
     : undefined
   return {
     title: post.metaTitle || post.title,

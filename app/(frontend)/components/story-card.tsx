@@ -5,6 +5,7 @@ import type { PostCard } from '@/lib/content/queries'
 import { formatDate } from '@/lib/format'
 import { visibilityLabel } from '@/lib/membership'
 import { postPath } from '@/lib/seo/site'
+import { thumbnailSrc } from '@/lib/content/media'
 
 const THUMB_SIZES_DEFAULT =
   '(max-width: 40rem) 100vw, (max-width: 64rem) 50vw, 22rem'
@@ -32,7 +33,7 @@ export function StoryCard({
     >
       {post.image && (
         <Image
-          src={post.image.url}
+          src={thumbnailSrc(post.image)}
           alt={post.image.alt}
           fill
           sizes={thumbSizes}

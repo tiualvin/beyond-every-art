@@ -186,6 +186,33 @@ describe('runImport', () => {
     expect(result.postsCreated).toBe(2)
     expect(collections.get('pages')).toHaveLength(2)
   })
+
+  // `Posts.ghostID` used to be `required: true`, and that flag was what stopped
+  // a record arriving without its identifier. The field now autofills a
+  // `native:` value instead, which is right for something authored here and
+  // wrong for something imported: a migrated document with a synthetic ID is
+  // one a rerun cannot match, so the next run duplicates it rather than
+  // updating it. The guard therefore lives in the importer now, and this is
+  // what holds it there.
+  it('refuses a record whose Ghost ID is missing, rather than inventing one', async () => {
+    const { payload, collections } = fakePayload()
+    const damaged = {
+      ...plan,
+      posts: plan.posts.map((post, index) =>
+        index === 0 ? { ...post, ghostID: '' } : post,
+      ),
+    }
+
+    const result = await runImport(payload, damaged)
+
+    expect(result.errors).toHaveLength(1)
+    expect(result.errors[0]).toContain('no Ghost ID')
+    // The rest of the import still runs; only the damaged record is refused.
+    expect(collections.get('posts')).toHaveLength(plan.posts.length - 1)
+    for (const post of collections.get('posts') ?? []) {
+      expect(String(post.ghostID)).not.toMatch(/^native:/)
+    }
+  })
 })
 
 /** The clean fixture carries no feature images; add one for the media test. */

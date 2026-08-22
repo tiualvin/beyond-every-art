@@ -1,11 +1,17 @@
 import type { CollectionConfig } from 'payload'
 
-import { adminOnly } from '../access/roles'
+import { adminOnly, isAdmin } from '../access/roles'
 
 export const NewsletterSignups: CollectionConfig = {
   slug: 'newsletter-signups',
   admin: {
+    group: 'Audience',
+    // Every operation below is admin-only, so an editor could see the
+    // collection in the sidebar and nothing behind it. Hiding it matches
+    // Members and Billing events, which made the same call.
+    hidden: ({ user }) => !isAdmin(user),
     useAsTitle: 'email',
+    defaultColumns: ['email', 'source', 'createdAt'],
     description: 'Email signups captured from the public /newsletter page.',
   },
   access: {

@@ -17,7 +17,11 @@ export const Users: CollectionConfig = {
     // `Secure` cookie would simply never be stored, breaking login locally.
     cookies: { secure: process.env.NODE_ENV === 'production' },
   },
-  admin: { useAsTitle: 'email' },
+  admin: {
+    group: 'System',
+    useAsTitle: 'email',
+    defaultColumns: ['name', 'email', 'role'],
+  },
   access: {
     create: adminOnly,
     read: ({ req }) => {

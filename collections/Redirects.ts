@@ -6,7 +6,11 @@ import { purgeOnChange, purgeOnDelete } from '../lib/cache/purge'
 
 export const Redirects: CollectionConfig = {
   slug: 'redirects',
-  admin: { useAsTitle: 'source' },
+  admin: {
+    group: 'SEO',
+    useAsTitle: 'source',
+    defaultColumns: ['source', 'destination', 'statusCode', 'enabled'],
+  },
   access: {
     create: editorsAndAdmins,
     read: editorsAndAdmins,

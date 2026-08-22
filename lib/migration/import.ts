@@ -55,6 +55,24 @@ async function upsertByGhostID(
   ghostID: string,
   data: UpsertData,
 ): Promise<UpsertOutcome> {
+  // The invariant `Posts.ghostID` used to hold up with `required: true`.
+  //
+  // That flag is gone — it made an editor invent a Ghost identifier for a page
+  // Ghost had never seen, and the field now mints a `native:` value instead
+  // (see `fields/ghost.ts`). But the reason the flag was there still stands for
+  // this path: a migrated document without its Ghost identifier is one a rerun
+  // can no longer match, so it would import again as a duplicate rather than an
+  // update. Autofilling one here would hide exactly that.
+  //
+  // So the guard moves rather than disappearing, and lands somewhere it can say
+  // what is actually wrong. An empty identifier means the export is malformed,
+  // not that somebody forgot to type something.
+  if (!ghostID) {
+    throw new Error(
+      `Refusing to import a ${collection} record with no Ghost ID: a rerun could not match it, so it would be duplicated rather than updated.`,
+    )
+  }
+
   const existing = await payload.find({
     collection,
     where: { ghostID: { equals: ghostID } },

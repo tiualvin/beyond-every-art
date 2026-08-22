@@ -5,6 +5,7 @@ import type { PostCard } from '@/lib/content/queries'
 import { formatDate } from '@/lib/format'
 import { visibilityLabel } from '@/lib/membership'
 import { postPath } from '@/lib/seo/site'
+import { thumbnailSrc } from '@/lib/content/media'
 
 const THUMB_SIZES = '(max-width: 51rem) 4rem, 5.5rem'
 
@@ -29,7 +30,7 @@ export function EntryRow({ post }: { post: PostCard }) {
       <span className="entry__thumb">
         {post.image && (
           <Image
-            src={post.image.url}
+            src={thumbnailSrc(post.image)}
             alt=""
             fill
             sizes={THUMB_SIZES}

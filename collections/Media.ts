@@ -1,18 +1,29 @@
 import type { CollectionConfig } from 'payload'
 
 import { editorsAndAdmins, publicRead } from '../access/roles'
+import { ghostUrlField, migrationStatusField } from '../fields/ghost'
 import { CONTENT_TAGS } from '../lib/cache/content'
 import { purgeOnChange, purgeOnDelete } from '../lib/cache/purge'
 import { refuseOversizedUpload } from '../lib/security/uploads'
 
 export const Media: CollectionConfig = {
   slug: 'media',
+  admin: {
+    group: 'Content',
+    useAsTitle: 'filename',
+    defaultColumns: ['filename', 'alt', 'aiGenerated', 'updatedAt'],
+  },
   access: {
     create: editorsAndAdmins,
     read: publicRead,
     update: editorsAndAdmins,
     delete: editorsAndAdmins,
   },
+  // Soft delete, and here it protects more than the record. Deleting an upload
+  // removes the file every post referencing it renders, so the blast radius of
+  // a mistaken delete is every article that used the image — and unlike a post,
+  // nothing about the admin list makes that visible before the click.
+  trash: true,
   hooks: {
     beforeOperation: [refuseOversizedUpload],
     afterChange: [purgeOnChange(CONTENT_TAGS.media)],
@@ -48,7 +59,23 @@ export const Media: CollectionConfig = {
     // body limit in front of the application is still the real defence, and is
     // recorded in docs/EDGE_PROTECTION.md as unfinished rather than left to be
     // rediscovered.
-    imageSizes: [{ name: 'card', width: 768, withoutEnlargement: true }],
+    imageSizes: [
+      // Listing thumbnails. `lib/content/media.ts` hands this to `next/image`
+      // as the source for cards, so the optimiser resizes from 768px instead of
+      // from a multi-megabyte original on every cold cache entry.
+      { name: 'card', width: 768, withoutEnlargement: true },
+      // Share cards. 1.91:1 is what Open Graph consumers crop to anyway, so
+      // producing it here is the difference between a scraper downloading a
+      // 3000px original and downloading the thing it was going to make.
+      //
+      // Enlargement is deliberately left on: a share card whose aspect ratio is
+      // wrong is a visibly broken preview, which costs more than upscaling a
+      // small source. Derivatives are generated at upload, so media already in
+      // the library has no `og` size until it is re-uploaded — the metadata
+      // helpers fall back to the original, which is the behaviour every
+      // document had before this existed.
+      { name: 'og', width: 1200, height: 630 },
+    ],
   },
   fields: [
     { name: 'alt', type: 'text', required: true },
@@ -67,17 +94,7 @@ export const Media: CollectionConfig = {
           'answerable — filter on this to find them.',
       },
     },
-    {
-      name: 'ghostURL',
-      label: 'Ghost URL',
-      type: 'text',
-      unique: true,
-      index: true,
-    },
-    {
-      name: 'migrationStatus',
-      type: 'select',
-      options: ['pending', 'migrated', 'failed'],
-    },
+    ghostUrlField({ unique: true }),
+    migrationStatusField(['pending', 'migrated', 'failed']),
   ],
 }
