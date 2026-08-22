@@ -4,10 +4,19 @@
 //   pnpm restore:media
 //
 // Flags:
+//   --from-dir <path>      read files from an extracted Ghost archive instead
+//                          of the network (see below)
 //   --dry-run              list what would be refetched; downloads nothing
 //   --ghost-base-url <url> origin for __GHOST_URL__ placeholders (or GHOST_SITE_URL)
 //   --limit <n>            stop after n documents (default: all)
 //   --report <path>        report output path (default media-restore-report.json)
+//
+// `--from-dir` points at an unpacked Ghost site archive, which carries every
+// media file under `content/images/...` exactly as the stored URLs address
+// them. Prefer it to the network whenever the archive is available: it cannot
+// 404, cannot be rate-limited, and does not depend on the old site still being
+// up — which, at the point this script is needed, is not a safe thing to
+// depend on.
 //
 // Every `media` row records the URL it was migrated from. When the stored files
 // are gone but the rows are not, that URL is the way back: download it, hand it
@@ -26,13 +35,17 @@
 // Safe to rerun: it refetches whatever it is pointed at, and re-uploading a
 // file that is already correct produces the same file.
 
-import { writeFile } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { readdir, readFile, writeFile } from 'node:fs/promises'
+import { join, relative, resolve } from 'node:path'
 
 import { resolveUrl } from '../lib/migration/media-import'
 import {
+  buildLocalIndex,
+  findLocalFile,
   isUsableDownload,
   planRestore,
+  type LocalFile,
+  type LocalIndex,
   type RestorableDoc,
   type RestorePlan,
 } from '../lib/media/restore'
@@ -42,9 +55,28 @@ const RETRIES = 2
 
 interface Cli {
   dryRun: boolean
+  fromDir?: string
   ghostBaseUrl?: string
   limit?: number
   reportPath: string
+}
+
+/** Every file under a directory, as paths relative to it. */
+async function walk(root: string, dir = root): Promise<LocalFile[]> {
+  const entries = await readdir(dir, { withFileTypes: true })
+  const found: LocalFile[] = []
+  for (const entry of entries) {
+    const absolutePath = join(dir, entry.name)
+    if (entry.isDirectory()) {
+      found.push(...(await walk(root, absolutePath)))
+    } else if (entry.isFile()) {
+      found.push({
+        relativePath: `/${relative(root, absolutePath)}`,
+        absolutePath,
+      })
+    }
+  }
+  return found
 }
 
 function flagValue(argv: string[], flag: string): string | undefined {
@@ -59,6 +91,7 @@ function parseArgs(argv: string[]): Cli {
   }
   return {
     dryRun: argv.includes('--dry-run'),
+    fromDir: flagValue(argv, '--from-dir'),
     ghostBaseUrl:
       flagValue(argv, '--ghost-base-url') ?? process.env.GHOST_SITE_URL,
     limit: limit === undefined ? undefined : Number(limit),
@@ -99,9 +132,17 @@ async function download(url: string): Promise<Response> {
 }
 
 async function main() {
-  const { dryRun, ghostBaseUrl, limit, reportPath } = parseArgs(
+  const { dryRun, fromDir, ghostBaseUrl, limit, reportPath } = parseArgs(
     process.argv.slice(2),
   )
+
+  let archive: LocalIndex | undefined
+  if (fromDir) {
+    const root = resolve(fromDir)
+    const files = await walk(root)
+    archive = buildLocalIndex(files)
+    process.stderr.write(`Indexed ${files.length} files under ${root}\n`)
+  }
 
   // Lazily imported through the alias the rest of the project uses, so this
   // file parses without a database — the same shape as `migrate-ghost.ts`.
@@ -119,6 +160,13 @@ async function main() {
     overrideAccess: true,
   })
 
+  /** Where one document's bytes will come from, for the report. */
+  const sourceLabel = (plan: RestorePlan): string => {
+    if (!archive) return resolveUrl(plan.ghostURL, ghostBaseUrl)
+    const located = findLocalFile(archive, plan.ghostURL)
+    return 'reason' in located ? located.reason : located.path
+  }
+
   const { plans, skipped } = planRestore(docs as RestorableDoc[])
   const selected = limit === undefined ? plans : plans.slice(0, limit)
 
@@ -131,18 +179,33 @@ async function main() {
 
   if (!dryRun) {
     for (const plan of selected) {
-      const source = resolveUrl(plan.ghostURL, ghostBaseUrl)
+      const source = sourceLabel(plan)
       try {
-        const response = await download(source)
-        const bytes = Buffer.from(await response.arrayBuffer())
+        let bytes: Buffer
+        let contentType: string | null = null
+
+        if (archive) {
+          const located = findLocalFile(archive, plan.ghostURL)
+          if ('reason' in located) {
+            failed.push({
+              id: plan.id,
+              filename: plan.filename,
+              reason: located.reason,
+            })
+            continue
+          }
+          bytes = await readFile(located.path)
+        } else {
+          const response = await download(source)
+          bytes = Buffer.from(await response.arrayBuffer())
+          contentType = response.headers.get('content-type')
+        }
 
         // A reconfigured source can answer a missing image with a 200 and an
         // HTML error page. Storing that would turn a missing file into a
         // corrupt one, which reads as healthy and is harder to find later.
-        const usable = isUsableDownload(
-          response.headers.get('content-type'),
-          bytes.length,
-        )
+        // Checked for a local file too: an archive can hold a truncated one.
+        const usable = isUsableDownload(contentType, bytes.length)
         if (usable !== true) {
           failed.push({ id: plan.id, filename: plan.filename, reason: usable })
           continue
@@ -155,7 +218,7 @@ async function main() {
           file: {
             data: bytes,
             name: plan.filename,
-            mimetype: response.headers.get('content-type') || plan.mimeType,
+            mimetype: contentType || plan.mimeType,
             size: bytes.length,
           },
           // Keeps the existing filename, and therefore every URL already
@@ -184,11 +247,12 @@ async function main() {
     // Rows with no ghostURL were authored here rather than migrated, so the
     // old site has nothing to give back. Listed so the count is explainable.
     skipped,
+    source: archive ? 'archive' : 'network',
     documents: dryRun
       ? selected.map((p: RestorePlan) => ({
           id: p.id,
           filename: p.filename,
-          from: resolveUrl(p.ghostURL, ghostBaseUrl),
+          from: sourceLabel(p),
         }))
       : restored,
   }

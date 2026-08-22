@@ -7,7 +7,13 @@
 
 import { describe, expect, it } from 'vitest'
 
-import { isUsableDownload, planRestore } from '../../lib/media/restore'
+import {
+  buildLocalIndex,
+  findLocalFile,
+  isUsableDownload,
+  planRestore,
+  urlPath,
+} from '../../lib/media/restore'
 
 const migrated = {
   id: 7,
@@ -97,5 +103,94 @@ describe('isUsableDownload', () => {
   it('allows a missing content type through on size alone', () => {
     expect(isUsableDownload(null, 40_000)).toBe(true)
     expect(isUsableDownload(undefined, 40_000)).toBe(true)
+  })
+})
+
+describe('restoring from an extracted Ghost archive', () => {
+  const index = buildLocalIndex([
+    {
+      relativePath: '/content/images/2024/02/corridor.jpg',
+      absolutePath: '/archive/content/images/2024/02/corridor.jpg',
+    },
+    {
+      relativePath: '/content/images/2023/05/corridor.jpg',
+      absolutePath: '/archive/content/images/2023/05/corridor.jpg',
+    },
+    {
+      relativePath: '/content/images/2024/02/gallery.jpg',
+      absolutePath: '/archive/content/images/2024/02/gallery.jpg',
+    },
+  ])
+
+  it('matches on the full path, which is unambiguous', () => {
+    expect(
+      findLocalFile(
+        index,
+        'https://old.example/content/images/2024/02/corridor.jpg',
+      ),
+    ).toEqual({ path: '/archive/content/images/2024/02/corridor.jpg' })
+  })
+
+  // Ghost namespaces uploads by year and month, so the same name legitimately
+  // appears twice. Guessing would put the wrong photograph on a published page.
+  it('refuses to guess when a name appears more than once', () => {
+    const flat = buildLocalIndex([
+      { relativePath: '/a/corridor.jpg', absolutePath: '/x/a/corridor.jpg' },
+      { relativePath: '/b/corridor.jpg', absolutePath: '/x/b/corridor.jpg' },
+    ])
+
+    const result = findLocalFile(
+      flat,
+      'https://old.example/images/corridor.jpg',
+    )
+
+    expect(result).toMatchObject({ reason: expect.stringContaining('2 times') })
+  })
+
+  // The forgiving case: an operator points at `content/images` instead of the
+  // archive root, so the stored path cannot match but the name still can.
+  it('falls back to a unique file name when the path does not line up', () => {
+    const nested = buildLocalIndex([
+      {
+        relativePath: '/2024/02/gallery.jpg',
+        absolutePath: '/x/2024/02/gallery.jpg',
+      },
+    ])
+
+    expect(
+      findLocalFile(
+        nested,
+        'https://old.example/content/images/2024/02/gallery.jpg',
+      ),
+    ).toEqual({ path: '/x/2024/02/gallery.jpg' })
+  })
+
+  it('says what it looked for when the archive does not have it', () => {
+    const result = findLocalFile(
+      index,
+      'https://old.example/content/images/gone.jpg',
+    )
+
+    expect(result).toMatchObject({
+      reason: expect.stringContaining('/content/images/gone.jpg'),
+    })
+  })
+})
+
+describe('urlPath', () => {
+  it('reads the path out of an absolute URL', () => {
+    expect(urlPath('https://old.example/content/images/a/b.jpg')).toBe(
+      '/content/images/a/b.jpg',
+    )
+  })
+
+  it('handles the placeholder form the export uses', () => {
+    expect(urlPath('__GHOST_URL__/content/images/a/b.jpg')).toBe(
+      '/content/images/a/b.jpg',
+    )
+  })
+
+  it('drops a query string, which is not part of the stored file', () => {
+    expect(urlPath('https://old.example/img/a.jpg?w=600')).toBe('/img/a.jpg')
   })
 })

@@ -135,7 +135,12 @@ docker compose run --rm migrate pnpm restore:media --dry-run
 docker compose run --rm migrate pnpm restore:media
 ```
 
-It needs no export file. Rows with no `ghostURL` were authored here rather than
+If the site archive is still to hand, restore from it instead — it carries every
+media file under `content/images/…` and cannot 404 or rate-limit, which the live
+site can. Unpack it somewhere the `migrate` service can read and pass
+`--from-dir`.
+
+It needs no export file when the source site is up. Rows with no `ghostURL` were authored here rather than
 migrated and are reported rather than restored — the old site has nothing to
 give back for those, and only a database backup would.
 

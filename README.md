@@ -128,6 +128,18 @@ pnpm restore:media --dry-run     # what would be refetched, and from where
 pnpm restore:media               # download and hand each file back to Payload
 ```
 
+**Prefer the site archive when you have it.** A Ghost export zip carries every
+media file under `content/images/…`, laid out exactly as the stored URLs address
+them, so `--from-dir` restores from disk with no network at all — it cannot 404,
+cannot be rate-limited, and does not depend on the old site still being up,
+which at the point this is needed is not a safe assumption:
+
+```bash
+unzip ghost-export.zip -d ghost-archive
+pnpm restore:media --from-dir ghost-archive --dry-run
+pnpm restore:media --from-dir ghost-archive
+```
+
 Payload rewrites the file and regenerates every derivative under the **same
 document id and the same filename**, so no post loses its featured image and no
 `<img src>` in a migrated body changes. Rows with no `ghostURL` were authored

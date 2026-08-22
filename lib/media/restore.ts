@@ -123,3 +123,87 @@ export function isUsableDownload(
   }
   return true
 }
+
+// --- restoring from an extracted Ghost archive, rather than over the network ---
+//
+// A Ghost site archive holds every media file under `content/images/...`, laid
+// out exactly as the URLs address them. That makes it a complete and offline
+// source for this recovery — better than the live site in every way, since it
+// cannot 404, cannot rate-limit, and does not depend on the old site staying up.
+
+/** One file found under the archive directory. */
+export interface LocalFile {
+  /** Path relative to the directory given, with a leading slash. */
+  relativePath: string
+  absolutePath: string
+}
+
+export interface LocalIndex {
+  byPath: Map<string, string>
+  byName: Map<string, string[]>
+}
+
+/**
+ * Index an extracted archive for lookup by URL.
+ *
+ * Two indexes because two things can be true: usually the archive mirrors the
+ * URL path exactly and the match is unambiguous, but an operator may point this
+ * at `content/images` rather than the archive root, in which case only the file
+ * name survives. Ghost namespaces uploads by year and month, so a bare name can
+ * legitimately appear twice — hence a list, and a refusal to guess below.
+ */
+export function buildLocalIndex(files: LocalFile[]): LocalIndex {
+  const byPath = new Map<string, string>()
+  const byName = new Map<string, string[]>()
+
+  for (const file of files) {
+    byPath.set(file.relativePath, file.absolutePath)
+    const name = file.relativePath.split('/').pop() ?? ''
+    if (!name) continue
+    const existing = byName.get(name)
+    if (existing) existing.push(file.absolutePath)
+    else byName.set(name, [file.absolutePath])
+  }
+
+  return { byPath, byName }
+}
+
+/** The path portion of a stored media URL, however it was written. */
+export function urlPath(url: string): string {
+  try {
+    return new URL(url).pathname
+  } catch {
+    const withoutQuery = url.split(/[?#]/)[0] ?? url
+    const stripped = withoutQuery.replace(/^__GHOST_URL__/, '')
+    return stripped.startsWith('/') ? stripped : `/${stripped}`
+  }
+}
+
+/**
+ * Locate one media file inside an indexed archive.
+ *
+ * The full path wins when it is there, because it is unambiguous. The file name
+ * is a fallback for an archive rooted somewhere else, and it is only trusted
+ * when exactly one file carries that name — two candidates means the archive
+ * cannot say which article's image this is, and silently picking one would put
+ * the wrong photograph on a published page.
+ */
+export function findLocalFile(
+  index: LocalIndex,
+  ghostURL: string,
+): { path: string } | { reason: string } {
+  const path = urlPath(ghostURL)
+
+  const exact = index.byPath.get(path)
+  if (exact) return { path: exact }
+
+  const name = path.split('/').pop() ?? ''
+  const candidates = name ? (index.byName.get(name) ?? []) : []
+  if (candidates.length === 1) return { path: candidates[0]! }
+  if (candidates.length > 1) {
+    return {
+      reason: `${name} appears ${candidates.length} times in the archive and the path ${path} matched none of them`,
+    }
+  }
+  return { reason: `not found in the archive: ${path}` }
+}
