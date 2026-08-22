@@ -4,6 +4,10 @@ import { cache } from 'react'
 
 import { getPostsByAuthor } from '@/lib/content/queries'
 import { logMissingRoute } from '@/lib/observability/missing-route'
+import {
+  recordSlugMiss,
+  requireLookupableSlug,
+} from '@/lib/security/slug-requests'
 import { absoluteUrl, authorPath, getSiteUrl } from '@/lib/seo/site'
 
 import { FadeIn } from '../../components/motion/fade-in'
@@ -17,7 +21,14 @@ export const dynamic = 'force-dynamic'
 
 type Params = { slug: string }
 
-const resolve = cache((slug: string) => getPostsByAuthor(slug))
+// Resolved once per request, and gated first: a slug that cannot name an
+// author is answered 404 without a query. See `lib/security/slug-requests.ts`.
+const resolve = cache(async (slug: string) => {
+  await requireLookupableSlug(slug)
+  const archive = await getPostsByAuthor(slug)
+  if (!archive) await recordSlugMiss()
+  return archive
+})
 
 export async function generateMetadata({
   params,

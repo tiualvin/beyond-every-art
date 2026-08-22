@@ -6,6 +6,10 @@ import { cache } from 'react'
 import { getPostsByTag, getTagsWithCounts } from '@/lib/content/queries'
 import { pigmentFor } from '@/lib/design/pigments'
 import { logMissingRoute } from '@/lib/observability/missing-route'
+import {
+  recordSlugMiss,
+  requireLookupableSlug,
+} from '@/lib/security/slug-requests'
 import { absoluteUrl, getSiteUrl, JOURNAL_PATH, tagPath } from '@/lib/seo/site'
 
 import { ArchiveGroups } from '../../components/archive-groups'
@@ -21,7 +25,14 @@ type Params = { slug: string }
 /** Enough to move on with, without turning the foot into a second archive. */
 const SIBLING_TOPICS = 5
 
-const resolve = cache((slug: string) => getPostsByTag(slug))
+// Resolved once per request, and gated first: a slug that cannot name a tag
+// is answered 404 without a query. See `lib/security/slug-requests.ts`.
+const resolve = cache(async (slug: string) => {
+  await requireLookupableSlug(slug)
+  const archive = await getPostsByTag(slug)
+  if (!archive) await recordSlugMiss()
+  return archive
+})
 
 export async function generateMetadata({
   params,

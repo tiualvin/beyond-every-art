@@ -14,6 +14,10 @@ import {
 import { shareImageSrc } from '@/lib/content/media'
 import { logMissingRoute } from '@/lib/observability/missing-route'
 import { getPreviewMode } from '@/lib/preview/mode'
+import {
+  recordSlugMiss,
+  requireLookupableSlug,
+} from '@/lib/security/slug-requests'
 import { buildArticleJsonLd, serializeJsonLd } from '@/lib/seo/jsonld'
 import { absoluteUrl, getSiteUrl, pagePath, postPath } from '@/lib/seo/site'
 
@@ -34,12 +38,25 @@ type Resolved =
   | { kind: 'none' }
 
 // Resolve once per request; generateMetadata and the page component share it.
+//
+// This is also where a slug that cannot resolve is turned away before it costs
+// two queries and two cache entries — see `lib/security/slug-requests.ts`. It
+// belongs here rather than in the two callers precisely because `cache()` makes
+// it run once: `generateMetadata` and the page body get the same verdict.
 const resolve = cache(async (slug: string): Promise<Resolved> => {
   const { draft, user } = await getPreviewMode()
+  // Preview is exempt. A draft save relaxes field validation, so an editor is
+  // the one caller who can legitimately ask for a slug the pattern refuses.
+  if (!draft) await requireLookupableSlug(slug)
+
   const post = await getPostBySlug(slug, { draft, user })
   if (post) return { kind: 'post', post }
   const page = await getPageBySlug(slug, { draft, user })
   if (page) return { kind: 'page', page }
+
+  // Both reads missed, so this slug names nothing. Counted against the source
+  // only now: a reader moving through real articles never reaches this line.
+  if (!draft) await recordSlugMiss()
   return { kind: 'none' }
 })
 

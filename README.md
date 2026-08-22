@@ -219,8 +219,24 @@ and GraphQL collection endpoints, and the MCP endpoint are answered with a 404
 there and reachable only on `CMS_ADDRESS`. The exceptions are `/api/media`,
 which serves uploaded images, and `/api/preview`, which carries an editor's
 draft session. Public endpoints that reach the database — search, the two signup
-forms, and Payload's own login and password-reset routes — are rate limited per
-source address by `lib/security/rate-limit.ts`.
+forms, `/api/preview`, the OAuth endpoints, and Payload's own login and
+password-reset routes — are rate limited per source address by
+`lib/security/rate-limit.ts`.
+
+Slug routes are bounded differently, because throttling a reader who is reading
+would be the wrong answer. A slug that does not match the pattern
+`fields/slug.ts` enforces on write cannot name a document, so it is answered 404
+without a query at all; a well-formed slug that resolves to nothing is counted,
+and a source that spends its allowance of those stops reaching the database.
+Reading real articles costs nothing here — only misses are counted. See
+`lib/security/slug-requests.ts`.
+
+`/_next/image` is not a route in this repository but it is a public endpoint
+that runs sharp on demand, and Caddy does not cover it. `lib/security/images.ts`
+is what bounds it: one permitted quality instead of a hundred, and uploads as
+the only local path it may be pointed at — which also closes the gap where the
+optimizer would dispatch any local URL through the application's own handler,
+reaching `/api/*` on the hostname where Caddy refuses it.
 
 Those limiters are per-container and bound one noisy source; they are not a
 defence against a distributed attacker, and nothing in front of the origin is.
