@@ -1808,6 +1808,15 @@ img {
   margin-top: 0.05em;
 }
 
+/* Body headings carry an `id` (see lib/content/headings.ts), so any of them can
+   be the target of a deep link — from a shared URL or a search result's "jump
+   to section". Without this the browser scrolls the heading to y=0, which is
+   underneath the fixed masthead, and the reader arrives at a section whose
+   title they cannot see. Same 5.25rem clearance `.group__label` uses. */
+.prose :is(h2, h3, h4, h5, h6) {
+  scroll-margin-top: 5.25rem;
+}
+
 .prose h2 {
   font-size: 1.7rem;
   margin-top: 2.5rem;

@@ -18,6 +18,7 @@ import {
   recordSlugMiss,
   requireLookupableSlug,
 } from '@/lib/security/slug-requests'
+import { robotsDirective } from '@/lib/seo/indexing'
 import { buildArticleJsonLd, serializeJsonLd } from '@/lib/seo/jsonld'
 import { absoluteUrl, getSiteUrl, pagePath, postPath } from '@/lib/seo/site'
 
@@ -82,6 +83,9 @@ export async function generateMetadata({
       description: page.metaDescription || undefined,
       alternates: { canonical },
       openGraph: { type: 'website', title: page.title, url: canonical },
+      // Omitted entirely unless something asks for a restriction, so the
+      // layout's deployment-wide switch is never overridden from here.
+      robots: robotsDirective(page.noindex),
     }
   }
 
@@ -119,6 +123,7 @@ export async function generateMetadata({
       description,
       images,
     },
+    robots: robotsDirective(post.noindex),
   }
 }
 

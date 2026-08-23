@@ -18,10 +18,20 @@ type SeoFieldsOptions = {
    * a way to point a live URL at somebody else's.
    */
   canonical?: boolean
+  /**
+   * Include the per-document "hide from search" switch.
+   *
+   * For collections whose documents can legitimately exist without wanting to
+   * rank — articles and pages. An archive or an author page is part of the
+   * site's own navigation, and hiding one from search while still linking to
+   * it from every article is a contradiction rather than a setting.
+   */
+  noindex?: boolean
 }
 
 export function seoFields({
   canonical = false,
+  noindex = false,
 }: SeoFieldsOptions = {}): Field[] {
   return [
     {
@@ -49,6 +59,21 @@ export function seoFields({
             admin: {
               description:
                 'Only when this was first published elsewhere. Points search engines at the original.',
+            },
+          },
+        ] as Field[])
+      : []),
+    ...(noindex
+      ? ([
+          {
+            name: 'noindex',
+            label: 'Hide from search engines',
+            type: 'checkbox',
+            defaultValue: false,
+            admin: {
+              description:
+                'Keeps this out of search results and the sitemap. For campaign and advertising landing pages, which otherwise compete with the articles they were written to support. Links on the page still count.',
+              position: 'sidebar',
             },
           },
         ] as Field[])

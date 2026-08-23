@@ -1,4 +1,7 @@
-import type { JSXConverters } from '@payloadcms/richtext-lexical/react'
+import type {
+  JSXConverterArgs,
+  JSXConverters,
+} from '@payloadcms/richtext-lexical/react'
 
 import {
   ACCORDION_BLOCK,
@@ -21,6 +24,7 @@ import {
   type PullQuoteData,
   type SignupData,
 } from '@/blocks/schema'
+import { createAnchorAllocator, headingText } from '@/lib/content/headings'
 import { Accordion } from './accordion'
 import { Bookmark } from './bookmark'
 import { ActionButton } from './button'
@@ -67,6 +71,50 @@ type UnknownNodeShape = {
 }
 
 /**
+ * A heading node, as much of one as an anchor needs.
+ *
+ * Payload types `node.children` as `SerializedLexicalNode[]`, which carries no
+ * `text` — the text lives on the concrete text-node subtype. Reading it is
+ * therefore a narrowing the shared type cannot express, so the node is widened
+ * to this shape at the single point where `headingText` is called.
+ */
+type HeadingTextNode = {
+  text?: string
+  children?: HeadingTextNode[]
+}
+
+/**
+ * A heading, with an `id` derived from its own text.
+ *
+ * Payload's default heading converter emits a bare `<h2>`, which cannot be
+ * linked to. The reasoning for anchoring them is in `lib/content/headings.ts`.
+ *
+ * The allocator is created per converter set — that is, once per rendered
+ * document — because uniqueness is a property of one page's markup. A module
+ * scoped allocator would leak anchors between requests and, worse, start
+ * numbering the first article's headings from wherever the last one stopped.
+ *
+ * Anchors deliberately come from the heading's *text* rather than its position,
+ * so `#binders-and-behaviour` survives an editor inserting a section above it.
+ * Rewording the heading does change the anchor, which is the honest trade: an
+ * anchor is a name for what the section says.
+ */
+function headingConverter(allocate: (text: string) => string) {
+  // Named rather than an arrow so `react/display-name` can tell this is a
+  // converter the renderer calls, not a component it mounts.
+  return function convertHeading({
+    node,
+    nodesToJSX,
+  }: JSXConverterArgs<{ tag?: string; children?: unknown[] }>) {
+    const Tag = (node.tag ?? 'h2') as 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
+    const children = nodesToJSX({ nodes: (node.children ?? []) as never })
+    return (
+      <Tag id={allocate(headingText(node as HeadingTextNode))}>{children}</Tag>
+    )
+  }
+}
+
+/**
  * Converters for a body, with this project's blocks registered.
  *
  * `preview` is threaded through rather than read from a hook because these run
@@ -79,6 +127,7 @@ export function buildConverters(preview: boolean) {
     defaultConverters: JSXConverters
   }): JSXConverters => ({
     ...defaultConverters,
+    heading: headingConverter(createAnchorAllocator()),
     blocks: Object.fromEntries(
       Object.entries(renderers).map(([slug, render]) => [
         slug,
