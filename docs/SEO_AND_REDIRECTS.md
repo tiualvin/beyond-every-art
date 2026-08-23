@@ -12,6 +12,7 @@ complements the migration handoff in
 | XML sitemap   | `/sitemap.xml`   | `app/sitemap.ts`             |
 | Robots rules  | `/robots.txt`    | `app/robots.ts`              |
 | RSS feed      | `/rss`           | `app/rss/route.ts`           |
+| Ad sellers    | `/ads.txt`       | `app/ads.txt/route.ts`       |
 | Redirects     | (all paths)      | `middleware.ts`              |
 | Redirect data | `/redirects-map` | `app/redirects-map/route.ts` |
 
@@ -21,6 +22,32 @@ The pure, framework-free logic lives under `lib/seo/` and is unit tested:
 - `lib/seo/redirects.ts` — path normalization and redirect-map matching.
 - `lib/seo/rss.ts` — RSS 2.0 rendering with XML escaping.
 - `lib/seo/sitemap.ts` — sitemap entry construction.
+- `lib/seo/ads-txt.ts` — the authorized-sellers record and its rendering.
+
+### ads.txt
+
+`ads.txt` names the accounts allowed to sell this site's ad inventory. A buyer's
+crawler fetches it from the domain root, and AdSense will not serve ads on a
+domain whose file it cannot fetch — so a missing file is not a warning, it is
+the whole feature off.
+
+Two things about it are deliberate and easy to undo by accident:
+
+- **It is a route, not a file in `public/`.** This project builds with
+  `output: 'standalone'`, and the Dockerfile's runtime stage copies
+  `.next/standalone` and `.next/static` only. A `public/ads.txt` would be
+  served by `next dev` and by `next start` from a full build, and would be
+  absent from the deployed image — a failure every local check passes.
+- **`ads.txt` is a reserved root slug.** Payload refuses it as a post or page
+  slug (`lib/seo/reserved-slugs.ts`), because content claiming that URL would
+  shadow the route and stop ad serving on a site that looked entirely healthy.
+
+The publisher ID is a constant rather than an environment variable: it is public
+by definition, never varies by deployment, and a wrong value is a monetization
+outage better caught in review than in a container's environment. It must match
+the ID AdSense shows under Sites → Ads.txt. `/ads.txt` is outside the middleware
+matcher (the matcher excludes any path containing a dot), so `STAGING_BASIC_AUTH`
+does not gate it and a crawler reaches it on a staging deployment too.
 
 ## Redirects
 

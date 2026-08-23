@@ -14,6 +14,10 @@ export const RESERVED_ROOT_SLUGS = [
   // authorization server.
   '.well-known',
   'admin',
+  // The authorized-sellers file, served by `app/ads.txt/route.ts`. A post that
+  // claimed this slug would shadow it, and ad serving would stop on a site that
+  // looked entirely healthy.
+  'ads.txt',
   'api',
   'apps',
   'author',
