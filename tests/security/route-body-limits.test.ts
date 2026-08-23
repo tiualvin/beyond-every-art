@@ -1,10 +1,10 @@
-// The bodies of both public ingest routes are bounded in lib/security/
+// The bodies of every public ingest route are bounded in lib/security/
 // request-body.ts, which has its own unit tests. These are about what the
 // routes do with a body that exceeds the limit, because that is the part a
 // later refactor can quietly change: the limit is enforced by a thrown
 // exception now, and where it is caught decides the status a stranger sees.
 
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/payload', () => ({
   getPayloadClient: () => {
@@ -13,6 +13,9 @@ vi.mock('@/lib/payload', () => ({
 }))
 
 import { POST as cspReport } from '../../app/csp-report/route'
+import { POST as oauthAuthorize } from '../../app/oauth/authorize/route'
+import { POST as oauthRevoke } from '../../app/oauth/revoke/route'
+import { POST as oauthToken } from '../../app/oauth/token/route'
 import { POST as stripeWebhook } from '../../app/webhooks/stripe/route'
 
 /** Distinct per request: the CSP route rate-limits per client address. */
@@ -128,5 +131,77 @@ describe('POST /webhooks/stripe', () => {
     )
 
     expect(response.status).toBe(400)
+  })
+})
+
+// The OAuth endpoints are unauthenticated POSTs — that is what an authorization
+// server is — so the caller chooses how much memory one request allocates
+// before anything has been validated. They were written after the two routes
+// above and did not inherit the ceiling; these pin it, and pin the ordering
+// with it: the mocked Payload client throws, so a route that reads its body
+// after reaching for Payload fails here rather than passing quietly.
+describe('the OAuth endpoints', () => {
+  /** Past MAX_OAUTH_BODY_BYTES, with a declared length the reader can refuse. */
+  const oversized = (field: string) => `${field}=${'t'.repeat(20_000)}`
+
+  const form = (body: string) =>
+    ({
+      method: 'POST',
+      headers: {
+        ...headers(),
+        'content-type': 'application/x-www-form-urlencoded',
+      },
+      body,
+    }) satisfies RequestInit
+
+  beforeEach(() => {
+    // Both are required or the endpoints answer 404 and prove nothing.
+    vi.stubEnv('MCP_OAUTH_ENABLED', '1')
+    vi.stubEnv('CMS_ADDRESS', 'cms.beyondeveryart.com')
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('refuses an oversized token request without parsing it', async () => {
+    const response = await oauthToken(
+      new Request(
+        'https://cms.beyondeveryart.com/oauth/token',
+        form(`grant_type=refresh_token&${oversized('refresh_token')}`),
+      ),
+    )
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'invalid_request',
+    })
+  })
+
+  it('refuses an oversized consent submission before touching Payload', async () => {
+    const response = await oauthAuthorize(
+      new Request(
+        'https://cms.beyondeveryart.com/oauth/authorize',
+        form(`decision=approve&${oversized('request')}`),
+      ),
+    )
+
+    // 400 and not a thrown mock: the body is read, and refused, first.
+    expect(response.status).toBe(400)
+  })
+
+  it('answers an oversized revocation the same as every other one', async () => {
+    const response = await oauthRevoke(
+      new Request(
+        'https://cms.beyondeveryart.com/oauth/revoke',
+        form(oversized('token')),
+      ),
+    )
+
+    // RFC 7009 §2.2: a revocation endpoint that distinguished outcomes would be
+    // an oracle for testing whether a stolen token is still live. Reaching 200
+    // without the mocked client throwing is what proves the body was refused
+    // rather than looked up.
+    expect(response.status).toBe(200)
   })
 })

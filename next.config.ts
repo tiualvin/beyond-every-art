@@ -3,6 +3,7 @@ import { withPayload } from '@payloadcms/next/withPayload'
 import type { NextConfig } from 'next'
 
 import { buildSecurityHeaders } from './lib/security/headers'
+import { buildImageConfig } from './lib/security/images'
 
 const nextConfig: NextConfig = {
   output: 'standalone',
@@ -24,16 +25,10 @@ const nextConfig: NextConfig = {
     if (headers.length === 0) return []
     return [{ source: '/:path*', headers }]
   },
-  images: {
-    remotePatterns: process.env.S3_PUBLIC_URL
-      ? [
-          {
-            hostname: new URL(process.env.S3_PUBLIC_URL).hostname,
-            protocol: 'https',
-          },
-        ]
-      : [],
-  },
+  // The image optimizer, bounded. See `lib/security/images.ts` for what each
+  // clause closes and why the block does not live in this file: a config that
+  // cannot be imported is a policy that cannot be unit-tested.
+  images: buildImageConfig(),
   reactStrictMode: true,
 }
 

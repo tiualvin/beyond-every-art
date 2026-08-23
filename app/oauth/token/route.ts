@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server'
 
-import { issuerOrigin, oauthEnabled } from '@/lib/oauth/config'
+import {
+  issuerOrigin,
+  MAX_OAUTH_BODY_BYTES,
+  oauthEnabled,
+} from '@/lib/oauth/config'
 import { redeemCode, refreshGrant } from '@/lib/oauth/grants'
 import { verifyPkce } from '@/lib/oauth/pkce'
 import { getPayloadClient } from '@/lib/payload'
@@ -10,6 +14,7 @@ import {
   FixedWindowRateLimiter,
   retryAfterSeconds,
 } from '@/lib/security/rate-limit'
+import { readBoundedText } from '@/lib/security/request-body'
 
 // The token endpoint. Two grants, both unauthenticated at the client level
 // because every client here is public — PKCE is what proves the caller is the
@@ -71,13 +76,17 @@ export async function POST(request: Request): Promise<NextResponse> {
   let form: URLSearchParams
   const contentType = request.headers.get('content-type') ?? ''
   try {
+    // Read once and bounded. The rate limiter caps how often this endpoint can
+    // be called; this caps what one call costs, which is the half a limiter
+    // cannot do — the body has already been buffered by the time it is counted.
+    const raw = await readBoundedText(request, MAX_OAUTH_BODY_BYTES)
     if (contentType.includes('application/json')) {
-      const body = (await request.json()) as Record<string, unknown>
+      const body = JSON.parse(raw) as Record<string, unknown>
       form = new URLSearchParams(
         Object.entries(body).map(([key, value]) => [key, String(value)]),
       )
     } else {
-      form = new URLSearchParams(await request.text())
+      form = new URLSearchParams(raw)
     }
   } catch {
     return fail('invalid_request', 'The request body could not be parsed.')
