@@ -1,0 +1,51 @@
+name: Audit
+# Its own workflow rather than a job inside CI, for three reasons. A new
+# advisory published upstream turns this red without a commit, so it must be
+# obvious that the code did not break — and it must be possible to see a green
+# `checks` and ship an urgent fix while this one is red. The third is the
+# schedule below, which is why it moved out of `ci.yml`: that workflow runs only
+# when somebody pushes, so an advisory published during a quiet week was
+# invisible until the next commit happened to notice it. That is how this
+# repository accumulated 26 advisories against a pinned Next once already.
+#
+# Deliberately not in the list of checks `main` requires (see
+# docs/DEPLOYMENT_STATUS.md): a red audit must never be the thing standing
+# between a fix and production.
+on:
+  pull_request:
+  push:
+    branches: [main, work]
+  # Daily, an hour after the nightly database backup, so a failure lands in the
+  # same part of the morning as the other overnight work. GitHub runs scheduled
+  # workflows from the default branch only, notifies the workflow's last editor
+  # when a scheduled run fails, and disables the schedule after 60 days without
+  # repository activity — which for this repository would itself be news.
+  schedule:
+    - cron: '0 4 * * *'
+  # So an advisory can be re-checked after a fix without waiting for tomorrow.
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    # Production dependencies only, and only `high` and above. `pnpm audit`
+    # reports the whole tree by default, including build tooling that never
+    # serves a request, and blocking on every moderate in a transitive
+    # dev dependency trains people to ignore the job entirely.
+    #
+    # Advisories against packages this project does not depend on directly are
+    # answered with `pnpm.overrides` in package.json — see the notes in
+    # tests/security/dependency-overrides.test.ts for what each one is for and
+    # when it can be removed.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { run_install: false }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --prod --audit-level high

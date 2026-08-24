@@ -1,85 +1,65 @@
 #!/bin/sh
 # Entrypoint for the billing reconciliation container. Installs a cron schedule
-# that runs `reconcile:billing`, and streams its output to the container log so
-# `docker compose logs reconcile` shows each run.
-#
-# Why this exists: webhooks are an optimisation over polling, not a guarantee.
-# Anything Stripe delivered while the app was down, or delivered and we failed
-# to store, is invisible until something reads the current state back. Once
-# Ghost is switched off nothing else is listening, so this sweep is the only
-# thing standing between a failed renewal and a member who keeps their access
-# for months — or loses it while still paying. The cutover runbook requires it
-# to be scheduled before Ghost's Stripe connection is removed.
-#
-# It runs from the migrator image rather than the backup one: the script reaches
-# Payload through the Local API, so it needs the application's dependency tree,
-# which the deliberately tiny backup image does not carry.
+# that runs `reconcile:billing` against Stripe, and streams its output to the
+# container log so `docker compose logs reconcile` shows each run.
 #
 # Environment:
-#   RECONCILE_CRON     cron schedule (default: 0 4 * * *, an hour after backups)
-#   RECONCILE_ON_START run one sweep immediately on container start (default false)
-#   STRIPE_SECRET_KEY  required; without it nothing is scheduled (see below)
-# plus the DATABASE_URI / PAYLOAD_SECRET variables the script reads through Payload.
+#   RECONCILE_CRON  cron schedule (default: 30 2 * * *, i.e. 02:30 daily)
+#   STRIPE_SECRET_KEY  required; the container refuses to start without it
+# plus the DATABASE_URI / PAYLOAD_SECRET / STRIPE_* variables the script reads.
+#
+# Why this exists. Webhooks are an optimisation over polling, not a guarantee:
+# anything Stripe delivered while the app was down, or to an endpoint that was
+# briefly misconfigured, is lost and nothing notices. `reconcile:billing`
+# re-reads every access-granting subscription from Stripe and compares it with
+# what the members collection says, so a drift shows up the next morning instead
+# of during a billing dispute. docs/CUTOVER_RUNBOOK.md requires this to be
+# scheduled with alerting on a non-zero exit before Ghost is cancelled — the
+# script exits non-zero on any unexplained difference, which is what makes the
+# alert possible.
+#
+# It runs in the migrator image rather than the backup one because the script
+# boots Payload: it needs the full dependency tree and payload.config.ts, and
+# the backup image deliberately carries neither.
 set -eu
 
+CRON="${RECONCILE_CRON:-30 2 * * *}"
 LOG=/var/log/reconcile.log
 ENV_FILE=/app/.reconcile-env
-CRON="${RECONCILE_CRON:-0 4 * * *}"
 
-# Stripe is taken over during the cutover, not before it, so this container
-# exists before the key it needs does. Scheduling anyway would fail every night
-# until then, and an alert that is always red is one nobody reads. Stay up and
-# say why instead: `docker compose ps` showing this container running, with one
-# line in its log naming the missing variable, is a more honest picture of an
-# unfinished cutover step than a container that is not there at all.
+# Fail at startup rather than at 02:30. This service is behind a Compose profile
+# that an operator turns on deliberately, so arriving here without a key means
+# the profile was enabled before the Stripe takeover in docs/CUTOVER_RUNBOOK.md
+# was finished — and a container that exits now says so far more clearly than a
+# nightly job failing on a guard inside the script.
 if [ -z "${STRIPE_SECRET_KEY:-}" ]; then
-  echo "{\"level\":\"warn\",\"event\":\"reconcile_not_scheduled\",\"time\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"reason\":\"STRIPE_SECRET_KEY is not set\"}"
-  echo "Billing reconciliation is not scheduled: STRIPE_SECRET_KEY is not set."
-  echo "See the Stripe takeover checklist in docs/CUTOVER_RUNBOOK.md."
-  # Idle rather than exit: exiting under `restart: unless-stopped` is a restart
-  # loop, and a loop is noise rather than a signal. `exec` so this is still PID
-  # 1 and `docker compose stop` is immediate rather than a ten-second wait.
-  exec tail -f /dev/null
+  echo "STRIPE_SECRET_KEY is not set, so there is nothing to reconcile against." >&2
+  echo "Set it in .env, or drop the 'reconcile' profile until the Stripe" >&2
+  echo "takeover in docs/CUTOVER_RUNBOOK.md is done." >&2
+  exit 1
 fi
-
-touch "$LOG"
-tail -F "$LOG" &
 
 # busybox crond runs jobs with a minimal environment, so persist the current
-# runtime environment for the cron job to source. Values here are connection
-# strings and keys with no embedded newlines.
+# runtime environment for the cron job to source. Values here are simple
+# connection strings and keys with no embedded newlines.
 printenv | sed 's/^\([^=]*\)=\(.*\)$/export \1="\2"/' >"$ENV_FILE"
-# It holds the live Stripe secret key, so it is readable by root and nobody else.
-chmod 600 "$ENV_FILE"
 
-# The script exits non-zero when Stripe and our records disagree, which is the
-# entire point of running it — so the wrapper turns that into one JSON line
-# beside the app's own `webhook_rejected` and `webhook_unresolved` lines, where
-# the same log collector can alert on it. No member data goes into the line; the
-# detail is in the report the script writes.
-cat <<'RUN' | sed "s#__ENV_FILE__#$ENV_FILE#" >/usr/local/bin/run-reconcile
-#!/bin/sh
-set -u
-. __ENV_FILE__
-cd /app
-now() { date -u +%Y-%m-%dT%H:%M:%SZ; }
-if pnpm --silent reconcile:billing --report /tmp/reconciliation-report.json; then
-  echo "{\"level\":\"info\",\"event\":\"reconcile_ok\",\"time\":\"$(now)\"}"
-else
-  status=$?
-  echo "{\"level\":\"error\",\"event\":\"reconcile_failed\",\"time\":\"$(now)\",\"exitCode\":$status}"
-fi
-RUN
-chmod +x /usr/local/bin/run-reconcile
-
+touch "$LOG"
 mkdir -p /etc/crontabs
-echo "$CRON /usr/local/bin/run-reconcile >> $LOG 2>&1" >/etc/crontabs/root
 
-if [ "${RECONCILE_ON_START:-false}" = "true" ]; then
-  echo "Running an initial reconciliation on start..." >>"$LOG"
-  /usr/local/bin/run-reconcile >>"$LOG" 2>&1 || true
-fi
+# No `--dry-run`: the daily sweep is meant to record what Stripe currently says,
+# which is what makes a missed webhook recoverable rather than merely visible.
+# The run is idempotent — the synthetic event ID carries the subscription's
+# status and period end, so a sweep that sees unchanged state writes nothing.
+#
+# No literal `%` may appear in a job line: cron reads one as a newline and feeds
+# the remainder to the job as stdin. Docker timestamps the stream instead
+# (`docker compose logs -t reconcile`).
+echo "$CRON . $ENV_FILE; cd /app && { echo \"--- billing reconciliation\"; pnpm reconcile:billing || echo \"Billing reconciliation FAILED - Stripe and the member records disagree, or the sweep could not run (see above).\"; } >> $LOG 2>&1" \
+  >/etc/crontabs/root
 
-echo "Reconciliation scheduler started with cron: $CRON"
+echo "Billing reconciliation scheduled with cron: $CRON"
 
+# Stream job output to stdout, then run cron in the foreground as PID 1's child.
+tail -F "$LOG" &
 exec crond -f -l 8

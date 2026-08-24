@@ -213,33 +213,10 @@ jobs:
           rm -rf "$drill"
       - run: pnpm build
 
-  audit:
-    # Its own job rather than a step inside `checks`, for two reasons. A new
-    # advisory published upstream turns this red without a commit, so it must be
-    # obvious that the code did not break — and it must be possible to see a
-    # green `checks` and ship an urgent fix while this one is red.
-    #
-    # Production dependencies only, and only `high` and above. `pnpm audit`
-    # reports the whole tree by default, including build tooling that never
-    # serves a request, and blocking on every moderate in a transitive
-    # dev dependency trains people to ignore the job entirely.
-    #
-    # Advisories against packages this project does not depend on directly are
-    # answered with `pnpm.overrides` in package.json — see the notes in
-    # tests/security/dependency-overrides.test.ts for what each one is for and
-    # when it can be removed.
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with: { run_install: false }
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm audit --prod --audit-level high
+  # The dependency audit used to be a job here. It now lives in its own
+  # workflow (`.github/workflows/audit.yml`) so it can also run on a schedule:
+  # a new advisory published upstream turns it red without anyone pushing, and
+  # this workflow only runs when somebody does.
 
   browser-smoke:
     # Browser-level launch checks against a seeded, disposable PostgreSQL
@@ -337,15 +314,15 @@ jobs:
       # discover it.
       - name: Build the migration image
         run: docker build --target migrator --tag beyond-every-art-migrator:ci .
-      # Same reasoning again for the reconciliation scheduler, which sits on top
-      # of the migrator stage and is likewise not reached by either build above.
-      # A container that only runs its entrypoint at 04:00 is one whose failures
-      # are easy to miss, so at least prove the image assembles.
-      - name: Build the reconciliation image
+      # The reconciliation scheduler runs that same image with the entrypoint
+      # `docker-compose.yml` names, so the image above already covers its build.
+      # What nothing else covers is the script itself: a container that only
+      # runs its entrypoint at 02:30 is one whose failures are easy to miss, so
+      # parse it here rather than discovering a syntax error overnight.
+      - name: Check the reconciliation entrypoint parses
         run: |
-          docker build --target reconciler --tag beyond-every-art-reconciler:ci .
-          docker run --rm --entrypoint sh beyond-every-art-reconciler:ci \
-            -c 'sh -n /usr/local/bin/reconcile-entrypoint.sh'
+          docker run --rm --entrypoint sh beyond-every-art-migrator:ci \
+            -c 'sh -n /app/docker/reconcile/entrypoint.sh'
       # The images are only half of it: the deploy runs `docker compose up`, so
       # a service that names a stage that does not exist, or mistypes a key,
       # fails on the VPS rather than here. Interpolation is checked too, which

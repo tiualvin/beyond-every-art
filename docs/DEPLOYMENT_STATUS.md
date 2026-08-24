@@ -142,10 +142,19 @@ certificate renewal — are in
    then run the baseline commands in
    [`DATABASE_MIGRATIONS.md`](DATABASE_MIGRATIONS.md). The script refuses
    anything that is not a pre-migrations database, and is safe to rerun.
-   Several deploys have succeeded since this was written (most recently #53,
-   #54), so this is likely already resolved — not reconfirmed directly, worth
-   a quick `docker compose run --rm migrate pnpm migrate:db:status` check
-   before treating it as closed.
+   CI history matches that story on both ends: the `deploy` job failed with
+   exit code 1 on the very first push that shipped schema migrations (#48,
+   2026-07-28), then kept failing through the next few pushes while the
+   `HOSTNAME`, `NewsletterBand`, and `DATABASE_URI` bugs above were being
+   tracked down. Starting with the fix for the second of those (2026-08-09,
+   "Don't show the newsletter promo band on the newsletter page", #54), the
+   `deploy` job has succeeded on every push to `main` since — 25+ consecutive
+   green deploys through 2026-08-22 (#98), with no failures in between. That
+   is strong circumstantial evidence the baseline was applied correctly, but
+   it is still inferred from a green `docker compose run --rm migrate` exit
+   code rather than a direct read of the migrations table. An operator can
+   retire this line for good with one command:
+   `docker compose run --rm migrate pnpm migrate:db:status`.
 
 0.4. **Media loss and R2 — recovered on 22 Aug. Two small steps left.**
 

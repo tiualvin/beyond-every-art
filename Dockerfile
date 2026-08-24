@@ -21,18 +21,6 @@ COPY . .
 RUN mkdir -p /app/media && chown 1001:1001 /app/media
 CMD ["pnpm", "migrate:db"]
 
-# The nightly billing reconciliation runs from the migrator image for the same
-# reason migrations do: `reconcile:billing` reaches Payload through the Local
-# API, so it needs the application's dependency tree. The backup image, which
-# already carries a cron scheduler, is deliberately tiny and has no node_modules
-# at all — which is why this is a second scheduler rather than a second job in
-# the first one.
-FROM migrator AS reconciler
-COPY docker/reconcile/entrypoint.sh /usr/local/bin/reconcile-entrypoint.sh
-RUN chmod +x /usr/local/bin/reconcile-entrypoint.sh
-CMD []
-ENTRYPOINT ["/usr/local/bin/reconcile-entrypoint.sh"]
-
 FROM base AS builder
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .

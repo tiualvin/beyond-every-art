@@ -66,7 +66,8 @@ Watch, via logs / Search Console / uptime monitor / `/health`:
 - Analytics traffic vs. the pre-migration baseline
 - Form submissions and email delivery
 - Database storage, R2 usage, CPU/memory
-- Nightly backup completion (`docker compose logs backup`)
+- Nightly backup completion, and the weekly restore check that reads one back
+  (`docker compose logs backup`; a failure prints `Restore verification FAILED`)
 - Rejected or unresolved billing webhooks (`webhook_rejected`,
   `webhook_unresolved` log lines), once the Stripe takeover below is live
 - The nightly reconciliation's verdict (`reconcile_failed` log lines), which is
@@ -140,14 +141,19 @@ explained without a manual Stripe audit.
       which records what Stripe currently says for each subscription. As of
       2026-08-18 the live account has no subscriptions at all, so expect an empty
       report and treat anything else as a surprise worth understanding.
-- [ ] Daily reconciliation confirmed running. The `reconcile` service schedules
-      it (`RECONCILE_CRON`, 04:00 by default), but it stays inert until
-      `STRIPE_SECRET_KEY` is set — so restart it after writing the key and check
-      that its log says it scheduled rather than that it skipped:
-      `docker compose logs reconcile | tail`. Each run emits one JSON line,
-      `reconcile_ok` or `reconcile_failed`; alert on the second, the same way
-      the app's `webhook_rejected` lines are watched. Webhooks are an
-      optimisation over polling, not a guarantee.
+- [ ] Daily reconciliation running. The schedule ships as the `reconcile`
+      service in `docker-compose.yml`, held behind a Compose profile so it
+      cannot start before this checklist reaches it. Turn it on by adding
+      `reconcile` to `COMPOSE_PROFILES` in the production `.env` — at the same
+      time as `STRIPE_SECRET_KEY`, because the container refuses to start
+      without one — then `docker compose up -d`. Confirm with
+      `docker compose logs reconcile`, which prints the schedule it installed.
+      Webhooks are an optimisation over polling, not a guarantee.
+- [ ] Alerting on a non-zero exit. The sweep exits non-zero on any unexplained
+      difference and writes a line beginning `Billing reconciliation FAILED` to
+      the container log; something has to be watching for it. This is the one
+      part of the reconciliation the repository cannot ship for you, because it
+      depends on where this deployment sends its alerts.
 - [ ] Only then: remove Ghost's Stripe connection.
 
 Watch the app logs for `webhook_rejected` and `webhook_unresolved` JSON lines in
