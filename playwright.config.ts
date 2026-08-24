@@ -45,6 +45,18 @@ const rateLimitOverrides = {
   // the middle of an unrelated assertion.
   RATE_LIMIT_OAUTH_REGISTER_PER_HOUR: '10000',
   RATE_LIMIT_OAUTH_TOKEN_PER_MINUTE: '10000',
+  RATE_LIMIT_OAUTH_AUTHORIZE_PER_MINUTE: '10000',
+  RATE_LIMIT_OAUTH_REVOKE_PER_MINUTE: '10000',
+  // Several specs assert that an unknown or unpublished slug answers 404, and
+  // each of those is a miss against the shared bucket. The production allowance
+  // of thirty a minute is comfortably above what one run spends, but not above
+  // a retried run — and the failure would look like a route regression rather
+  // than a limiter, since the page still 404s either way and only the reason
+  // changes. `tests/security/slug-requests.test.ts` covers the real policy.
+  RATE_LIMIT_SLUG_MISSES_PER_MINUTE: '10000',
+  // `privacy-and-redirects.spec.ts` and the preview specs drive /api/preview
+  // from the same address as everything else.
+  RATE_LIMIT_PREVIEW_PER_MINUTE: '10000',
 }
 
 /**

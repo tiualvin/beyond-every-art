@@ -78,7 +78,15 @@ async function downloadWithRetry(
     : new Error(`Failed to download ${url}`)
 }
 
-function resolveUrl(url: string, ghostBaseUrl?: string): string {
+/**
+ * Turn a stored Ghost media URL into one that can actually be fetched.
+ *
+ * Exported because the recovery path needs the same rule: `lib/media/restore.ts`
+ * re-downloads from the `ghostURL` this importer wrote, and a second, slightly
+ * different idea of what `__GHOST_URL__` means would send it to the wrong host
+ * for exactly the files that are already missing.
+ */
+export function resolveUrl(url: string, ghostBaseUrl?: string): string {
   if (url.startsWith('__GHOST_URL__')) {
     const base = (ghostBaseUrl ?? '').replace(/\/$/, '')
     return `${base}${url.slice('__GHOST_URL__'.length)}`

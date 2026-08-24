@@ -129,7 +129,17 @@ services:
       - media_data:/app/media
 
   caddy:
-    image: caddy:2-alpine
+    # Caddy plus the Cloudflare DNS module, from `docker/caddy/Dockerfile`.
+    #
+    # Adopted on its own, ahead of the change that needs it. The module is
+    # additive: with no `tls` directive in the Caddyfile, this image still
+    # answers the HTTP-01 challenge and behaves exactly like `caddy:2-alpine`.
+    # That is the point — the risky change is switching the ACME challenge, and
+    # doing it in the same deploy as a new image would leave two suspects if the
+    # site stopped serving. See docs/EDGE_PROTECTION.md.
+    build:
+      context: .
+      dockerfile: docker/caddy/Dockerfile
     restart: unless-stopped
     # Container logs are a fixed-size resource on this box. Docker's json-file
     # driver keeps them forever by default, so a noisy loop — or an

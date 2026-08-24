@@ -1,12 +1,19 @@
 import type { CollectionConfig } from 'payload'
 
 import { editorsAndAdmins, publicRead } from '../access/roles'
+import { ghostIdField } from '../fields/ghost'
+import { seoFields } from '../fields/seo'
+import { slugField } from '../fields/slug'
 import { CONTENT_TAGS } from '../lib/cache/content'
 import { purgeOnChange, purgeOnDelete } from '../lib/cache/purge'
 
 export const Tags: CollectionConfig = {
   slug: 'tags',
-  admin: { useAsTitle: 'name' },
+  admin: {
+    group: 'Content',
+    useAsTitle: 'name',
+    defaultColumns: ['name', 'slug', 'updatedAt'],
+  },
   access: {
     create: editorsAndAdmins,
     read: publicRead,
@@ -19,17 +26,12 @@ export const Tags: CollectionConfig = {
   },
   fields: [
     { name: 'name', type: 'text', required: true },
-    { name: 'slug', type: 'text', required: true, unique: true, index: true },
+    // `/tag/<slug>`, so an application route cannot be shadowed and the
+    // reserved-slug list does not apply — see the note in `fields/slug.ts`.
+    slugField({ from: 'name' }),
     { name: 'description', type: 'textarea' },
     { name: 'featuredImage', type: 'upload', relationTo: 'media' },
-    { name: 'metaTitle', type: 'text' },
-    { name: 'metaDescription', type: 'textarea' },
-    {
-      name: 'ghostID',
-      label: 'Ghost ID',
-      type: 'text',
-      unique: true,
-      index: true,
-    },
+    ...seoFields(),
+    ghostIdField(),
   ],
 }

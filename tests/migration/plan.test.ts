@@ -115,6 +115,33 @@ describe('buildMigrationPlan', () => {
       },
     ])
   })
+
+  // Payload's slug field now refuses anything outside `SLUG_PATTERN`, so an
+  // export carrying one would fail partway through an import against a live
+  // database. This is the dry run that says so first, and names the document.
+  it('reports slugs the collections would refuse', () => {
+    const raw = JSON.parse(
+      readFileSync(resolve('tests/fixtures/ghost-export.json'), 'utf8'),
+    )
+    raw.db[0].data.posts[0].slug = 'Notes From The Studio!'
+
+    const malformedPlan = buildMigrationPlan(parseGhostExport(raw))
+
+    expect(malformedPlan.conflicts.malformedSlugs).toEqual([
+      {
+        collection: 'posts',
+        ghostID: 'post-1',
+        slug: 'Notes From The Studio!',
+      },
+    ])
+  })
+
+  // Ghost produced the shape the rule describes, which is why the rule is that
+  // shape. If this ever fails, the validator has become stricter than the URLs
+  // already published under it.
+  it('finds nothing to refuse in an export Ghost actually produced', () => {
+    expect(plan.conflicts.malformedSlugs).toEqual([])
+  })
 })
 
 describe('summarizePlan', () => {
@@ -128,6 +155,7 @@ describe('summarizePlan', () => {
       drafts: 1,
       duplicateSlugs: ['understanding-ultramarine'],
       reservedSlugs: [],
+      malformedSlugs: [],
       missingAuthors: ['user-99'],
       missingTags: ['tag-99'],
     })

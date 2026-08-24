@@ -7,6 +7,7 @@ import { visibilityLabel } from '@/lib/membership'
 import { postPath } from '@/lib/seo/site'
 
 import { Reveal } from './motion/reveal'
+import { thumbnailSrc } from '@/lib/content/media'
 
 const PLATE_SIZES = '(max-width: 46rem) 100vw, (max-width: 64rem) 50vw, 22rem'
 
@@ -50,7 +51,7 @@ export function ReadNext({
                 <div className="read-next__plate">
                   {post.image && (
                     <Image
-                      src={post.image.url}
+                      src={thumbnailSrc(post.image)}
                       alt=""
                       fill
                       sizes={PLATE_SIZES}

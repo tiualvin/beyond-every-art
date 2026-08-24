@@ -28,3 +28,15 @@ export const issuerOrigin = (env = process.env): string | null => cmsOrigin(env)
 
 /** Discovery documents are public, cacheable, and must not be stale for long. */
 export const METADATA_CACHE_CONTROL = 'public, max-age=300'
+
+/**
+ * The largest body any OAuth endpoint will read.
+ *
+ * All three are unauthenticated POSTs — that is what an authorization server
+ * is — so without a ceiling the caller chooses how much memory one request
+ * allocates before anything is validated. The bodies themselves are tiny: a
+ * form-encoded grant request, a token, or the consent form's sealed blob and
+ * its ticked boxes. Sixteen kilobytes is the same ceiling `/csp-report` uses,
+ * and for the same reason.
+ */
+export const MAX_OAUTH_BODY_BYTES = 16_000

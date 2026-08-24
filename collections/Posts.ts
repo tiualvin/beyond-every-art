@@ -7,26 +7,45 @@ import {
   ownedPosts,
   postsRead,
 } from '../access/roles'
+import {
+  ghostIdField,
+  ghostUrlField,
+  migrationStatusField,
+} from '../fields/ghost'
+import { seoFields } from '../fields/seo'
+import { slugField } from '../fields/slug'
 import { CONTENT_TAGS } from '../lib/cache/content'
 import { contentEditor } from '../lib/content/editor'
 import { purgeOnChange, purgeOnDelete } from '../lib/cache/purge'
 import { recordMcpWrite } from '../lib/mcp/audit'
 import { refuseMcpPublish } from '../lib/mcp/publish-guard'
 import { buildPreviewUrl } from '../lib/preview/live-preview'
-import { validateRootContentSlug } from '../lib/seo/reserved-slugs'
 
 export const Posts: CollectionConfig = {
   slug: 'posts',
   admin: {
+    group: 'Content',
     useAsTitle: 'title',
+    defaultColumns: ['title', 'publishedAt', 'visibility', '_status'],
     preview: (doc) => buildPreviewUrl({ collection: 'posts', slug: doc?.slug }),
   },
+  // The date an editor thinks in. Postgres orders nulls first on a descending
+  // sort, so drafts — which have no `publishedAt` yet — collect at the top of
+  // the list, which is where the work in progress belongs.
+  defaultSort: '-publishedAt',
   access: {
     create: authenticated,
     read: postsRead,
     update: ownedPosts,
     delete: deleteOwnedDrafts,
   },
+  // Soft delete. `deleteOwnedDrafts` lets an author destroy their own draft and
+  // an editor destroy anything, and until now the only way back from a mistake
+  // was last night's backup — which restores the whole database, so recovering
+  // one article means losing every change made since. Trashed documents leave
+  // the site and every listing exactly as a deleted one did; they are simply
+  // still there to restore.
+  trash: true,
   hooks: {
     beforeChange: [
       ({ data, operation, req }) => {
@@ -50,14 +69,7 @@ export const Posts: CollectionConfig = {
   versions: { drafts: { autosave: { interval: 800 } }, maxPerDoc: 50 },
   fields: [
     { name: 'title', type: 'text', required: true },
-    {
-      name: 'slug',
-      type: 'text',
-      required: true,
-      unique: true,
-      index: true,
-      validate: validateRootContentSlug,
-    },
+    slugField({ reserved: true }),
     { name: 'publishedAt', type: 'date', index: true },
     { name: 'ghostUpdatedAt', type: 'date' },
     {
@@ -103,9 +115,7 @@ export const Posts: CollectionConfig = {
         update: editorsAndAdminsField,
       },
     },
-    { name: 'metaTitle', type: 'text' },
-    { name: 'metaDescription', type: 'textarea' },
-    { name: 'canonicalURL', label: 'Canonical URL', type: 'text' },
+    ...seoFields({ canonical: true, noindex: true }),
     { name: 'featured', type: 'checkbox', defaultValue: false },
     {
       name: 'visibility',
@@ -113,19 +123,8 @@ export const Posts: CollectionConfig = {
       options: ['public', 'members', 'paid'],
       defaultValue: 'public',
     },
-    {
-      name: 'ghostID',
-      label: 'Ghost ID',
-      type: 'text',
-      required: true,
-      unique: true,
-      index: true,
-    },
-    { name: 'ghostURL', label: 'Ghost URL', type: 'text' },
-    {
-      name: 'migrationStatus',
-      type: 'select',
-      options: ['pending', 'migrated', 'conflict', 'failed'],
-    },
+    ghostIdField({ autofill: true }),
+    ghostUrlField(),
+    migrationStatusField(['pending', 'migrated', 'conflict', 'failed']),
   ],
 }

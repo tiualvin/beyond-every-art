@@ -2,8 +2,7 @@
 //
 // The plugin's generated CRUD tools are enough to read and edit documents, but
 // not to write one: they expose `content` as raw Lexical editor state (see
-// `markdown.ts`) and `ghostID` as a required field. Nor can they carry a file,
-// so an image has no way in at all. These tools close both gaps, so an agent's
+// `markdown.ts`). Nor can they carry a file, so an image has no way in at all. These tools close both gaps, so an agent's
 // job is to write and illustrate the article rather than to satisfy the schema.
 //
 // `@payloadcms/plugin-mcp` still has no `defineTool` helper at `3.88.0`, the
@@ -13,7 +12,6 @@
 // refactor of this file, not a config change.
 
 import type { MCPPluginConfig } from '@payloadcms/plugin-mcp'
-import { randomUUID } from 'node:crypto'
 import type { PayloadRequest, TypedUser } from 'payload'
 import { z } from 'zod'
 
@@ -42,20 +40,6 @@ const text = (value: unknown): ToolResult => ({
     },
   ],
 })
-
-/**
- * External identifier for an article that did not come from Ghost.
- *
- * `ghostID` is required and unique on Posts because it is what makes the Ghost
- * import idempotent, and it must stay that way until the final import is done.
- * A prefixed synthetic value satisfies the field without weakening it: it can
- * never collide with a Ghost ObjectID, `pnpm migrate:validate` keys on the IDs
- * the export actually contains, and `native:` makes natively authored articles
- * greppable when the field is eventually relaxed.
- */
-export function nativeGhostID(): string {
-  return `native:${randomUUID()}`
-}
 
 /** Resolves slugs to document ids, refusing rather than silently dropping. */
 async function idsForSlugs(
@@ -178,7 +162,6 @@ export const mcpTools: McpTool[] = [
           _status: 'draft',
           content: markdownToLexical(req.payload, 'posts', markdown),
           excerpt,
-          ghostID: nativeGhostID(),
           metaDescription,
           metaTitle,
           slug,

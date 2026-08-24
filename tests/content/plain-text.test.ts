@@ -5,8 +5,13 @@ import {
   BOOKMARK_BLOCK,
   BUTTON_BLOCK,
   CALLOUT_BLOCK,
+  COMPARISON_TABLE_BLOCK,
   EMBED_BLOCK,
+  FAQ_BLOCK,
+  FEATURE_LIST_BLOCK,
   GALLERY_BLOCK,
+  KEY_TAKEAWAYS_BLOCK,
+  MEDIA_TEXT_BLOCK,
   PAYWALL_BLOCK,
   PULL_QUOTE_BLOCK,
   SIGNUP_BLOCK,
@@ -215,12 +220,114 @@ describe('block serialization', () => {
     expect(plain).not.toContain('EDITOR NOTE')
   })
 
+  it('keeps every key takeaway', () => {
+    // The most quotable sentences in the piece, written to stand alone —
+    // exactly what a description or a feed summary should be able to reach.
+    const plain = richTextToPlainText(
+      editorState(
+        block(KEY_TAKEAWAYS_BLOCK, {
+          heading: 'Key takeaways',
+          items: [
+            { text: 'Lapis is the rock, ultramarine the pigment.' },
+            { text: 'The synthetic arrived in 1826.' },
+          ],
+        }),
+      ),
+    )
+
+    expect(plain).toContain('Key takeaways')
+    expect(plain).toContain('Lapis is the rock, ultramarine the pigment.')
+    expect(plain).toContain('The synthetic arrived in 1826.')
+  })
+
+  it('keeps both halves of every FAQ entry', () => {
+    // Questions are often the exact wording somebody searched for, and a
+    // collapsed answer is still published text.
+    const plain = richTextToPlainText(
+      editorState(
+        block(FAQ_BLOCK, {
+          heading: 'Common questions',
+          items: [
+            {
+              question: 'Is lapis ultramarine?',
+              answer: editorState(paragraph(text('Not quite.'))),
+            },
+          ],
+        }),
+      ),
+    )
+
+    expect(plain).toContain('Common questions')
+    expect(plain).toContain('Is lapis ultramarine?')
+    expect(plain).toContain('Not quite.')
+  })
+
+  it('keeps a feature list’s headings and item copy', () => {
+    const plain = richTextToPlainText(
+      editorState(
+        block(FEATURE_LIST_BLOCK, {
+          heading: 'Six pigments',
+          intro: 'Each one changed what a painter could do.',
+          items: [{ title: 'Ultramarine', body: 'Ground lapis, once.' }],
+        }),
+      ),
+    )
+
+    expect(plain).toContain('Six pigments')
+    expect(plain).toContain('Each one changed what a painter could do.')
+    expect(plain).toContain('Ultramarine')
+    expect(plain).toContain('Ground lapis, once.')
+  })
+
+  it('keeps the words beside an image, but nothing about the image', () => {
+    const plain = richTextToPlainText(
+      editorState(
+        block(MEDIA_TEXT_BLOCK, {
+          heading: 'Lapis',
+          body: editorState(paragraph(text('Ground, once.'))),
+          imageSide: 'right',
+        }),
+      ),
+    )
+
+    expect(plain).toContain('Lapis')
+    expect(plain).toContain('Ground, once.')
+    expect(plain).not.toContain('right')
+  })
+
+  it('reads a comparison table caption, headers and every cell', () => {
+    const plain = richTextToPlainText(
+      editorState(
+        block(COMPARISON_TABLE_BLOCK, {
+          caption: 'How three pigments behave in oil',
+          rowHeader: 'Pigment',
+          columns: [{ label: 'Lightfastness' }],
+          rows: [{ label: 'Ultramarine', cells: [{ value: 'Excellent' }] }],
+        }),
+      ),
+    )
+
+    expect(plain).toContain('How three pigments behave in oil')
+    expect(plain).toContain('Pigment')
+    expect(plain).toContain('Lightfastness')
+    expect(plain).toContain('Ultramarine')
+    expect(plain).toContain('Excellent')
+  })
+
   it('survives a block with no fields at all', () => {
     // What a draft looks like the moment an editor inserts a module and has
     // not filled anything in. Live Preview renders exactly this.
     expect(() =>
       richTextToPlainText(
-        editorState(block(ACCORDION_BLOCK), block(PULL_QUOTE_BLOCK)),
+        editorState(
+          block(ACCORDION_BLOCK),
+          block(PULL_QUOTE_BLOCK),
+          block(KEY_TAKEAWAYS_BLOCK),
+          block(FAQ_BLOCK),
+          block(FEATURE_LIST_BLOCK),
+          block(MEDIA_TEXT_BLOCK),
+          block(COMPARISON_TABLE_BLOCK),
+        ),
       ),
     ).not.toThrow()
   })
