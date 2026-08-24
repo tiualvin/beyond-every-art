@@ -2659,6 +2659,155 @@ ol.feature-list__items .feature-list__title::before {
   line-height: 1.6;
 }
 
+/* --- Steps (a variant of the feature list) -------------------------------- */
+
+/* A procedure reads down a spine. The rule is drawn on the list rather than
+   between the items so it does not appear below the last one. */
+@media (min-width: 40rem) {
+  .feature-list--steps .feature-list__items {
+    position: relative;
+    padding-left: 1.5rem;
+    border-left: 1px solid var(--color-line);
+  }
+
+  .feature-list--steps .feature-list__item {
+    position: relative;
+  }
+
+  .feature-list--steps .feature-list__item::before {
+    content: '';
+    position: absolute;
+    left: -0.3rem;
+    width: 0.55rem;
+    height: 0.55rem;
+    margin-top: 0.5rem;
+    border-radius: 50%;
+    background: var(--color-burgundy);
+  }
+}
+
+/* --- Image and text ------------------------------------------------------- */
+
+.media-text {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+}
+
+@media (min-width: 47rem) {
+  .media-text {
+    grid-template-columns: minmax(0, 21rem) minmax(0, 1fr);
+    align-items: start;
+    gap: 2rem;
+  }
+
+  /* The image is always first in the markup so the reading order does not
+     change with the layout; `order` is what moves it, and only visually. */
+  .media-text--right .media-text__figure {
+    order: 2;
+  }
+}
+
+.media-text__frame {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: var(--color-line);
+}
+
+.media-text__frame img {
+  display: block;
+}
+
+.media-text__caption {
+  margin: 0.5rem 0 0;
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+
+.prose .media-text__heading {
+  margin-top: 0;
+}
+
+.media-text__body > * + * {
+  margin-top: 0.9rem;
+}
+
+/* --- Comparison table ----------------------------------------------------- */
+
+/* A table wider than the screen scrolls inside its own box rather than
+   stretching the page. The box is focusable — see the component — so a
+   keyboard user can reach the scroll; the outline says when they have. */
+.comparison__scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.comparison__scroll:focus-visible {
+  outline: 2px solid var(--color-burgundy);
+  outline-offset: 2px;
+}
+
+.comparison__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-sans);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.comparison__caption {
+  caption-side: top;
+  text-align: left;
+  padding-bottom: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--color-muted);
+}
+
+.comparison__table th,
+.comparison__table td {
+  padding: 0.6rem 0.9rem;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--color-line);
+  /* Keeps a long value from collapsing the column beside it. */
+  min-width: 7rem;
+}
+
+.comparison__table thead th {
+  font-weight: 600;
+  color: var(--color-burgundy);
+  border-bottom-width: 2px;
+  white-space: nowrap;
+}
+
+.comparison__table tbody th {
+  font-weight: 600;
+}
+
+.comparison__table tbody tr:last-child th,
+.comparison__table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.comparison__corner {
+  border-bottom: 2px solid var(--color-line);
+}
+
+/* --- Pull quote source ---------------------------------------------------- */
+
+.pull-quote__source {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
 /* --- Unrecognised module (preview only) ---------------------------------- */
 
 /* Published pages render nothing for an unknown block; this is what an editor

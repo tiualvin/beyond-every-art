@@ -8,11 +8,13 @@ import {
   BOOKMARK_BLOCK,
   BUTTON_BLOCK,
   CALLOUT_BLOCK,
+  COMPARISON_TABLE_BLOCK,
   EMBED_BLOCK,
   FAQ_BLOCK,
   FEATURE_LIST_BLOCK,
   GALLERY_BLOCK,
   KEY_TAKEAWAYS_BLOCK,
+  MEDIA_TEXT_BLOCK,
   PAYWALL_BLOCK,
   PULL_QUOTE_BLOCK,
   SIGNUP_BLOCK,
@@ -21,11 +23,13 @@ import {
   type BookmarkData,
   type ButtonData,
   type CalloutData,
+  type ComparisonTableData,
   type EmbedData,
   type FaqData,
   type FeatureListData,
   type GalleryData,
   type KeyTakeawaysData,
+  type MediaTextData,
   type PaywallData,
   type PullQuoteData,
   type SignupData,
@@ -35,11 +39,13 @@ import { Accordion } from './accordion'
 import { Bookmark } from './bookmark'
 import { ActionButton } from './button'
 import { Callout } from './callout'
+import { ComparisonTable } from './comparison-table'
 import { Embed } from './embed'
 import { Faq } from './faq'
 import { FeatureList } from './feature-list'
 import { Gallery } from './gallery'
 import { KeyTakeaways } from './key-takeaways'
+import { MediaText } from './media-text'
 import { PaywallMarker } from './paywall'
 import { PullQuote } from './pull-quote'
 import { Signup } from './signup'
@@ -117,6 +123,15 @@ const renderers: BlockRenderers = {
         preview={preview}
       />
     )
+  },
+  // Nothing to allocate: a table's caption is a caption, not a heading.
+  [COMPARISON_TABLE_BLOCK]: (fields) => (
+    <ComparisonTable data={fields as ComparisonTableData} />
+  ),
+  [MEDIA_TEXT_BLOCK]: (fields, { allocate }) => {
+    const data = fields as MediaTextData
+    const heading = data.heading?.trim()
+    return <MediaText data={data} anchor={heading ? allocate(heading) : ''} />
   },
   [FEATURE_LIST_BLOCK]: (fields, { allocate }) => {
     const data = fields as FeatureListData

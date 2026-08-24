@@ -5,11 +5,13 @@ import {
   BOOKMARK_BLOCK,
   BUTTON_BLOCK,
   CALLOUT_BLOCK,
+  COMPARISON_TABLE_BLOCK,
   EMBED_BLOCK,
   FAQ_BLOCK,
   FEATURE_LIST_BLOCK,
   GALLERY_BLOCK,
   KEY_TAKEAWAYS_BLOCK,
+  MEDIA_TEXT_BLOCK,
   PAYWALL_BLOCK,
   PULL_QUOTE_BLOCK,
   SIGNUP_BLOCK,
@@ -277,6 +279,41 @@ describe('block serialization', () => {
     expect(plain).toContain('Ground lapis, once.')
   })
 
+  it('keeps the words beside an image, but nothing about the image', () => {
+    const plain = richTextToPlainText(
+      editorState(
+        block(MEDIA_TEXT_BLOCK, {
+          heading: 'Lapis',
+          body: editorState(paragraph(text('Ground, once.'))),
+          imageSide: 'right',
+        }),
+      ),
+    )
+
+    expect(plain).toContain('Lapis')
+    expect(plain).toContain('Ground, once.')
+    expect(plain).not.toContain('right')
+  })
+
+  it('reads a comparison table caption, headers and every cell', () => {
+    const plain = richTextToPlainText(
+      editorState(
+        block(COMPARISON_TABLE_BLOCK, {
+          caption: 'How three pigments behave in oil',
+          rowHeader: 'Pigment',
+          columns: [{ label: 'Lightfastness' }],
+          rows: [{ label: 'Ultramarine', cells: [{ value: 'Excellent' }] }],
+        }),
+      ),
+    )
+
+    expect(plain).toContain('How three pigments behave in oil')
+    expect(plain).toContain('Pigment')
+    expect(plain).toContain('Lightfastness')
+    expect(plain).toContain('Ultramarine')
+    expect(plain).toContain('Excellent')
+  })
+
   it('survives a block with no fields at all', () => {
     // What a draft looks like the moment an editor inserts a module and has
     // not filled anything in. Live Preview renders exactly this.
@@ -288,6 +325,8 @@ describe('block serialization', () => {
           block(KEY_TAKEAWAYS_BLOCK),
           block(FAQ_BLOCK),
           block(FEATURE_LIST_BLOCK),
+          block(MEDIA_TEXT_BLOCK),
+          block(COMPARISON_TABLE_BLOCK),
         ),
       ),
     ).not.toThrow()

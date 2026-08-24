@@ -1,12 +1,19 @@
 import Image from 'next/image'
 
-import type { FeatureListData } from '@/blocks/schema'
+import type { FeatureListData, FeatureListVariant } from '@/blocks/schema'
+import { FEATURE_LIST_VARIANTS } from '@/blocks/schema'
 import { toMediaImage } from '@/lib/content/media'
 
 // An item's plate is at most the body column on a phone and roughly a third of
 // it beside the text on a wide screen. Stated so the browser does not download
 // a full-width file to paint a thumbnail.
 const ITEM_SIZES = '(max-width: 40rem) 100vw, 16rem'
+
+function toVariant(value: FeatureListData['variant']): FeatureListVariant {
+  return FEATURE_LIST_VARIANTS.includes(value as FeatureListVariant)
+    ? (value as FeatureListVariant)
+    : 'list'
+}
 
 /**
  * A list of things, each with a title and its own paragraph.
@@ -19,6 +26,12 @@ const ITEM_SIZES = '(max-width: 40rem) 100vw, 16rem'
  * `numbered` picks `<ol>` or `<ul>` rather than styling numbers on, because the
  * choice says whether the order means anything — which is a fact about the
  * content that a reader using a screen reader is entitled to as well.
+ *
+ * The `steps` variant is the same module with the order made mandatory: a
+ * procedure is a list whose sequence is the content. It is a variant rather
+ * than a separate block because a second block with identical fields, markup
+ * and structured data would only ask editors to pick between two things that
+ * behave the same.
  */
 export function FeatureList({
   data,
@@ -49,13 +62,15 @@ export function FeatureList({
 
   const heading = data.heading?.trim()
   const intro = data.intro?.trim()
-  // Absent means an older document saved before the field existed; those read
-  // as numbered, which is the default an editor would have got.
-  const List = data.numbered === false ? 'ul' : 'ol'
+  const variant = toVariant(data.variant)
+  // Steps are ordered by definition, so the switch does not apply to them.
+  // Otherwise: absent means a document saved before the field existed, and
+  // those read as numbered, which is the default an editor would have got.
+  const List = variant === 'steps' || data.numbered !== false ? 'ol' : 'ul'
 
   return (
     <section
-      className="module module--feature-list feature-list"
+      className={`module module--feature-list feature-list feature-list--${variant}`}
       {...(heading ? { 'aria-labelledby': headingAnchor } : {})}
     >
       {heading && (

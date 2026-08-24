@@ -25,6 +25,8 @@ export const PAYWALL_BLOCK = 'paywall'
 export const KEY_TAKEAWAYS_BLOCK = 'keyTakeaways'
 export const FAQ_BLOCK = 'faq'
 export const FEATURE_LIST_BLOCK = 'featureList'
+export const MEDIA_TEXT_BLOCK = 'mediaText'
+export const COMPARISON_TABLE_BLOCK = 'comparisonTable'
 
 /** Every block slug this repository knows how to render. */
 export const BLOCK_SLUGS = [
@@ -40,6 +42,8 @@ export const BLOCK_SLUGS = [
   KEY_TAKEAWAYS_BLOCK,
   FAQ_BLOCK,
   FEATURE_LIST_BLOCK,
+  MEDIA_TEXT_BLOCK,
+  COMPARISON_TABLE_BLOCK,
 ] as const
 
 export type BlockSlug = (typeof BLOCK_SLUGS)[number]
@@ -69,6 +73,7 @@ export type PullQuoteVariant = (typeof PULL_QUOTE_VARIANTS)[number]
 export type PullQuoteData = {
   quote?: string | null
   attribution?: string | null
+  sourceURL?: string | null
   variant?: PullQuoteVariant | null
 }
 
@@ -160,11 +165,48 @@ export type FeatureListItem = {
   image?: unknown
 }
 
+export const FEATURE_LIST_VARIANTS = ['list', 'steps'] as const
+export type FeatureListVariant = (typeof FEATURE_LIST_VARIANTS)[number]
+
 export type FeatureListData = {
   heading?: string | null
   intro?: string | null
+  variant?: FeatureListVariant | null
   numbered?: boolean | null
   items?: FeatureListItem[] | null
+}
+
+export const MEDIA_SIDES = ['left', 'right'] as const
+export type MediaSide = (typeof MEDIA_SIDES)[number]
+
+export type MediaTextData = {
+  image?: unknown
+  heading?: string | null
+  body?: unknown
+  imageSide?: MediaSide | null
+}
+
+export type ComparisonColumn = {
+  id?: string | null
+  label?: string | null
+}
+
+export type ComparisonCell = {
+  id?: string | null
+  value?: string | null
+}
+
+export type ComparisonRow = {
+  id?: string | null
+  label?: string | null
+  cells?: ComparisonCell[] | null
+}
+
+export type ComparisonTableData = {
+  caption?: string | null
+  rowHeader?: string | null
+  columns?: ComparisonColumn[] | null
+  rows?: ComparisonRow[] | null
 }
 
 // --- Block configs -------------------------------------------------------
@@ -228,6 +270,29 @@ export const PullQuoteBlock: Block = {
       name: 'attribution',
       type: 'text',
       admin: { description: 'Who said it. Optional.' },
+    },
+    {
+      name: 'sourceURL',
+      label: 'Source URL',
+      type: 'text',
+      admin: {
+        description:
+          'Where the quotation came from. Names the source in the markup and links the attribution.',
+      },
+      validate: (value: string | null | undefined) => {
+        const raw = (value ?? '').trim()
+        // Optional, unlike the button's href — a quotation from a book or an
+        // interview has no URL, and demanding one would push editors into
+        // inventing a page that happens to mention it.
+        if (!raw) return true
+        try {
+          return new URL(raw).protocol === 'https:'
+            ? true
+            : 'Source links must use https://.'
+        } catch {
+          return 'That is not a valid URL.'
+        }
+      },
     },
     {
       name: 'variant',
@@ -626,12 +691,27 @@ export const FeatureListBlock: Block = {
       admin: { description: 'Optional line under the heading.' },
     },
     {
+      name: 'variant',
+      type: 'select',
+      defaultValue: 'list',
+      options: [
+        { label: 'List of things', value: 'list' },
+        { label: 'Steps in a process', value: 'steps' },
+      ],
+      admin: {
+        description:
+          'Steps are always numbered and shown as a sequence. Use it only when doing them out of order would be wrong.',
+      },
+    },
+    {
       name: 'numbered',
       type: 'checkbox',
       defaultValue: true,
       admin: {
         description:
-          'Numbers the items. Turn this off when the order carries no meaning — a numbered list tells a reader the sequence matters.',
+          'Numbers the items. Turn this off when the order carries no meaning — a numbered list tells a reader the sequence matters. Ignored for steps, which are numbered by definition.',
+        condition: (_data, siblingData: Partial<FeatureListData>) =>
+          siblingData?.variant !== 'steps',
       },
     },
     {
@@ -650,11 +730,123 @@ export const FeatureListBlock: Block = {
   ],
 }
 
+/**
+ * An image beside a passage of text.
+ *
+ * The alternating row a landing page is built from, and a perfectly ordinary
+ * editorial figure-with-commentary. It exists as its own block rather than
+ * being achieved with a floated image because the two halves need to stack in
+ * a defined order on a phone — and because a float leaves the text and the
+ * picture with no stated relationship for anyone not looking at the layout.
+ *
+ * `imageSide` is presentation only. The markup order is always image then
+ * text, so the reading order a screen reader and a crawler get does not change
+ * when a designer alternates the rows.
+ */
+export const MediaTextBlock: Block = {
+  slug: MEDIA_TEXT_BLOCK,
+  interfaceName: 'MediaTextBlock',
+  labels: { singular: 'Image and text', plural: 'Image and text' },
+  fields: [
+    { name: 'image', type: 'upload', relationTo: 'media', required: true },
+    { name: 'heading', type: 'text' },
+    { name: 'body', type: 'richText', required: true },
+    {
+      name: 'imageSide',
+      type: 'select',
+      defaultValue: 'left',
+      options: [
+        { label: 'Image on the left', value: 'left' },
+        { label: 'Image on the right', value: 'right' },
+      ],
+      admin: {
+        description:
+          'Which side the image sits on for a wide screen. Both stack image-first on a phone.',
+      },
+    },
+  ],
+}
+
+/**
+ * A small table of values compared across columns.
+ *
+ * Pigment against binder, one material against another — the shape this
+ * publication keeps needing and the shape a general rich-text table serves
+ * badly. Owning the markup is the point: a real `<caption>`, `scope="col"` on
+ * the column heads and `scope="row"` on the first cell of each row are what
+ * make a table readable out loud and liftable into a search result, and none
+ * of them survive an editor building a grid by hand.
+ *
+ * Deliberately capped small. A table with fifteen columns is a spreadsheet,
+ * and no phone renders one usefully.
+ */
+export const ComparisonTableBlock: Block = {
+  slug: COMPARISON_TABLE_BLOCK,
+  interfaceName: 'ComparisonTableBlock',
+  labels: { singular: 'Comparison table', plural: 'Comparison tables' },
+  fields: [
+    {
+      name: 'caption',
+      type: 'text',
+      required: true,
+      admin: {
+        description:
+          'What the table shows, as a sentence. Read out before the table itself, and often the only description a search result gets.',
+      },
+    },
+    {
+      name: 'rowHeader',
+      type: 'text',
+      admin: {
+        description:
+          'Optional label for the first column, the one naming each row — e.g. Pigment.',
+      },
+    },
+    {
+      name: 'columns',
+      type: 'array',
+      minRows: 1,
+      maxRows: 5,
+      required: true,
+      labels: { singular: 'Column', plural: 'Columns' },
+      fields: [{ name: 'label', type: 'text', required: true }],
+    },
+    {
+      name: 'rows',
+      type: 'array',
+      minRows: 1,
+      maxRows: 30,
+      required: true,
+      labels: { singular: 'Row', plural: 'Rows' },
+      fields: [
+        {
+          name: 'label',
+          type: 'text',
+          required: true,
+          admin: { description: 'Names the row. Becomes its row header.' },
+        },
+        {
+          name: 'cells',
+          type: 'array',
+          labels: { singular: 'Cell', plural: 'Cells' },
+          admin: {
+            description:
+              'One per column, in order. A row with too few is padded with blanks rather than rejected.',
+          },
+          fields: [{ name: 'value', type: 'text' }],
+        },
+      ],
+    },
+  ],
+}
+
 /** The blocks offered inside a Post or Page body. */
 export const CONTENT_BLOCKS: Block[] = [
   KeyTakeawaysBlock,
   FaqBlock,
   FeatureListBlock,
+  MediaTextBlock,
+  ComparisonTableBlock,
   AccordionBlock,
   PullQuoteBlock,
   SignupBlock,

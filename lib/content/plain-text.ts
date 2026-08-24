@@ -19,11 +19,13 @@ import {
   BOOKMARK_BLOCK,
   BUTTON_BLOCK,
   CALLOUT_BLOCK,
+  COMPARISON_TABLE_BLOCK,
   EMBED_BLOCK,
   FAQ_BLOCK,
   FEATURE_LIST_BLOCK,
   GALLERY_BLOCK,
   KEY_TAKEAWAYS_BLOCK,
+  MEDIA_TEXT_BLOCK,
   PAYWALL_BLOCK,
   PULL_QUOTE_BLOCK,
   SIGNUP_BLOCK,
@@ -32,11 +34,13 @@ import {
   type BookmarkData,
   type ButtonData,
   type CalloutData,
+  type ComparisonTableData,
   type EmbedData,
   type FaqData,
   type FeatureListData,
   type GalleryData,
   type KeyTakeawaysData,
+  type MediaTextData,
   type PullQuoteData,
 } from '../../blocks/schema'
 import type { ArticleBody } from './body'
@@ -88,6 +92,7 @@ const blockSerializers: Record<BlockSlug, (fields: unknown) => string> = {
     ])
   },
 
+  // The URL is machinery; the words and who said them are not.
   [PULL_QUOTE_BLOCK]: (fields) => {
     const data = (fields ?? {}) as PullQuoteData
     return join([data.quote, data.attribution])
@@ -147,6 +152,28 @@ const blockSerializers: Record<BlockSlug, (fields: unknown) => string> = {
       data.heading,
       ...(data.items ?? []).map((item) =>
         join([item?.question, nestedPlainText(item?.answer)]),
+      ),
+    ])
+  },
+
+  // Editorial prose that happens to sit beside a picture. The image cannot
+  // contribute text, and its caption belongs to the Media record rather than
+  // to this placement.
+  [MEDIA_TEXT_BLOCK]: (fields) => {
+    const data = (fields ?? {}) as MediaTextData
+    return join([data.heading, nestedPlainText(data.body)])
+  },
+
+  // Everything a reader would see. A table's caption is often the only
+  // sentence stating what the numbers are, so it leads.
+  [COMPARISON_TABLE_BLOCK]: (fields) => {
+    const data = (fields ?? {}) as ComparisonTableData
+    return join([
+      data.caption,
+      data.rowHeader,
+      ...(data.columns ?? []).map((column) => column?.label),
+      ...(data.rows ?? []).map((row) =>
+        join([row?.label, ...(row?.cells ?? []).map((cell) => cell?.value)]),
       ),
     ])
   },

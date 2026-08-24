@@ -18,11 +18,13 @@ import {
   BOOKMARK_BLOCK,
   BUTTON_BLOCK,
   CALLOUT_BLOCK,
+  COMPARISON_TABLE_BLOCK,
   EMBED_BLOCK,
   FAQ_BLOCK,
   FEATURE_LIST_BLOCK,
   GALLERY_BLOCK,
   KEY_TAKEAWAYS_BLOCK,
+  MEDIA_TEXT_BLOCK,
   PAYWALL_BLOCK,
   PULL_QUOTE_BLOCK,
   SIGNUP_BLOCK,
@@ -52,6 +54,12 @@ const blockJsonLd: Record<BlockSlug, (fields: unknown) => JsonLdNode[]> = {
   [GALLERY_BLOCK]: NOTHING,
   [BOOKMARK_BLOCK]: NOTHING,
   [KEY_TAKEAWAYS_BLOCK]: NOTHING,
+  [MEDIA_TEXT_BLOCK]: NOTHING,
+
+  // schema.org has `Table`, and it says only "this region is a table" — which
+  // the `<table>` element already said, to every consumer, more reliably. The
+  // structured-data win for a table is the markup, not a node describing it.
+  [COMPARISON_TABLE_BLOCK]: NOTHING,
 
   // Form chrome and an editorial marker. Neither is content.
   [SIGNUP_BLOCK]: NOTHING,
