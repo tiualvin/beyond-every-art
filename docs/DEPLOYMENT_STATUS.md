@@ -9,6 +9,43 @@ Related: [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md),
 [`ACCOUNT_MODEL.md`](ACCOUNT_MODEL.md),
 [`SUBSCRIPTION_WEBHOOKS.md`](SUBSCRIPTION_WEBHOOKS.md).
 
+## Pick up here
+
+Last worked on **22 Aug 2026**. Storage and backups are now real: R2 configured,
+media recovered after a three-week-old loss, first backup uploaded. Details and
+the exact commands are in item 0.4.
+
+In dependency order, what is left before the public cutover:
+
+1. **Finish 0.4** — set `BACKUP_ENCRYPTION_KEY`, prove a restore works, delete
+   the unencrypted backup. Minutes of work, and the restore is a Phase 1
+   acceptance criterion that has never been met.
+2. **Work [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md) end to end.** Every
+   box in §4–§6 is unticked. Its media check can pass now, which it could not
+   before. Includes the email-delivery test (item 3 below) and the crawl
+   comparison.
+3. **Members, then Stripe** — item 1 then item 2 below, in that order:
+   reconciliation has nothing to reconcile against until the member records
+   exist.
+4. **Decide trailing slashes.** [`SEO_AND_REDIRECTS.md`](SEO_AND_REDIRECTS.md)
+   §Pending. Canonical tags, the sitemap and the feed advertise the slashed Ghost
+   permalinks while Next.js redirects to the un-slashed form, so every URL the
+   site advertises lands on a redirect. Settling it after search engines recrawl
+   costs a second round of redirects on every URL.
+5. **Decide what happens to paying subscribers.** Phase 1 ships no reader
+   accounts and no paywall ([`ACCOUNT_MODEL.md`](ACCOUNT_MODEL.md)), but posts
+   keep their Ghost `visibility` and render a teaser. On cutover day a paying
+   subscriber gets a teaser where Ghost gave them the full piece, with no way to
+   sign in. Count the exposure first:
+   `SELECT visibility, count(*) FROM posts GROUP BY visibility;`
+6. **Edge protection** — [`EDGE_PROTECTION.md`](EDGE_PROTECTION.md), and read the
+   ordering warning before touching Cloudflare. Adopt the DNS-01 Caddy image in
+   its own quiet deploy, _then_ proxy. Not cutover-day work.
+7. **Flip.** Unset `NEXT_PUBLIC_NOINDEX` and `STAGING_BASIC_AUTH`, move
+   `SITE_ADDRESS` and `NEXT_PUBLIC_SITE_URL` to the production domain. Leaving
+   the noindex on is the quiet failure: the site works perfectly and is invisible
+   to search.
+
 ## Done
 
 - VPS provisioned (Hetzner), Docker installed, repo cloned; the `postgres`,
@@ -63,6 +100,10 @@ Related: [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md),
   imported with zero failures, 1 redirect created. `pnpm migrate:validate`
   confirms `"ok": true` with every collection's expected count matching
   actual. Members are still not imported — see item 3 below, still open.
+- **R2 configured and the lost media recovered (22 Aug).** Two buckets, media
+  and backups deliberately separate; 109 of 110 images restored from the site
+  archive with filenames and document ids intact; first database backup
+  uploaded. Full account, and the two steps still outstanding, in item 0.4.
 - **Fixed three bugs found while getting the above working**, all merged to
   `main`:
   - The `app` container had been reporting `unhealthy` since it was created
@@ -115,26 +156,78 @@ certificate renewal — are in
    retire this line for good with one command:
    `docker compose run --rm migrate pnpm migrate:db:status`.
 
-0.4. **Re-import the media after the next deploy (operator action).**
-Uploads are stored on local disk — no object storage is configured, so
-`useR2` in `payload.config.ts` is false and Payload writes to `/app/media`
-inside the app container. Until the `media_data` volume was added there was
-nothing persisting that directory, so `docker compose up -d --build` threw it
-away on every release: the container is recreated and its writable layer goes
-with it. The `media` rows survived in Postgres, so each post kept pointing at
-a file that no longer existed, `/api/media/file/<name>` answered 500 with a
-JSON body, and every image on the site rendered as a broken-image icon.
+0.4. **Media loss and R2 — recovered on 22 Aug. Two small steps left.**
 
-The volume stops it happening again but cannot bring back what was already
-discarded. Re-run the Ghost media import once, after a deploy that includes
-the volume, and the files will land in the volume and stay there:
+Recorded in full because the failure was invisible for three weeks and the
+recovery this note originally prescribed would not have worked.
+
+**What happened.** Uploads went to local disk (`useR2` false, no `S3_*` set).
+Before the `media_data` volume existed, `docker compose up -d --build` recreated
+the app container and discarded its writable layer, taking `/app/media` with it.
+The volume prevents a recurrence but could not undo the one that had happened:
+as of 22 Aug the volume was empty and had been since **31 July**. All 110 `media`
+rows survived, each pointing at a file that was not there.
+
+**Why the documented recovery could not work.** This note used to say "re-run the
+Ghost media import". `importMedia` matches on `ghostURL` and skips every row that
+already exists — and the rows all survived — so it reports 110 reused, uploads
+nothing, and leaves the site exactly as broken as it found it. Confirmed by
+running it: 0 B transferred.
+
+**What was actually done, 22 Aug:**
+
+- Two R2 buckets created: `beyondeveryart-prod` for media, `beyondeveryart-backup`
+  for database dumps. **Deliberately separate.** R2 public access is per-bucket
+  and all-or-nothing, so if the media bucket is ever given a custom domain — a
+  plausible future step, to stop every image request hitting the VPS — anything
+  sharing that bucket becomes downloadable. Database dumps must never be in it.
+- One account-scoped API token (not a user token, which dies with the user),
+  `Object Read & Write`, scoped to both buckets. `S3_*` and `BACKUP_S3_BUCKET`
+  set in `.env`. `S3_PUBLIC_URL` deliberately left **empty**: the config does not
+  set `disablePayloadAccessControl`, so Payload serves media from
+  `/api/media/file/<name>` and streams it out of R2 itself. The bucket stays
+  private and needs no public URL.
+- 109 of 110 images restored with `pnpm restore:media --from-dir`, sourced from
+  the Ghost site archive rather than the live site. Filenames and document ids
+  preserved, derivatives rebuilt, images confirmed rendering on staging.
+- First database backup taken and uploaded: 2.3 MB, no errors.
+
+**Still to do (minutes of work):**
+
+1. **Set `BACKUP_ENCRYPTION_KEY`.** The first backup uploaded unencrypted and
+   said so on the run. A dump carries the users table, OAuth records, and — once
+   item 1 below is done — every member email and Stripe identifier. Generate with
+   `openssl rand -base64 32`, put it in `.env`, keep a copy somewhere that is
+   neither this server nor the backup bucket, then re-run the backup and confirm
+   `"encrypted": true`.
+2. **Prove a restore works.** Not yet done, and it is a Phase 1 acceptance
+   criterion in the handoff:
+   `docker compose run --rm --entrypoint tsx backup scripts/restore-database.ts --latest --dry-run`
+3. **Delete the unencrypted backup** once an encrypted one exists and step 2 has
+   passed — not before, since it is currently the only one.
+4. **Media id 4** (`photo-1689659721022-3aa475803e19`) has no copy in the archive
+   and carries no file extension, which suggests it was linked directly rather
+   than stored in Ghost. Check with
+   `SELECT ghost_u_r_l FROM media WHERE id = 4;` and
+   `SELECT slug FROM posts WHERE featured_image_id = 4;` — if no post uses it,
+   ignore it.
+
+**Two commands worth knowing before touching any of this.** Every SSH session
+needs the environment loaded first, or `$S3_*` are empty and tools fail in
+confusing ways (an empty bucket name makes rclone try to list _all_ buckets):
 
 ```
-docker compose run --rm migrate pnpm migrate:ghost --input <export.json>
+cd ~/beyond-every-art && set -a && . ./.env && set +a
 ```
 
-Worth doing before the public cutover regardless, since the same wipe would
-have taken any image uploaded through Payload Admin.
+That prints two harmless `command not found` lines — `BACKUP_CRON` and
+`EMAIL_FROM_NAME` have unquoted spaces, which bash trips on and Docker Compose
+does not. **Do not "fix" them in `.env`**; quoting would make Compose store the
+quote characters as part of the value.
+
+And `docker compose run` never rebuilds an image, so it is always one deploy
+behind until the deploy rebuilds it. A script added in a merge is not available
+until that merge has deployed; `docker compose build migrate` forces it sooner.
 
 0.5. **MCP from mobile — subdomain is live, endpoint is not enabled yet
 (operator action).** `cms.beyondeveryart.com` now has a real certificate (see

@@ -6,7 +6,11 @@ import {
   toolCapabilities,
 } from '@/lib/oauth/capabilities'
 import { redirectUriIsRegistered } from '@/lib/oauth/clients'
-import { issuerOrigin, oauthEnabled } from '@/lib/oauth/config'
+import {
+  issuerOrigin,
+  MAX_OAUTH_BODY_BYTES,
+  oauthEnabled,
+} from '@/lib/oauth/config'
 import { renderConsentPage, renderErrorPage } from '@/lib/oauth/consent-page'
 import { createGrant } from '@/lib/oauth/grants'
 import { CODE_CHALLENGE_METHOD } from '@/lib/oauth/pkce'
@@ -18,6 +22,13 @@ import {
 } from '@/lib/oauth/authorize-request'
 import { MCP_PATH } from '@/lib/oauth/metadata'
 import { getPayloadClient } from '@/lib/payload'
+import {
+  clientKey,
+  configuredLimit,
+  FixedWindowRateLimiter,
+  retryAfterSeconds,
+} from '@/lib/security/rate-limit'
+import { readBoundedText } from '@/lib/security/request-body'
 
 // The authorization endpoint: the only place a human is in the loop.
 //
@@ -49,6 +60,28 @@ export const dynamic = 'force-dynamic'
  *
  * `no-store` because the page carries a sealed authorization request.
  */
+/**
+ * Bounded like `/oauth/register` and `/oauth/token`, which it sits between in
+ * the flow and did not match.
+ *
+ * A `GET` here reaches the database twice before it has validated anything a
+ * caller sent: a `find` on `oauth-clients` to resolve the `client_id`, and then
+ * `payload.auth` to find out who is approving. Both run for a client id that
+ * does not exist, which makes an unknown `client_id` the cheapest way to buy
+ * two queries on this hostname.
+ *
+ * Only `GET` is limited. The `POST` is gated on a sealed request whose HMAC is
+ * checked before anything else happens, so an unauthenticated caller is refused
+ * without a query — and rate limiting the approval itself would put a wait in
+ * front of the one action a person is present for.
+ *
+ * Thirty a minute is several connection attempts, sign-in redirect included.
+ */
+const limiter = new FixedWindowRateLimiter(
+  configuredLimit('RATE_LIMIT_OAUTH_AUTHORIZE_PER_MINUTE', 30),
+  60_000,
+)
+
 const html = (body: string, status = 200) =>
   new NextResponse(body, {
     status,
@@ -78,6 +111,24 @@ export async function GET(request: Request): Promise<NextResponse> {
   const origin = issuerOrigin()
   if (!oauthEnabled() || !origin) {
     return NextResponse.json({ message: 'Not found' }, { status: 404 })
+  }
+
+  const limit = limiter.check(clientKey(request.headers))
+  if (!limit.allowed) {
+    return new NextResponse(
+      renderErrorPage(
+        'Too many attempts',
+        'This address has started too many connections in the last minute. Wait a moment and try again.',
+      ),
+      {
+        status: 429,
+        headers: {
+          'Cache-Control': 'no-store',
+          'Content-Type': 'text/html; charset=utf-8',
+          'Retry-After': String(retryAfterSeconds(limit.resetAt)),
+        },
+      },
+    )
   }
 
   const params = new URL(request.url).searchParams
@@ -234,8 +285,27 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ message: 'Not found' }, { status: 404 })
   }
 
+  // Read before Payload is touched, which is the order the body ceilings are
+  // meant to hold in — see `tests/security/route-body-limits.test.ts`. The
+  // consent form is `application/x-www-form-urlencoded` (no enctype, no upload)
+  // so it can be read under a ceiling and parsed, where `request.formData()`
+  // would buffer whatever an anonymous caller chose to send.
+  let form: URLSearchParams
+  try {
+    form = new URLSearchParams(
+      await readBoundedText(request, MAX_OAUTH_BODY_BYTES),
+    )
+  } catch {
+    return html(
+      renderErrorPage(
+        'That request could not be read',
+        'The approval form did not arrive intact. Start the connection again.',
+      ),
+      400,
+    )
+  }
+
   const payload = await getPayloadClient()
-  const form = await request.formData()
 
   const sealed = String(form.get('request') ?? '')
   const approval: AuthorizeRequest | null = openRequest(sealed, payload.secret)

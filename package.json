@@ -34,6 +34,7 @@
     "migrate:members": "tsx scripts/migrate-members.ts",
     "migrate:validate": "tsx scripts/validate-migration.ts",
     "backfill:media": "tsx scripts/backfill-media-sizes.ts",
+    "restore:media": "tsx scripts/restore-media-from-ghost.ts",
     "migration:compare": "tsx scripts/compare-sites.ts",
     "reconcile:billing": "tsx scripts/reconcile-billing.ts",
     "backup:db": "tsx scripts/backup-database.ts",

@@ -36,6 +36,7 @@ validation-report*.json
 members-report*.json
 reconciliation-report*.json
 media-backfill-report*.json
+media-restore-report*.json
 
 # Payload generated types (run `pnpm generate:types`)
 payload-types.ts

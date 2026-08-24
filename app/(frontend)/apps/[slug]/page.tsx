@@ -7,6 +7,10 @@ import { cache } from 'react'
 import { getAppBySlug, type AppDetail } from '@/lib/content/queries'
 import { logMissingRoute } from '@/lib/observability/missing-route'
 import { getPreviewMode } from '@/lib/preview/mode'
+import {
+  recordSlugMiss,
+  requireLookupableSlug,
+} from '@/lib/security/slug-requests'
 import { absoluteUrl, appPath, APPS_PATH, getSiteUrl } from '@/lib/seo/site'
 
 import { AppPlate } from '../../components/app-plate'
@@ -55,10 +59,16 @@ function seedFrom(slug: string): number {
   return hash >>> 0
 }
 
-// Resolved once per request; generateMetadata and the page body share it.
+// Resolved once per request; generateMetadata and the page body share it, and
+// so share the gate that keeps an unresolvable slug from reaching Postgres. See
+// `lib/security/slug-requests.ts`; preview is exempt for the reason given there.
 const resolve = cache(async (slug: string): Promise<AppDetail | null> => {
   const { draft, user } = await getPreviewMode()
-  return getAppBySlug(slug, { draft, user })
+  if (!draft) await requireLookupableSlug(slug)
+
+  const app = await getAppBySlug(slug, { draft, user })
+  if (!app && !draft) await recordSlugMiss()
+  return app
 })
 
 export async function generateMetadata({
