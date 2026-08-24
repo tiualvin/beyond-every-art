@@ -20,7 +20,10 @@ import {
   BUTTON_BLOCK,
   CALLOUT_BLOCK,
   EMBED_BLOCK,
+  FAQ_BLOCK,
+  FEATURE_LIST_BLOCK,
   GALLERY_BLOCK,
+  KEY_TAKEAWAYS_BLOCK,
   PAYWALL_BLOCK,
   PULL_QUOTE_BLOCK,
   SIGNUP_BLOCK,
@@ -30,7 +33,10 @@ import {
   type ButtonData,
   type CalloutData,
   type EmbedData,
+  type FaqData,
+  type FeatureListData,
   type GalleryData,
+  type KeyTakeawaysData,
   type PullQuoteData,
 } from '../../blocks/schema'
 import type { ArticleBody } from './body'
@@ -123,6 +129,36 @@ const blockSerializers: Record<BlockSlug, (fields: unknown) => string> = {
   // A marker, not content. It should never reach a serializer in the first
   // place — `toArticleBody` strips it — and contributes nothing if it does.
   [PAYWALL_BLOCK]: () => '',
+
+  // The most quotable text in the article, written to stand alone. Whatever
+  // eventually derives a description or a feed summary wants this above almost
+  // anything else in the body.
+  [KEY_TAKEAWAYS_BLOCK]: (fields) => {
+    const data = (fields ?? {}) as KeyTakeawaysData
+    return join([data.heading, ...(data.items ?? []).map((item) => item?.text)])
+  },
+
+  // Questions and answers both. A collapsed answer is still published text —
+  // the same rule the dropdown follows, and here the questions are often the
+  // exact wording somebody searched for.
+  [FAQ_BLOCK]: (fields) => {
+    const data = (fields ?? {}) as FaqData
+    return join([
+      data.heading,
+      ...(data.items ?? []).map((item) =>
+        join([item?.question, nestedPlainText(item?.answer)]),
+      ),
+    ])
+  },
+
+  [FEATURE_LIST_BLOCK]: (fields) => {
+    const data = (fields ?? {}) as FeatureListData
+    return join([
+      data.heading,
+      data.intro,
+      ...(data.items ?? []).map((item) => join([item?.title, item?.body])),
+    ])
+  },
 }
 
 const blockConverters: Converters = {

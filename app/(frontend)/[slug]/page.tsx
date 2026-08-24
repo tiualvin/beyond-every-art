@@ -18,6 +18,7 @@ import {
   recordSlugMiss,
   requireLookupableSlug,
 } from '@/lib/security/slug-requests'
+import { collectBlockJsonLd } from '@/lib/seo/block-jsonld'
 import { robotsDirective } from '@/lib/seo/indexing'
 import { buildArticleJsonLd, serializeJsonLd } from '@/lib/seo/jsonld'
 import { absoluteUrl, getSiteUrl, pagePath, postPath } from '@/lib/seo/site'
@@ -147,8 +148,16 @@ export default async function SlugPage({
 
   if (resolved.kind === 'page') {
     const { page } = resolved
+    // A page has no Article node — it is not an article — but its blocks still
+    // describe themselves. A landing page whose FAQ answers the question a
+    // visitor searched is worth saying out loud even when the page around it
+    // is not editorial.
+    const pageBlockJsonLd = collectBlockJsonLd(page.body)
     return (
       <main>
+        {pageBlockJsonLd.map((node, index) => (
+          <BlockJsonLd key={index} node={node} />
+        ))}
         {showBanner && <DraftBanner />}
         <article className="article">
           <div className="container article__inner">
@@ -192,16 +201,36 @@ export default async function SlugPage({
     }),
   )
 
+  // Separate <script> tags rather than one `@graph`. Both are valid and
+  // crawlers merge them, and keeping the Article node byte-identical to what it
+  // was means a block cannot change the shape of the thing that already ranks.
+  const blockJsonLd = collectBlockJsonLd(post.body)
+
   return (
     <>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: jsonLd }}
       />
+      {blockJsonLd.map((node, index) => (
+        <BlockJsonLd key={index} node={node} />
+      ))}
       {showBanner && <DraftBanner />}
       <Article post={post} preview={draft} />
       <ReadNext posts={related} topic={post.tags[0]?.name} />
     </>
+  )
+}
+
+/** One structured-data node contributed by a block in the body. */
+function BlockJsonLd({ node }: { node: Record<string, unknown> }) {
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{
+        __html: serializeJsonLd({ '@context': 'https://schema.org', ...node }),
+      }}
+    />
   )
 }
 

@@ -2473,6 +2473,192 @@ img {
   color: var(--color-muted);
 }
 
+/* --- Key takeaways -------------------------------------------------------- */
+
+/* A summary of the argument, not an aside from it — so it reads as part of the
+   page rather than as a tinted box bolted to the side of it. The rule at the
+   top does the separating that a background would otherwise do. */
+.takeaways {
+  border-top: 2px solid var(--color-burgundy);
+  padding-top: 1.25rem;
+}
+
+/* Scoped to `.prose` to outrank `.prose h2`, which would otherwise win on
+   specificity and hand this the size and top margin of a section heading. Every
+   body renders inside `.prose` — see `ArticleBody`. */
+.prose .takeaways__heading {
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-weight: 600;
+  color: var(--color-burgundy);
+  margin-bottom: 0.9rem;
+}
+
+.takeaways__list {
+  margin: 0;
+  padding-left: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.takeaways__item {
+  font-size: 1.02rem;
+  line-height: 1.55;
+}
+
+.takeaways__item::marker {
+  color: var(--color-burgundy);
+  font-weight: 600;
+}
+
+/* --- FAQ ------------------------------------------------------------------ */
+
+/* Same disclosure mechanics as the dropdown, and deliberately the same look:
+   they behave identically for a reader, and only the meaning differs. */
+.faq__items {
+  border-top: 1px solid var(--color-line);
+}
+
+.faq__item {
+  border-bottom: 1px solid var(--color-line);
+}
+
+.faq__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 0;
+  cursor: pointer;
+  list-style: none;
+}
+
+.faq__summary::-webkit-details-marker {
+  display: none;
+}
+
+.faq__summary:focus-visible {
+  outline: 2px solid var(--color-burgundy);
+  outline-offset: 2px;
+}
+
+/* The question is a real `<h3>` so it joins the document outline, which means
+   undoing the size and spacing `.prose h3` gives a section heading — inside a
+   summary it is a control, not a section title. */
+.prose .faq__question {
+  flex: 1;
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.faq__marker {
+  flex: none;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-right: 2px solid var(--color-burgundy);
+  border-bottom: 2px solid var(--color-burgundy);
+  transform: rotate(45deg);
+  transform-origin: center;
+  margin-bottom: 0.25rem;
+}
+
+.faq__item[open] .faq__marker {
+  transform: rotate(-135deg);
+  margin-bottom: -0.25rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .faq__marker {
+    transition:
+      transform 0.2s ease,
+      margin 0.2s ease;
+  }
+}
+
+.faq__answer {
+  padding: 0 0 1.25rem;
+  font-size: 1rem;
+}
+
+.faq__answer > * + * {
+  margin-top: 0.85rem;
+}
+
+/* --- Feature list --------------------------------------------------------- */
+
+.feature-list__intro {
+  color: var(--color-muted);
+  margin-bottom: 1.25rem;
+}
+
+.feature-list__items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: feature;
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+.feature-list__item {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.9rem;
+}
+
+/* An item with a plate puts it beside the text once there is room for both. */
+@media (min-width: 40rem) {
+  .feature-list__item:has(.feature-list__frame) {
+    grid-template-columns: 14rem minmax(0, 1fr);
+    align-items: start;
+    gap: 1.5rem;
+  }
+}
+
+.feature-list__frame {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: var(--color-line);
+}
+
+.feature-list__frame img {
+  display: block;
+}
+
+/* Numbering is drawn from a counter rather than the list's own markers so the
+   number sits with the title even when a plate takes the first grid column.
+   `<ol>` versus `<ul>` still carries the meaning; this only positions it. */
+ol.feature-list__items .feature-list__title::before {
+  counter-increment: feature;
+  content: counter(feature) '. ';
+  color: var(--color-burgundy);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Same specificity reason as `.takeaways__heading` above. */
+.prose .feature-list__title {
+  margin: 0 0 0.4rem;
+  font-size: 1.2rem;
+  line-height: 1.3;
+}
+
+.feature-list__body {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
 /* --- Unrecognised module (preview only) ---------------------------------- */
 
 /* Published pages render nothing for an unknown block; this is what an editor

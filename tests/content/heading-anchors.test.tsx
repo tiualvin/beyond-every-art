@@ -6,6 +6,7 @@ import { RichText } from '@payloadcms/richtext-lexical/react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 
+import { FAQ_BLOCK } from '../../blocks/schema'
 import { buildConverters } from '../../app/(frontend)/components/blocks/registry'
 
 const text = (value: string) => ({
@@ -26,6 +27,37 @@ const heading = (tag: string, value: string) => ({
   format: '',
   indent: 0,
   children: [text(value)],
+})
+
+const richTextValue = (value: string) => ({
+  root: {
+    type: 'root',
+    direction: 'ltr',
+    format: '',
+    indent: 0,
+    version: 1,
+    children: [
+      {
+        type: 'paragraph',
+        direction: 'ltr',
+        format: '',
+        indent: 0,
+        version: 1,
+        children: [text(value)],
+      },
+    ],
+  },
+})
+
+const faq = (question: string) => ({
+  type: 'block',
+  version: 1,
+  format: '',
+  fields: {
+    blockType: FAQ_BLOCK,
+    heading: 'Questions',
+    items: [{ question, answer: richTextValue('An answer.') }],
+  },
 })
 
 const body = (children: unknown[]) => ({
@@ -74,5 +106,16 @@ describe('body headings', () => {
   it('preserves the heading level the editor chose', () => {
     const html = render([heading('h4', 'A footnote of a section')])
     expect(html).toContain('<h4 id="a-footnote-of-a-section">')
+  })
+
+  it('shares one anchor counter between headings and the blocks between them', () => {
+    // A block allocating from its own counter would hand an FAQ question the
+    // same id as a section heading above it, and a duplicate id makes both
+    // links resolve to whichever the browser met first.
+    const html = render([heading('h2', 'Method'), faq('Method')])
+
+    expect(html).toContain('<h2 id="method">')
+    expect(html).toContain('id="method-2"')
+    expect(html.match(/id="method"/g)).toHaveLength(1)
   })
 })

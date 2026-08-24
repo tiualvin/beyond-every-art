@@ -22,6 +22,9 @@ export const GALLERY_BLOCK = 'gallery'
 export const BOOKMARK_BLOCK = 'bookmark'
 export const EMBED_BLOCK = 'embed'
 export const PAYWALL_BLOCK = 'paywall'
+export const KEY_TAKEAWAYS_BLOCK = 'keyTakeaways'
+export const FAQ_BLOCK = 'faq'
+export const FEATURE_LIST_BLOCK = 'featureList'
 
 /** Every block slug this repository knows how to render. */
 export const BLOCK_SLUGS = [
@@ -34,6 +37,9 @@ export const BLOCK_SLUGS = [
   BOOKMARK_BLOCK,
   EMBED_BLOCK,
   PAYWALL_BLOCK,
+  KEY_TAKEAWAYS_BLOCK,
+  FAQ_BLOCK,
+  FEATURE_LIST_BLOCK,
 ] as const
 
 export type BlockSlug = (typeof BLOCK_SLUGS)[number]
@@ -124,6 +130,41 @@ export type EmbedData = {
 
 export type PaywallData = {
   note?: string | null
+}
+
+export type KeyTakeawayItem = {
+  id?: string | null
+  text?: string | null
+}
+
+export type KeyTakeawaysData = {
+  heading?: string | null
+  items?: KeyTakeawayItem[] | null
+}
+
+export type FaqItem = {
+  id?: string | null
+  question?: string | null
+  answer?: unknown
+}
+
+export type FaqData = {
+  heading?: string | null
+  items?: FaqItem[] | null
+}
+
+export type FeatureListItem = {
+  id?: string | null
+  title?: string | null
+  body?: string | null
+  image?: unknown
+}
+
+export type FeatureListData = {
+  heading?: string | null
+  intro?: string | null
+  numbered?: boolean | null
+  items?: FeatureListItem[] | null
 }
 
 // --- Block configs -------------------------------------------------------
@@ -480,8 +521,140 @@ export const PaywallBlock: Block = {
   ],
 }
 
+/**
+ * The points a reader should leave with, as a short list.
+ *
+ * Deliberately not a callout. A callout is an `<aside>` — content set apart
+ * from the argument — and a summary of the argument is the opposite of that.
+ * It is a `<section>` with a heading and an ordered list, which is the shape
+ * search engines lift into a list result and the shape an answer engine can
+ * quote without having to decide what the article was about.
+ */
+export const KeyTakeawaysBlock: Block = {
+  slug: KEY_TAKEAWAYS_BLOCK,
+  interfaceName: 'KeyTakeawaysBlock',
+  labels: { singular: 'Key takeaways', plural: 'Key takeaways' },
+  fields: [
+    {
+      name: 'heading',
+      type: 'text',
+      defaultValue: 'Key takeaways',
+      admin: {
+        description:
+          'Names the section. Leave the default unless it reads oddly.',
+      },
+    },
+    {
+      name: 'items',
+      type: 'array',
+      minRows: 1,
+      maxRows: 8,
+      required: true,
+      labels: { singular: 'Takeaway', plural: 'Takeaways' },
+      admin: {
+        description:
+          'One sentence each, and each one true on its own — a reader who reads only this list should not be misled by it.',
+      },
+      fields: [{ name: 'text', type: 'textarea', required: true }],
+    },
+  ],
+}
+
+/**
+ * Questions and their answers.
+ *
+ * A separate block from the dropdown even though both collapse, because the
+ * difference is not presentational: a dropdown is a way of showing something,
+ * an FAQ is a claim about what the content *is*. Only the second can be
+ * described to a search engine as questions and answers, and guessing which
+ * dropdowns happened to be Q&A would mean describing "Materials used" as a
+ * question somebody asked.
+ *
+ * Each question is a heading with its own anchor, so an answer can be linked
+ * to directly rather than only the article that contains it.
+ */
+export const FaqBlock: Block = {
+  slug: FAQ_BLOCK,
+  interfaceName: 'FaqBlock',
+  labels: { singular: 'FAQ', plural: 'FAQs' },
+  fields: [
+    {
+      name: 'heading',
+      type: 'text',
+      defaultValue: 'Frequently asked questions',
+    },
+    {
+      name: 'items',
+      type: 'array',
+      minRows: 1,
+      required: true,
+      labels: { singular: 'Question', plural: 'Questions' },
+      admin: {
+        description:
+          'Write the question the way a reader would ask it, not the way a heading would phrase it.',
+      },
+      fields: [
+        { name: 'question', type: 'text', required: true },
+        { name: 'answer', type: 'richText', required: true },
+      ],
+    },
+  ],
+}
+
+/**
+ * A list of things, each with a title and its own paragraph.
+ *
+ * The editorial "six pigments that changed painting" shape, and the same shape
+ * a landing page uses for what something offers. Each item's title is a real
+ * heading with an anchor, which is where the search value is: a flat list of
+ * bolded phrases contributes nothing to a document outline, and the same list
+ * as headings gives every item its own addressable section.
+ *
+ * Images are optional per item rather than all-or-nothing, because a list of
+ * six where two have a plate is a normal article and a placeholder for the
+ * other four would be worse than the asymmetry.
+ */
+export const FeatureListBlock: Block = {
+  slug: FEATURE_LIST_BLOCK,
+  interfaceName: 'FeatureListBlock',
+  labels: { singular: 'Feature list', plural: 'Feature lists' },
+  fields: [
+    { name: 'heading', type: 'text' },
+    {
+      name: 'intro',
+      type: 'textarea',
+      admin: { description: 'Optional line under the heading.' },
+    },
+    {
+      name: 'numbered',
+      type: 'checkbox',
+      defaultValue: true,
+      admin: {
+        description:
+          'Numbers the items. Turn this off when the order carries no meaning — a numbered list tells a reader the sequence matters.',
+      },
+    },
+    {
+      name: 'items',
+      type: 'array',
+      minRows: 1,
+      maxRows: 20,
+      required: true,
+      labels: { singular: 'Item', plural: 'Items' },
+      fields: [
+        { name: 'title', type: 'text', required: true },
+        { name: 'body', type: 'textarea' },
+        { name: 'image', type: 'upload', relationTo: 'media' },
+      ],
+    },
+  ],
+}
+
 /** The blocks offered inside a Post or Page body. */
 export const CONTENT_BLOCKS: Block[] = [
+  KeyTakeawaysBlock,
+  FaqBlock,
+  FeatureListBlock,
   AccordionBlock,
   PullQuoteBlock,
   SignupBlock,
