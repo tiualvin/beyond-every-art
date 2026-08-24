@@ -373,6 +373,8 @@ export type PostDetail = {
   metaTitle: string | null
   metaDescription: string | null
   canonicalURL: string | null
+  /** Editor asked for this to stay out of search results and the sitemap. */
+  noindex: boolean
   visibility: PostVisibility
   /**
    * Whether `body` is a teaser rather than the piece. True for a members-only
@@ -391,6 +393,8 @@ export type PageDetail = {
   metaTitle: string | null
   metaDescription: string | null
   canonicalURL: string | null
+  /** Editor asked for this to stay out of search results and the sitemap. */
+  noindex: boolean
 }
 
 export type Archive = {
@@ -416,6 +420,7 @@ type RawContentDoc = {
   metaTitle?: string
   metaDescription?: string
   canonicalURL?: string
+  noindex?: boolean
   visibility?: string
 }
 
@@ -446,6 +451,7 @@ function toPostDetail(doc: RawContentDoc, preview: boolean): PostDetail {
     metaTitle: doc.metaTitle ?? null,
     metaDescription: doc.metaDescription ?? null,
     canonicalURL: doc.canonicalURL ?? null,
+    noindex: Boolean(doc.noindex),
     visibility,
     restricted,
   }
@@ -616,6 +622,7 @@ async function readPageBySlug(
       metaTitle: doc.metaTitle ?? null,
       metaDescription: doc.metaDescription ?? null,
       canonicalURL: doc.canonicalURL ?? null,
+      noindex: Boolean(doc.noindex),
     }
   } catch {
     return null

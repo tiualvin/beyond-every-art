@@ -13,6 +13,13 @@ export type SitemapDoc = {
   slug: string
   updatedAt?: string | Date | null
   publishedAt?: string | Date | null
+  /**
+   * The document asks to stay out of search results.
+   *
+   * Only Posts and Pages carry the field; the archives do not have it, and a
+   * caller that passes nothing gets the old behaviour.
+   */
+  noindex?: boolean | null
 }
 
 export type SitemapEntry = {
@@ -71,8 +78,12 @@ export function buildSitemapEntries({
     })
   }
 
+  // A noindexed document is dropped rather than listed. A sitemap is a request
+  // to index, so listing a URL whose own page says not to is a contradiction —
+  // Search Console reports it as one, and the mixed signal is resolved in
+  // whichever direction the crawler prefers rather than the one asked for.
   for (const post of posts) {
-    if (!post.slug) continue
+    if (!post.slug || post.noindex) continue
     entries.push({
       url: absoluteUrl(postPath(post.slug), siteUrl),
       lastModified: toIso(post.updatedAt) ?? toIso(post.publishedAt),
@@ -82,7 +93,7 @@ export function buildSitemapEntries({
   }
 
   for (const page of pages) {
-    if (!page.slug) continue
+    if (!page.slug || page.noindex) continue
     entries.push({
       url: absoluteUrl(pagePath(page.slug), siteUrl),
       lastModified: toIso(page.updatedAt) ?? toIso(page.publishedAt),

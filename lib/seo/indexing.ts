@@ -14,6 +14,32 @@ export function isNoindex(env: Env = process.env): boolean {
   return value === '1' || value === 'true' || value === 'yes'
 }
 
+/** What a `robots` meta tag says, in the shape Next's Metadata accepts. */
+export type RobotsDirective = { index: false; follow: boolean }
+
+/**
+ * The robots directive a document should carry, or undefined for the default.
+ *
+ * Undefined rather than `{ index: true }` on purpose. Next merges metadata by
+ * letting the page override the layout, and `app/(frontend)/layout.tsx` is
+ * where the deployment-wide `NEXT_PUBLIC_NOINDEX` switch lives — so a page that
+ * cheerfully announced `index: true` would silently un-hide the whole of
+ * staging. This function never emits a positive directive; the only thing it
+ * can do is add a restriction.
+ *
+ * A document marked noindex still gets `follow`, which is the standard
+ * treatment for a page that should not rank but should still pass its links on
+ * — an ad landing page linking into the archive being the case this exists for.
+ */
+export function robotsDirective(
+  documentNoindex: boolean | null | undefined,
+  env: Env = process.env,
+): RobotsDirective | undefined {
+  if (isNoindex(env)) return { index: false, follow: false }
+  if (documentNoindex) return { index: false, follow: true }
+  return undefined
+}
+
 export interface BasicAuthCredentials {
   user: string
   password: string

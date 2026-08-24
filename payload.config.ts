@@ -13,6 +13,7 @@ import { BillingEvents } from './collections/BillingEvents'
 import { Media } from './collections/Media'
 import { Members } from './collections/Members'
 import { NewsletterSignups } from './collections/NewsletterSignups'
+import { SignupCampaigns } from './collections/SignupCampaigns'
 import { Pages } from './collections/Pages'
 import { Posts } from './collections/Posts'
 import { Redirects } from './collections/Redirects'
@@ -81,6 +82,7 @@ export default buildConfig({
     Redirects,
     Members,
     NewsletterSignups,
+    SignupCampaigns,
     BillingEvents,
     // The OAuth layer's storage. Registered unconditionally, like the MCP
     // plugin's own key collection and for the same reason: the database schema

@@ -115,7 +115,7 @@ export const Posts: CollectionConfig = {
         update: editorsAndAdminsField,
       },
     },
-    ...seoFields({ canonical: true }),
+    ...seoFields({ canonical: true, noindex: true }),
     { name: 'featured', type: 'checkbox', defaultValue: false },
     {
       name: 'visibility',

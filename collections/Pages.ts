@@ -49,7 +49,7 @@ export const Pages: CollectionConfig = {
       admin: { language: 'html' },
     },
     { name: 'featuredImage', type: 'upload', relationTo: 'media' },
-    ...seoFields({ canonical: true }),
+    ...seoFields({ canonical: true, noindex: true }),
     ghostIdField({ autofill: true }),
   ],
 }
