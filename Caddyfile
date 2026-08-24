@@ -1,5 +1,31 @@
+# How every site block below proves it owns its domain.
+#
+# DNS-01 rather than the default HTTP-01, because Cloudflare's proxy terminates
+# the connection at their edge: once the orange cloud is on, Let's Encrypt can
+# no longer reach this server on port 80 and an HTTP-01 challenge never arrives.
+# Writing a TXT record into the zone instead keeps working from behind the
+# proxy — which is what makes the proxy adoptable at all. See
+# docs/EDGE_PROTECTION.md.
+#
+# The token is read at runtime from the environment rather than substituted
+# into the config, so it is never written into a rendered Caddyfile and never
+# appears in `docker compose config`. It needs Zone → DNS → Edit on this zone
+# and nothing else.
+#
+# Names that cannot hold a public certificate — the `localhost` defaults a
+# local or CI stack falls back to — are unaffected: Caddy issues those from its
+# internal CA regardless of the issuer configured here, because the subject
+# does not qualify for a publicly trusted certificate.
+(cloudflare_dns_challenge) {
+  tls {
+    dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+  }
+}
+
 # Public site.
 {$SITE_ADDRESS:localhost} {
+  import cloudflare_dns_challenge
+
   encode zstd gzip
 
   # Staff tooling is served only on the CMS hostname below, so the address
@@ -76,6 +102,8 @@
 # the block, which is what a local or staging deployment wants: Caddy would
 # otherwise try, and fail, to get a certificate for a name that does not exist.
 {$SITE_REDIRECT_FROM:redirect-disabled.localhost} {
+  import cloudflare_dns_challenge
+
   redir https://{$SITE_ADDRESS:localhost}{uri} permanent
 }
 
@@ -110,6 +138,8 @@
 # blocks are otherwise sorted by matcher specificity, and the order is the whole
 # meaning here.
 {$CMS_ADDRESS:cms.localhost} {
+  import cloudflare_dns_challenge
+
   encode zstd gzip
 
   route {

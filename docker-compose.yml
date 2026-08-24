@@ -171,6 +171,11 @@ services:
       # start, and a real-looking default would have it request a certificate
       # for a domain this deployment does not own.
       SITE_REDIRECT_FROM: ${SITE_REDIRECT_FROM:-redirect-disabled.localhost}
+      # Read by the tls directive in the Caddyfile. Empty until the operator
+      # sets it, which is why the DNS-01 switch is deployed on its own and
+      # verified against the log rather than merged with anything else: a
+      # missing or under-scoped token means Caddy obtains no certificate at all.
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
       # Staff hostname serving Payload Admin and the MCP endpoint, e.g.
       # cms.beyondeveryart.com. See the Caddyfile.
       CMS_ADDRESS: ${CMS_ADDRESS:-cms.localhost}
