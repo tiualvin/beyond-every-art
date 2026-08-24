@@ -49,6 +49,13 @@ WORKDIR /app
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# `output: 'standalone'` traces the server's imports; it does not copy `public`,
+# on the assumption that a CDN serves it. Nothing does here — Caddy reverse
+# proxies every path to this container — so without this line every file in
+# `public` is a 404 in production while working perfectly in `next dev`. That
+# is how `/ads.txt` came to be committed and never served; `tests/seo/
+# ads-txt.test.ts` is what keeps this line and that file in step.
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 # Payload serves local uploads from `path.resolve('media')`, which is /app/media
 # under this working directory. It must exist and be writable before the volume
 # is mounted over it — see the migrator stage above, and the `media_data` volume
