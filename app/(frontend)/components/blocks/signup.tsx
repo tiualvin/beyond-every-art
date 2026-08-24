@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useId } from 'react'
 
 import { subscribeFromArticle } from '@/app/(frontend)/newsletter/actions'
 import type { SignupData } from '@/blocks/schema'
@@ -26,6 +26,15 @@ export function Signup({ data }: { data: SignupData }) {
     subscribeFromArticle,
     null,
   )
+  // Two signup modules in one article are an ordinary editorial choice — one
+  // partway through a long piece and one at the end. With the ids hardcoded
+  // both forms claimed the same ones, and a duplicate id does not fail
+  // visibly: the browser resolves `for` and `aria-describedby` to whichever
+  // element it met first, so the second form's label and consent line both
+  // pointed at the first form's input.
+  const fieldId = useId()
+  const emailId = `${fieldId}-email`
+  const consentId = `${fieldId}-consent`
   const heading = data.heading?.trim() || 'Stay close to the work'
 
   if (status === 'success') {
@@ -44,18 +53,18 @@ export function Signup({ data }: { data: SignupData }) {
       {data.body?.trim() && <p className="signup__body">{data.body}</p>}
 
       <form className="signup__form" action={formAction}>
-        <label className="visually-hidden" htmlFor="signup-block-email">
+        <label className="visually-hidden" htmlFor={emailId}>
           Email address
         </label>
         <input
-          id="signup-block-email"
+          id={emailId}
           className="signup__input"
           type="email"
           name="email"
           required
           autoComplete="email"
           placeholder="you@example.com"
-          aria-describedby="signup-block-consent"
+          aria-describedby={consentId}
         />
         <button className="signup__btn" type="submit" disabled={pending}>
           {pending ? 'Subscribing…' : data.submitLabel?.trim() || 'Subscribe'}
@@ -78,7 +87,7 @@ export function Signup({ data }: { data: SignupData }) {
           `pages` document guaranteed to be at `/privacy`, so linking one here
           would ship a 404 next to a consent notice — worse than the omission.
           Add the link here once that page exists. */}
-      <p className="signup__note" id="signup-block-consent">
+      <p className="signup__note" id={consentId}>
         Occasional emails about new work. No spam, unsubscribe any time.
       </p>
     </section>
