@@ -105,9 +105,25 @@ has to use the slash too. The ones that exist today:
 | Middleware's read of the redirect table                                      | `/redirects-map/`   |
 | Search suggestions, fetched from the browser                                 | `/search/suggest/`  |
 | Feed, as advertised in `<link rel="alternate">` and the feed's own self link | `/rss/`             |
+| OAuth client registration, authorization, token, and revocation              | `/oauth/…/`         |
 
 A browser posting a CSP report and Stripe delivering a webhook both treat a
 redirect as a failure rather than following it, so those two are not cosmetic.
+
+The two RFC 8414 / RFC 9728 discovery documents are the one place a caller
+cannot be asked to add the slash: the specifications fix those URLs exactly.
+They are served at the address the specification names and redirect to their
+slashed form, which every OAuth client follows — but it is why the resource
+identifier in the metadata stays `/api/mcp`, unslashed, as the identifier the
+specification says it is rather than a URL to fetch.
+
+Payload's REST API under `/api/` is the exception: it answers at either shape.
+Next routes it on path segments, which a trailing slash does not add to, but
+the MCP transport compares `req.url` against the path it was mounted at — so
+`app/(payload)/api/[...slug]/route.ts` takes the slash back off before Payload
+sees the request. Without that, a tool call to `/api/mcp` was authenticated and
+then answered `404 Not found`. `/api/mcp` therefore stays the endpoint every
+document names, and the OAuth resource identifier it has to match.
 
 Redirect matching is trailing-slash insensitive, so stored rules and inbound
 links resolve whether or not they include a trailing slash.
