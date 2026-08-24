@@ -134,6 +134,20 @@ warning about why the proxy cannot simply be toggled on — it breaks HTTP-01
 certificate renewal — are in
 [`EDGE_PROTECTION.md`](EDGE_PROTECTION.md). Blocked on a Cloudflare API token.
 
+Two of the six steps are done. The `caddy` service builds from the prepared
+image with the `caddy-dns/cloudflare` module (#103), so the DNS-01 switch is a
+configuration change rather than a build. And a Hetzner Cloud Firewall now
+fronts the server (24 Aug), attached, with three inbound rules — TCP 22, 80 and
+443 — each sourced from `Any` for now. That closes every other port; it does
+not yet close the origin, because the sources cannot narrow to Cloudflare until
+Cloudflare is the one connecting. Doing it there rather than in `ufw` is not a
+preference: Docker publishes Caddy's ports with its own iptables rules, which
+are evaluated before the chain `ufw` manages, so a `ufw deny 80/tcp` reports
+success and changes nothing.
+
+What is left is therefore the token, the DNS-01 configuration, the proxy
+toggle, `TRUST_CLOUDFLARE_IP=1`, and one edit to two existing firewall rules.
+
 0. **One-time migration baseline (operator action, before the next deploy).**
    Schema migrations now exist and automatic push is off. The VPS database was
    built by push, so it must be told the initial migration is already applied

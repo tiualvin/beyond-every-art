@@ -156,29 +156,44 @@ Cloud servers only. A Robot/dedicated machine has no such firewall and needs
 the `DOCKER-USER` rules below instead. If the server appears in the project
 list at `console.hetzner.cloud`, it is a Cloud server.
 
-1. `console.hetzner.cloud` → the project → **Firewalls** → **Create Firewall**.
-2. Add three inbound rules. Anything not listed is denied; leave the outbound
-   rules alone, or the deploy loses its own network access.
+Do it in two passes. The firewall is worth having before Cloudflare exists —
+it closes every port that is not one of the three below — and the sources
+cannot be narrowed to Cloudflare until Cloudflare is actually the one
+connecting. Narrowing them early blocks the real visitors instead.
 
-   | Protocol | Port | Source                                      |
-   | -------- | ---- | ------------------------------------------- |
-   | TCP      | 22   | Any, or an address that is definitely yours |
-   | TCP      | 80   | Cloudflare's IPv4 **and** IPv6 ranges       |
-   | TCP      | 443  | Cloudflare's IPv4 **and** IPv6 ranges       |
+**Pass one — done, 24 Aug.** `console.hetzner.cloud` → the project →
+**Firewalls** → **Create Firewall**, three inbound rules, `Any IPv4` and
+`Any IPv6` as the source of each:
 
-   The ranges are published as plain text at
-   [cloudflare.com/ips-v4](https://www.cloudflare.com/ips-v4) and
-   [cloudflare.com/ips-v6](https://www.cloudflare.com/ips-v6): around twenty
-   entries in total, comfortably inside Hetzner's per-rule limit.
+| Protocol | Port | Source | Why                                      |
+| -------- | ---- | ------ | ---------------------------------------- |
+| TCP      | 22   | Any    | SSH, including the deploy workflow's     |
+| TCP      | 80   | Any    | HTTP→HTTPS redirect, and HTTP-01 renewal |
+| TCP      | 443  | Any    | the site                                 |
 
-3. Attach it to the server under **Apply to**, and create. Rules take effect
-   immediately.
+Leave the outbound rules empty — adding one switches outbound from
+allow-everything to allow-only-these, and the deploy loses its own network
+access. Attach it under **Apply to**, and create; rules take effect
+immediately.
 
-**Both address families, or neither.** Caddy listens on `0.0.0.0` and `::`, and
-Cloudflare reaches an origin over whichever family the DNS record offers. Allow
-only the IPv4 ranges while an `AAAA` record exists and Cloudflare will arrive
-over IPv6 and be dropped — a site that is down behind a firewall that reads as
-correct.
+Port 80 is not optional in this pass. Certificates still renew over HTTP-01
+until step 3 of the procedure above changes that, and a firewall without port
+80 breaks renewal in the silent, six-weeks-later way this document opens by
+warning about.
+
+**Pass two — after step 4, once the proxy is on.** Edit only the port 80 and
+443 rules and replace `Any` with Cloudflare's ranges, published as plain text
+at [cloudflare.com/ips-v4](https://www.cloudflare.com/ips-v4) and
+[cloudflare.com/ips-v6](https://www.cloudflare.com/ips-v6) — around twenty
+entries in total, comfortably inside Hetzner's per-rule limit. **Both lists go
+into both rules.** This is the pass that actually closes the origin; pass one
+only removes the ports nothing was serving.
+
+**Both address families, or neither.** In pass two: Caddy listens on `0.0.0.0`
+and `::`, and Cloudflare reaches an origin over whichever family the DNS record
+offers. Allow only the IPv4 ranges while an `AAAA` record exists and Cloudflare
+will arrive over IPv6 and be dropped — a site that is down behind a firewall
+that reads as correct.
 
 **Port 22 is the way back in.** Add that rule before attaching the firewall, and
 confirm a fresh SSH session still works before closing the one already open.
@@ -203,8 +218,9 @@ through `INPUT`, and is not affected by `DOCKER-USER` at all.
 
 ### Confirm it, from outside
 
-A firewall is only believed once the thing it forbids actually fails. From a
-machine that is not the VPS, with the site up through Cloudflare:
+After pass two only — during pass one every one of these answers, which is the
+point. A firewall is only believed once the thing it forbids actually fails.
+From a machine that is not the VPS, with the site up through Cloudflare:
 
 ```bash
 curl -I --connect-timeout 10 http://<origin-ip>     # must time out
@@ -217,11 +233,15 @@ on a Docker host, almost always because they were written where `ufw` put them.
 
 ### Order
 
-After step 4, not before. Restricting port 80 removes the HTTP-01 challenge's
-route to the server, so doing this while Caddy still renews over HTTP-01 breaks
-renewal — silently, and visibly only weeks later, which is the same failure this
-document opens by warning about. Once step 3 has moved issuance to DNS-01,
-port 80 carries nothing but redirects to HTTPS and can be closed freely.
+Pass one stands alone and is already done. Pass two belongs after step 4, not
+before: narrowing the sources to Cloudflare while requests still arrive
+straight from browsers blocks the visitors, and narrowing port 80 while Caddy
+still renews over HTTP-01 breaks renewal silently. Once step 3 has moved
+issuance to DNS-01 and step 4 has put the proxy in front, both are safe and
+port 80 carries nothing but redirects to HTTPS.
+
+One consequence of pass one worth knowing: ICMP is not among the three rules,
+so the server no longer answers `ping`. That is expected, not a symptom.
 
 ## What this does not solve
 
