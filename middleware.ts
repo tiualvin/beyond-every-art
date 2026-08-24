@@ -12,6 +12,7 @@ import { isAuthorized, parseBasicAuth } from '@/lib/seo/indexing'
 import { RedirectMapCache } from '@/lib/seo/redirect-map'
 import {
   matchRedirect,
+  normalizePath,
   redirectLocation,
   type ResolvedRedirect,
 } from '@/lib/seo/redirects'
@@ -143,7 +144,13 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 
   // Optional HTTP Basic Auth gate for staging deployments. The /health probe
   // stays open so container healthchecks and uptime monitors can reach it.
-  if (request.nextUrl.pathname !== '/health') {
+  //
+  // Compared through `normalizePath` rather than against the literal, because
+  // `trailingSlash: true` means every caller arrives at `/health/`: an exact
+  // match against `/health` puts the gate back in front of the one request that
+  // cannot authenticate, and a staging deploy then fails on its own healthcheck
+  // with the app running perfectly well behind it.
+  if (normalizePath(request.nextUrl.pathname) !== '/health') {
     const credentials = parseBasicAuth(process.env)
     if (
       credentials &&
