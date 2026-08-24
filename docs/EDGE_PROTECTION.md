@@ -103,11 +103,10 @@ in its own quiet deploy, not during a cutover.
    would share a handful of buckets and throttle each other.
 
 6. **Close the origin to direct traffic.** Proxying hides the IP from DNS but
-   does not stop anyone who already has it. Restrict ports 80 and 443 at the VPS
-   firewall to [Cloudflare's published ranges](https://www.cloudflare.com/ips/),
-   or use a Cloudflare Tunnel and stop exposing them at all. Skipping this leaves
-   an attacker who recorded today's address able to bypass every one of the
-   protections above.
+   does not stop anyone who already has it — and this address has been public
+   since July. Skipping this leaves an attacker who recorded it able to bypass
+   every one of the protections above. The procedure is
+   ["Closing the origin"](#closing-the-origin) below.
 
 7. **Keep `cms.beyondeveryart.com` unproxied, or proxied with care.** Payload
    Admin and the MCP endpoint live there. MCP is called by Anthropic's and
@@ -127,6 +126,102 @@ in its own quiet deploy, not during a cutover.
    credential-_presence_ check, not authentication — Payload still decides
    whether a session or key is valid. What it removes is the anonymous case,
    which is the one that reaches Postgres before anything is checked.
+
+## Closing the origin
+
+Step 6 above, written out, because the obvious way to do it does not work.
+
+### `ufw` cannot do this
+
+`docker-compose.yml` publishes Caddy's ports as `80:80` and `443:443`. Docker
+implements a published port by writing its own `iptables` rules, and those are
+evaluated **before** the `INPUT` chain that `ufw` manages. So `ufw deny 80/tcp`
+reports success, `ufw status` lists the port as denied, and the port stays open
+to the entire internet. The rule is not wrong; it is never reached.
+
+Only two placements actually filter traffic to a published container port: a
+firewall **outside** the machine, or rules in Docker's own `DOCKER-USER` chain.
+
+`postgres` and `app` need no rule either way — they publish to `127.0.0.1`, so
+they are already unreachable from outside the host. Caddy is the only service
+exposed, which is what makes this a small change.
+
+### Preferred: the Hetzner Cloud Firewall
+
+Free, applied in Hetzner's network before packets reach the server, and
+therefore impossible for Docker to bypass. A mistake is also recoverable from
+the web console rather than requiring the SSH access the mistake just removed.
+
+Cloud servers only. A Robot/dedicated machine has no such firewall and needs
+the `DOCKER-USER` rules below instead. If the server appears in the project
+list at `console.hetzner.cloud`, it is a Cloud server.
+
+1. `console.hetzner.cloud` → the project → **Firewalls** → **Create Firewall**.
+2. Add three inbound rules. Anything not listed is denied; leave the outbound
+   rules alone, or the deploy loses its own network access.
+
+   | Protocol | Port | Source                                      |
+   | -------- | ---- | ------------------------------------------- |
+   | TCP      | 22   | Any, or an address that is definitely yours |
+   | TCP      | 80   | Cloudflare's IPv4 **and** IPv6 ranges       |
+   | TCP      | 443  | Cloudflare's IPv4 **and** IPv6 ranges       |
+
+   The ranges are published as plain text at
+   [cloudflare.com/ips-v4](https://www.cloudflare.com/ips-v4) and
+   [cloudflare.com/ips-v6](https://www.cloudflare.com/ips-v6): around twenty
+   entries in total, comfortably inside Hetzner's per-rule limit.
+
+3. Attach it to the server under **Apply to**, and create. Rules take effect
+   immediately.
+
+**Both address families, or neither.** Caddy listens on `0.0.0.0` and `::`, and
+Cloudflare reaches an origin over whichever family the DNS record offers. Allow
+only the IPv4 ranges while an `AAAA` record exists and Cloudflare will arrive
+over IPv6 and be dropped — a site that is down behind a firewall that reads as
+correct.
+
+**Port 22 is the way back in.** Add that rule before attaching the firewall, and
+confirm a fresh SSH session still works before closing the one already open.
+Restricting it to a single address is better than `Any`, but only where that
+address is genuinely static; a dynamic one locks the operator out on the next
+lease. Leaving it open is no worse than today's exposure — though it is worth
+reading alongside `DEPLOYMENT_STATUS.md`'s note that root SSH still accepts
+password authentication, which matters rather more once this is the only
+unrestricted port left.
+
+### Fallback: the `DOCKER-USER` chain
+
+For a machine with no cloud firewall in front of it. `DOCKER-USER` is the one
+chain Docker leaves to the operator and consults before its own rules, so it is
+the only in-machine placement that holds.
+
+Allow each Cloudflare range to reach 80 and 443, then drop the rest — and write
+the same rules with `ip6tables` for the IPv6 list. They do not survive a reboot
+on their own; `netfilter-persistent save` (from `iptables-persistent`) is what
+keeps them. Nothing here should touch port 22: SSH is a host service, reached
+through `INPUT`, and is not affected by `DOCKER-USER` at all.
+
+### Confirm it, from outside
+
+A firewall is only believed once the thing it forbids actually fails. From a
+machine that is not the VPS, with the site up through Cloudflare:
+
+```bash
+curl -I --connect-timeout 10 http://<origin-ip>     # must time out
+curl -I --connect-timeout 10 https://<origin-ip>    # must time out
+curl -sI https://www.beyondeveryart.com | head -1   # must still be 200
+```
+
+A response to either of the first two means the rules are not being reached —
+on a Docker host, almost always because they were written where `ufw` put them.
+
+### Order
+
+After step 4, not before. Restricting port 80 removes the HTTP-01 challenge's
+route to the server, so doing this while Caddy still renews over HTTP-01 breaks
+renewal — silently, and visibly only weeks later, which is the same failure this
+document opens by warning about. Once step 3 has moved issuance to DNS-01,
+port 80 carries nothing but redirects to HTTPS and can be closed freely.
 
 ## What this does not solve
 
