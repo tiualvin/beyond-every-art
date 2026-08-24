@@ -3,6 +3,8 @@
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
+import type { SignupCampaign } from '@/blocks/schema'
+import { isCampaignLive } from '@/lib/content/signup-campaign'
 import { getPayloadClient } from '@/lib/payload'
 import {
   clientKey,
@@ -108,23 +110,58 @@ export async function subscribeFromModal(
   return record(normalise(formData), 'subscribe-modal')
 }
 
+const ARTICLE_SOURCE = 'article-signup'
+
+/**
+ * The source to file an article signup under.
+ *
+ * The form may name a campaign, and that is all it may do. The name is looked
+ * up here and the source is built from the *stored* record — so a submission
+ * can only ever be attributed to a campaign that exists and is running, and
+ * the worst a forged or stale id can achieve is the default attribution.
+ * Nothing the client sends reaches the stored value.
+ *
+ * The same `isCampaignLive` the module renders through, so a module showing
+ * its own fallback copy cannot have its signups filed under a campaign that
+ * has ended.
+ */
+async function articleSource(formData: FormData): Promise<string> {
+  const id = String(formData.get('campaign') ?? '').trim()
+  // Bounded before it reaches a query. An id is short; anything long is not a
+  // typo, and there is no reason to hand it to the database to find that out.
+  if (!id || id.length > 64) return ARTICLE_SOURCE
+
+  try {
+    const payload = await getPayloadClient()
+    const campaign = (await payload.findByID({
+      collection: 'signup-campaigns',
+      id,
+      depth: 0,
+      overrideAccess: true,
+      // A missing id is an ordinary outcome here — a campaign deleted while a
+      // page sat open in a tab — so it is a null rather than a thrown 404.
+      disableErrors: true,
+    })) as SignupCampaign | null
+
+    if (!campaign?.slug || !isCampaignLive(campaign)) return ARTICLE_SOURCE
+    return `${ARTICLE_SOURCE}:${campaign.slug}`
+  } catch {
+    // Attribution is not worth failing a subscription over. The address still
+    // gets on the list, filed under the default source.
+    return ARTICLE_SOURCE
+  }
+}
+
 /**
  * The same signup, for a signup module placed inside an article body.
  *
  * Answers in place like the modal does: this form is in the middle of a piece
  * somebody is reading, and redirecting them to the newsletter page would throw
  * away their position in it.
- *
- * The source is a constant rather than anything the block or the form supplies.
- * A per-placement or per-campaign source is worth having, but it has to be
- * derived server-side from a campaign record — a hidden input naming its own
- * attribution is a value the server would be trusting the client to tell it.
- * That record is the `signup-campaigns` collection this repository has not
- * built; until it exists, every article placement reports the same source.
  */
 export async function subscribeFromArticle(
   _previous: SignupStatus | null,
   formData: FormData,
 ): Promise<SignupStatus> {
-  return record(normalise(formData), 'article-signup')
+  return record(normalise(formData), await articleSource(formData))
 }

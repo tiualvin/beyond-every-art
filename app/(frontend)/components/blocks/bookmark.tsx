@@ -2,6 +2,7 @@ import Image from 'next/image'
 
 import type { BookmarkData } from '@/blocks/schema'
 import { displayHost, safeHref } from '@/lib/content/embed'
+import { linkRel } from '@/lib/content/link-rel'
 import { toMediaImage } from '@/lib/content/media'
 
 /**
@@ -15,6 +16,10 @@ import { toMediaImage } from '@/lib/content/media'
  *
  * No metadata is fetched: the reasoning is on `BookmarkBlock` in
  * `blocks/schema.ts`. What an editor typed is what a reader sees.
+ *
+ * A bookmark is the block most likely to point at something commercial — a
+ * shop, a publisher, a listing — so it carries the same relationship field the
+ * button does, and for the same reason.
  */
 export function Bookmark({ data }: { data: BookmarkData }) {
   const href = safeHref(data.url)
@@ -30,7 +35,7 @@ export function Bookmark({ data }: { data: BookmarkData }) {
       <a
         className="bookmark"
         href={href}
-        rel="noopener noreferrer"
+        rel={linkRel(data.relationship, { external: true })}
         target="_blank"
       >
         <span className="bookmark__text">

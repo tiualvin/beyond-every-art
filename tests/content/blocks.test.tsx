@@ -297,6 +297,54 @@ describe('Gallery', () => {
   })
 })
 
+describe('outbound link relationships', () => {
+  it('marks a sponsored button and keeps the window protections', () => {
+    // An affiliate or advertising link that passes ranking signal like an
+    // editorial one is the thing manual actions are issued for.
+    const html = render(
+      <ActionButton
+        data={{
+          label: 'Buy the chart',
+          href: 'https://shop.example.com',
+          relationship: 'sponsored',
+        }}
+      />,
+    )
+
+    expect(html).toContain('rel="sponsored noopener noreferrer"')
+  })
+
+  it('marks a sponsored bookmark', () => {
+    const html = render(
+      <Bookmark
+        data={{
+          url: 'https://shop.example.com',
+          title: 'The pigment chart',
+          relationship: 'sponsored',
+        }}
+      />,
+    )
+
+    expect(html).toContain('rel="sponsored noopener noreferrer"')
+  })
+
+  it('leaves an ordinary internal button with no rel at all', () => {
+    const html = render(
+      <ActionButton data={{ label: 'Read on', href: '/journal' }} />,
+    )
+
+    expect(html).not.toContain('rel=')
+  })
+
+  it('still protects an ordinary external button', () => {
+    const html = render(
+      <ActionButton data={{ label: 'Read on', href: 'https://example.com' }} />,
+    )
+
+    expect(html).toContain('rel="noopener noreferrer"')
+  })
+})
+
 describe('Bookmark', () => {
   it('makes the whole card one link', () => {
     // One tab stop and one target the width of the card, rather than a thin

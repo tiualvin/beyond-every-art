@@ -7,6 +7,7 @@ import type {
 } from '@/blocks/schema'
 import { BUTTON_ALIGNMENTS, BUTTON_VARIANTS } from '@/blocks/schema'
 import { safeHref } from '@/lib/content/embed'
+import { linkRel } from '@/lib/content/link-rel'
 
 function toVariant(value: ButtonData['variant']): ButtonVariant {
   return BUTTON_VARIANTS.includes(value as ButtonVariant)
@@ -31,7 +32,9 @@ function toAlign(value: ButtonData['align']): ButtonAlignment {
  * than rendered, so the failure is a missing button, not a live one.
  *
  * Internal paths go through `next/link` for client-side navigation; external
- * ones are a plain anchor with `rel="noopener"`.
+ * ones are a plain anchor. What lands in `rel` beyond that comes from the
+ * block's relationship field — see `lib/content/link-rel.ts` for why a
+ * publication running campaign pages needs to be able to say "sponsored".
  */
 export function ActionButton({ data }: { data: ButtonData }) {
   const label = data.label?.trim()
@@ -40,22 +43,18 @@ export function ActionButton({ data }: { data: ButtonData }) {
 
   const className = `button button--${toVariant(data.variant)}`
   const internal = href.startsWith('/')
+  const rel = linkRel(data.relationship, { external: !internal })
 
   return (
     <div
       className={`module module--button button-block button-block--${toAlign(data.align)}`}
     >
       {internal ? (
-        <Link href={href} className={className}>
+        <Link href={href} className={className} rel={rel}>
           {label}
         </Link>
       ) : (
-        <a
-          href={href}
-          className={className}
-          rel="noopener noreferrer"
-          target="_blank"
-        >
+        <a href={href} className={className} rel={rel} target="_blank">
           {label}
         </a>
       )}

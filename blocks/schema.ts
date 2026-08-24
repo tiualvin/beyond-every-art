@@ -11,7 +11,9 @@
 // small the visual change looks — so they are named for what the module *is*,
 // never for how it currently looks.
 
-import type { Block } from 'payload'
+import type { Block, Field } from 'payload'
+
+import type { LinkRelationship } from '../lib/content/link-rel'
 
 export const ACCORDION_BLOCK = 'accordion'
 export const PULL_QUOTE_BLOCK = 'pullQuote'
@@ -48,6 +50,34 @@ export const BLOCK_SLUGS = [
 
 export type BlockSlug = (typeof BLOCK_SLUGS)[number]
 
+/**
+ * The "what kind of link is this" select, shared by every block with an href.
+ *
+ * Written once so the button and the bookmark cannot drift apart on what the
+ * options mean. `lib/content/link-rel.ts` turns the stored value into the
+ * attribute; see the note there for why a publication that runs campaign pages
+ * needs this at all.
+ */
+function linkRelationshipField(): Field {
+  return {
+    name: 'relationship',
+    type: 'select',
+    defaultValue: 'normal',
+    // Annotated so a typo in a value is a compile error rather than an option
+    // that silently falls back to `normal` at render time.
+    options: [
+      { label: 'Ordinary link', value: 'normal' },
+      { label: 'Paid or affiliate (sponsored)', value: 'sponsored' },
+      { label: 'Not endorsed (nofollow)', value: 'nofollow' },
+      { label: 'Reader-submitted (ugc)', value: 'ugc' },
+    ] satisfies Array<{ label: string; value: LinkRelationship }>,
+    admin: {
+      description:
+        'Anything paid for — an affiliate link, an advertiser, a sponsored placement — must be marked sponsored. Search engines treat an unmarked paid link as an attempt to pass ranking on.',
+    },
+  }
+}
+
 // --- Data shapes ---------------------------------------------------------
 //
 // What each block's `fields` object looks like once Payload has stored it.
@@ -77,7 +107,26 @@ export type PullQuoteData = {
   variant?: PullQuoteVariant | null
 }
 
+/**
+ * A campaign as the signup module needs to see it once Payload has populated
+ * the relationship. Left as an id when a query ran too shallow to populate it.
+ */
+export type SignupCampaign = {
+  id?: number | string
+  slug?: string | null
+  heading?: string | null
+  body?: string | null
+  submitLabel?: string | null
+  consentText?: string | null
+  privacyLink?: string | null
+  successMessage?: string | null
+  active?: boolean | null
+  startsAt?: string | null
+  endsAt?: string | null
+}
+
 export type SignupData = {
+  campaign?: SignupCampaign | number | string | null
   heading?: string | null
   body?: string | null
   submitLabel?: string | null
@@ -101,6 +150,7 @@ export type ButtonAlignment = (typeof BUTTON_ALIGNMENTS)[number]
 export type ButtonData = {
   label?: string | null
   href?: string | null
+  relationship?: string | null
   variant?: ButtonVariant | null
   align?: ButtonAlignment | null
 }
@@ -125,6 +175,7 @@ export type BookmarkData = {
   title?: string | null
   description?: string | null
   publisher?: string | null
+  relationship?: string | null
   image?: unknown
 }
 
@@ -314,17 +365,39 @@ export const PullQuoteBlock: Block = {
 /**
  * A newsletter signup placed inside the body.
  *
- * There is deliberately no campaign, provider list, or tracking-source field.
- * Those belong to the `signup-campaigns` collection this repository has not
- * built yet, and a hidden client-supplied source is exactly the value a server
- * must not trust — the renderer's action derives the source itself.
+ * There is still no provider list or tracking-source field, and there will not
+ * be one: a hidden client-supplied source is exactly the value a server must
+ * not trust. What the block may name is a *campaign*, and the server reads the
+ * attribution out of that record rather than out of the form — see
+ * `collections/SignupCampaigns.ts`.
+ *
+ * The local copy stays required rather than becoming conditional on the
+ * campaign. A campaign can be switched off or run past its end date, and when
+ * it does every module pointing at it needs something to say.
  */
 export const SignupBlock: Block = {
   slug: SIGNUP_BLOCK,
   interfaceName: 'SignupBlock',
   labels: { singular: 'Newsletter signup', plural: 'Newsletter signups' },
   fields: [
-    { name: 'heading', type: 'text', required: true },
+    {
+      name: 'campaign',
+      type: 'relationship',
+      relationTo: 'signup-campaigns',
+      admin: {
+        description:
+          'Optional. Points this module at a campaign, whose copy replaces the fields below and whose name is what the signup is attributed to. Ending the campaign ends every module pointing at it.',
+      },
+    },
+    {
+      name: 'heading',
+      type: 'text',
+      required: true,
+      admin: {
+        description:
+          'Used when there is no campaign, or when the campaign is not currently running.',
+      },
+    },
     {
       name: 'body',
       type: 'textarea',
@@ -396,6 +469,7 @@ export const ButtonBlock: Block = {
         return 'Links must be a relative path or use https://.'
       },
     },
+    linkRelationshipField(),
     {
       name: 'variant',
       type: 'select',
@@ -500,6 +574,7 @@ export const BookmarkBlock: Block = {
       type: 'text',
       admin: { description: 'The site being linked to, e.g. The Burlington.' },
     },
+    linkRelationshipField(),
     {
       name: 'image',
       type: 'upload',
