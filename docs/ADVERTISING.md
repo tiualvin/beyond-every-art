@@ -479,3 +479,43 @@ one layer down: the thing worth abstracting is the signal, not the provider.
 It also settles the GA4 gap in §2. Once `Analytics` reads the same signals, one
 banner governs both tags and there is no second source of truth — which was the
 actual requirement, and is the part no CMP gives you for free.
+
+### What the banner can be made to look like
+
+Choosing Google's CMP is choosing its markup, so it is worth being precise about
+where the line falls before anyone designs against it.
+
+Genuinely configurable, from the AdSense console under Privacy & messaging:
+background, text and button colours as your own hex or RGB values; font family
+and size, sized in `em` so it scales with the reader's own settings; bold,
+italic, underline and alignment on the European regulations message; your logo;
+button styling. Google checks button contrast and refuses combinations it reads
+as unreadable. The paper ground, the burgundy, and a serif heading are all
+reachable.
+
+Not configurable: there is no custom HTML or CSS. The message renders inside
+Google's own container from a fixed set of options, so a bespoke layout — our
+own disclosure rows, our own reveal — is not reproducible.
+
+Two things that look like workarounds and are not:
+
+- **Do not restyle it from outside.** Certification covers the interface as
+  rendered, including requirements like accept and reject carrying equal
+  prominence. CSS that reaches into Google's container to change that produces
+  a banner that breaks compliance while continuing to look compliant, which is
+  strictly worse than an ugly one.
+- **Do not build our own and feed Google the result.** The TC string has to be
+  produced by a CMP that is registered with IAB Europe and certified against
+  Google's validation. The Privacy & Messaging JavaScript API controls _when_
+  the message appears and reports the resulting consent state; it does not
+  accept a publisher-supplied interface.
+
+One point left unverified deliberately. Bottom-pinned and centred-modal
+placement are documented for ad blocking recovery messages; whether the same
+choice is offered for the European regulations message was not confirmed, and
+the console is the place to settle it rather than this file.
+
+None of which wastes a design pass on the banner, because the banner was never
+the expensive part. What placement, density, reserved slot heights, and the
+behaviour on refusal look like is ours whatever renders the box — and per §8
+that is the half that decides both revenue and Core Web Vitals.
