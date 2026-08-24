@@ -216,7 +216,40 @@ on their own; `netfilter-persistent save` (from `iptables-persistent`) is what
 keeps them. Nothing here should touch port 22: SSH is a host service, reached
 through `INPUT`, and is not affected by `DOCKER-USER` at all.
 
-### Confirm it, from outside
+### Confirm pass one, from outside
+
+The opposite of the pass-two check below: everything must answer. Run it
+straight after attaching the firewall, because both ports failing closed is
+silent — the Compose healthcheck runs inside the container, where no firewall
+applies, so the deploy stays green while the site is unreachable.
+
+```bash
+curl -I --connect-timeout 10 http://<origin-ip>
+# HTTP/1.1 308 Permanent Redirect, Server: Caddy
+
+curl -I --connect-timeout 10 https://staging.beyondeveryart.com
+# HTTP/1.1 200, or 401 from the staging Basic Auth gate
+```
+
+Read curl's exit code rather than the word "error", because the two failures
+mean opposite things:
+
+| Result                            | Meaning                                             |
+| --------------------------------- | --------------------------------------------------- |
+| `(28) Timeout was reached`        | the port is shut — a rule is missing or narrowed    |
+| `(35) tlsv1 alert internal error` | the port is **open**; TLS just had nothing to serve |
+
+The second is the expected answer to `https://<origin-ip>`, and is not a
+failure. Connecting by address sends no SNI, and Caddy holds certificates for
+three named hosts and no catch-all, so it cannot choose one and closes the
+handshake. Test HTTPS by hostname, where the name selects the certificate.
+
+A timeout on port 80 here is the important one to catch. Certificates still
+renew over HTTP-01 until step 3, so a firewall that omits port 80 — or narrows
+it to Cloudflare before Cloudflare is in front — breaks renewal in the silent,
+weeks-later way this document opens by warning about.
+
+### Confirm pass two, from outside
 
 After pass two only — during pass one every one of these answers, which is the
 point. A firewall is only believed once the thing it forbids actually fails.
