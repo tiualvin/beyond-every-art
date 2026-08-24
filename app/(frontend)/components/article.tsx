@@ -1,7 +1,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 
-import type { MediaImage } from '@/lib/content/media'
+import { thumbnailSrc, type MediaImage } from '@/lib/content/media'
 import type { AuthorSummary, PostDetail } from '@/lib/content/queries'
 import { formatDate } from '@/lib/format'
 import { authorPath, tagPath } from '@/lib/seo/site'
@@ -120,7 +120,7 @@ function AuthorCard({ author }: { author: AuthorSummary }) {
       {author.image && (
         <span className="author-card__avatar">
           <Image
-            src={author.image.url}
+            src={thumbnailSrc(author.image)}
             alt=""
             fill
             sizes="3.5rem"

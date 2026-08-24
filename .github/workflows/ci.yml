@@ -355,6 +355,14 @@ jobs:
         env:
           PAYLOAD_SECRET: not-a-real-secret-compose-render-only
         run: docker compose config --quiet
+      # Caddy is now built from source rather than pulled, so a broken
+      # `xcaddy build` — an upstream module that stops compiling, say — would
+      # otherwise first appear on the VPS, in the deploy that replaces the only
+      # thing answering on ports 80 and 443. Same reasoning as the two builds
+      # above, applied to the service whose failure is hardest to recover from
+      # remotely.
+      - name: Build the Caddy image
+        run: docker build --file docker/caddy/Dockerfile --tag beyond-every-art-caddy:ci .
 
   deploy:
     # Only after all builds are proven good, and only for real pushes to main

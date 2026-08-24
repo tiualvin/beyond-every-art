@@ -11,6 +11,7 @@ import { Reveal } from '../components/motion/reveal'
 
 import { joinAppWaitlist } from './actions'
 import { Paragraphs } from './paragraphs'
+import { thumbnailSrc } from '@/lib/content/media'
 
 // Rendered per request so canonical URLs, feeds and JSON-LD come from the
 // running container's environment rather than the build's; the database reads
@@ -226,7 +227,7 @@ function AppEntry({ app, index }: { app: AppCard; index: number }) {
         <div className="app__plate" data-plate={app.plate}>
           {app.image ? (
             <Image
-              src={app.image.url}
+              src={thumbnailSrc(app.image)}
               alt={app.image.alt || ''}
               fill
               sizes="(max-width: 56rem) 100vw, 34rem"

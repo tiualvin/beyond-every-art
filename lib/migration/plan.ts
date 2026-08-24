@@ -15,6 +15,7 @@ import {
 } from './ghost-export'
 import { collectMediaUrls } from './media'
 import { isReservedRootSlug } from '../seo/reserved-slugs'
+import { isWellFormedSlug } from '../seo/slug-format'
 
 export type ContentStatus = 'draft' | 'published'
 export type Visibility = 'public' | 'members' | 'paid'
@@ -94,6 +95,16 @@ export interface MigrationConflicts {
   // Root slugs already owned by application routes. Importing one would make
   // the migrated document unreachable even if Payload accepted the record.
   reservedSlugs: Array<{
+    collection: 'posts' | 'pages'
+    ghostID: string
+    slug: string
+  }>
+  // Slugs Payload's own field validation will now refuse. Ghost produced the
+  // shape `SLUG_PATTERN` describes, so this is expected to stay empty — which
+  // is exactly why it is worth checking here. If the export disagrees, the
+  // import would fail partway through against a live database; a dry run says
+  // so first, and names the documents.
+  malformedSlugs: Array<{
     collection: 'posts' | 'pages'
     ghostID: string
     slug: string
@@ -295,6 +306,23 @@ export function buildMigrationPlan(ghost: GhostExport): MigrationPlan {
       })),
   ]
 
+  const malformedSlugs: MigrationConflicts['malformedSlugs'] = [
+    ...posts
+      .filter((post) => !isWellFormedSlug(post.slug))
+      .map((post) => ({
+        collection: 'posts' as const,
+        ghostID: post.ghostID,
+        slug: post.slug,
+      })),
+    ...pages
+      .filter((page) => !isWellFormedSlug(page.slug))
+      .map((page) => ({
+        collection: 'pages' as const,
+        ghostID: page.ghostID,
+        slug: page.slug,
+      })),
+  ]
+
   return {
     version: ghostVersion(ghost),
     authors,
@@ -305,6 +333,7 @@ export function buildMigrationPlan(ghost: GhostExport): MigrationPlan {
     conflicts: {
       duplicateSlugs,
       reservedSlugs,
+      malformedSlugs,
       missingAuthors: [...missingAuthors],
       missingTags: [...missingTags],
     },
@@ -325,6 +354,7 @@ export function summarizePlan(plan: MigrationPlan) {
     media: plan.media.length,
     duplicateSlugs: plan.conflicts.duplicateSlugs,
     reservedSlugs: plan.conflicts.reservedSlugs,
+    malformedSlugs: plan.conflicts.malformedSlugs,
     missingAuthors: plan.conflicts.missingAuthors,
     missingTags: plan.conflicts.missingTags,
   }

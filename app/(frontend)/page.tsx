@@ -16,6 +16,7 @@ import { TopicSwatches } from './components/topic-swatches'
 import { FadeIn } from './components/motion/fade-in'
 import { Reveal } from './components/motion/reveal'
 import { StaggerChildren, StaggerItem } from './components/motion/stagger'
+import { thumbnailSrc } from '@/lib/content/media'
 
 // Rendered per request so canonical URLs, feeds and JSON-LD come from the
 // running container's environment rather than the build's; the database reads
@@ -140,7 +141,7 @@ function LatestBand({ post }: { post: PostCard }) {
         <span className="latest__plate">
           {post.image && (
             <Image
-              src={post.image.url}
+              src={thumbnailSrc(post.image)}
               alt=""
               fill
               sizes="(max-width: 56rem) 4.5rem, 6.5rem"

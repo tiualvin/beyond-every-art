@@ -11,6 +11,17 @@ export type MediaImage = {
   height: number | null
   caption: string | null
   credit: string | null
+  /**
+   * Pre-generated derivatives, when the record has them.
+   *
+   * `Media` produces a 768px `card` and a 1200x630 `og`, but only at upload
+   * time — anything already in the library predates a size that was added
+   * later and simply will not have it. Both are therefore optional and every
+   * reader falls back to `url`, which is what the whole site used before these
+   * existed. `cardUrl` feeds listing thumbnails, `ogUrl` feeds share cards.
+   */
+  cardUrl: string | null
+  ogUrl: string | null
 }
 
 const IMAGE_FILE_EXTENSION = /\.(avif|gif|jpe?g|png|svg|tiff?|webp)$/i
@@ -63,6 +74,15 @@ type RawMedia = {
   credit?: unknown
   width?: unknown
   height?: unknown
+  sizes?: unknown
+}
+
+/** The URL of one generated size, or null when it was never generated. */
+function sizeUrl(sizes: unknown, name: string): string | null {
+  if (!sizes || typeof sizes !== 'object') return null
+  const size = (sizes as Record<string, unknown>)[name]
+  if (!size || typeof size !== 'object') return null
+  return toOptionalText((size as { url?: unknown }).url)
 }
 
 /**
@@ -88,5 +108,34 @@ export function toMediaImage(value: unknown): MediaImage | null {
     height: toDimension(raw.height),
     caption: toOptionalText(raw.caption),
     credit: toOptionalText(raw.credit),
+    cardUrl: sizeUrl(raw.sizes, 'card'),
+    ogUrl: sizeUrl(raw.sizes, 'og'),
   }
+}
+
+/**
+ * The source a listing thumbnail should load.
+ *
+ * Every thumbnail on the site renders somewhere between 4.5rem and a card
+ * width, and `next/image` resizes whatever it is given — so handing it the
+ * original meant the optimiser decoding a multi-megabyte photograph to produce
+ * a 72px plate, once per size, on every cold cache entry. The 768px derivative
+ * already exists; this is what points at it.
+ *
+ * Falls back to the original, which is what a record uploaded before the size
+ * existed will need.
+ */
+export function thumbnailSrc(image: MediaImage): string {
+  return image.cardUrl ?? image.url
+}
+
+/**
+ * The source an `og:image` should name.
+ *
+ * A share card is fetched by crawlers, not by readers, and they crop it to
+ * roughly 1.91:1 regardless — so the pre-generated `og` size is both smaller
+ * and closer to what they will show. Same fallback, same reason.
+ */
+export function shareImageSrc(image: MediaImage): string {
+  return image.ogUrl ?? image.url
 }

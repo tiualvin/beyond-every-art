@@ -117,6 +117,58 @@ records, draft/published drift, lost feature images, changed slugs or dates):
 pnpm migrate:validate --input ghost-export/ghost-content.json
 ```
 
+### Recovering media whose files are gone
+
+Every `media` row records the URL it was migrated from. If the stored files are
+lost but the rows survive — a container rebuild that discarded an unmounted
+media directory, say — that URL is the way back:
+
+```bash
+pnpm restore:media --dry-run     # what would be refetched, and from where
+pnpm restore:media               # download and hand each file back to Payload
+```
+
+**Prefer the site archive when you have it.** A Ghost export zip carries every
+media file under `content/images/…`, laid out exactly as the stored URLs address
+them, so `--from-dir` restores from disk with no network at all — it cannot 404,
+cannot be rate-limited, and does not depend on the old site still being up,
+which at the point this is needed is not a safe assumption:
+
+```bash
+unzip ghost-export.zip -d ghost-archive
+pnpm restore:media --from-dir ghost-archive --dry-run
+pnpm restore:media --from-dir ghost-archive
+```
+
+Payload rewrites the file and regenerates every derivative under the **same
+document id and the same filename**, so no post loses its featured image and no
+`<img src>` in a migrated body changes. Rows with no `ghostURL` were authored
+here rather than migrated and are reported rather than restored — only a
+database backup recovers those.
+
+`pnpm migrate:ghost` is not the tool for this: it matches on `ghostURL` and
+skips rows that already exist, so it reports everything reused and uploads
+nothing.
+
+### Regenerating image derivatives
+
+Payload generates the sizes declared in `collections/Media.ts` when a file is
+uploaded, and only then — so a size added to the collection later does not exist
+for anything already in the library. Nothing breaks (`lib/content/media.ts`
+falls back to the original), but the benefit only reaches new uploads until the
+existing ones are rewritten:
+
+```bash
+pnpm backfill:media --dry-run     # what is missing, per size
+pnpm backfill:media               # hand each original back to Payload
+```
+
+It keeps every stored filename, so no published image URL changes, and it is
+safe to rerun: a document that already has every size it can have is skipped.
+Sizes Payload would omit as too small for their source are not counted as
+missing, so a rerun does not chase them forever. Add `--base-url` when originals
+live in R2 and the media URLs are root-relative.
+
 During the staging rehearsal, compare the live Ghost surface with the migrated
 site using `pnpm migration:compare`. It records redirects, canonicals, metadata,
 robots directives, images, links, and per-URL status evidence without reading
@@ -167,8 +219,24 @@ and GraphQL collection endpoints, and the MCP endpoint are answered with a 404
 there and reachable only on `CMS_ADDRESS`. The exceptions are `/api/media`,
 which serves uploaded images, and `/api/preview`, which carries an editor's
 draft session. Public endpoints that reach the database — search, the two signup
-forms, and Payload's own login and password-reset routes — are rate limited per
-source address by `lib/security/rate-limit.ts`.
+forms, `/api/preview`, the OAuth endpoints, and Payload's own login and
+password-reset routes — are rate limited per source address by
+`lib/security/rate-limit.ts`.
+
+Slug routes are bounded differently, because throttling a reader who is reading
+would be the wrong answer. A slug that does not match the pattern
+`fields/slug.ts` enforces on write cannot name a document, so it is answered 404
+without a query at all; a well-formed slug that resolves to nothing is counted,
+and a source that spends its allowance of those stops reaching the database.
+Reading real articles costs nothing here — only misses are counted. See
+`lib/security/slug-requests.ts`.
+
+`/_next/image` is not a route in this repository but it is a public endpoint
+that runs sharp on demand, and Caddy does not cover it. `lib/security/images.ts`
+is what bounds it: one permitted quality instead of a hundred, and uploads as
+the only local path it may be pointed at — which also closes the gap where the
+optimizer would dispatch any local URL through the application's own handler,
+reaching `/api/*` on the hostname where Caddy refuses it.
 
 Those limiters are per-container and bound one noisy source; they are not a
 defence against a distributed attacker, and nothing in front of the origin is.

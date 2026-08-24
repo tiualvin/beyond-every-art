@@ -116,4 +116,31 @@ describe('buildSitemapEntries — apps', () => {
     const appPages = entries.filter((e) => /\/apps\/.+\//.test(e.url))
     expect(appPages).toHaveLength(1)
   })
+
+  it('leaves out posts and pages marked noindex', () => {
+    const entries = buildSitemapEntries({
+      siteUrl,
+      posts: [
+        { slug: 'ultramarine' },
+        { slug: 'spring-campaign', noindex: true },
+      ],
+      pages: [{ slug: 'about' }, { slug: 'workshop-offer', noindex: true }],
+    })
+
+    const urls = entries.map((entry) => entry.url)
+    expect(urls).toContain('https://beyondeveryart.com/ultramarine/')
+    expect(urls).toContain('https://beyondeveryart.com/about/')
+    expect(urls.some((url) => url.includes('spring-campaign'))).toBe(false)
+    expect(urls.some((url) => url.includes('workshop-offer'))).toBe(false)
+  })
+
+  it('lists a document whose noindex is absent or false', () => {
+    const entries = buildSitemapEntries({
+      siteUrl,
+      posts: [{ slug: 'ultramarine', noindex: false }, { slug: 'sienna' }],
+      pages: [{ slug: 'about', noindex: null }],
+    })
+
+    expect(entries).toHaveLength(5)
+  })
 })

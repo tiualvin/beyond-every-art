@@ -1,6 +1,6 @@
 import type { CollectionBeforeValidateHook, CollectionConfig } from 'payload'
 
-import { adminOnly } from '../access/roles'
+import { adminOnly, isAdmin } from '../access/roles'
 
 /**
  * "Tell me when this one is ready" signups from `/apps`.
@@ -61,6 +61,8 @@ export const AppWaitlist: CollectionConfig = {
     defaultColumns: ['email', 'app', 'createdAt'],
     description: 'Per-app “notify me” signups captured from /apps.',
     group: 'Apps',
+    // Admin-only on every operation; see the note in NewsletterSignups.
+    hidden: ({ user }) => !isAdmin(user),
   },
   access: {
     // Writes arrive through the /apps server action, which uses

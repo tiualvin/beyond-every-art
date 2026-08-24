@@ -9,15 +9,12 @@ import {
 } from '@/lib/security/rate-limit'
 import { forwardedOrigin, internalOrigin } from '@/lib/security/origins'
 import { isAuthorized, parseBasicAuth } from '@/lib/seo/indexing'
+import { RedirectMapCache } from '@/lib/seo/redirect-map'
 import {
-  buildRedirectMap,
   matchRedirect,
   redirectLocation,
-  type RedirectRecord,
   type ResolvedRedirect,
 } from '@/lib/seo/redirects'
-
-const CACHE_TTL_MS = 60_000
 
 /**
  * Password reset is the only place on this site where an anonymous request
@@ -53,49 +50,88 @@ const loginLimiter = new FixedWindowRateLimiter(
   15 * 60_000,
 )
 
-/** The auth routes above, matched against the pathname Payload serves them on. */
-function authLimiterFor(pathname: string): FixedWindowRateLimiter | null {
+/**
+ * Preview is bounded for the same reason login is.
+ *
+ * `GET /api/preview` answers 401 to anyone without an editor session — but it
+ * finds that out by calling `payload.auth()`, which is a database lookup and a
+ * token verification. The refusal is correct and the work in front of it is
+ * free, and the route has to stay reachable without a credential on both
+ * hostnames: the Caddyfile exempts `/api/preview*` from the API block precisely
+ * so an editor's draft session can reach the frontend.
+ *
+ * Sixty a minute is far above an editor opening previews — the Live Preview
+ * iframe hits this once per document and then updates over postMessage — and
+ * far below anything worth pointing at the endpoint.
+ */
+const previewLimiter = new FixedWindowRateLimiter(
+  configuredLimit('RATE_LIMIT_PREVIEW_PER_MINUTE', 60),
+  60_000,
+)
+
+/**
+ * The `/api` routes this middleware bounds, matched against the pathname each
+ * is served on.
+ *
+ * Everything under `/api` is otherwise excluded from the matcher, because
+ * Payload owns the prefix; these three are named there explicitly so they can
+ * be throttled and nothing else about this file applies to them.
+ */
+function apiLimiterFor(pathname: string): FixedWindowRateLimiter | null {
   if (pathname.startsWith('/api/users/forgot-password')) {
     return forgotPasswordLimiter
   }
   if (pathname.startsWith('/api/users/login')) return loginLimiter
+  // `/api/preview/exit` only clears two cookies and reaches nothing, so it is
+  // deliberately not covered — an editor leaving preview should never be told
+  // to wait.
+  if (
+    pathname.startsWith('/api/preview') &&
+    !pathname.startsWith('/api/preview/exit')
+  ) {
+    return previewLimiter
+  }
   return null
 }
 
-type RedirectCache = {
-  map: Map<string, ResolvedRedirect>
-  expiresAt: number
-}
-
-let cache: RedirectCache | null = null
-
-async function loadRedirectMap(
-  origin: string,
-): Promise<Map<string, ResolvedRedirect>> {
-  const now = Date.now()
-  if (cache && cache.expiresAt > now) return cache.map
-
-  const response = await fetch(`${origin}/redirects-map/`, {
-    headers: { accept: 'application/json' },
-  })
-  if (!response.ok)
-    throw new Error(`redirects-map responded ${response.status}`)
-
-  const data = (await response.json()) as { redirects?: RedirectRecord[] }
-  const map = buildRedirectMap(data.redirects ?? [])
-  cache = { map, expiresAt: now + CACHE_TTL_MS }
-  return map
-}
+/**
+ * The redirect table, fetched from the app's own loopback address because
+ * middleware cannot reach Postgres. The deadline, the shared refresh and the
+ * stale fallback all live in `lib/seo/redirect-map.ts`, where they are tested;
+ * what stays here is the log line, which is a middleware concern.
+ *
+ * Falling through silently means every migrated Ghost URL starts answering 404
+ * with nothing anywhere saying why — an SEO failure that looks exactly like
+ * normal operation from in here. One line per failed refresh makes it something
+ * `docker compose logs app` can find, without turning one failure into a burst
+ * of lines from every request that was waiting on it.
+ */
+const redirectMap = new RedirectMapCache({
+  onFailure: (error, servingStale) => {
+    console.error(
+      JSON.stringify({
+        level: 'error',
+        event: 'redirect_map_unavailable',
+        time: new Date().toISOString(),
+        message: servingStale
+          ? 'Could not refresh the redirect map; serving the last good copy.'
+          : 'Could not load the redirect map; migrated URLs will not redirect ' +
+            'until this succeeds.',
+        reason: error instanceof Error ? error.message : String(error),
+      }),
+    )
+  },
+})
 
 export async function middleware(request: NextRequest): Promise<NextResponse> {
-  // Payload's auth routes are matched only so they can be rate limited. They
+  // The `/api` routes above are matched only so they can be rate limited. They
   // return here rather than falling through: the Basic Auth gate below has
   // never covered `/api` and enabling it now would answer the admin panel's own
   // login request with a 401 on staging, and the redirect map has nothing to
   // say about an endpoint Payload owns.
-  const authLimiter = authLimiterFor(request.nextUrl.pathname)
-  if (authLimiter) {
-    const allowance = authLimiter.check(clientKey(request.headers))
+  const apiLimiter = apiLimiterFor(request.nextUrl.pathname)
+  if (apiLimiter) {
+    const allowance = apiLimiter.check(clientKey(request.headers))
     if (!allowance.allowed) {
       return NextResponse.json(
         TOO_MANY_REQUESTS_BODY,
@@ -127,25 +163,11 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     // Not `request.nextUrl.origin`: that is the bind address wearing the
     // forwarded scheme, which behind Caddy is `https://0.0.0.0:3000` and fails
     // the TLS handshake against a plain-HTTP listener. See `internalOrigin`.
-    map = await loadRedirectMap(internalOrigin())
-  } catch (error) {
-    // Never let redirect lookups take the site down; fall through instead.
-    //
-    // Falling through silently, though, means every migrated Ghost URL starts
-    // answering 404 with nothing anywhere saying why — an SEO failure that
-    // looks exactly like normal operation from in here. One line per failure
-    // makes it something `docker compose logs app` can find.
-    console.error(
-      JSON.stringify({
-        level: 'error',
-        event: 'redirect_map_unavailable',
-        time: new Date().toISOString(),
-        message:
-          'Could not load the redirect map; migrated URLs will not redirect ' +
-          'until this succeeds.',
-        reason: error instanceof Error ? error.message : String(error),
-      }),
-    )
+    map = await redirectMap.load(internalOrigin())
+  } catch {
+    // Never let redirect lookups take the site down; fall through instead. The
+    // cache has already logged the reason, and only reaches here when it has no
+    // previous copy to serve.
     return NextResponse.next()
   }
 
@@ -193,10 +215,11 @@ export const config = {
   // arrive. Each report would also pull the redirect map for nothing.
   matcher: [
     '/((?!_next/static|_next/image|favicon.ico|admin|api|oauth|webhooks|csp-report|redirects-map|sitemap.xml|robots.txt|rss|.*\\..*).*)',
-    // The one deliberate exception to the `api` exclusion above. Payload's
-    // auth routes are matched so `authLimiterFor` can throttle them, and the
-    // handler returns immediately for anything it matches, so nothing else in
-    // this middleware applies to them.
+    // The deliberate exceptions to the `api` exclusion above. Payload's auth
+    // routes and the preview entry point are matched so `apiLimiterFor` can
+    // throttle them, and the handler returns immediately for anything it
+    // matches, so nothing else in this middleware applies to them.
     '/api/users/:path*',
+    '/api/preview/:path*',
   ],
 }

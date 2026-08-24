@@ -14,6 +14,8 @@ type PublishedDoc = {
   slug?: string
   updatedAt?: string
   publishedAt?: string
+  /** Posts and Pages only; the archives have no such field to select. */
+  noindex?: boolean
 }
 
 function toDocs(docs: PublishedDoc[]): SitemapDoc[] {
@@ -23,6 +25,7 @@ function toDocs(docs: PublishedDoc[]): SitemapDoc[] {
       slug: doc.slug,
       updatedAt: doc.updatedAt ?? null,
       publishedAt: doc.publishedAt ?? null,
+      noindex: doc.noindex ?? false,
     }))
 }
 
@@ -47,7 +50,17 @@ const readSlugs = cachedRead(
         // Restricted posts have real, indexable URLs that serve a teaser, so
         // they are listed like any other published post.
         where: { _status: { equals: 'published' } },
-        select: { slug: true, updatedAt: true, publishedAt: true },
+        // `noindex` is selected rather than filtered on in the query: the
+        // column is null for every document written before the field existed,
+        // and a `not_equals: true` filter would have to be trusted to treat
+        // null as "not true" identically in every adapter. The exclusion is
+        // decided in `buildSitemapEntries`, where it is unit tested.
+        select: {
+          slug: true,
+          updatedAt: true,
+          publishedAt: true,
+          noindex: true,
+        },
       }),
       payload.find({
         collection: 'pages',
@@ -56,7 +69,12 @@ const readSlugs = cachedRead(
         pagination: false,
         limit: 0,
         where: { _status: { equals: 'published' } },
-        select: { slug: true, updatedAt: true, publishedAt: true },
+        select: {
+          slug: true,
+          updatedAt: true,
+          publishedAt: true,
+          noindex: true,
+        },
       }),
       payload.find({
         collection: 'tags',

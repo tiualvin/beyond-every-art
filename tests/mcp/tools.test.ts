@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { mcpTools, nativeGhostID } from '../../lib/mcp/tools'
 import { mcpPluginConfig } from '../../lib/mcp/plugin'
+import { mcpTools } from '../../lib/mcp/tools'
+import { nativeGhostID } from '../../lib/migration/native-id'
 
 describe('nativeGhostID', () => {
-  // `ghostID` stays required and unique so the Ghost import remains idempotent.
-  // A natively authored article has to satisfy it without ever looking like a
-  // record the export could also contain.
+  // `ghostID` stays unique so the Ghost import remains idempotent. A natively
+  // authored article is autofilled with one of these by the field itself, and
+  // it has to be a value the export could never also contain.
   it('is namespaced so it cannot collide with a Ghost ObjectID', () => {
     const id = nativeGhostID()
 
