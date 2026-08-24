@@ -70,6 +70,8 @@ Watch, via logs / Search Console / uptime monitor / `/health`:
   (`docker compose logs backup`; a failure prints `Restore verification FAILED`)
 - Rejected or unresolved billing webhooks (`webhook_rejected`,
   `webhook_unresolved` log lines), once the Stripe takeover below is live
+- The nightly reconciliation's verdict (`reconcile_failed` log lines), which is
+  what notices a subscription change no webhook ever delivered
 
 ## Rollback
 
@@ -157,3 +159,7 @@ explained without a manual Stripe audit.
 Watch the app logs for `webhook_rejected` and `webhook_unresolved` JSON lines in
 the days around the switch:
 `docker compose logs app | grep '"event":"webhook_'`.
+
+And the sweep's own verdict, which is the one that catches what the webhooks
+missed rather than what they rejected:
+`docker compose logs reconcile | grep '"event":"reconcile_'`.

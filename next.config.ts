@@ -7,6 +7,18 @@ import { buildImageConfig } from './lib/security/images'
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  // Ghost served every permalink with a trailing slash, and those are the URLs
+  // search engines have indexed and other sites link to. Without this, Next
+  // redirects `/a-post/` to `/a-post` while `lib/seo/site.ts` advertises the
+  // slashed form in canonical tags, the sitemap, and the feed — so every URL we
+  // publish is one that bounces, and the page a crawler lands on claims its
+  // real address is the URL it just came from. Serving the slashed form
+  // directly is what makes the migrated URLs keep working exactly as they are.
+  //
+  // It applies to every route, including the ones that are not pages, so a
+  // caller of `/health` or `/webhooks/stripe` has to use the slash too. Those
+  // are updated alongside this; docs/SEO_AND_REDIRECTS.md has the list.
+  trailingSlash: true,
   // `X-Powered-By: Next.js, Payload` otherwise names the framework and the CMS
   // on every response, which is free reconnaissance and buys nothing.
   poweredByHeader: false,

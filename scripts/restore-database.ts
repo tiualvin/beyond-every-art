@@ -21,7 +21,11 @@ import {
   isEncryptedArchive,
   resolveBackupPassphrase,
 } from '../lib/backup/encrypt'
-import { backupTimestamp, resolveBackupConfig } from '../lib/backup/plan'
+import {
+  backupTimestamp,
+  resolveBackupConfig,
+  resolveLocalBackupConfig,
+} from '../lib/backup/plan'
 import { getObject, listObjects } from '../lib/backup/s3'
 
 interface Cli {
@@ -84,8 +88,13 @@ function restoreWithPsql(databaseUri: string, sql: Buffer): Promise<void> {
 
 async function main() {
   const cli = parseArgs(process.argv.slice(2))
-  const config = resolveBackupConfig(process.env)
-  const target = cli.target ?? config.databaseUri
+  // Each half of the configuration is resolved only by the path that reads it,
+  // so a restore never demands a variable it will not use. Restoring a file
+  // from disk into an explicit --target touches neither the object store nor
+  // DATABASE_URI; that is the path a recovery machine takes, holding the
+  // archive and the database and quite possibly nothing else, and a restore is
+  // the wrong moment to go looking for a value nothing is going to read.
+  const target = cli.target ?? resolveLocalBackupConfig(process.env).databaseUri
 
   // Resolve the compressed backup bytes from the chosen source.
   let source: string
@@ -94,9 +103,10 @@ async function main() {
     source = resolve(cli.inputFile)
     archive = await readFile(source)
   } else {
+    const { s3, prefix } = resolveBackupConfig(process.env)
     let key = cli.input
     if (cli.latest) {
-      const keys = await listObjects(config.s3, `${config.prefix}/`)
+      const keys = await listObjects(s3, `${prefix}/`)
       const newest = keys
         .filter((k) => backupTimestamp(k))
         .sort((a, b) =>
@@ -105,8 +115,8 @@ async function main() {
       if (!newest) throw new Error('No backups found to restore')
       key = newest
     }
-    source = `s3://${config.s3.bucket}/${key}`
-    archive = await getObject(config.s3, key!)
+    source = `s3://${s3.bucket}/${key}`
+    archive = await getObject(s3, key!)
   }
 
   // Decrypt and decompress up front, so a wrong passphrase or a corrupt archive

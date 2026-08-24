@@ -238,9 +238,15 @@ to the Claude connector. See [`MCP_SERVER.md`](MCP_SERVER.md).
 1. **Members CSV.** Not included in the site archive already checked. Export
    separately from Ghost Admin (Members → Settings → Export all members)
    before migrating member records and Stripe IDs.
-2. **Stripe webhook takeover.** Required before Ghost is cancelled — see
-   `CUTOVER_RUNBOOK.md`'s "Paid subscriptions in Stripe" checklist and
-   `SUBSCRIPTION_WEBHOOKS.md`. Not started.
+2. **Stripe webhook takeover (operator action).** Required before Ghost is
+   cancelled — see `CUTOVER_RUNBOOK.md`'s "Paid subscriptions in Stripe"
+   checklist and `SUBSCRIPTION_WEBHOOKS.md`. The code side is in place: the
+   endpoint, the reconciliation script, and now the `reconcile` service that
+   runs the sweep nightly and emits `reconcile_ok` / `reconcile_failed` log
+   lines. It stays inert until `STRIPE_SECRET_KEY` is set, so restart it after
+   writing the key and confirm from its log that it scheduled. What remains is
+   operator work in Stripe: the keys, the endpoint, its verification, and the
+   backfill.
 3. **VPS security hardening**, found while debugging the deploy key:
    - Root SSH login currently accepts **password** authentication, not just
      keys. Disable `PasswordAuthentication` in `sshd_config` once key-based

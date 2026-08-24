@@ -126,6 +126,91 @@ jobs:
         run: |
           pnpm migrate:validate --input tests/fixtures/ghost-export-clean.json
           jq -e '.ok == true' validation-report.json > /dev/null
+      # The members CSV is the one Ghost export produced by hand, at cutover
+      # time, from a live admin screen — so its write path must not be first
+      # exercised there. Both fixtures are synthetic, and named clear of
+      # `.gitignore`'s `ghost-members*.csv` rule, which is there to stop a real
+      # member export ever being committed.
+      #
+      # The conflict fixture proves the dry run names colliding CSV lines while
+      # they are still free to fix: email and ghostID are unique in the
+      # collection, so a real import that meets a collision is rejected by
+      # Postgres part-way through, with some members written and the rest not.
+      - name: Report member CSV conflicts without importing
+        run: |
+          pnpm migrate:members --dry-run --input tests/fixtures/members-conflicts.csv
+          jq -e '.conflicts.duplicateEmails == [{"rows": [2, 4]}]' members-report.json > /dev/null
+          jq -e '.conflicts.duplicateGhostIDs == [{"rows": [3, 5]}]' members-report.json > /dev/null
+          jq -e '.skipped == [{"row": 6, "reason": "missing email address"}]' members-report.json > /dev/null
+          jq -e '.warnings | length == 2' members-report.json > /dev/null
+      # And the clean fixture proves the import itself. Twice, so the upsert on
+      # `ghostID` is demonstrated to be rerunnable rather than assumed, and the
+      # unique indexes are actually met. The row counts are read back from
+      # PostgreSQL as a second opinion on the script's own report: two members
+      # are `paid` only because the mapper derived it from a Stripe customer id
+      # and an explicit status, which is the part worth proving against the
+      # real column rather than a stub.
+      - name: Import the members fixture into the CI database
+        run: |
+          pnpm migrate:members --input tests/fixtures/members-clean.csv
+          jq -e '.created == 4 and .updated == 0 and (.errors | length) == 0' members-report.json > /dev/null
+          pnpm migrate:members --input tests/fixtures/members-clean.csv
+          jq -e '.created == 0 and .updated == 4 and (.errors | length) == 0' members-report.json > /dev/null
+          test "$(psql "$DATABASE_URI" -tAc 'SELECT count(*) FROM members')" = 4
+          test "$(psql "$DATABASE_URI" -tAc "SELECT count(*) FROM members WHERE status = 'paid'")" = 2
+      # "A database backup has been successfully restored" is an acceptance
+      # criterion, and it was a thing someone did once by hand. A backup nobody
+      # has restored is a hope, and the failure modes are quiet ones: a dump
+      # that streams to a truncated file, an archive that decompresses but
+      # replays with errors, a passphrase the restore cannot use.
+      #
+      # This runs the real production shape — encrypted, gzipped, restored
+      # through psql with ON_ERROR_STOP — against the database the steps above
+      # just filled, and restores into a scratch database so the source stays
+      # intact to compare against. Both scripts run fully offline here
+      # (`--skip-upload --output`, `--input-file --target`), so no bucket and no
+      # credentials are involved: what is being tested is the archive and the
+      # restore, not R2's availability today.
+      - name: Restore drill — back up, restore into a scratch database, compare
+        env:
+          RESTORE_TARGET: postgresql://payload:payload@localhost:5432/restore_drill
+        run: |
+          # A dump is a copy of every member record. Even here, where the
+          # database holds fixtures, it is written outside the checkout so the
+          # habit does not travel to a machine where it holds real ones.
+          drill="$RUNNER_TEMP/restore-drill"
+          mkdir -p "$drill"
+          export BACKUP_ENCRYPTION_KEY="$(openssl rand -base64 32)"
+          pnpm --silent backup:db --skip-upload --output "$drill/db.sql.gz.enc" \
+            > "$drill/backup-report.json"
+          jq -e '.encrypted == true and .uploaded == false' "$drill/backup-report.json" > /dev/null
+          psql "$DATABASE_URI" -q -c 'DROP DATABASE IF EXISTS restore_drill' \
+            -c 'CREATE DATABASE restore_drill OWNER payload'
+          # DATABASE_URI is dropped for this one command, and no S3_* variable
+          # exists anywhere in this job: both halves of a file-to-target restore
+          # run on nothing but the archive and the target, which is what a
+          # recovery machine will have.
+          env -u DATABASE_URI pnpm --silent restore:db --input-file "$drill/db.sql.gz.enc" \
+            --target "$RESTORE_TARGET" --yes > "$drill/restore-report.json"
+          jq -e '.encrypted == true and .restored == true' "$drill/restore-report.json" > /dev/null
+          # Every table named here is filled by the steps above, so a zero row
+          # count means the drill compared nothing and called it a match.
+          for table in posts pages tags authors members payload_migrations; do
+            source_rows=$(psql "$DATABASE_URI" -tAc "SELECT count(*) FROM $table")
+            restored_rows=$(psql "$RESTORE_TARGET" -tAc "SELECT count(*) FROM $table")
+            if [ "$source_rows" != "$restored_rows" ] || [ "$source_rows" = 0 ]; then
+              echo "::error::$table: $source_rows rows backed up, $restored_rows restored"
+              exit 1
+            fi
+          done
+          # Matching row counts say the rows arrived, not that they arrived
+          # intact. Point the validator at the restored copy and it has to
+          # reach the same verdict it reached on the original.
+          DATABASE_URI="$RESTORE_TARGET" pnpm migrate:validate \
+            --input tests/fixtures/ghost-export-clean.json \
+            --report "$drill/validation.json"
+          jq -e '.ok == true' "$drill/validation.json" > /dev/null
+          rm -rf "$drill"
       - run: pnpm build
 
   # The dependency audit used to be a job here. It now lives in its own
@@ -229,6 +314,24 @@ jobs:
       # discover it.
       - name: Build the migration image
         run: docker build --target migrator --tag beyond-every-art-migrator:ci .
+      # The reconciliation scheduler runs that same image with the entrypoint
+      # `docker-compose.yml` names, so the image above already covers its build.
+      # What nothing else covers is the script itself: a container that only
+      # runs its entrypoint at 02:30 is one whose failures are easy to miss, so
+      # parse it here rather than discovering a syntax error overnight.
+      - name: Check the reconciliation entrypoint parses
+        run: |
+          docker run --rm --entrypoint sh beyond-every-art-migrator:ci \
+            -c 'sh -n /app/docker/reconcile/entrypoint.sh'
+      # The images are only half of it: the deploy runs `docker compose up`, so
+      # a service that names a stage that does not exist, or mistypes a key,
+      # fails on the VPS rather than here. Interpolation is checked too, which
+      # is why a placeholder secret is supplied — `config` renders the file, it
+      # does not start anything.
+      - name: Validate the Compose file
+        env:
+          PAYLOAD_SECRET: not-a-real-secret-compose-render-only
+        run: docker compose config --quiet
       # Caddy is now built from source rather than pulled, so a broken
       # `xcaddy build` — an upstream module that stops compiling, say — would
       # otherwise first appear on the VPS, in the deploy that replaces the only
@@ -352,7 +455,7 @@ jobs:
           docker compose up -d --build --wait --wait-timeout 180
           docker compose ps --all
           docker compose exec -T app node -e '
-            fetch("http://127.0.0.1:3000/health", {
+            fetch("http://127.0.0.1:3000/health/", {
               signal: AbortSignal.timeout(10000),
             })
               .then(async (response) => {

@@ -26,8 +26,15 @@ import {
   type ResolvedRedirect,
 } from './redirects'
 
-/** The Node-runtime endpoint that publishes the table. */
-export const REDIRECT_MAP_PATH = '/redirects-map'
+/**
+ * The Node-runtime endpoint that publishes the table.
+ *
+ * With the trailing slash, because `next.config.ts` sets `trailingSlash: true`
+ * — the unslashed form answers with a 308 to this one, and a redirect on the
+ * hot path of every request the middleware cannot already answer is a cost
+ * paid for nothing.
+ */
+export const REDIRECT_MAP_PATH = '/redirects-map/'
 
 /** How long a fetched map is served before a refresh is attempted. */
 export const REDIRECT_MAP_TTL_MS = 60_000

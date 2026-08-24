@@ -34,6 +34,9 @@ ENV_FILE=/app/.backup-env
 # runtime environment for the cron job to source. Values here are simple
 # connection strings and keys with no embedded newlines.
 printenv | sed 's/^\([^=]*\)=\(.*\)$/export \1="\2"/' >"$ENV_FILE"
+# It holds the backup passphrase and the storage credentials, so it is readable
+# by root and nobody else.
+chmod 600 "$ENV_FILE"
 
 touch "$LOG"
 mkdir -p /etc/crontabs

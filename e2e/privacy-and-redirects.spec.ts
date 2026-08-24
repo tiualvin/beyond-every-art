@@ -2,12 +2,14 @@ import { expect, test } from '@playwright/test'
 
 import { fixtures } from './fixtures'
 
+// Each written the way the site serves it, so these requests exercise the
+// surfaces themselves rather than the trailing-slash redirect in front of them.
 const DISCOVERY_PATHS = [
   '/',
-  '/journal',
+  '/journal/',
   '/search/?q=E2E',
   '/sitemap.xml',
-  '/rss',
+  '/rss/',
 ]
 
 // The homepage shows a fixed number of recent pieces, so it can legitimately
@@ -85,10 +87,13 @@ test('an imported body does not print the title a second time', async ({
 test('legacy URLs return the seeded permanent redirect', async ({
   request,
 }) => {
-  // Avoid Next.js' trailing-slash normalization redirect so this assertion
-  // exercises the seeded redirect handled by middleware directly.
-  const source = fixtures.redirect.source.replace(/\/$/, '')
-  const response = await request.get(source, {
+  // Requested exactly as stored, trailing slash and all. That is the shape a
+  // Ghost permalink has, so it is the shape a reader or a crawler arrives with,
+  // and with `trailingSlash: true` it is served without a normalisation hop
+  // in front of it: one request, one permanent redirect. The previous version
+  // of this test stripped the slash to dodge a normalisation redirect that
+  // pointed the other way, and in doing so stopped testing the real journey.
+  const response = await request.get(fixtures.redirect.source, {
     maxRedirects: 0,
   })
 
@@ -115,8 +120,7 @@ test('a legacy URL redirects to the host the reader used, not the bind address',
   //
   // Forwarding a host that is deliberately not the one the server is bound to
   // is what separates the two. The old code ignored these headers completely.
-  const source = fixtures.redirect.source.replace(/\/$/, '')
-  const response = await request.get(source, {
+  const response = await request.get(fixtures.redirect.source, {
     maxRedirects: 0,
     headers: {
       'x-forwarded-host': 'readers.example',

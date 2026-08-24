@@ -5,6 +5,7 @@ import {
   backupTimestamp,
   databaseNameFromUri,
   resolveBackupConfig,
+  resolveLocalBackupConfig,
   selectExpiredKeys,
 } from '../../lib/backup/plan'
 
@@ -57,6 +58,36 @@ describe('resolveBackupConfig', () => {
   it('rejects a non-positive retention count', () => {
     expect(() =>
       resolveBackupConfig({ ...baseEnv, BACKUP_RETENTION_COUNT: '0' }),
+    ).toThrow('BACKUP_RETENTION_COUNT must be a positive integer')
+  })
+})
+
+describe('resolveLocalBackupConfig', () => {
+  it('needs only the database, so a local dump or restore works without S3', () => {
+    const config = resolveLocalBackupConfig({
+      DATABASE_URI: baseEnv.DATABASE_URI,
+    })
+    expect(config.databaseName).toBe('beyond_every_art')
+    expect(config.prefix).toBe('db-backups')
+    expect(config.retentionCount).toBe(14)
+  })
+
+  it('still requires the database itself', () => {
+    expect(() => resolveLocalBackupConfig({})).toThrow(
+      'Missing required environment variable DATABASE_URI',
+    )
+  })
+
+  it('applies the same prefix and retention rules as the full config', () => {
+    const env = {
+      DATABASE_URI: baseEnv.DATABASE_URI,
+      BACKUP_PREFIX: 'nightly/',
+      BACKUP_RETENTION_COUNT: '30',
+    }
+    expect(resolveLocalBackupConfig(env).prefix).toBe('nightly')
+    expect(resolveLocalBackupConfig(env).retentionCount).toBe(30)
+    expect(() =>
+      resolveLocalBackupConfig({ ...env, BACKUP_RETENTION_COUNT: '0' }),
     ).toThrow('BACKUP_RETENTION_COUNT must be a positive integer')
   })
 })

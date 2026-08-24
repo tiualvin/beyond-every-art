@@ -132,7 +132,7 @@ describe('buildCspPolicy', () => {
 
   it('points reports at the built-in endpoint unless overridden', () => {
     expect(directive(buildCspPolicy({ env: {} }), 'report-uri')).toBe(
-      'report-uri /csp-report',
+      'report-uri /csp-report/',
     )
     expect(
       directive(
@@ -157,7 +157,7 @@ describe('buildCspPolicy', () => {
 
 describe('buildReportingEndpoints', () => {
   it('names the group the report-to directive refers to', () => {
-    expect(buildReportingEndpoints({})).toBe('csp-endpoint="/csp-report"')
+    expect(buildReportingEndpoints({})).toBe('csp-endpoint="/csp-report/"')
   })
 })
 

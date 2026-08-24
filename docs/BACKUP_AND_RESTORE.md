@@ -117,6 +117,12 @@ pnpm backup:db --skip-upload --output ./beyond_every_art.sql.gz
 `pg_dump` and `psql` must be on `PATH` when running these on a host. Inside the
 `backup` container they are already installed.
 
+The last form needs no storage configuration at all — only `DATABASE_URI` and,
+if you want the archive encrypted, `BACKUP_ENCRYPTION_KEY`. Same for a restore
+from `--input-file`. Those are the commands reached for during an incident, on
+whichever machine can still reach the database, so they do not ask for
+credentials they never use.
+
 ## Restore procedure
 
 Restoring is **destructive** — it runs the dump's SQL against the target
@@ -187,6 +193,20 @@ nothing — which is a poor thing to discover during a restore.
 Drop `--dry-run` and add `--yes` to perform the restore. For a full-database
 restore you generally want the app stopped first (`docker compose stop app`) and
 an empty target; recreate the database if needed before restoring.
+
+## The drill CI runs on every change
+
+`checks` performs a complete restore drill against the CI database: it takes an
+encrypted dump with `--skip-upload`, restores it into a scratch database with
+`--input-file --target`, compares row counts table by table, and then runs
+`migrate:validate` against the restored copy so the content is checked for
+substance and not only for arriving. No bucket and no credentials are involved,
+because what needs proving on every commit is the archive and the restore path,
+not R2's availability that morning.
+
+It does not replace the checklist below. CI proves the mechanism; only a real
+run proves that _this_ bucket, holding _these_ objects, encrypted with the
+passphrase currently in the production environment file, can be read back.
 
 ## Recovery checklist
 

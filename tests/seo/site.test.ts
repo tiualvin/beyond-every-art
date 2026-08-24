@@ -49,14 +49,14 @@ describe('path builders', () => {
     expect(authorPath('livia')).toBe('/author/livia/')
   })
 
-  it('builds publication routes without trailing slashes', () => {
-    expect(PUBLICATION_PATH).toBe('/publication')
-    expect(publicationPath('spring-2025')).toBe('/publication/spring-2025')
+  it('builds publication routes with the trailing slash Next.js serves', () => {
+    expect(PUBLICATION_PATH).toBe('/publication/')
+    expect(publicationPath('spring-2025')).toBe('/publication/spring-2025/')
     expect(publicationReadPath('spring-2025')).toBe(
-      '/publication/spring-2025/read',
+      '/publication/spring-2025/read/',
     )
     expect(publicationTranscriptPath('spring-2025')).toBe(
-      '/publication/spring-2025/transcript',
+      '/publication/spring-2025/transcript/',
     )
   })
 })

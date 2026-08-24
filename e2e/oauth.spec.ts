@@ -32,7 +32,7 @@ async function registerClient(
   request: APIRequestContext,
   clientName = 'Playwright Connector',
 ): Promise<string> {
-  const response = await request.post('/oauth/register', {
+  const response = await request.post('/oauth/register/', {
     data: { client_name: clientName, redirect_uris: [REDIRECT_URI] },
   })
   expect(response.status()).toBe(201)
@@ -89,7 +89,7 @@ async function authorize(
   capabilities: string[] = ['tool.draftArticle'],
 ): Promise<string> {
   const url =
-    `/oauth/authorize?response_type=code&client_id=${encodeURIComponent(clientId)}` +
+    `/oauth/authorize/?response_type=code&client_id=${encodeURIComponent(clientId)}` +
     `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
     `&code_challenge=${challenge}&code_challenge_method=S256&state=xyz`
 
@@ -100,7 +100,7 @@ async function authorize(
   const sealed = /name="request" value="([^"]+)"/.exec(html)?.[1]
   expect(sealed, 'consent page carried no sealed request').toBeTruthy()
 
-  const approved = await request.post('/oauth/authorize', {
+  const approved = await request.post('/oauth/authorize/', {
     // A raw urlencoded body rather than Playwright's `form` helper, because
     // `capability` repeats — that is how a set of checkboxes arrives, and an
     // object cannot express one key twice.
@@ -135,7 +135,7 @@ async function exchange(
   code: string,
   verifier: string,
 ) {
-  const response = await request.post('/oauth/token', {
+  const response = await request.post('/oauth/token/', {
     form: {
       code,
       code_verifier: verifier,
@@ -229,7 +229,7 @@ test.describe('OAuth authorization server', () => {
   }) => {
     await registerClient(request)
 
-    const bad = await request.post('/oauth/register', {
+    const bad = await request.post('/oauth/register/', {
       data: { redirect_uris: ['http://evil.test/cb'] },
     })
     expect(bad.status()).toBe(400)
@@ -243,7 +243,7 @@ test.describe('OAuth authorization server', () => {
     const { challenge } = pkce()
 
     const response = await request.get(
-      `/oauth/authorize?response_type=code&client_id=${clientId}` +
+      `/oauth/authorize/?response_type=code&client_id=${clientId}` +
         `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
         `&code_challenge=${challenge}&code_challenge_method=S256`,
       { maxRedirects: 0 },
@@ -281,7 +281,7 @@ test.describe('OAuth authorization server', () => {
     const { challenge } = pkce()
 
     const response = await request.get(
-      `/oauth/authorize?response_type=code&client_id=${clientId}` +
+      `/oauth/authorize/?response_type=code&client_id=${clientId}` +
         `&redirect_uri=${encodeURIComponent('https://evil.test/steal')}` +
         `&code_challenge=${challenge}&code_challenge_method=S256`,
       { maxRedirects: 0 },
@@ -298,7 +298,7 @@ test.describe('OAuth authorization server', () => {
     const clientId = await registerClient(request)
 
     const response = await request.get(
-      `/oauth/authorize?response_type=code&client_id=${clientId}` +
+      `/oauth/authorize/?response_type=code&client_id=${clientId}` +
         `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`,
       { maxRedirects: 0 },
     )
@@ -388,7 +388,7 @@ test.describe('OAuth authorization server', () => {
     const code = await authorize(request, clientId, challenge, token)
     const first = (await exchange(request, code, verifier)).body
 
-    const refreshed = await request.post('/oauth/token', {
+    const refreshed = await request.post('/oauth/token/', {
       form: { grant_type: 'refresh_token', refresh_token: first.refresh_token },
     })
     expect(refreshed.status()).toBe(200)
@@ -405,7 +405,7 @@ test.describe('OAuth authorization server', () => {
     // The old one is spent. A caller presenting it is either a thief or a
     // client that lost the rotation — and the two cannot be told apart, so the
     // grant is burned rather than merely refused.
-    const replay = await request.post('/oauth/token', {
+    const replay = await request.post('/oauth/token/', {
       form: { grant_type: 'refresh_token', refresh_token: first.refresh_token },
     })
     expect(replay.status()).toBe(400)
@@ -421,7 +421,7 @@ test.describe('OAuth authorization server', () => {
     })
     expect(afterAccess.status()).toBe(401)
 
-    const afterRefresh = await request.post('/oauth/token', {
+    const afterRefresh = await request.post('/oauth/token/', {
       form: {
         grant_type: 'refresh_token',
         refresh_token: second.refresh_token,
@@ -482,7 +482,7 @@ test.describe('OAuth authorization server', () => {
     })
     expect(before.status()).toBe(200)
 
-    const revoked = await request.post('/oauth/revoke', {
+    const revoked = await request.post('/oauth/revoke/', {
       form: { token: body.access_token },
     })
     expect(revoked.status()).toBe(200)

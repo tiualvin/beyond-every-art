@@ -6,8 +6,8 @@
 
 import type { S3Config } from './s3'
 
-export interface BackupConfig {
-  s3: S3Config
+/** Everything a backup or restore needs when no object store is involved. */
+export interface LocalBackupConfig {
   /** Key prefix backups live under, e.g. `db-backups`. Never ends with `/`. */
   prefix: string
   /** Postgres connection string (pg_dump / psql `--dbname`). */
@@ -16,6 +16,10 @@ export interface BackupConfig {
   databaseName: string
   /** Number of most-recent backups to retain; older ones are pruned. */
   retentionCount: number
+}
+
+export interface BackupConfig extends LocalBackupConfig {
+  s3: S3Config
 }
 
 /** Derive the logical database name from a Postgres connection string. */
@@ -39,15 +43,16 @@ function requireEnv(env: Env, name: string): string {
 }
 
 /**
- * Resolve backup configuration from the environment. Backups reuse the same R2
- * credentials as media storage (S3_*), with backup-specific settings under
- * BACKUP_*. A dedicated BACKUP_S3_BUCKET is honored when set, otherwise media's
- * S3_BUCKET is used. Throws a clear error naming the first missing variable.
+ * Resolve the part of the configuration that describes the database itself.
+ *
+ * This is all a local dump (`--skip-upload --output`) or a restore from a file
+ * on disk (`--input-file`) needs. Those are the commands reached for during an
+ * incident, often on a machine that has the database but not the storage
+ * credentials — so demanding an endpoint and a key from them would be a
+ * requirement that only ever bites at the worst moment.
  */
-export function resolveBackupConfig(env: Env): BackupConfig {
+export function resolveLocalBackupConfig(env: Env): LocalBackupConfig {
   const databaseUri = requireEnv(env, 'DATABASE_URI')
-  const endpoint = requireEnv(env, 'S3_ENDPOINT')
-  const bucket = env.BACKUP_S3_BUCKET || requireEnv(env, 'S3_BUCKET')
 
   const retentionRaw = env.BACKUP_RETENTION_COUNT
   const retentionCount = retentionRaw ? Number(retentionRaw) : 14
@@ -58,6 +63,26 @@ export function resolveBackupConfig(env: Env): BackupConfig {
   }
 
   return {
+    prefix: (env.BACKUP_PREFIX || 'db-backups').replace(/\/+$/, ''),
+    databaseUri,
+    databaseName: databaseNameFromUri(databaseUri),
+    retentionCount,
+  }
+}
+
+/**
+ * Resolve backup configuration from the environment. Backups reuse the same R2
+ * credentials as media storage (S3_*), with backup-specific settings under
+ * BACKUP_*. A dedicated BACKUP_S3_BUCKET is honored when set, otherwise media's
+ * S3_BUCKET is used. Throws a clear error naming the first missing variable.
+ */
+export function resolveBackupConfig(env: Env): BackupConfig {
+  const local = resolveLocalBackupConfig(env)
+  const endpoint = requireEnv(env, 'S3_ENDPOINT')
+  const bucket = env.BACKUP_S3_BUCKET || requireEnv(env, 'S3_BUCKET')
+
+  return {
+    ...local,
     s3: {
       endpoint,
       region: env.S3_REGION || 'auto',
@@ -65,10 +90,6 @@ export function resolveBackupConfig(env: Env): BackupConfig {
       accessKeyId: requireEnv(env, 'S3_ACCESS_KEY_ID'),
       secretAccessKey: requireEnv(env, 'S3_SECRET_ACCESS_KEY'),
     },
-    prefix: (env.BACKUP_PREFIX || 'db-backups').replace(/\/+$/, ''),
-    databaseUri,
-    databaseName: databaseNameFromUri(databaseUri),
-    retentionCount,
   }
 }
 

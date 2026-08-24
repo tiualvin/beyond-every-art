@@ -1,0 +1,6 @@
+id,email,name,status
+member-1,ada@example.com,Ada Lovelace,free
+member-2,grace@example.com,Grace Hopper,paid
+member-3,Ada@Example.com,Ada Lovelace (duplicate address),free
+member-2,katherine@example.com,Katherine Johnson,free
+member-4,,No Address,free

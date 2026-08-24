@@ -20,8 +20,10 @@ import { encryptArchive, resolveBackupPassphrase } from '../lib/backup/encrypt'
 import {
   backupKey,
   resolveBackupConfig,
+  resolveLocalBackupConfig,
   selectExpiredKeys,
 } from '../lib/backup/plan'
+import type { S3Config } from '../lib/backup/s3'
 import { deleteObject, listObjects, putObject } from '../lib/backup/s3'
 
 interface Cli {
@@ -105,9 +107,28 @@ function dumpAndGzip(databaseUri: string): Promise<Buffer> {
   })
 }
 
+/** Narrow the optional storage config at the points that genuinely need it. */
+function requireStorage(storage: S3Config | null): S3Config {
+  if (!storage) {
+    throw new Error('This run needs object storage configuration (S3_*)')
+  }
+  return storage
+}
+
 async function main() {
   const cli = parseArgs(process.argv.slice(2))
-  const config = resolveBackupConfig(process.env)
+  const config = resolveLocalBackupConfig(process.env)
+  // `--skip-upload` writes nothing to the object store, so it does not need
+  // credentials for one: that is the emergency dump, taken on whichever machine
+  // can still reach the database, and demanding an endpoint and a key would
+  // block it exactly when those are hardest to find. A dry run does read the
+  // bucket, to report what a real run would prune, so it resolves the rest.
+  //
+  // Resolved here rather than at the point of use for the same reason the
+  // passphrase below is: a missing variable should stop the run at the first
+  // line, not after dumping the whole database.
+  const localOnly = cli.skipUpload && !cli.dryRun
+  const storage = localOnly ? null : resolveBackupConfig(process.env).s3
   const retentionCount = cli.keep ?? config.retentionCount
   // Resolved before pg_dump runs: a passphrase that fails validation should
   // stop the run at the first line, not after dumping the whole database.
@@ -122,7 +143,7 @@ async function main() {
   const report: Record<string, unknown> = {
     mode: cli.dryRun ? 'dry-run' : 'backup',
     database: config.databaseName,
-    bucket: config.s3.bucket,
+    bucket: storage?.bucket ?? null,
     key,
     retentionCount,
     encrypted: Boolean(passphrase),
@@ -143,7 +164,10 @@ async function main() {
 
   if (cli.dryRun) {
     // Read-only: list what exists and show what a real run would prune.
-    const existing = await listObjects(config.s3, `${config.prefix}/`)
+    const existing = await listObjects(
+      requireStorage(storage),
+      `${config.prefix}/`,
+    )
     report.existingBackups = existing.length
     report.wouldPrune = selectExpiredKeys([...existing, key], retentionCount)
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`)
@@ -169,17 +193,18 @@ async function main() {
     return
   }
 
-  await putObject(config.s3, key, archive)
+  const s3 = requireStorage(storage)
+  await putObject(s3, key, archive)
   report.uploaded = true
 
   // Prune older backups beyond the retention count.
-  const existing = await listObjects(config.s3, `${config.prefix}/`)
+  const existing = await listObjects(s3, `${config.prefix}/`)
   const expired = selectExpiredKeys(existing, retentionCount)
   const pruned: string[] = []
   const errors: string[] = []
   for (const expiredKey of expired) {
     try {
-      await deleteObject(config.s3, expiredKey)
+      await deleteObject(s3, expiredKey)
       pruned.push(expiredKey)
     } catch (error) {
       errors.push(
