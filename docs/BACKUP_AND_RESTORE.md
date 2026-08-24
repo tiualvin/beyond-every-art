@@ -45,6 +45,7 @@ you want backups in a bucket separate from media. Relevant variables (see
 | `BACKUP_ENCRYPTION_KEY`                                                | unset        | Passphrase to encrypt backups at rest    |
 | `BACKUP_CRON`                                                          | `0 3 * * *`  | Schedule (backup container only)         |
 | `BACKUP_ON_START`                                                      | `false`      | Run one backup when the container starts |
+| `RESTORE_VERIFY_CRON`                                                  | `0 4 * * 0`  | Restore-check schedule; `off` disables   |
 
 ## Encryption
 
@@ -95,6 +96,11 @@ Set the R2 and `BACKUP_*` variables in `.env` before starting. To take an
 immediate backup for verification, set `BACKUP_ON_START=true` (or run the
 on-demand command below).
 
+The same container also runs the restore check described below, weekly at 04:00
+on Sunday — an hour after the nightly backup, so it reads back the object that
+run just produced. `RESTORE_VERIFY_CRON=off` installs no such job; leaving the
+variable blank falls back to the default schedule rather than disabling it.
+
 ## On-demand backup
 
 ```bash
@@ -126,11 +132,14 @@ This downloads the newest backup, confirms it decrypts and decompresses, and
 reports its size without touching any database. Use `--input <key>` to check a
 specific backup or `--input-file <path>` for a local archive.
 
-Worth doing on a schedule, not only during an incident: a dry run is the only
+This runs on a schedule, not only during an incident: a dry run is the only
 thing that proves `BACKUP_ENCRYPTION_KEY` is still the passphrase the bucket
 was written with. A rotated key breaks every restore silently, and the nightly
 backup keeps succeeding while it does — it only encrypts, it never reads one
-back.
+back. The `backup` container runs exactly this command weekly (see above), and
+a failure appears in `docker compose logs backup` as a line beginning
+`Restore verification FAILED`. Run it by hand as well whenever the passphrase
+changes, rather than waiting for Sunday to find out.
 
 ### 2. Restore into a scratch database first (recommended)
 
@@ -184,6 +193,8 @@ an empty target; recreate the database if needed before restoring.
 - [ ] A backup completes and the object appears in R2:
       `docker compose run --rm --entrypoint tsx backup scripts/backup-database.ts`
 - [ ] `pnpm restore:db --latest --dry-run` reports a valid, decompressible archive.
+      (The `backup` container does this weekly; check its log rather than
+      assuming, and treat a missing line as a failure of the schedule itself.)
 - [ ] A restore into a scratch database reproduces expected content and counts.
 - [ ] Retention pruning keeps exactly `BACKUP_RETENTION_COUNT` backups.
 - [ ] R2 credentials and `.env` are backed up securely and separately from Git.

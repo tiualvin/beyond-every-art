@@ -45,7 +45,10 @@ Confirm against the provider's own documentation before implementing.
 8. **Run a reconciliation sweep anyway.** A daily job that re-reads state for
    every known subscriber catches whatever the webhooks missed while the server
    was down or misbehaving. Webhooks are an optimisation over polling, not a
-   guarantee.
+   guarantee. This is the `reconcile` service in `docker-compose.yml`; it is
+   behind a Compose profile until the takeover in
+   [`CUTOVER_RUNBOOK.md`](CUTOVER_RUNBOOK.md) is done, and refuses to start
+   without `STRIPE_SECRET_KEY` rather than failing quietly at 02:30 each night.
 9. **Separate sandbox from production** — different endpoints, different
    secrets, different credentials. Test events must never touch real accounts.
 
@@ -98,12 +101,13 @@ one exclusion keeps covering it. Do not rely on the in-handler exemption that
 Follow the split the repo already uses for the backup pipeline (pure logic in
 `lib/`, I/O at the edges, a CLI for operational work):
 
-| Piece                                                   | Where                          |
-| ------------------------------------------------------- | ------------------------------ |
-| Signature verification, provider status → account state | `lib/billing/*.ts` (pure)      |
-| Unit tests for the above                                | `tests/billing/*.test.ts`      |
-| HTTP entry points                                       | `app/webhooks/*/route.ts`      |
-| Backfill and daily reconciliation                       | `scripts/reconcile-billing.ts` |
+| Piece                                                   | Where                            |
+| ------------------------------------------------------- | -------------------------------- |
+| Signature verification, provider status → account state | `lib/billing/*.ts` (pure)        |
+| Unit tests for the above                                | `tests/billing/*.test.ts`        |
+| HTTP entry points                                       | `app/webhooks/*/route.ts`        |
+| Backfill and daily reconciliation                       | `scripts/reconcile-billing.ts`   |
+| The schedule that runs it daily                         | `docker/reconcile/entrypoint.sh` |
 
 The reconciliation script should take `--dry-run` and be safe to rerun, like
 `scripts/backup-database.ts` and the migration scripts.

@@ -237,6 +237,51 @@ services:
       DATABASE_URI: ${DATABASE_URI:-postgresql://payload:payload@postgres:5432/beyond_every_art}
       BACKUP_CRON: ${BACKUP_CRON:-0 3 * * *}
       BACKUP_ON_START: ${BACKUP_ON_START:-false}
+      # The read side of the pipeline. A backup that cannot be restored is not a
+      # backup, and nothing else in this stack ever opens one: `backup:db` only
+      # writes, so a rotated BACKUP_ENCRYPTION_KEY breaks every archive in the
+      # bucket while the nightly run keeps reporting success. Weekly, an hour
+      # after the backup, `restore:db --latest --dry-run` reads the newest object
+      # back. Set to `off` to install no verification job; blank means default.
+      RESTORE_VERIFY_CRON: ${RESTORE_VERIFY_CRON:-0 4 * * 0}
+
+  # Daily Stripe reconciliation. Behind a profile because it cannot do anything
+  # useful until the Stripe takeover in docs/CUTOVER_RUNBOOK.md is done: turn it
+  # on by adding `reconcile` to COMPOSE_PROFILES in .env, at the same time as
+  # STRIPE_SECRET_KEY. Until then `docker compose up -d` leaves it alone.
+  #
+  # It runs the migrator image, not the backup one: `reconcile:billing` boots
+  # Payload, so it needs the dependency tree and payload.config.ts that the
+  # deliberately-tiny backup image does not carry.
+  reconcile:
+    build:
+      context: .
+      target: migrator
+    entrypoint: ['/bin/sh', '/app/docker/reconcile/entrypoint.sh']
+    profiles: ['reconcile']
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: ${LOG_MAX_SIZE:-10m}
+        max-file: '${LOG_MAX_FILES:-3}'
+    deploy:
+      resources:
+        limits:
+          memory: ${RECONCILE_MEMORY_LIMIT:-1g}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # STRIPE_SECRET_KEY arrives through the env file rather than being named
+    # below, so the live key is never written into a committed file or shown in
+    # `docker compose config`.
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URI: ${DATABASE_URI:-postgresql://payload:payload@postgres:5432/beyond_every_art}
+      PAYLOAD_SECRET: ${PAYLOAD_SECRET}
+      RECONCILE_CRON: ${RECONCILE_CRON:-30 2 * * *}
 
 volumes:
   postgres_data:
