@@ -27,27 +27,26 @@ In dependency order, what is left before the public cutover:
 3. **Members, then Stripe** — item 1 then item 2 below, in that order:
    reconciliation has nothing to reconcile against until the member records
    exist.
-4. **Decide trailing slashes.** [`SEO_AND_REDIRECTS.md`](SEO_AND_REDIRECTS.md)
-   §Pending. Canonical tags, the sitemap and the feed advertise the slashed Ghost
-   permalinks while Next.js redirects to the un-slashed form, so every URL the
-   site advertises lands on a redirect. Settling it after search engines recrawl
-   costs a second round of redirects on every URL.
-5. **Decide what happens to paying subscribers.** Phase 1 ships no reader
+4. **Decide what happens to paying subscribers.** Phase 1 ships no reader
    accounts and no paywall ([`ACCOUNT_MODEL.md`](ACCOUNT_MODEL.md)), but posts
    keep their Ghost `visibility` and render a teaser. On cutover day a paying
    subscriber gets a teaser where Ghost gave them the full piece, with no way to
    sign in. Count the exposure first:
    `SELECT visibility, count(*) FROM posts GROUP BY visibility;`
-6. **Edge protection** — [`EDGE_PROTECTION.md`](EDGE_PROTECTION.md), and read the
+5. **Edge protection** — [`EDGE_PROTECTION.md`](EDGE_PROTECTION.md), and read the
    ordering warning before touching Cloudflare. Adopt the DNS-01 Caddy image in
    its own quiet deploy, _then_ proxy. Not cutover-day work.
-7. **Flip.** Unset `NEXT_PUBLIC_NOINDEX` and `STAGING_BASIC_AUTH`, move
+6. **Flip.** Unset `NEXT_PUBLIC_NOINDEX` and `STAGING_BASIC_AUTH`, move
    `SITE_ADDRESS` and `NEXT_PUBLIC_SITE_URL` to the production domain. Leaving
    the noindex on is the quiet failure: the site works perfectly and is invisible
    to search.
 
 ## Done
 
+- **Trailing slashes, decided.** `next.config.ts` sets `trailingSlash: true` to
+  match the Ghost permalinks the site is migrating, described in
+  [`SEO_AND_REDIRECTS.md`](SEO_AND_REDIRECTS.md#the-trailing-slash). No longer
+  an open decision.
 - VPS provisioned (Hetzner), Docker installed, repo cloned; the `postgres`,
   `app`, `caddy`, and `backup` services run via `docker compose up -d`.
 - **Automatic deploy on merge to `main`** (`.github/workflows/ci.yml`,
