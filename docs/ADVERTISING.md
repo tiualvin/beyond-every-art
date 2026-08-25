@@ -307,9 +307,10 @@ static file is right for AdSense.
    §9 recommends Google's Privacy & messaging to start; the work in this
    repository is reading Consent Mode v2 signals and retrofitting GA4 behind
    them, not building a banner.
-3. **Cut over.** [`DEPLOYMENT_STATUS.md`](DEPLOYMENT_STATUS.md) item 7 — unset
-   `NEXT_PUBLIC_NOINDEX` and `STAGING_BASIC_AUTH`. Nothing about advertising
-   can be evaluated before this, including the AdSense application itself.
+3. **Cut over.** [`DEPLOYMENT_STATUS.md`](DEPLOYMENT_STATUS.md)'s "Flip" —
+   unset `NEXT_PUBLIC_NOINDEX` and `STAGING_BASIC_AUTH`. Nothing about
+   advertising can be evaluated before this, including the AdSense
+   application itself.
 4. **Let traffic establish, then apply to AdSense.** Applying against a site
    with no organic traffic history and a fresh domain configuration invites a
    decline that is slow to appeal.
