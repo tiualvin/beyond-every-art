@@ -1,18 +1,22 @@
-// `/ads.txt` has to be reachable, and reachable is not the same as committed.
+// `ads.txt` lives at the repository root, and the application does not serve it.
 //
-// The file was committed at the repository root, where Next.js serves nothing:
-// static assets come from `public`, and the production image is a standalone
-// bundle that copies only what it is told to. So the publisher ID sat in the
-// tree for months declaring a selling relationship that no crawler could read,
-// and every check anyone would think to run — the file is there, the ID is
-// right — passed.
+// That is deliberate and it is not the obvious arrangement, so it is worth
+// stating plainly: on Ghost a redirect answers `/ads.txt`, and the file here is
+// the record of what that redirect points at. Next.js serves static assets from
+// `public` and nowhere else, so a file at the root is never a URL — which is
+// correct while the redirect is the serving mechanism, and a bug the day it
+// stops being.
 //
-// An ads.txt that 404s is not a degraded ads.txt. Buyers treat an unreadable
-// file as an absent one, which makes the inventory unauthorised, which is the
-// whole thing the file exists to prevent. These tests check the two facts that
-// have to hold together for the URL to answer at all.
+// See `docs/ADVERTISING.md` §1 for the cutover consequence, which is the part
+// that fails quietly: the Ghost redirect is importable into the `Redirects`
+// collection, but the middleware matcher skips any path containing a dot, so a
+// redirect row for `/ads.txt` can look perfectly configured and never run.
+//
+// What is checked here is the file's contract with ad buyers, which holds
+// wherever it is eventually served from: a malformed record is dropped by
+// parsers, and a dropped record means unauthorised inventory.
 
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -20,23 +24,24 @@ import { describe, expect, it } from 'vitest'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 
-const adsTxt = readFileSync(join(root, 'public', 'ads.txt'), 'utf8')
-const dockerfile = readFileSync(join(root, 'Dockerfile'), 'utf8')
+const adsTxt = readFileSync(join(root, 'ads.txt'), 'utf8')
 
 describe('ads.txt', () => {
-  // The path is the assertion. `readFileSync` above already fails the suite if
-  // the file moves back to the root, but it fails as an unreadable-file error
-  // rather than as the reason, so this names it.
-  it('lives in public/, which is the only directory Next.js serves it from', () => {
+  // `readFileSync` above already fails the suite if the file moves, but it
+  // fails as an unreadable-file error rather than as the reason, so this names
+  // what is expected to be where.
+  it('lives at the repository root', () => {
     expect(adsTxt).not.toBe('')
   })
 
-  it('is copied into the production image', () => {
-    // `output: 'standalone'` does not include `public`, and Caddy has no
-    // `file_server` — it reverse proxies every path to the app container. If
-    // this COPY goes, the file is a 404 in production and nowhere else, which
-    // is the failure mode that is hardest to notice.
-    expect(dockerfile).toMatch(/COPY .*\/app\/public \.\/public/)
+  it('is not in public/, where it would silently start being served', () => {
+    // Moving it there changes who answers `/ads.txt` — the app rather than the
+    // redirect — which is a decision about a third party's records, not a
+    // tidy-up. It also needs a `COPY` of `public` added to the Dockerfile in
+    // the same change, or the file is served in `next dev` and 404s in
+    // production. Make that move deliberately; do not let it happen as a
+    // side effect of moving a file somewhere it looks like it belongs.
+    expect(existsSync(join(root, 'public', 'ads.txt'))).toBe(false)
   })
 
   it('declares each selling relationship on its own line', () => {
@@ -61,9 +66,9 @@ describe('ads.txt', () => {
   })
 
   it('ends with a newline', () => {
-    // Committed without one. Some parsers drop a final record that is not
-    // newline-terminated, which with a single-record file means dropping the
-    // only one.
+    // Originally committed without one. Some parsers drop a final record that
+    // is not newline-terminated, which with a single-record file means
+    // dropping the only one.
     expect(adsTxt.endsWith('\n')).toBe(true)
   })
 })

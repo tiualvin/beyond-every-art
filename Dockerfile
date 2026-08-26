@@ -49,13 +49,25 @@ WORKDIR /app
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-# `output: 'standalone'` traces the server's imports; it does not copy `public`,
-# on the assumption that a CDN serves it. Nothing does here — Caddy reverse
-# proxies every path to this container — so without this line every file in
-# `public` is a 404 in production while working perfectly in `next dev`. That
-# is how `/ads.txt` came to be committed and never served; `tests/seo/
-# ads-txt.test.ts` is what keeps this line and that file in step.
-COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+# No `COPY` of `public` here, and that is a live constraint rather than an
+# omission: `output: 'standalone'` does not copy `public` (it assumes a CDN
+# serves it) and nothing else here does either, because the Caddyfile has no
+# `file_server` and reverse proxies every path to this container.
+#
+# So the first file added to a `public` directory in this repository is a 404 in
+# production while working perfectly under `next dev`. Add the directory and a
+# `COPY --from=builder --chown=nextjs:nodejs /app/public ./public` line together,
+# never one without the other — a `COPY` of a directory that does not exist
+# fails the build outright, which is why this line cannot simply be left here
+# against future need.
+#
+# That is not hypothetical: the line has now been added and removed twice. The
+# first time it referenced a `public` that had never existed and broke the
+# build, which is what the `app-image` CI job was added to catch (see
+# docs/DEPLOYMENT_STATUS.md). The second time it arrived with a `public/ads.txt`
+# that has since moved back to the repository root — see docs/ADVERTISING.md §1
+# for why the root is where that particular file belongs.
+#
 # Payload serves local uploads from `path.resolve('media')`, which is /app/media
 # under this working directory. It must exist and be writable before the volume
 # is mounted over it — see the migrator stage above, and the `media_data` volume

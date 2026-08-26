@@ -2,8 +2,8 @@
 
 An evaluation of putting ad units on the site: what is in the way, what the
 architecture should be so that AdSense is not a one-way door, where the units
-go, and in what order the work should happen. Nothing here is built except the
-`/ads.txt` serving fix described in §1.
+go, and in what order the work should happen. None of it is built, and §1 is a
+cutover item rather than a change already made.
 
 Related: [`CONTENT_SECURITY_POLICY.md`](CONTENT_SECURITY_POLICY.md),
 [`DEPLOYMENT_STATUS.md`](DEPLOYMENT_STATUS.md),
@@ -26,11 +26,11 @@ ship yet, for reasons that have nothing to do with the code:
 3. `/ads.txt` is served on Ghost by a redirect, and neither that redirect nor
    the root file survives the cutover — the redirect because middleware skips
    dotted paths, the file because Next does not serve the repository root.
-   Closed here, and worth reading because the redirect half fails silently.
+   Still open, and worth reading because the redirect half fails silently.
 
-The order that follows from this is: settle ads.txt (done), build consent, cut
-over, apply, then wire the ad layer behind a flag. §7 lays it out, §8 plans the
-placements, and §9 evaluates the consent platforms.
+The order that follows from this is: settle ads.txt at cutover, build consent,
+cut over, apply, then wire the ad layer behind a flag. §7 lays it out, §8 plans
+the placements, and §9 evaluates the consent platforms.
 
 The more important point is in §6: **the ceiling on RPM is traffic, not
 architecture.** Futureproofing the code is cheap and worth doing, but it is not
@@ -76,29 +76,39 @@ not a degraded `ads.txt` — buyers treat an unreadable file as an absent one,
 which makes the inventory unauthorised. The file exists precisely to prevent
 that, so a broken one inverts its own purpose.
 
-**What is now in place.** The static route, because it is the correct shape for
-a single AdSense record and needs no exception to the middleware:
+**Where it stands.** The file stays at the repository root, as the record of
+what the Ghost redirect points at, and the application does not serve it. That
+is the arrangement the site runs on today, and it is deliberate — the point of
+this section is that it has an expiry date, not that it is wrong now.
 
-- the file lives at `public/ads.txt`;
-- the `Dockerfile` runner stage copies `public` into the image;
-- [`../tests/seo/ads-txt.test.ts`](../tests/seo/ads-txt.test.ts) fails if
-  either of those stops being true, and also checks record formatting and the
-  trailing newline (it was committed without one, and some parsers drop an
-  unterminated final record — which, in a one-record file, is all of them).
+[`../tests/seo/ads-txt.test.ts`](../tests/seo/ads-txt.test.ts) pins it: the
+file is at the root, it is not in `public`, its records parse, and it ends with
+a newline (it was originally committed without one, and some parsers drop an
+unterminated final record — which, in a one-record file, is all of them). The
+`public` check is there because moving the file is how the serving mechanism
+would change by accident rather than by decision.
 
-**If the redirect is the behaviour you want to keep**, that is a Caddy rule
-rather than a middleware change — a `redir /ads.txt <target> permanent` in the
-site block, evaluated before the catch-all `reverse_proxy`. Prefer that to
-loosening the middleware matcher, which would put every dotted path in the site
-through a redirect-map lookup to fix one file. The two are mutually exclusive:
-a file at `public/ads.txt` is served by the app and a Caddy `redir` never
-reaches it, so pick one. The end of §6 covers when the redirect becomes the
-better answer, which is the day a managed partner hosts the file.
+**So `/ads.txt` has to be settled before cutover, and there are two ways.**
+They are mutually exclusive, because a file the app serves is never reached by
+a redirect:
 
-Either way this is a cutover checklist item, not a launch-day discovery. Verify
-after the next deploy by fetching `https://<domain>/ads.txt` and reading the
-body, not the status code. Note that `trailingSlash: true` does not apply to
-files in `public`; they are served at the exact path.
+- _Keep the redirect._ A Caddy rule, not a middleware change: `redir /ads.txt
+<target> permanent` in the site block, evaluated before the catch-all
+  `reverse_proxy`. Prefer this to loosening the middleware matcher, which would
+  put every dotted path through a redirect-map lookup to fix one file. This
+  becomes the clearly better answer the day a managed partner hosts the file —
+  see the end of §6.
+- _Serve it from the app._ Move the file to `public/ads.txt` **and** add
+  `COPY --from=builder --chown=nextjs:nodejs /app/public ./public` to the
+  `Dockerfile` runner stage in the same change. Neither half works alone: with
+  no `COPY` the file 404s in production while working under `next dev`, and
+  with no `public` directory the `COPY` fails the build outright. `trailingSlash:
+true` does not apply to files in `public`; they are served at the exact
+  path.
+
+Either way this is a cutover checklist item rather than a launch-day discovery.
+Whichever is chosen, verify it by fetching `https://<domain>/ads.txt` and
+reading the body, not the status code.
 
 ## 2. Consent is the real blocker
 
@@ -297,12 +307,18 @@ loads a script — and those are cheap.
 often hundreds of lines, and typically ask you to redirect `/ads.txt` to a file
 they host so it stays current without a deploy. That is a Caddy rule when the
 time comes, and it is worth knowing now so that nobody builds elaborate
-generation machinery for a file that will eventually be a redirect. The current
-static file is right for AdSense.
+generation machinery for a file that will eventually be a redirect.
+
+It also argues for one of §1's two options over the other. The site already
+serves `/ads.txt` by redirect on Ghost, and a managed partner would want a
+redirect again — so carrying the redirect across the cutover keeps the shape
+the file has had all along, and a one-line committed record is right for
+AdSense in the meantime.
 
 ## 7. Sequence
 
-1. **Done.** `public/ads.txt` is served and tested.
+1. **Settle `/ads.txt`,** at cutover and not before — the Ghost redirect serves
+   it until then. §1 has the two options and the trap in each.
 2. **Consent management.** A prerequisite for ads rather than a part of them.
    §9 recommends Google's Privacy & messaging to start; the work in this
    repository is reading Consent Mode v2 signals and retrofitting GA4 behind
