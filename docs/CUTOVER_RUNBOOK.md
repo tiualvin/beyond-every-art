@@ -37,14 +37,32 @@ on cutover day.
 
    Do not proceed unless it reports `"ok": true`.
 
-7. Spot-check: content counts, several recent posts, the homepage, media,
-   a handful of redirects, `/sitemap.xml`, `/rss`, `/robots.txt`, `/health`.
-8. **Change DNS** to the new server. Watch propagation.
-9. Monitor logs and error output (`docker compose logs -f app caddy`) and the
-   `request_error` (500) and `not_found` (404) JSON log lines emitted by the
-   app. Filter them with, for example,
-   `docker compose logs app | grep '"event":"not_found"'`.
-10. Keep **Ghost active as a fallback**. Do not cancel it yet.
+7. **Validate the redirects** against the production host. Not a spot-check:
+   this is the one part of the migration whose failure is silent, because a
+   broken rule looks exactly like a URL nobody has asked for yet.
+
+   ```bash
+   pnpm validate:redirects \
+     --target https://www.beyondeveryart.com \
+     --input ghost-export/redirects.json \
+     --redirects-map https://cms.beyondeveryart.com/redirects-map/ \
+     --tag <a-real-tag> --author <a-real-author>
+   ```
+
+   It exits non-zero on the first failure of any rule, checks the built-in
+   pagination rules alongside the table, and reports rules the middleware
+   matcher can never run whatever the response was. Do not proceed while it
+   reports errors. See
+   [`SEO_AND_REDIRECTS.md`](SEO_AND_REDIRECTS.md#validating-them).
+
+8. Spot-check by eye: content counts, several recent posts, the homepage, media,
+   `/sitemap.xml`, `/rss`, `/robots.txt`, `/health`.
+9. **Change DNS** to the new server. Watch propagation.
+10. Monitor logs and error output (`docker compose logs -f app caddy`) and the
+    `request_error` (500) and `not_found` (404) JSON log lines emitted by the
+    app. Filter them with, for example,
+    `docker compose logs app | grep '"event":"not_found"'`.
+11. Keep **Ghost active as a fallback**. Do not cancel it yet.
 
 ## Immediately after cutover
 

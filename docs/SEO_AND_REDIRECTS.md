@@ -19,6 +19,11 @@ The pure, framework-free logic lives under `lib/seo/` and is unit tested:
 
 - `lib/seo/site.ts` — site origin resolution and Ghost-parity path builders.
 - `lib/seo/redirects.ts` — path normalization and redirect-map matching.
+- `lib/seo/ghost-urls.ts` — the built-in rules for Ghost URL shapes this site
+  does not serve.
+- `lib/seo/middleware-coverage.ts` — which paths the matcher runs on, and so
+  which rules can ever fire.
+- `lib/seo/redirect-audit.ts` — judging a redirect against what a live site did.
 - `lib/seo/rss.ts` — RSS 2.0 rendering with XML escaping.
 - `lib/seo/sitemap.ts` — sitemap entry construction.
 
@@ -39,6 +44,104 @@ runtime and cannot reach Postgres directly, the flow is:
 
 Editing redirects in the CMS takes effect within the cache window without a
 redeploy.
+
+### The rules that can never run
+
+`middleware.ts` narrows itself with a matcher, and one clause in it decides
+something the admin panel gives no hint of: **any path containing a dot is
+skipped**, along with the prefixes the app and Payload own (`/admin`, `/api`,
+`/oauth`, `/webhooks`, `/csp-report`, `/redirects-map`, `/rss`, `/sitemap.xml`,
+`/robots.txt`). A redirect row for such a path imports cleanly, shows as
+enabled, is returned by `/redirects-map`, and never fires — the request never
+reaches the code that would answer it.
+
+`/ads.txt` is the live instance ([`ADVERTISING.md`](ADVERTISING.md) §1). A Ghost
+migration meets three more classes of it:
+
+| Path                         | Why it matters                                   |
+| ---------------------------- | ------------------------------------------------ |
+| `/sitemap-posts.xml` and kin | Ghost's `/sitemap.xml` is an index of these four |
+| `/content/images/…`          | every image hotlink and Google Images result     |
+| `/ads.txt`                   | ad buyers, once display advertising is live      |
+
+`lib/seo/middleware-coverage.ts` models the matcher so this is checkable rather
+than remembered. `pnpm migrate:redirects` prints a warning naming any imported
+rule that cannot run, and `pnpm validate:redirects` reports it as an error
+against a live host. The fix is to serve the path from Caddy, not to adjust the
+row.
+
+Next requires `config.matcher` to be a statically analysable literal, so the
+module cannot share the constant with the middleware; the copy is pinned to the
+real one by `tests/seo/middleware-coverage.test.ts`.
+
+### Pagination, which no export covers
+
+Ghost paginates in the **path** (`/page/2/`, `/tag/x/page/2/`,
+`/author/x/page/3/`); this site paginates in the **query string**
+(`/journal/?page=2`). Ghost served those URLs itself, so its `redirects.json`
+has nothing to say about them — and with 117 posts every one of them exists on
+the live site today, is linked from its own archive pages, and is crawled.
+Untreated they become 404s on cutover day.
+
+`lib/seo/ghost-urls.ts` answers them, built in rather than as rows: they follow
+from the two URL schemes rather than from anything an editor decided, and a
+hand-maintained row per page number goes stale the next time a post is
+published. A row for the same source still wins — the middleware consults the
+table first — so any of them can be overridden from the admin panel.
+
+Each collapses to the **unpaginated** archive, not to the equivalent `?page=N`:
+
+| Ghost URL           | Destination  |
+| ------------------- | ------------ |
+| `/page/N/`          | `/journal/`  |
+| `/tag/x/page/N/`    | `/tag/x/`    |
+| `/author/x/page/N/` | `/author/x/` |
+
+Two reasons, and the second is a bug rather than a preference. Ghost's page size
+and this site's are different numbers, so "page 2" does not name the same posts
+on both sides — there is nothing to preserve. And `/journal/` calls `notFound()`
+for a page past the end of the archive, so mapping `/page/40/` to
+`/journal/?page=40` would be a permanent redirect onto a 404: worse than the 404
+it replaced, because a crawler then records the destination as the URL's new
+home and stops asking for either.
+
+### Validating them
+
+`pnpm validate:redirects` checks every rule against a running site and exits
+non-zero if any fails, so a cutover can be gated on it the way the import is
+gated on `pnpm migrate:validate`:
+
+```bash
+pnpm validate:redirects --target https://staging.beyondeveryart.com \
+  --input ghost-export/redirects.json \
+  --basic-auth-env STAGING_CRAWL_BASIC_AUTH
+
+pnpm validate:redirects --target https://www.beyondeveryart.com \
+  --redirects-map https://cms.beyondeveryart.com/redirects-map/ \
+  --tag materials --author livia-calderon
+```
+
+Rules come from a Ghost export (`--input`, which works before the import has
+run) or from the live table (`--redirects-map`, which is what the middleware
+actually reads — served only on the CMS hostname, since Caddy 404s it on the
+public one). Give both and a rule present in the export but missing from the
+table is reported too: an import that did not land, which checking the table
+alone would never show.
+
+For each rule it asserts four things, of which only the first is what a manual
+spot-check covers:
+
+- the source answers with the **configured status**;
+- the `Location` points at the **stored destination**;
+- that destination answers **200** — not another redirect, and not a 404;
+- the source is one the **matcher actually runs on**.
+
+It also warns on a redirect chain, which is usually a stored destination missing
+its trailing slash that `trailingSlash: true` then fixes with a second round
+trip for every reader and every crawl.
+
+The built-in pagination rules are checked alongside the table. Pass `--tag` and
+`--author` (repeatable) to expand the archive probes onto real slugs.
 
 ### Which origin, and why it is not the obvious one
 

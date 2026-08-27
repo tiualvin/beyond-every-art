@@ -8,6 +8,7 @@ import {
   tooManyRequestsInit,
 } from '@/lib/security/rate-limit'
 import { forwardedOrigin, internalOrigin } from '@/lib/security/origins'
+import { legacyGhostRedirect } from '@/lib/seo/ghost-urls'
 import { isAuthorized, parseBasicAuth } from '@/lib/seo/indexing'
 import { RedirectMapCache } from '@/lib/seo/redirect-map'
 import {
@@ -165,20 +166,27 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     }
   }
 
-  let map: Map<string, ResolvedRedirect>
+  // The built-in rules for the Ghost URL shapes this site does not serve —
+  // pagination, which moved from the path to the query string. Resolved before
+  // the table is consulted but applied after it, so an editor can override any
+  // of them with a row and nothing here depends on the table loading.
+  const legacy = legacyGhostRedirect(request.nextUrl.pathname)
+
+  let map: Map<string, ResolvedRedirect> | null = null
   try {
     // Not `request.nextUrl.origin`: that is the bind address wearing the
     // forwarded scheme, which behind Caddy is `https://0.0.0.0:3000` and fails
     // the TLS handshake against a plain-HTTP listener. See `internalOrigin`.
     map = await redirectMap.load(internalOrigin())
   } catch {
-    // Never let redirect lookups take the site down; fall through instead. The
-    // cache has already logged the reason, and only reaches here when it has no
-    // previous copy to serve.
-    return NextResponse.next()
+    // Never let redirect lookups take the site down. The cache has already
+    // logged the reason, and only reaches here when it has no previous copy to
+    // serve — so fall through to the built-in rules, which need no table.
+    map = null
   }
 
-  const hit = matchRedirect(map, request.nextUrl.pathname)
+  const hit =
+    (map ? matchRedirect(map, request.nextUrl.pathname) : null) ?? legacy
   if (!hit) return NextResponse.next()
 
   // Resolved against the origin the reader used, not `request.nextUrl.origin`
