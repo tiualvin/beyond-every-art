@@ -174,6 +174,22 @@ services:
       # Staff hostname serving Payload Admin and the MCP endpoint, e.g.
       # cms.beyondeveryart.com. See the Caddyfile.
       CMS_ADDRESS: ${CMS_ADDRESS:-cms.localhost}
+      # Which ACME challenge every site block uses: `acme-default` (HTTP-01,
+      # what this deployment has always done) or `acme-cloudflare` (DNS-01,
+      # required once Cloudflare's proxy is in front). Both are snippets defined
+      # at the top of the Caddyfile.
+      #
+      # Resolved here with `:-` rather than left to the Caddyfile's own
+      # `{$CADDY_ACME:acme-default}`, and that is not redundant. Caddy falls
+      # back only when the variable is *unset*; a `CADDY_ACME=` line in .env
+      # makes it set-and-empty, which adapts to a bare `import` and Caddy then
+      # refuses to start at all. Compose's `:-` treats empty as absent, so the
+      # container always receives a real snippet name.
+      CADDY_ACME: ${CADDY_ACME:-acme-default}
+      # Read at runtime by the `acme-cloudflare` snippet. Scope the token to
+      # Zone -> DNS -> Edit on this zone only; it is never needed by
+      # `acme-default`. See docs/EDGE_PROTECTION.md.
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
     ports:
       - '80:80'
       - '443:443'

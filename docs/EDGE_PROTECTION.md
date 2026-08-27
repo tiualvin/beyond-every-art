@@ -9,10 +9,10 @@
 > on a €5 box, and the origin's IP address is published in DNS for anyone who
 > looks.
 >
-> This must be closed before the public cutover. It is not closed by any change
-> in this repository so far; the work below is written out and the image is
-> built, but **it cannot be finished without a Cloudflare API token**, which is
-> an operator action.
+> This must be closed before the public cutover. The repository now carries
+> everything it can: the image is built and in use, and the challenge switch is
+> a single variable. What remains is operator work in the production `.env` and
+> the Cloudflare and Hetzner dashboards — steps 1 and 3 through 6 below.
 
 ## Do not simply turn the proxy on
 
@@ -55,43 +55,64 @@ below.
   ignored while the proxy is off, because anyone can send that header when
   Cloudflare is not the one setting it.
 
-Neither is wired into `docker-compose.yml`, on purpose: building Caddy from
-source runs a Go toolchain on the production VPS, and `DEPLOYMENT_STATUS.md`
-already notes CPU contention during the ~2–3 minute app build. Adopt the image
-in its own quiet deploy, not during a cutover.
+Both are wired into `docker-compose.yml` now, along with `CADDY_ACME` and
+`CLOUDFLARE_API_TOKEN`, and all of it is inert until those variables are set —
+which is the point. Building Caddy from source runs a Go toolchain on the
+production VPS, and `DEPLOYMENT_STATUS.md` notes CPU contention during the
+~2–3 minute app build, so the image was adopted in its own quiet deploy rather
+than during a cutover. What is left is configuration.
 
 ## The procedure
 
 1. **Create a Cloudflare API token.** Scope it to `Zone → DNS → Edit` for this
    zone only. Not the Global API Key — that credential can do anything to the
    account. Put it in the production `.env` as `CLOUDFLARE_API_TOKEN`, and never
-   in git.
+   in git. `docker-compose.yml` already passes it through to the `caddy`
+   service, so nothing else has to change to make it readable; nothing reads it
+   either until step 3.
 
-2. **Switch the Caddy service to the custom image**, and deploy that alone.
-   Confirm the site still serves normally — at this point nothing has changed
-   behaviour, which is the entire point of doing it as a separate step.
+2. **Switch the Caddy service to the custom image** — **done (#103)**.
+   `docker-compose.yml` builds `caddy` from `docker/caddy/Dockerfile`, and the
+   module sat unused behind it for weeks, which is exactly what this step was
+   for: the image and the challenge change never share a deploy, so a site that
+   stops serving has one suspect rather than two.
 
-   ```yaml
-   caddy:
-     build:
-       context: .
-       dockerfile: docker/caddy/Dockerfile
-   ```
-
-3. **Move both site blocks to DNS-01**, passing the token through to Caddy.
-   In `docker-compose.yml`, add it to the `caddy` service's environment; in the
-   `Caddyfile`, add to each site block:
+3. **Move every site block to DNS-01.** This is now one line in the production
+   `.env`, not an edit to tracked files:
 
    ```
-   tls {
-     dns cloudflare {env.CLOUDFLARE_API_TOKEN}
-   }
+   CADDY_ACME=acme-cloudflare
    ```
 
-   Deploy, then confirm Caddy has issued certificates through the new challenge
-   before going further: `docker compose logs caddy | grep -i "certificate obtained"`.
+   The `Caddyfile` defines two snippets — `acme-default` (empty, which is
+   HTTP-01, Caddy's own behaviour) and `acme-cloudflare` (the `tls` block with
+   the Cloudflare DNS provider) — and every site block imports whichever
+   `CADDY_ACME` names. All three blocks move together, the redirect host
+   included: it holds a certificate of its own, and leaving it on HTTP-01 breaks
+   _its_ renewal the moment the proxy goes on.
+
+   Validate before deploying, because the `deploy` job checks the app's health
+   from inside the app container and would not notice Caddy failing to start:
+
+   ```bash
+   docker compose exec caddy caddy validate \
+     --config /etc/caddy/Caddyfile --adapter caddyfile
+   ```
+
+   Then deploy and confirm a certificate has been obtained through the new
+   challenge before going further:
+   `docker compose logs caddy | grep -i "certificate obtained"`.
    Forcing a renewal is the honest test — an existing certificate will keep
    working regardless of whether the new challenge is functioning.
+
+   > [!NOTE]
+   > Leave `CADDY_ACME` blank to stay on HTTP-01; blank and absent both resolve
+   > to `acme-default`. That is handled in `docker-compose.yml` with `:-` rather
+   > than left to the Caddyfile, and the difference is not cosmetic: Caddy's own
+   > `{$VAR:default}` falls back only when a variable is **unset**, so a
+   > `CADDY_ACME=` line would adapt to a bare `import` and Caddy would refuse to
+   > start at all. A typo'd snippet name fails the same way — hence the
+   > validate step above.
 
 4. **Only now, turn on the orange cloud** for the site record in Cloudflare.
    Set SSL/TLS mode to **Full (strict)**; anything less lets the edge accept an
@@ -298,10 +319,13 @@ concerns already handled in the repo, and nothing about these:
   accepted report costs a log line and the log file is rotated: a flood could
   otherwise push genuine violations out of the window during exactly the
   report-only phase when they are the only evidence there is.
-- Media is served by Node from local disk (`useR2` is false — no object storage
-  is configured). Every image occupies an app worker. Caching at the edge hides
-  this rather than fixing it; moving media to R2 is the actual fix, and R2 has
-  no egress charge.
+- Media is served by Node out of R2, not off local disk — R2 was configured on
+  22 Aug (`DEPLOYMENT_STATUS.md` item 0.4). `S3_PUBLIC_URL` is deliberately
+  empty, so Payload streams each file from `/api/media/file/<name>` rather than
+  handing out a bucket URL, and every image still occupies an app worker for the
+  length of the transfer. Caching at the edge is what removes that; a public
+  bucket on a custom domain is the alternative, and it is the reason media and
+  backups are in separate buckets.
 - **Uploads through the admin panel are capped in the application, not at the
   edge.** Payload v3's `UploadConfig` has no size option, so `collections/Media.ts`
   can restrict the format and nothing else, and an upload was once bounded only

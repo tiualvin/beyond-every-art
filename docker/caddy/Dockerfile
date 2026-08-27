@@ -1,9 +1,10 @@
 # Caddy with the Cloudflare DNS module.
 #
-# NOT IN USE YET. `docker-compose.yml` still runs the stock `caddy:2-alpine`.
-# This image exists so that turning on Cloudflare's proxy is a config change
-# rather than a build problem discovered halfway through a cutover. Read
-# docs/EDGE_PROTECTION.md before switching to it.
+# IN USE. `docker-compose.yml` builds the `caddy` service from this file, and
+# has since #103 — deliberately ahead of anything that needs the module, so
+# that turning on Cloudflare's proxy is a config change rather than a build
+# problem discovered halfway through a cutover. Read docs/EDGE_PROTECTION.md
+# before switching the challenge over.
 #
 # Why a custom image at all: the site currently proves domain ownership to
 # Let's Encrypt over HTTP-01, which requires the challenge to reach this
@@ -14,9 +15,10 @@
 # proxy, and it needs a Caddy build that can write that record. The standard
 # image cannot; this one can.
 #
-# The module is additive. Built and swapped in without any Caddyfile change,
-# this image behaves exactly like the stock one — which is what makes it safe
-# to adopt in a separate, boring deploy before the change that depends on it.
+# The module is additive. While CADDY_ACME selects `acme-default` — the empty
+# snippet, which is Caddy's own behaviour — this image behaves exactly like the
+# stock one. That is what made it safe to adopt in a separate, boring deploy
+# ahead of the change that depends on it.
 
 FROM caddy:2-builder-alpine AS builder
 
