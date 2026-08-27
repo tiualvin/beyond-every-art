@@ -15,6 +15,23 @@ Last worked on **22 Aug 2026**. Storage and backups are now real: R2 configured,
 media recovered after a three-week-old loss, first backup uploaded. Details and
 the exact commands are in item 0.4.
 
+**2026-08-27: the deploy of `13f6736` (merge of #110) failed and production is
+still serving the previous commit.** `checks`, `browser-smoke`, `backup-image`,
+and `app-image` all passed; only `deploy` failed, and not on the application —
+`docker compose run --rm migrate` had already completed by the time the job
+died. `docker compose up -d --build` was still compiling the Caddy binary
+(`xcaddy build --with github.com/caddy-dns/cloudflare`, which pulls a large Go
+dependency tree from scratch) when the deploy step's 20-minute SSH timeout
+killed it (`timeout --signal=TERM 20m ssh …`, exit 124). Every deploy since
+#103 (23 Aug) has rebuilt Caddy from source the same way and finished in
+10–11 minutes; this is the first time that step alone has run past 20. That
+points at the VPS's Docker build cache or its network to the Go module proxy
+for that one build stage, not at anything in this repo. Not actionable from
+this environment (no VPS access) — an operator should check
+`docker system df` / build cache state on the VPS and consider retrying the
+deploy (re-run the `deploy` job, or push a no-op commit) before the next
+merge to `main` lands on top of it.
+
 In dependency order, what is left before the public cutover:
 
 1. **Finish 0.4** — set `BACKUP_ENCRYPTION_KEY`, prove a restore works, delete
@@ -161,9 +178,12 @@ toggle, `TRUST_CLOUDFLARE_IP=1`, and one edit to two existing firewall rules.
    `HOSTNAME`, `NewsletterBand`, and `DATABASE_URI` bugs above were being
    tracked down. Starting with the fix for the second of those (2026-08-09,
    "Don't show the newsletter promo band on the newsletter page", #54), the
-   `deploy` job has succeeded on every push to `main` since — 25+ consecutive
-   green deploys through 2026-08-22 (#98), with no failures in between. That
-   is strong circumstantial evidence the baseline was applied correctly, but
+   `deploy` job succeeded on every push to `main` through 2026-08-25 (#109) —
+   30+ consecutive green deploys, with no failures in between, `migrate`
+   included every time. The one failure since (2026-08-27, see "Pick up
+   here" above) does not reset that count: it happened in the Caddy image
+   build, after `migrate` had already completed. That is strong
+   circumstantial evidence the baseline was applied correctly, but
    it is still inferred from a green `docker compose run --rm migrate` exit
    code rather than a direct read of the migrations table. An operator can
    retire this line for good with one command:
