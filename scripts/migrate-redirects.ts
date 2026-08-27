@@ -20,6 +20,7 @@ import {
   buildRedirectPlan,
   parseGhostRedirects,
 } from '../lib/migration/redirects'
+import { unservableRedirectSources } from '../lib/seo/middleware-coverage'
 
 interface Cli {
   dryRun: boolean
@@ -53,10 +54,20 @@ async function main() {
   )
   const plan = buildRedirectPlan(rules)
 
+  // Rules the middleware matcher can never run — a dot in the path, or a
+  // prefix the app owns. They import cleanly, show as enabled in the admin
+  // panel, and are returned by `/redirects-map`; the request simply never
+  // reaches the code that would answer it. `/ads.txt` is the known live
+  // instance (`docs/ADVERTISING.md` §1). Reported rather than fatal: the fix is
+  // to serve the path from Caddy, and the row is still the record of where it
+  // should point.
+  const unservable = unservableRedirectSources(plan.map((rule) => rule.source))
+
   const report: Record<string, unknown> = {
     mode: dryRun ? 'dry-run' : 'import',
     redirectsFound: rules.length,
     redirectsPlanned: plan.length,
+    unservableSources: unservable,
     errors: [] as string[],
   }
 
@@ -78,6 +89,15 @@ async function main() {
 
   await writeFile(resolve(reportPath), `${JSON.stringify(report, null, 2)}\n`)
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`)
+
+  if (unservable.length > 0) {
+    process.stderr.write(
+      `\nWARNING: ${unservable.length} rule(s) can never run — the middleware ` +
+        `matcher skips these paths:\n` +
+        unservable.map((source) => `  ${source}\n`).join('') +
+        `Serve them from Caddy instead. See docs/SEO_AND_REDIRECTS.md.\n`,
+    )
+  }
 
   if (!dryRun && Array.isArray(report.errors) && report.errors.length > 0) {
     process.exitCode = 1

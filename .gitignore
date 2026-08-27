@@ -1,4 +1,7 @@
 node_modules/
+# pnpm's content-addressable store, created by running pnpm outside a container.
+# Cache, not source, and it grows without bound.
+.pnpm-store/
 .next/
 dist/
 coverage/
@@ -18,7 +21,16 @@ test-results/
 /.claude/
 
 # Private Ghost migration material must never be committed.
+#
+# Two directory names, because the rule is about the material and not about
+# where someone put it: `ghost-export/` is what the runbooks tell you to use,
+# and `ghost-archive/` is what the production VPS actually has. The second was
+# untracked but unignored for weeks — a weaker guarantee than it looks, since
+# untracked means one `git add -A` away from committed. The extension rules
+# below caught the DB dump and the content JSON by luck; the ~1,374 media
+# files, `redirects.json` and `routes.yaml` were covered by nothing.
 ghost-export/
+ghost-archive/
 ghost-content*.json
 ghost-members*.csv
 complete-site-archive*.zip

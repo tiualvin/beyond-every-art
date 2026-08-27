@@ -133,3 +133,62 @@ test('a legacy URL redirects to the host the reader used, not the bind address',
     `https://readers.example${fixtures.redirect.destination}`,
   )
 })
+
+// Ghost paginates in the path (`/page/2/`, `/tag/x/page/2/`); this site
+// paginates in the query string. Nothing in Ghost's redirects export covers the
+// difference, because Ghost never needed a redirect for a URL it served itself
+// — so every one of these was a 404 waiting for cutover day. `lib/seo/ghost-urls.ts`
+// answers them, and these check that answer through the real stack, where the
+// middleware matcher and the middleware's own ordering can undo it.
+test('legacy Ghost pagination redirects to the archive', async ({
+  request,
+}) => {
+  for (const [source, destination] of [
+    ['/page/2/', '/journal/'],
+    ['/page/7/', '/journal/'],
+    [`/tag/${fixtures.tag.slug}/page/2/`, `/tag/${fixtures.tag.slug}/`],
+    [
+      `/author/${fixtures.author.slug}/page/3/`,
+      `/author/${fixtures.author.slug}/`,
+    ],
+  ] as const) {
+    const response = await request.get(source, { maxRedirects: 0 })
+
+    expect(response.status(), source).toBe(301)
+    expect(new URL(response.headers().location).pathname, source).toBe(
+      destination,
+    )
+  }
+})
+
+test('a legacy pagination URL lands on a page that exists', async ({
+  request,
+}) => {
+  // The half a status assertion misses. A permanent redirect onto a 404 is
+  // worse than the 404 it replaced: a crawler records the destination as the
+  // URL's new home and stops asking for either one. It is also the specific
+  // reason these collapse to the bare archive rather than to `?page=N`, which
+  // `/journal/` answers with `notFound()` past the end of the archive.
+  const response = await request.get('/page/9/')
+
+  expect(response.status()).toBe(200)
+  expect(new URL(response.url()).pathname).toBe('/journal/')
+})
+
+test('a built-in redirect uses the host the reader used, not the bind address', async ({
+  request,
+}) => {
+  // The built-in rules go out through the same `redirectLocation` +
+  // `forwardedOrigin` path as the table's, so they can fail the same way — and
+  // they are the rules with no row anywhere to inspect when they do.
+  const response = await request.get('/page/2/', {
+    maxRedirects: 0,
+    headers: {
+      'x-forwarded-host': 'readers.example',
+      'x-forwarded-proto': 'https',
+    },
+  })
+
+  expect(response.status()).toBe(301)
+  expect(response.headers().location).toBe('https://readers.example/journal/')
+})

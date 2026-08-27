@@ -11,9 +11,10 @@ Related: [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md),
 
 ## Pick up here
 
-Last worked on **22 Aug 2026**. Storage and backups are now real: R2 configured,
-media recovered after a three-week-old loss, first backup uploaded. Details and
-the exact commands are in item 0.4.
+Last worked on **27 Aug 2026**. The redirect layer was audited end to end and
+two gaps closed in code — see "Redirects, audited" below. Before that, storage
+and backups became real: R2 configured, media recovered after a three-week-old
+loss, first backup uploaded. Details and the exact commands are in item 0.4.
 
 In dependency order, what is left before the public cutover:
 
@@ -22,8 +23,8 @@ In dependency order, what is left before the public cutover:
    acceptance criterion that has never been met.
 2. **Work [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md) end to end.** Every
    box in §4–§6 is unticked. Its media check can pass now, which it could not
-   before. Includes the email-delivery test (item 3 below) and the crawl
-   comparison.
+   before. Includes the email-delivery test (item 3 below), the crawl
+   comparison, and `pnpm validate:redirects`, which is new and must exit zero.
 3. **Members, then Stripe** — item 1 then item 2 below, in that order:
    reconciliation has nothing to reconcile against until the member records
    exist.
@@ -42,6 +43,32 @@ In dependency order, what is left before the public cutover:
    to search.
 
 ## Done
+
+- **Redirects, audited (27 Aug).** The 301 layer was checked end to end rather
+  than spot-checked, and two gaps were found and closed in code.
+
+  - **Ghost pagination had no answer at all.** Ghost paginates in the path
+    (`/page/2/`, `/tag/x/page/2/`, `/author/x/page/3/`); this site paginates in
+    the query string. Ghost's `redirects.json` says nothing about them — it
+    served those URLs itself — so every one of them was a 404 waiting for
+    cutover day, and with 117 posts there are a lot of them. `lib/seo/ghost-urls.ts`
+    now redirects each to its unpaginated archive, permanently. A table row for
+    the same source still wins.
+  - **A redirect row can be silently unservable.** The middleware matcher skips
+    any path containing a dot, so a row for `/ads.txt`, `/sitemap-posts.xml`, or
+    `/content/images/…` imports cleanly, shows as enabled, and never fires. This
+    was known for `/ads.txt` alone; `lib/seo/middleware-coverage.ts` now models
+    the matcher, `pnpm migrate:redirects` warns about any such rule at import
+    time, and the validator below reports it as an error.
+  - **`pnpm validate:redirects` is new** and is what replaces "spot-check a
+    handful" in the rehearsal and cutover checklists. It checks every rule
+    against a running host — status, destination, that the destination answers
+    200, and that the matcher runs on the source — and exits non-zero on any
+    failure. See
+    [`SEO_AND_REDIRECTS.md`](SEO_AND_REDIRECTS.md#validating-them).
+
+  Not yet run against staging or production: that is part of the rehearsal
+  (item 2 above), and it needs a host this repository's CI cannot reach.
 
 - **Trailing slashes, decided.** `next.config.ts` sets `trailingSlash: true` to
   match the Ghost permalinks the site is migrating, described in

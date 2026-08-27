@@ -79,7 +79,7 @@ discrepancy. Fix the root cause and re-run until it reports `"ok": true`.
 - [ ] **Drafts** are still drafts and are not publicly reachable.
 - [ ] **Media** loads from R2 (not the old Ghost domain) with alt text intact.
 - [ ] **URLs** preserve the original slugs and trailing-slash structure.
-- [ ] **Redirects** resolve (spot-check several from `redirects.json`).
+- [ ] **Redirects** validated in full by the command below — not spot-checked.
 - [ ] **Canonical URLs**, meta titles, and descriptions are preserved.
 - [ ] **Sitemap** (`/sitemap.xml`), **RSS** (`/rss`), and **robots** are correct.
 - [ ] **Payload admin** loads and editing works.
@@ -87,6 +87,22 @@ discrepancy. Fix the root cause and re-run until it reports `"ok": true`.
 - [ ] **Forms** (search, newsletter signup) submit successfully.
 - [ ] **Email** delivery works (trigger an admin password reset; confirm receipt).
 - [ ] **Health** endpoint (`/health`) returns `status: ok`.
+
+The redirect line above is the one item on this list that a spot-check cannot
+stand in for: a broken rule looks exactly like a URL nobody has asked for yet,
+so checking "several" of them says nothing about the rest. Check all of them.
+
+```bash
+pnpm validate:redirects --target https://staging.<domain> \
+  --input ghost-export/redirects.json \
+  --basic-auth-env STAGING_CRAWL_BASIC_AUTH \
+  --tag <a-real-tag> --author <a-real-author>
+```
+
+It must exit zero. As well as every rule in the export, it checks the built-in
+pagination rules — the Ghost URL shapes no export covers — and reports any rule
+the middleware matcher can never run. See
+[`SEO_AND_REDIRECTS.md`](SEO_AND_REDIRECTS.md#validating-them).
 
 ## 5. Backups and restore
 

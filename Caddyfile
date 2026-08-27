@@ -1,5 +1,34 @@
+# ── How certificates are obtained ─────────────────────────────────────────────
+#
+# Two named strategies, chosen by CADDY_ACME rather than by editing this file on
+# the server. The default is what this deployment has always done: HTTP-01,
+# where Let's Encrypt reaches this machine directly on port 80. It is an empty
+# snippet because that is already Caddy's own behaviour — naming it is what
+# makes the other one selectable.
+#
+# Setting CADDY_ACME=acme-cloudflare in the production .env moves every site
+# block to DNS-01, which proves ownership by writing a TXT record and therefore
+# keeps working once Cloudflare terminates TLS at their edge. It needs
+# CLOUDFLARE_API_TOKEN set in the same file.
+#
+# Order matters and the failure is silent: switch to DNS-01 and confirm a
+# certificate has been obtained through it BEFORE turning the orange cloud on.
+# Proxying first leaves the current certificate working and breaks its renewal,
+# about thirty days before expiry, with a browser warning as the first symptom.
+# Read docs/EDGE_PROTECTION.md before changing this.
+(acme-default) {
+}
+
+(acme-cloudflare) {
+  tls {
+    dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+  }
+}
+
 # Public site.
 {$SITE_ADDRESS:localhost} {
+  import {$CADDY_ACME:acme-default}
+
   encode zstd gzip
 
   # Staff tooling is served only on the CMS hostname below, so the address
@@ -76,6 +105,8 @@
 # the block, which is what a local or staging deployment wants: Caddy would
 # otherwise try, and fail, to get a certificate for a name that does not exist.
 {$SITE_REDIRECT_FROM:redirect-disabled.localhost} {
+  import {$CADDY_ACME:acme-default}
+
   redir https://{$SITE_ADDRESS:localhost}{uri} permanent
 }
 
@@ -110,6 +141,8 @@
 # blocks are otherwise sorted by matcher specificity, and the order is the whole
 # meaning here.
 {$CMS_ADDRESS:cms.localhost} {
+  import {$CADDY_ACME:acme-default}
+
   encode zstd gzip
 
   route {
