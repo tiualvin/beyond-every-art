@@ -20,11 +20,30 @@
 # stock one. That is what made it safe to adopt in a separate, boring deploy
 # ahead of the change that depends on it.
 
-FROM caddy:2-builder-alpine AS builder
+# Cross-compiled, not emulated.
+#
+# The production VPS is arm64 (a Hetzner CAX) and GitHub's runners are amd64,
+# so an image built the obvious way on CI cannot execute there at all: the
+# container exec-fails and restarts forever, which is precisely what happened
+# on 2026-08-27 and which the deploy reported as a success.
+#
+# `--platform=$BUILDPLATFORM` pins the *builder* stage to the machine doing the
+# building, and GOOS/GOARCH tell Go what to emit. Go cross-compiles natively, so
+# an arm64 binary is produced at amd64 speed. Without the pin, buildx would
+# instead run the whole Go toolchain under QEMU for the foreign architecture —
+# correct, and slow enough to put us back where this started.
+FROM --platform=$BUILDPLATFORM caddy:2-builder-alpine AS builder
 
-RUN xcaddy build \
+# Supplied by BuildKit from the requested --platform; defaulted so a plain
+# `docker build` with no platform flag still works for a local smoke test.
+ARG TARGETOS=linux
+ARG TARGETARCH
+
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} xcaddy build \
     --with github.com/caddy-dns/cloudflare
 
+# Not pinned: this stage must be the *target* platform, so the runtime layers
+# underneath the binary match the machine that will run it.
 FROM caddy:2-alpine
 
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy

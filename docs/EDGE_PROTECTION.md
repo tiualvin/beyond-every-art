@@ -67,6 +67,21 @@ under a minute and publishes it; the server pulls a few megabytes. The
 `build:` section stays as a fallback so a machine that cannot reach the
 registry still comes up — slowly, and saying so in the log.
 
+**This server is arm64** (a Hetzner CAX) and the runner that builds is amd64.
+The first attempt published an amd64-only image, which could not execute here
+at all: the container exec-failed and restarted forever, the site answered
+nothing on 80 or 443, and the deploy reported success. The image is a manifest
+list covering both architectures now, built by cross-compiling rather than
+emulating — the builder stage is pinned to the runner's own platform and Go
+emits the foreign binary at native speed.
+
+The deploy also asserts that Caddy is _running_ fifteen seconds after the
+containers are replaced. Nothing else could see it: the service has no
+healthcheck, Compose treats a service without one as ready the moment it is
+running — which a container that starts and immediately exits satisfies for
+just long enough — and the post-deploy health probe fetches `/health` from
+inside the app container, so it never crosses the proxy.
+
 ## The procedure
 
 1. **Create a Cloudflare API token.** Scope it to `Zone → DNS → Edit` for this
@@ -90,10 +105,16 @@ registry still comes up — slowly, and saying so in the log.
 > **Public**. The image is upstream Caddy plus a public DNS plugin; it carries
 > no configuration and no credentials.
 >
-> The deploy log says which path it took — look for the `WARNING: could not
-pull the Caddy image` line. Authenticating the host to `ghcr.io` instead of
-> making the package public works too; the point is that one of the two has to
-> be true.
+> The deploy log says which path it took — look for the
+> `WARNING: could not pull the Caddy image` line. Authenticating the host to
+> `ghcr.io` instead of making the package public works too; the point is that
+> one of the two has to be true.
+>
+> **If `CADDY_IMAGE` is set in the production `.env`, remove it.** It was added
+> on 27 Aug to pin the server to a locally built image, after a published
+> amd64-only one could not run on this arm64 host. The published image covers
+> both architectures now, so the pin only keeps the server on whatever it built
+> last.
 
 2. **Switch the Caddy service to the custom image** — **done (#103)**.
    `docker-compose.yml` builds `caddy` from `docker/caddy/Dockerfile`, and the
