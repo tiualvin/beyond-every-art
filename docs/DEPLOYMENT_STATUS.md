@@ -304,9 +304,21 @@ to the Claude connector. See [`MCP_SERVER.md`](MCP_SERVER.md).
    the team. The workflow does not mutate repository protection rules or infer
    who should have bypass authority.
 6. **Lower priority / only if needed later:**
-   - Move the image build off the production VPS (build in CI, push to a
-     registry, VPS just pulls) if frequent merges start causing noticeable
-     CPU contention with live traffic during the ~2–3 minute build window.
+   - ~~Move the image build off the production VPS~~ — **done for Caddy, and it
+     was not lower priority.** Compiling Caddy with the Cloudflare module ran
+     seventeen minutes on this box without finishing and killed the deploy of
+     #110 on its 20-minute timeout (CI run 33043176270, 27 Aug); the same build
+     takes under a minute on a runner. CI publishes the image to GHCR now and
+     the VPS pulls it. **The package must be public, or the server must be
+     authenticated to `ghcr.io`, or every deploy silently takes the slow path
+     again** — see the note in
+     [`EDGE_PROTECTION.md`](EDGE_PROTECTION.md#the-procedure).
+   - The **app** image is still built on the VPS, deliberately: its
+     `NEXT_PUBLIC_CHECKOUT_URL_*` build arguments come from the production
+     `.env`, so moving that build to CI means moving those values into CI
+     secrets. Worth doing eventually; it is a separate decision, and getting it
+     wrong leaves the subscribe modal saying membership is not open with
+     nothing in the logs. Its ~2–3 minute build is not the problem Caddy was.
    - A GitHub Environment with a manual-approval gate in front of the
      `deploy` job, if merges to `main` should not always auto-deploy.
 

@@ -132,11 +132,24 @@ services:
     # Caddy plus the Cloudflare DNS module, from `docker/caddy/Dockerfile`.
     #
     # Adopted on its own, ahead of the change that needs it. The module is
-    # additive: with no `tls` directive in the Caddyfile, this image still
-    # answers the HTTP-01 challenge and behaves exactly like `caddy:2-alpine`.
-    # That is the point — the risky change is switching the ACME challenge, and
-    # doing it in the same deploy as a new image would leave two suspects if the
-    # site stopped serving. See docs/EDGE_PROTECTION.md.
+    # additive: while CADDY_ACME selects `acme-default` this image behaves
+    # exactly like `caddy:2-alpine`. That is the point — the risky change is
+    # switching the ACME challenge, and doing it in the same deploy as a new
+    # image would leave two suspects if the site stopped serving. See
+    # docs/EDGE_PROTECTION.md.
+    #
+    # Pulled, not compiled here. `image:` and `build:` together mean the
+    # published image is used when it can be fetched, and the Dockerfile is
+    # still there to build from when it cannot — a new machine, an offline one,
+    # or a registry outage all come up rather than failing.
+    #
+    # Compiling it locally is the thing to avoid. This module set pulls in the
+    # AWS, GCP and Smithy SDKs, and on the 4GB production VPS the Go link step
+    # ran seventeen minutes without finishing and killed the deploy on its own
+    # 20-minute timeout. CI builds the same image in under a minute and
+    # publishes it (`.github/workflows/ci.yml`, "Publish the Caddy image"), so
+    # the deploy pulls a few megabytes instead.
+    image: ${CADDY_IMAGE:-ghcr.io/tiualvin/beyond-every-art-caddy:main}
     build:
       context: .
       dockerfile: docker/caddy/Dockerfile
