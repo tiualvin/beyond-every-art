@@ -295,6 +295,12 @@ jobs:
         run: docker build --file docker/backup/Dockerfile --tag beyond-every-art-backup:ci .
 
   app-image:
+    # Grants only what the publish step below needs, on top of the workflow's
+    # `contents: read`. Naming both is required: a job-level `permissions` block
+    # replaces the workflow default rather than adding to it.
+    permissions:
+      contents: read
+      packages: write
     # Build-only smoke test for the main app image. `pnpm build` in `checks`
     # only proves the Next.js build succeeds outside a container; it does not
     # exercise the Dockerfile itself, so a broken multi-stage COPY (e.g.
@@ -332,14 +338,49 @@ jobs:
         env:
           PAYLOAD_SECRET: not-a-real-secret-compose-render-only
         run: docker compose config --quiet
-      # Caddy is now built from source rather than pulled, so a broken
+      # Caddy is built from source rather than pulled, so a broken
       # `xcaddy build` — an upstream module that stops compiling, say — would
       # otherwise first appear on the VPS, in the deploy that replaces the only
       # thing answering on ports 80 and 443. Same reasoning as the two builds
       # above, applied to the service whose failure is hardest to recover from
       # remotely.
+      #
+      # It is also published, and that is not a convenience. Compiling Caddy
+      # with this module set pulls in the AWS, GCP and Smithy SDKs, and on the
+      # 4GB production VPS the link step ran for seventeen minutes without
+      # finishing and killed the deploy on its own 20-minute timeout (run
+      # 33043176270, 2026-08-27). The same build takes under a minute on a
+      # runner. Nothing about that is going to improve on its own: every cache
+      # invalidation — an upstream `caddy:2-builder-alpine` push, a pruned
+      # layer, a rebuilt box — puts a seventeen-minute Go build in front of a
+      # deploy that is allowed twenty.
+      #
+      # So the runner does it once and the VPS pulls the result. The `build:`
+      # section stays in docker-compose.yml as a fallback, so a machine that
+      # cannot reach the registry can still come up.
       - name: Build the Caddy image
         run: docker build --file docker/caddy/Dockerfile --tag beyond-every-art-caddy:ci .
+
+      # Only for real pushes to main: pull requests keep the build-only check
+      # above, which is what makes a broken Dockerfile fail review rather than
+      # deploy. `github.actor` and GITHUB_TOKEN authenticate the push; no
+      # long-lived registry credential exists anywhere.
+      - name: Publish the Caddy image
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REGISTRY_IMAGE: ghcr.io/${{ github.repository }}-caddy
+        run: |
+          printf '%s' "$GITHUB_TOKEN" \
+            | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
+          # Two tags on purpose. `main` is what the VPS follows, so a deploy
+          # needs no knowledge of which commit built the image; the SHA tag is
+          # what makes a rollback nameable after the fact.
+          docker tag beyond-every-art-caddy:ci "$REGISTRY_IMAGE:main"
+          docker tag beyond-every-art-caddy:ci "$REGISTRY_IMAGE:${GITHUB_SHA::12}"
+          docker push "$REGISTRY_IMAGE:main"
+          docker push "$REGISTRY_IMAGE:${GITHUB_SHA::12}"
+          docker logout ghcr.io
 
   deploy:
     # Only after all builds are proven good, and only for real pushes to main
@@ -347,7 +388,13 @@ jobs:
     needs: [checks, browser-smoke, backup-image, app-image]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # Sized for the worst case rather than the normal one. A deploy that pulls
+    # Caddy takes a couple of minutes; one that has to fall back to building it
+    # takes closer to twenty on this hardware. The 2026-08-27 failure was that
+    # build being killed part-way by a budget set for the normal case, which
+    # left the checkout advanced and the containers not replaced — the most
+    # confusing state of the three.
+    timeout-minutes: 35
     # Never let two deploys mutate the same checkout/Compose project at once.
     # A running production deploy is allowed to finish instead of being
     # cancelled halfway through a build or container replacement.
@@ -401,7 +448,7 @@ jobs:
         run: |
           printf -v remote_path '%q' "$DEPLOY_PATH"
           printf -v remote_sha '%q' "$DEPLOY_SHA"
-          timeout --signal=TERM 20m ssh \
+          timeout --signal=TERM 30m ssh \
             -i "$DEPLOY_KEY" \
             -o BatchMode=yes \
             -o ConnectTimeout=10 \
@@ -452,7 +499,31 @@ jobs:
           docker compose build migrate
           docker compose run --rm migrate
 
-          docker compose up -d --build --wait --wait-timeout 180
+          # Caddy is pulled rather than built: compiling it here is what
+          # killed the 2026-08-27 deploy, seventeen minutes into a Go link step
+          # on a 4GB box. A failure here is survivable — the compose file keeps
+          # the Dockerfile, so `up` builds it instead — but it is not silent,
+          # because the fallback is the slow path this change exists to avoid
+          # and "the deploy got mysteriously slower" is not a diagnosis.
+          #
+          # The most likely cause by far is package visibility: images published
+          # to GHCR are private until someone makes them public, and this host
+          # pulls anonymously. See docs/EDGE_PROTECTION.md.
+          if ! docker compose pull caddy; then
+            echo "WARNING: could not pull the Caddy image; falling back to" \
+              "building it here, which takes ~17 minutes on this machine." >&2
+            echo "Check that ghcr.io/tiualvin/beyond-every-art-caddy is" \
+              "public, or that this host is authenticated to ghcr.io." >&2
+          fi
+
+          # Everything that genuinely has to be built from this checkout. The
+          # app carries the commit's code, and `backup` carries the scripts the
+          # nightly job and the restore drill run. Named explicitly rather than
+          # left to `up --build`, which would rebuild Caddy too and put the Go
+          # toolchain back in front of every deploy.
+          docker compose build app backup
+
+          docker compose up -d --wait --wait-timeout 180
           docker compose ps --all
           docker compose exec -T app node -e '
             fetch("http://127.0.0.1:3000/health/", {

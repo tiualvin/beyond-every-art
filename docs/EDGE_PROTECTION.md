@@ -57,10 +57,15 @@ below.
 
 Both are wired into `docker-compose.yml` now, along with `CADDY_ACME` and
 `CLOUDFLARE_API_TOKEN`, and all of it is inert until those variables are set —
-which is the point. Building Caddy from source runs a Go toolchain on the
-production VPS, and `DEPLOYMENT_STATUS.md` notes CPU contention during the
-~2–3 minute app build, so the image was adopted in its own quiet deploy rather
-than during a cutover. What is left is configuration.
+which is the point. What is left is configuration.
+
+The image is no longer compiled on the VPS. That was the original plan's one
+bad assumption: building Caddy with this module set pulls in the AWS, GCP and
+Smithy SDKs, and on a 4GB machine the Go link step ran for seventeen minutes
+without finishing and killed the deploy on its own timeout. CI builds it in
+under a minute and publishes it; the server pulls a few megabytes. The
+`build:` section stays as a fallback so a machine that cannot reach the
+registry still comes up — slowly, and saying so in the log.
 
 ## The procedure
 
@@ -70,6 +75,25 @@ than during a cutover. What is left is configuration.
    in git. `docker-compose.yml` already passes it through to the `caddy`
    service, so nothing else has to change to make it readable; nothing reads it
    either until step 3.
+
+> [!IMPORTANT]
+> **One-time: make the published Caddy image public.**
+>
+> CI builds the image and pushes it to
+> `ghcr.io/tiualvin/beyond-every-art-caddy`, and the VPS pulls it anonymously.
+> **Images published to GHCR are private until someone changes that**, so until
+> this is done every deploy falls back to compiling Caddy on the server — which
+> takes about seventeen minutes there and is what killed the 2026-08-27 deploy.
+>
+> On GitHub: the repository's **Packages** (or your profile's Packages) →
+> `beyond-every-art-caddy` → **Package settings** → **Change visibility** →
+> **Public**. The image is upstream Caddy plus a public DNS plugin; it carries
+> no configuration and no credentials.
+>
+> The deploy log says which path it took — look for the `WARNING: could not
+pull the Caddy image` line. Authenticating the host to `ghcr.io` instead of
+> making the package public works too; the point is that one of the two has to
+> be true.
 
 2. **Switch the Caddy service to the custom image** — **done (#103)**.
    `docker-compose.yml` builds `caddy` from `docker/caddy/Dockerfile`, and the
