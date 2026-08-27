@@ -313,6 +313,17 @@ to the Claude connector. See [`MCP_SERVER.md`](MCP_SERVER.md).
      authenticated to `ghcr.io`, or every deploy silently takes the slow path
      again** — see the note in
      [`EDGE_PROTECTION.md`](EDGE_PROTECTION.md#the-procedure).
+
+     The first attempt at this broke the site. **The VPS is arm64**; GitHub's
+     runners are amd64, and the amd64-only image it published could not execute
+     here — Caddy exec-failed and restarted forever, nothing answered on 80 or
+     443, and the deploy reported success anyway. The image is a two-architecture
+     manifest list now, and the deploy asserts Caddy is actually running rather
+     than trusting `--wait`, which for a service with no healthcheck treats
+     "running" as ready. **Remove `CADDY_IMAGE` from the production `.env`** —
+     it was added by hand to restore service and now only pins the server to
+     whatever it last built.
+
    - The **app** image is still built on the VPS, deliberately: its
      `NEXT_PUBLIC_CHECKOUT_URL_*` build arguments come from the production
      `.env`, so moving that build to CI means moving those values into CI

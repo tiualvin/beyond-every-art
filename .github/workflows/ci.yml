@@ -361,6 +361,23 @@ jobs:
       - name: Build the Caddy image
         run: docker build --file docker/caddy/Dockerfile --tag beyond-every-art-caddy:ci .
 
+      # The default docker driver cannot emit a manifest list, and the two steps
+      # below need one. No QEMU alongside it: the builder stage is pinned to the
+      # native platform and Go cross-compiles, so nothing foreign is ever
+      # executed — the arm64 stage only copies a binary in.
+      - name: Set up buildx
+        uses: docker/setup-buildx-action@v3
+
+      # The production VPS is arm64 and this runner is amd64, so the build above
+      # proves the Dockerfile compiles and proves nothing about whether the
+      # result can execute where it is going. It could not, on 2026-08-27: the
+      # container exec-failed and restarted forever while the deploy reported
+      # success. Building the foreign architecture here is the check.
+      - name: Build the Caddy image for the architecture the server runs
+        run: |
+          docker buildx build --platform linux/arm64 \
+            --file docker/caddy/Dockerfile --tag beyond-every-art-caddy:ci-arm64 .
+
       # Only for real pushes to main: pull requests keep the build-only check
       # above, which is what makes a broken Dockerfile fail review rather than
       # deploy. `github.actor` and GITHUB_TOKEN authenticate the push; no
@@ -376,10 +393,18 @@ jobs:
           # Two tags on purpose. `main` is what the VPS follows, so a deploy
           # needs no knowledge of which commit built the image; the SHA tag is
           # what makes a rollback nameable after the fact.
-          docker tag beyond-every-art-caddy:ci "$REGISTRY_IMAGE:main"
-          docker tag beyond-every-art-caddy:ci "$REGISTRY_IMAGE:${GITHUB_SHA::12}"
-          docker push "$REGISTRY_IMAGE:main"
-          docker push "$REGISTRY_IMAGE:${GITHUB_SHA::12}"
+          # Both architectures, in one manifest list, so the server pulls the
+          # one it can run. amd64 is not there for the server — it is there so
+          # a developer machine and this runner can pull the same reference.
+          #
+          # Built rather than tagged: a multi-platform result cannot live in
+          # the local image store, so buildx assembles and pushes it in one
+          # step. The layers are already cached by the two builds above.
+          docker buildx build --platform linux/amd64,linux/arm64 \
+            --file docker/caddy/Dockerfile \
+            --tag "$REGISTRY_IMAGE:main" \
+            --tag "$REGISTRY_IMAGE:${GITHUB_SHA::12}" \
+            --push .
           docker logout ghcr.io
 
   deploy:
@@ -525,6 +550,38 @@ jobs:
 
           docker compose up -d --wait --wait-timeout 180
           docker compose ps --all
+
+          # `--wait` cannot speak for Caddy. The service has no healthcheck, and
+          # for a service without one Compose treats "running" as ready — which
+          # a container that starts and then immediately exec-fails satisfies
+          # for just long enough. On 2026-08-27 the deploy printed
+          # "Container beyond-every-art-caddy-1 Healthy" four seconds before
+          # `ps` showed it restarting, and still exited 0.
+          #
+          # Nothing else here would catch it either: the health probe below
+          # fetches /health from inside the app container, so it never crosses
+          # the proxy. That is the whole reason a green deploy could sit on top
+          # of a site that answered nothing on 80 or 443.
+          #
+          # Settle first, because a crash loop passes through "running" on its
+          # way round.
+          sleep 15
+          # Read through `docker inspect` rather than `compose ps --format`:
+          # the Go-template form of the latter depends on the Compose version
+          # installed on the server, and a gate that fails because of its own
+          # formatting is worse than no gate.
+          caddy_id=$(docker compose ps -q caddy || true)
+          if [ -n "$caddy_id" ]; then
+            caddy_state=$(docker inspect -f '{{.State.Status}}' "$caddy_id" 2>/dev/null || echo unreadable)
+          else
+            caddy_state=missing
+          fi
+          if [ "$caddy_state" != "running" ]; then
+            echo "Caddy is not running after the deploy (state: $caddy_state)." >&2
+            echo "The site answers nothing on 80/443 in this state." >&2
+            docker compose logs --no-color --tail=50 caddy >&2
+            exit 1
+          fi
           docker compose exec -T app node -e '
             fetch("http://127.0.0.1:3000/health/", {
               signal: AbortSignal.timeout(10000),
