@@ -14,6 +14,12 @@ on cutover day.
 - [ ] The `backup` service is running and has produced at least one backup.
 - [ ] DNS TTL for the domain reduced (e.g. to 300s) so the flip propagates fast.
 - [ ] Administrator account exists in production Payload.
+- [ ] **Search baseline captured from the Ghost site** — Search Console queries
+      and pages (top 100 each, three months, sorted by impressions) and the GA4
+      organic landing pages for the same window. This is the only item here that
+      cannot be done afterwards: once DNS moves, there is no way back to what
+      the site ranked for before. The post-launch list below compares against
+      it. See [`SEO_CUTOVER_RISK.md`](SEO_CUTOVER_RISK.md#capture-the-baseline-before-the-flip).
 
 ## Cutover
 
@@ -81,7 +87,10 @@ Watch, via logs / Search Console / uptime monitor / `/health`:
 - Missing images / broken links
 - Search Console coverage and sitemap processing
 - Canonical URL issues
-- Analytics traffic vs. the pre-migration baseline
+- Analytics traffic vs. the pre-migration baseline captured above.
+  [`SEO_CUTOVER_RISK.md`](SEO_CUTOVER_RISK.md#reading-the-aftermath) covers
+  which shapes of change are recrawl noise and which are a real problem — the
+  distinction is the pattern, not the size
 - Form submissions and email delivery
 - Database storage, R2 usage, CPU/memory
 - Nightly backup completion, and the weekly restore check that reads one back
