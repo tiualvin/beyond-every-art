@@ -293,17 +293,49 @@ to the Claude connector. See [`MCP_SERVER.md`](MCP_SERVER.md).
      login is confirmed working for every account that needs access.
    - The deploy SSH user (`VPS_USER`) is currently `root`. Consider a
      dedicated low-privilege deploy user in the `docker` group instead.
-4. **Docker image/layer cleanup (operator action).** Nothing automatically
+4. **The VPS has no swap, and it is now failing deploys (operator action).**
+   Measured 27 Aug: 3.7GB of RAM, **`Swap: 0B`**, about 2.0GB available with
+   the stack running. The Next.js production build peaks near that on its own,
+   so the deploy of #118 was killed outright by the OOM killer
+   (`failed to execute bake: signal: killed`) — after the same build had
+   succeeded twice earlier the same day. That is a coin flip, not a margin, and
+   it will land on cutover day eventually.
+
+   Add a swapfile. It needs disk, so check first:
+
+   ```bash
+   df -h /
+   fallocate -l 4G /swapfile && chmod 600 /swapfile
+   mkswap /swapfile && swapon /swapfile
+   echo '/swapfile none swap sw 0 0' >> /etc/fstab
+   sysctl -w vm.swappiness=10
+   echo 'vm.swappiness=10' > /etc/sysctl.d/99-swappiness.conf
+   free -h
+   ```
+
+   Low swappiness keeps it as overflow for build spikes rather than something
+   the kernel reaches for while serving. The deploy now also builds the two
+   images one at a time rather than letting bake run them in parallel, which
+   halves the peak — insurance, not a substitute.
+
+5. **Docker image/layer cleanup (operator action).** Nothing automatically
    prunes old images or layers on the VPS. That is intentional: an unattended
    prune can remove rollback material and consume I/O at the worst time.
    Periodically inspect `docker system df`, then have an operator review and
    remove only confirmed-unused images/layers during a maintenance window.
-5. **GitHub branch protection (operator action).** Configure the `main` branch
+
+   Measured 27 Aug: **7.9GB of build cache** and 4.2GB of images, of which
+   3.3GB (78%) is reclaimable — several of them stale Caddy builds, including
+   the amd64 one that could not run here. `docker builder prune` reclaims the
+   cache safely; images want the review this item describes, since one of them
+   is the rollback.
+
+6. **GitHub branch protection (operator action).** Configure the `main` branch
    in repository settings to require the `checks`, `browser-smoke`,
    `backup-image`, and `app-image` jobs and disallow bypasses appropriate to
    the team. The workflow does not mutate repository protection rules or infer
    who should have bypass authority.
-6. **Lower priority / only if needed later:**
+7. **Lower priority / only if needed later:**
    - ~~Move the image build off the production VPS~~ — **done for Caddy, and it
      was not lower priority.** Compiling Caddy with the Cloudflare module ran
      seventeen minutes on this box without finishing and killed the deploy of

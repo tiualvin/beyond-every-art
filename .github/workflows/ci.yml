@@ -546,7 +546,21 @@ jobs:
           # nightly job and the restore drill run. Named explicitly rather than
           # left to `up --build`, which would rebuild Caddy too and put the Go
           # toolchain back in front of every deploy.
-          docker compose build app backup
+          #
+          # One at a time, deliberately. Naming both in a single invocation lets
+          # Compose hand them to bake, which builds them in parallel — and this
+          # machine has 3.7GB of RAM, no swap at all, and about 2GB actually
+          # available with the stack running. The Next.js production build alone
+          # gets close to that; a second build alongside it went over on
+          # 2026-08-27 and the kernel killed the whole thing
+          # (`failed to execute bake: signal: killed`).
+          #
+          # Sequential costs about twenty seconds and halves the peak. It is not
+          # a substitute for swap on this box, which is the actual fix — see
+          # docs/DEPLOYMENT_STATUS.md — but it stops the deploy being the thing
+          # that discovers the ceiling.
+          docker compose build app
+          docker compose build backup
 
           docker compose up -d --wait --wait-timeout 180
           docker compose ps --all
