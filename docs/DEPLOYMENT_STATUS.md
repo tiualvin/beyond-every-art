@@ -11,38 +11,115 @@ Related: [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md),
 
 ## Pick up here
 
-Last worked on **27 Aug 2026**. The redirect layer was audited end to end and
-two gaps closed in code — see "Redirects, audited" below. Before that, storage
-and backups became real: R2 configured, media recovered after a three-week-old
-loss, first backup uploaded. Details and the exact commands are in item 0.4.
+Last worked on **28 Aug 2026**. The deploy pipeline broke and was repaired; the
+detail is in "The 27–28 Aug deploy outage" below, and it is worth reading before
+the next infrastructure change because two of the three failures were invisible
+to CI. The server now runs everything through #120.
+
+Closed since the last update: the migrations baseline (confirmed directly, not
+inferred), encrypted backups **with a proven restore**, the paying-subscriber
+question, and the redirect audit. The box also gained 4GB of swap and went from
+2.3GB free to 19GB.
 
 In dependency order, what is left before the public cutover:
 
-1. **Finish 0.4** — set `BACKUP_ENCRYPTION_KEY`, prove a restore works, delete
-   the unencrypted backup. Minutes of work, and the restore is a Phase 1
-   acceptance criterion that has never been met.
+1. **Two loose ends, minutes each.**
+   - Delete the two **unencrypted** backups still in the R2 bucket. An
+     encrypted one exists and its restore has been proven, so the precondition
+     for removing them is met. They carry the users table and OAuth records.
+   - Remove `CADDY_IMAGE` from the production `.env` and confirm the published
+     multi-architecture image pulls and runs:
+     `docker compose pull caddy && docker compose up -d caddy`, then
+     `sleep 15 && docker compose ps caddy` — `Up`, not `Restarting`. The pin was
+     added by hand on 27 Aug to restore service and now only holds the server on
+     whatever it last built locally.
+
 2. **Work [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md) end to end.** Every
-   box in §4–§6 is unticked. Its media check can pass now, which it could not
-   before. Includes the email-delivery test (item 3 below), the crawl
-   comparison, and `pnpm validate:redirects`, which is new and must exit zero.
-3. **Members, then Stripe** — item 1 then item 2 below, in that order:
-   reconciliation has nothing to reconcile against until the member records
-   exist.
-4. **Decide what happens to paying subscribers.** Phase 1 ships no reader
-   accounts and no paywall ([`ACCOUNT_MODEL.md`](ACCOUNT_MODEL.md)), but posts
-   keep their Ghost `visibility` and render a teaser. On cutover day a paying
-   subscriber gets a teaser where Ghost gave them the full piece, with no way to
-   sign in. Count the exposure first:
-   `SELECT visibility, count(*) FROM posts GROUP BY visibility;`
-5. **Edge protection** — [`EDGE_PROTECTION.md`](EDGE_PROTECTION.md), and read the
-   ordering warning before touching Cloudflare. Adopt the DNS-01 Caddy image in
-   its own quiet deploy, _then_ proxy. Not cutover-day work.
-6. **Flip.** Unset `NEXT_PUBLIC_NOINDEX` and `STAGING_BASIC_AUTH`, move
-   `SITE_ADDRESS` and `NEXT_PUBLIC_SITE_URL` to the production domain. Leaving
-   the noindex on is the quiet failure: the site works perfectly and is invisible
-   to search.
+   box in §4–§6 is unticked, and this is the bulk of what is left. Newly
+   unblocked: `pnpm validate:redirects` is deployed and must exit zero, the media
+   check can pass, and staging no longer requires Basic Auth so the crawl
+   comparison and the validator need no credentials. Includes the
+   email-delivery test.
+
+3. **Members CSV.** Export from Ghost Admin and import. Low stakes now — there
+   are no paying members, so this is the newsletter list rather than billing
+   identifiers, and the Stripe takeover is off the critical path to cancelling
+   Ghost.
+
+4. **Edge protection** — [`EDGE_PROTECTION.md`](EDGE_PROTECTION.md). The token
+   exists and the repository side is done: `CADDY_ACME=acme-cloudflare` in `.env`
+   switches every site block to DNS-01. What remains is that switch, confirming
+   a certificate is obtained through it, the orange cloud, `TRUST_CLOUDFLARE_IP=1`,
+   and firewall pass two. **Its own quiet deploy, not cutover-day work**, and
+   validate the Caddyfile before deploying.
+
+5. **Branch protection (operator action).** Promoted out of the "not done yet"
+   list because it stopped being housekeeping on 28 Aug: three Dependabot pull
+   requests, each green on its own branch, merged into a `pnpm-lock.yaml` that
+   no YAML parser accepts, and `main` could not deploy until it was regenerated
+   (#120). Requiring branches to be up to date before merging is the check that
+   would have caught it. Cheap now; expensive on cutover day.
+
+6. **Flip.** Unset `NEXT_PUBLIC_NOINDEX`, move `SITE_ADDRESS` and
+   `NEXT_PUBLIC_SITE_URL` to the production domain, then change DNS.
+   `STAGING_BASIC_AUTH` is already unset — staging has been deliberately public
+   since 28 Aug, which is why `NEXT_PUBLIC_NOINDEX` is now the **only** thing
+   keeping a complete copy of the site out of search results. Do not unset it
+   before the domain moves.
+
+Not blocking, but pending: the server has been asking for a restart for days,
+and confirming the `/etc/fstab` swap line survives a reboot is worth doing
+before cutover rather than discovering it afterwards.
 
 ## Done
+
+- **The 27–28 Aug deploy outage, and what it cost.** Recorded in full because
+  two of the three failures were invisible to CI, and the same blind spots would
+  have applied on cutover day.
+
+  Moving the Caddy build off the VPS was correct — compiling it there ran
+  seventeen minutes and killed one deploy on its own timeout — but the image CI
+  published was **amd64 and this server is arm64**. Caddy could not execute,
+  entered a restart loop, and nothing answered on 80 or 443. **The deploy
+  reported success**: Caddy has no healthcheck, `up --wait` treats a service
+  without one as ready the moment it is running, and the post-deploy probe
+  fetches `/health` from inside the app container, so it never crosses the
+  proxy. Service was restored by pinning `CADDY_IMAGE` to the locally built
+  image (#118 fixed the cause; the deploy now also asserts Caddy is running).
+
+  The fix then could not deploy: the Next.js build was killed by the OOM killer
+  on a 3.7GB machine with **no swap at all** (#119 builds the images one at a
+  time; 4GB of swap was added). And that deploy could not run either, because
+  three Dependabot merges had left `pnpm-lock.yaml` unparseable and four of five
+  gate jobs failed on it (#120).
+
+  Three ceilings, none of which the pipeline could see: architecture, memory,
+  disk. All three are now instrumented or removed.
+
+- **Backups are encrypted and a restore is proven (27 Aug).** The Phase 1
+  acceptance criterion that had never been met. `BACKUP_ENCRYPTION_KEY` is set,
+  a backup uploaded reporting `"encrypted": true`, and
+  `restore-database.ts --latest --dry-run` decrypted and decompressed it to
+  **exactly the same `sqlBytes`** as the known-good unencrypted archive — which
+  is what makes it proof of the passphrase rather than proof of a passphrase.
+  The dry run decrypts before reporting, and the format is AES-256-GCM, so a
+  wrong key fails the authentication tag rather than producing garbage.
+  Two unencrypted archives remain in the bucket and should be deleted; see
+  item 1 above.
+
+- **The paying-subscriber question is closed (27 Aug).** Measured rather than
+  assumed: every post is `public`, and Ghost reports **zero paying members**. So
+  no reader loses access at cutover, the members import is a newsletter list
+  rather than billing identifiers, and the entire Stripe webhook takeover leaves
+  the critical path to cancelling Ghost. `visibility` remains a working
+  teaser gate (`lib/content/richtext.ts`, 500 characters) for whenever
+  memberships open — it withholds server-side, so gated text never reaches the
+  markup.
+
+- **The migrations baseline, confirmed rather than inferred (27 Aug).**
+  `docker compose run --rm migrate pnpm migrate:db:status` lists all ten
+  migrations as `Ran: Yes` across batches 1–7. Item 0 below can be retired; it
+  had been resting on a green deploy exit code.
 
 - **Redirects, audited (27 Aug).** The 301 layer was checked end to end rather
   than spot-checked, and two gaps were found and closed in code.
