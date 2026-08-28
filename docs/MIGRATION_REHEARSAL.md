@@ -74,6 +74,25 @@ discrepancy. Fix the root cause and re-run until it reports `"ok": true`.
 
 ## 4. Manual verification checklist
 
+> [!NOTE]
+> **Several of these mechanisms were exercised against a real build on 28 Aug**
+> — a local Postgres, the committed migrations, seeded content, a production
+> build, and the app served over HTTP. What that establishes is that the
+> machinery works; it says nothing about _your_ 117 posts, so none of the boxes
+> below are pre-ticked.
+>
+> Confirmed working: draft posts 404 and appear in neither the sitemap nor the
+> feed; a restricted post returns 200 with its withheld body absent from the
+> HTML rather than hidden; trailing-slash normalisation; `pnpm validate:redirects`
+> exiting zero against a live app, including the built-in Ghost pagination
+> rules; redirect `Location` headers resolving to the forwarded host rather than
+> the bind address; and `NEXT_PUBLIC_NOINDEX` switching `robots.txt` between
+> `Disallow: /` and the public form, with the matching `noindex` meta tag.
+>
+> So spend the attention on what only real content can show: media loading from
+> R2 with alt text, embeds and captions inside migrated bodies, metadata that
+> Ghost carried, and the counts matching Ghost admin.
+
 - [ ] **Content counts** match the Ghost admin (posts, pages, tags, authors).
 - [ ] **Recent posts** render correctly, including embeds and captions.
 - [ ] **Drafts** are still drafts and are not publicly reachable.
