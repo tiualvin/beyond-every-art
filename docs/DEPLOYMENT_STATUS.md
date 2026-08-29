@@ -21,6 +21,11 @@ inferred), encrypted backups **with a proven restore** and the plaintext ones
 deleted, the paying-subscriber question, and the redirect audit. The box also
 gained 4GB of swap and went from 2.3GB free to 19GB.
 
+Closed on 29 Aug, clearing the whole "minutes each" group: the plaintext backups
+are deleted, Caddy is unpinned onto the published arm64 image, the box has been
+rebooted and its swap comes back, and `main` is protected by a ruleset. What is
+left is verification work against real content, not setup.
+
 Newly on the list and easy to miss: **capture the pre-migration search baseline
 before DNS moves** — it is the only item here that cannot be done afterwards.
 See [`SEO_CUTOVER_RISK.md`](SEO_CUTOVER_RISK.md).
@@ -46,14 +51,7 @@ In dependency order, what is left before the public cutover:
    and firewall pass two. **Its own quiet deploy, not cutover-day work**, and
    validate the Caddyfile before deploying.
 
-4. **Branch protection (operator action).** Promoted out of the "not done yet"
-   list because it stopped being housekeeping on 28 Aug: three Dependabot pull
-   requests, each green on its own branch, merged into a `pnpm-lock.yaml` that
-   no YAML parser accepts, and `main` could not deploy until it was regenerated
-   (#120). Requiring branches to be up to date before merging is the check that
-   would have caught it. Cheap now; expensive on cutover day.
-
-5. **Flip.** Unset `NEXT_PUBLIC_NOINDEX`, move `SITE_ADDRESS` and
+4. **Flip.** Unset `NEXT_PUBLIC_NOINDEX`, move `SITE_ADDRESS` and
    `NEXT_PUBLIC_SITE_URL` to the production domain, then change DNS.
    `STAGING_BASIC_AUTH` is already unset — staging has been deliberately public
    since 28 Aug, which is why `NEXT_PUBLIC_NOINDEX` is now the **only** thing
@@ -122,6 +120,31 @@ errors`, and `/swapfile` is `-rw-------`. Its one warning — "non-bind mount
   Worth knowing for capacity: **764M of swap was in use before the reboot.** The
   box does not merely have swap, it leans on it — which is what the OOM kill on
   28 Aug was telling us about 3.7GB with none.
+
+- **`main` is protected (29 Aug).** A repository ruleset named `Main`, Active,
+  targeting the default branch, with an **empty bypass list** — a bypass for the
+  only person here would have quietly restored the behaviour the rule exists to
+  prevent.
+
+  It requires a pull request, blocks force pushes, and requires four status
+  checks: `checks`, `browser-smoke`, `backup-image`, `app-image`. Above all it
+  requires **branches to be up to date before merging**, which is the specific
+  rule that would have caught the three Dependabot merges: each was green on its
+  own branch, none was ever tested against the other two, and git merged three
+  lockfile edits as text into something no YAML parser accepts (#120).
+
+  Two jobs are deliberately **not** required, and should stay that way:
+
+  - `deploy` is gated on `github.ref == 'refs/heads/main' && github.event_name
+== 'push'`, so it never runs on a pull request. Requiring it would block
+    every PR forever, waiting on a check that cannot start.
+  - `audit` argues its own exclusion at the top of `audit.yml`: an advisory
+    published upstream turns it red with no commit involved, and shipping an
+    urgent fix must not wait on it. Requiring it hands a stranger's publishing
+    schedule a veto over merges here.
+
+  Expect Dependabot pull requests to start showing an **Update branch** button
+  before they will merge. That friction is the feature.
 
 - **Backups are encrypted and a restore is proven (27 Aug).** The Phase 1
   acceptance criterion that had never been met. `BACKUP_ENCRYPTION_KEY` is set,
