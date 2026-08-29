@@ -60,9 +60,8 @@ In dependency order, what is left before the public cutover:
    keeping a complete copy of the site out of search results. Do not unset it
    before the domain moves.
 
-Not blocking, but pending: the server has been asking for a restart for days,
-and confirming the `/etc/fstab` swap line survives a reboot is worth doing
-before cutover rather than discovering it afterwards.
+The reboot that was pending here is done — see "The swap survives a reboot"
+below.
 
 ## Done
 
@@ -105,6 +104,24 @@ before cutover rather than discovering it afterwards.
   container, so it cannot distinguish a working proxy from a dead one — which
   is exactly how a downed site reported a successful deploy. Any future change
   to Caddy is worth confirming from outside the stack, not from within it.
+
+- **The swap survives a reboot (29 Aug).** Rebooted deliberately, while the
+  apex still points at Ghost and the only public thing on this box is staging —
+  the same reboot after the flip is a real outage. `/etc/fstab` carries
+  `/swapfile none swap sw 0 0`, `findmnt --verify` reported `0 parse errors, 0
+errors`, and `/swapfile` is `-rw-------`. Its one warning — "non-bind mount
+  source is a directory or regular file" — is `findmnt` checking a swap entry as
+  if it were a filesystem mount, where a regular file would be odd; for swap it
+  is correct.
+
+  After the reboot: `free -h` shows 4.0Gi of swap, all four containers came back
+  on their `restart: unless-stopped` policies with both healthchecks green, and
+  staging returned 200. Caddy came back on the GHCR image, which also confirms
+  the `CADDY_IMAGE` removal persisted.
+
+  Worth knowing for capacity: **764M of swap was in use before the reboot.** The
+  box does not merely have swap, it leans on it — which is what the OOM kill on
+  28 Aug was telling us about 3.7GB with none.
 
 - **Backups are encrypted and a restore is proven (27 Aug).** The Phase 1
   acceptance criterion that had never been met. `BACKUP_ENCRYPTION_KEY` is set,
