@@ -26,9 +26,11 @@ are deleted, Caddy is unpinned onto the published arm64 image, the box has been
 rebooted and its swap comes back, and `main` is protected by a ruleset. What is
 left is verification work against real content, not setup.
 
-Newly on the list and easy to miss: **capture the pre-migration search baseline
-before DNS moves** — it is the only item here that cannot be done afterwards.
-See [`SEO_CUTOVER_RISK.md`](SEO_CUTOVER_RISK.md).
+Newly on the list and easy to miss: **capture the pre-migration search
+baseline**, and check that Search Console's verification does not depend on
+Ghost serving the domain. The verification is the part that can actually lock
+you out — the history itself survives, because the domain is not changing.
+Procedure in [`SEO_BASELINE_CAPTURE.md`](SEO_BASELINE_CAPTURE.md).
 
 In dependency order, what is left before the public cutover:
 

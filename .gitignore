@@ -50,6 +50,14 @@ reconciliation-report*.json
 media-backfill-report*.json
 media-restore-report*.json
 
+# Search Console and GA4 exports. This repository is public, so committing them
+# would publish the site's query data and traffic figures; the README explaining
+# what belongs here is kept, the data is not. Same reasoning as the Ghost block
+# above — see docs/SEO_BASELINE_CAPTURE.md for where the files should live
+# instead.
+seo-baseline/*
+!seo-baseline/README.md
+
 # Payload generated types (run `pnpm generate:types`)
 payload-types.ts
 
