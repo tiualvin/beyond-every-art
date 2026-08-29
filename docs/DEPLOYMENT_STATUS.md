@@ -11,22 +11,23 @@ Related: [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md),
 
 ## Pick up here
 
-Last worked on **28 Aug 2026**. The deploy pipeline broke and was repaired; the
+Last worked on **29 Aug 2026**. The deploy pipeline broke and was repaired; the
 detail is in "The 27–28 Aug deploy outage" below, and it is worth reading before
 the next infrastructure change because two of the three failures were invisible
-to CI. The server now runs everything through #120.
+to CI. The server now runs everything through #121.
 
 Closed since the last update: the migrations baseline (confirmed directly, not
-inferred), encrypted backups **with a proven restore**, the paying-subscriber
-question, and the redirect audit. The box also gained 4GB of swap and went from
-2.3GB free to 19GB.
+inferred), encrypted backups **with a proven restore** and the plaintext ones
+deleted, the paying-subscriber question, and the redirect audit. The box also
+gained 4GB of swap and went from 2.3GB free to 19GB.
+
+Newly on the list and easy to miss: **capture the pre-migration search baseline
+before DNS moves** — it is the only item here that cannot be done afterwards.
+See [`SEO_CUTOVER_RISK.md`](SEO_CUTOVER_RISK.md).
 
 In dependency order, what is left before the public cutover:
 
-1. **Two loose ends, minutes each.**
-   - Delete the two **unencrypted** backups still in the R2 bucket. An
-     encrypted one exists and its restore has been proven, so the precondition
-     for removing them is met. They carry the users table and OAuth records.
+1. **One loose end, minutes.**
    - Remove `CADDY_IMAGE` from the production `.env` and confirm the published
      multi-architecture image pulls and runs:
      `docker compose pull caddy && docker compose up -d caddy`, then
@@ -104,8 +105,20 @@ before cutover rather than discovering it afterwards.
   is what makes it proof of the passphrase rather than proof of a passphrase.
   The dry run decrypts before reporting, and the format is AES-256-GCM, so a
   wrong key fails the authentication tag rather than producing garbage.
-  Two unencrypted archives remain in the bucket and should be deleted; see
-  item 1 above.
+
+  **The plaintext archives are gone (29 Aug).** There were **seven**, not the
+  two this file previously claimed — every nightly run from 22 Aug until
+  encryption was turned on at 09:13 on 27 Aug. The count was never checked
+  against the bucket; listing it first is what corrected it. A fourth encrypted
+  backup was taken before deleting, so removing seven objects left three rather
+  than two inside a nineteen-hour window. The bucket now holds encrypted
+  archives only.
+
+  Listing is not a first-class operation in `backup-database.ts` — `--dry-run`
+  reports `existingBackups` as a count, and the keys are only visible through
+  `wouldPrune`, which needs `--keep 1` to name them all. That flag is read-only
+  **only** in combination with `--dry-run`; on a real run it would prune the
+  bucket down to a single object. Worth a `--list` flag if this comes up again.
 
 - **The paying-subscriber question is closed (27 Aug).** Measured rather than
   assumed: every post is `public`, and Ghost reports **zero paying members**. So
