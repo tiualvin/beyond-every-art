@@ -6,6 +6,8 @@ import { getPreviewMode } from '@/lib/preview/mode'
 import { isNoindex } from '@/lib/seo/indexing'
 import { getSiteUrl } from '@/lib/seo/site'
 
+import { resolveAnalyticsTag } from '@/lib/analytics/tag'
+
 import { Analytics } from './components/analytics'
 import { LivePreviewListener } from './components/live-preview-listener'
 import { NewsletterBand } from './components/newsletter-band'
@@ -52,8 +54,7 @@ export default async function FrontendLayout({
     getPreviewMode(),
   ])
 
-  const gaId = process.env.NEXT_PUBLIC_GA_ID
-  const analyticsEnabled = Boolean(gaId) && !isNoindex()
+  const analyticsTag = resolveAnalyticsTag()
 
   return (
     <html lang="en" className={`${playfair.variable} ${inter.variable}`}>
@@ -70,7 +71,7 @@ export default async function FrontendLayout({
           links={footer.links}
           copyright={footer.copyright}
         />
-        {analyticsEnabled && <Analytics gaId={gaId!} />}
+        {analyticsTag && <Analytics tag={analyticsTag} />}
         {preview.live && <LivePreviewListener serverURL={getSiteUrl()} />}
       </body>
     </html>

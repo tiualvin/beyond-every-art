@@ -91,23 +91,45 @@ it is already on the list for its own reasons.
 
 ## Capture the baseline before the flip
 
-**This is the part that cannot be done afterwards**, which is why it has a
-section rather than a bullet. The moment DNS moves, "what did we rank for
-before" stops being observable except through whatever was written down.
-
 The runbook's post-launch list says to watch "analytics traffic vs. the
-pre-migration baseline". Nothing creates that baseline, so it is a checklist
-item now in [`CUTOVER_RUNBOOK.md`](CUTOVER_RUNBOOK.md) — and the reasoning is
-here.
+pre-migration baseline". Nothing created that baseline, so it is a checklist
+item now in [`CUTOVER_RUNBOOK.md`](CUTOVER_RUNBOOK.md), with the full procedure
+in [`SEO_BASELINE_CAPTURE.md`](SEO_BASELINE_CAPTURE.md).
 
-Export and keep, from Search Console, for the **last three months** on the Ghost
-site:
+**A correction to an earlier version of this section**, which said the baseline
+"cannot be done afterwards" because the data stops being observable once DNS
+moves. That was wrong, and wrong in a way worth recording, because it is the
+kind of claim that sounds obviously true. Search Console data belongs to the
+_property_, which is the domain — and **the domain is not changing**. This is a
+platform migration, not a domain migration, so the history stays and stays
+readable.
 
-- **Queries** — top 100 by impressions, with clicks, CTR and average position.
-- **Pages** — top 100 by impressions, same columns.
-- **Coverage** — the current count of indexed pages.
+What is actually at risk is narrower and more specific:
 
-And from GA4: sessions and organic landing pages for the same window.
+- **Verification can lapse.** If the property is verified by an HTML file or a
+  `<meta>` tag that Ghost is serving, that proof dies with Ghost and Google
+  eventually unverifies the property. The data is not deleted, but it becomes
+  unreadable until re-verified. A DNS-record verification survives, because it
+  lives in the zone rather than on the origin. **This is the item that can
+  genuinely lock you out**, and it is worth fixing before cutover.
+- **Retention is about 16 months**, so the pre-migration window ages out on its
+  own regardless.
+- **Ghost's own built-in analytics** die with the subscription — those are
+  unrecoverable.
+- **GA4 continuity** holds only if the same measurement ID carries across.
+
+So the baseline is still worth capturing, for durability past the retention
+window and for the convenience of frozen numbers to diff against. It is just
+not the one-way door it was previously described as. The one-way door is the
+verification method.
+
+What to export, in short — the click paths are in
+[`SEO_BASELINE_CAPTURE.md`](SEO_BASELINE_CAPTURE.md):
+
+- **Queries** and **Pages** from Search Console, three months, with clicks,
+  CTR and average position.
+- The current **indexed page count**.
+- From GA4: sessions by channel, and organic landing pages, same window.
 
 Three months rather than one so a seasonal comparison is possible, and
 impressions rather than clicks as the sort because impressions move first when

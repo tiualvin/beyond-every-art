@@ -11,65 +11,57 @@ Related: [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md),
 
 ## Pick up here
 
-Last worked on **28 Aug 2026**. The deploy pipeline broke and was repaired; the
+Last worked on **29 Aug 2026**. The deploy pipeline broke and was repaired; the
 detail is in "The 27–28 Aug deploy outage" below, and it is worth reading before
 the next infrastructure change because two of the three failures were invisible
-to CI. The server now runs everything through #120.
+to CI. The server now runs everything through #121.
 
 Closed since the last update: the migrations baseline (confirmed directly, not
-inferred), encrypted backups **with a proven restore**, the paying-subscriber
-question, and the redirect audit. The box also gained 4GB of swap and went from
-2.3GB free to 19GB.
+inferred), encrypted backups **with a proven restore** and the plaintext ones
+deleted, the paying-subscriber question, and the redirect audit. The box also
+gained 4GB of swap and went from 2.3GB free to 19GB.
+
+Closed on 29 Aug, clearing the whole "minutes each" group: the plaintext backups
+are deleted, Caddy is unpinned onto the published arm64 image, the box has been
+rebooted and its swap comes back, and `main` is protected by a ruleset. What is
+left is verification work against real content, not setup.
+
+Newly on the list and easy to miss: **capture the pre-migration search
+baseline**, and check that Search Console's verification does not depend on
+Ghost serving the domain. The verification is the part that can actually lock
+you out — the history itself survives, because the domain is not changing.
+Procedure in [`SEO_BASELINE_CAPTURE.md`](SEO_BASELINE_CAPTURE.md).
 
 In dependency order, what is left before the public cutover:
 
-1. **Two loose ends, minutes each.**
-   - Delete the two **unencrypted** backups still in the R2 bucket. An
-     encrypted one exists and its restore has been proven, so the precondition
-     for removing them is met. They carry the users table and OAuth records.
-   - Remove `CADDY_IMAGE` from the production `.env` and confirm the published
-     multi-architecture image pulls and runs:
-     `docker compose pull caddy && docker compose up -d caddy`, then
-     `sleep 15 && docker compose ps caddy` — `Up`, not `Restarting`. The pin was
-     added by hand on 27 Aug to restore service and now only holds the server on
-     whatever it last built locally.
-
-2. **Work [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md) end to end.** Every
+1. **Work [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md) end to end.** Every
    box in §4–§6 is unticked, and this is the bulk of what is left. Newly
    unblocked: `pnpm validate:redirects` is deployed and must exit zero, the media
    check can pass, and staging no longer requires Basic Auth so the crawl
    comparison and the validator need no credentials. Includes the
    email-delivery test.
 
-3. **Members CSV.** Export from Ghost Admin and import. Low stakes now — there
+2. **Members CSV.** Export from Ghost Admin and import. Low stakes now — there
    are no paying members, so this is the newsletter list rather than billing
    identifiers, and the Stripe takeover is off the critical path to cancelling
    Ghost.
 
-4. **Edge protection** — [`EDGE_PROTECTION.md`](EDGE_PROTECTION.md). The token
+3. **Edge protection** — [`EDGE_PROTECTION.md`](EDGE_PROTECTION.md). The token
    exists and the repository side is done: `CADDY_ACME=acme-cloudflare` in `.env`
    switches every site block to DNS-01. What remains is that switch, confirming
    a certificate is obtained through it, the orange cloud, `TRUST_CLOUDFLARE_IP=1`,
    and firewall pass two. **Its own quiet deploy, not cutover-day work**, and
    validate the Caddyfile before deploying.
 
-5. **Branch protection (operator action).** Promoted out of the "not done yet"
-   list because it stopped being housekeeping on 28 Aug: three Dependabot pull
-   requests, each green on its own branch, merged into a `pnpm-lock.yaml` that
-   no YAML parser accepts, and `main` could not deploy until it was regenerated
-   (#120). Requiring branches to be up to date before merging is the check that
-   would have caught it. Cheap now; expensive on cutover day.
-
-6. **Flip.** Unset `NEXT_PUBLIC_NOINDEX`, move `SITE_ADDRESS` and
+4. **Flip.** Unset `NEXT_PUBLIC_NOINDEX`, move `SITE_ADDRESS` and
    `NEXT_PUBLIC_SITE_URL` to the production domain, then change DNS.
    `STAGING_BASIC_AUTH` is already unset — staging has been deliberately public
    since 28 Aug, which is why `NEXT_PUBLIC_NOINDEX` is now the **only** thing
    keeping a complete copy of the site out of search results. Do not unset it
    before the domain moves.
 
-Not blocking, but pending: the server has been asking for a restart for days,
-and confirming the `/etc/fstab` swap line survives a reboot is worth doing
-before cutover rather than discovering it afterwards.
+The reboot that was pending here is done — see "The swap survives a reboot"
+below.
 
 ## Done
 
@@ -96,6 +88,66 @@ before cutover rather than discovering it afterwards.
   Three ceilings, none of which the pipeline could see: architecture, memory,
   disk. All three are now instrumented or removed.
 
+  **The pin is off and the published image is proven (29 Aug).**
+  `CADDY_IMAGE=beyond-every-art-caddy` had held the server on whatever it last
+  built locally. Before removing it, the replacement was checked rather than
+  assumed: `docker pull` of `ghcr.io/tiualvin/beyond-every-art-caddy:main`
+  succeeded **anonymously**, so the GHCR package is public, and
+  `docker image inspect --format '{{.Os}}/{{.Architecture}}'` reported
+  `linux/arm64` — the manifest list resolves per-architecture, which is the
+  specific thing that failed on 27 Aug. Caddy then came up on the pulled image
+  and stayed `Up`.
+
+  And the check the outage was missing: `curl` against
+  `https://staging.beyondeveryart.com/` returned **200**. That request crosses
+  the proxy. The deploy's own probe fetches `/health` from inside the app
+  container, so it cannot distinguish a working proxy from a dead one — which
+  is exactly how a downed site reported a successful deploy. Any future change
+  to Caddy is worth confirming from outside the stack, not from within it.
+
+- **The swap survives a reboot (29 Aug).** Rebooted deliberately, while the
+  apex still points at Ghost and the only public thing on this box is staging —
+  the same reboot after the flip is a real outage. `/etc/fstab` carries
+  `/swapfile none swap sw 0 0`, `findmnt --verify` reported `0 parse errors, 0
+errors`, and `/swapfile` is `-rw-------`. Its one warning — "non-bind mount
+  source is a directory or regular file" — is `findmnt` checking a swap entry as
+  if it were a filesystem mount, where a regular file would be odd; for swap it
+  is correct.
+
+  After the reboot: `free -h` shows 4.0Gi of swap, all four containers came back
+  on their `restart: unless-stopped` policies with both healthchecks green, and
+  staging returned 200. Caddy came back on the GHCR image, which also confirms
+  the `CADDY_IMAGE` removal persisted.
+
+  Worth knowing for capacity: **764M of swap was in use before the reboot.** The
+  box does not merely have swap, it leans on it — which is what the OOM kill on
+  28 Aug was telling us about 3.7GB with none.
+
+- **`main` is protected (29 Aug).** A repository ruleset named `Main`, Active,
+  targeting the default branch, with an **empty bypass list** — a bypass for the
+  only person here would have quietly restored the behaviour the rule exists to
+  prevent.
+
+  It requires a pull request, blocks force pushes, and requires four status
+  checks: `checks`, `browser-smoke`, `backup-image`, `app-image`. Above all it
+  requires **branches to be up to date before merging**, which is the specific
+  rule that would have caught the three Dependabot merges: each was green on its
+  own branch, none was ever tested against the other two, and git merged three
+  lockfile edits as text into something no YAML parser accepts (#120).
+
+  Two jobs are deliberately **not** required, and should stay that way:
+
+  - `deploy` is gated on `github.ref == 'refs/heads/main' && github.event_name
+== 'push'`, so it never runs on a pull request. Requiring it would block
+    every PR forever, waiting on a check that cannot start.
+  - `audit` argues its own exclusion at the top of `audit.yml`: an advisory
+    published upstream turns it red with no commit involved, and shipping an
+    urgent fix must not wait on it. Requiring it hands a stranger's publishing
+    schedule a veto over merges here.
+
+  Expect Dependabot pull requests to start showing an **Update branch** button
+  before they will merge. That friction is the feature.
+
 - **Backups are encrypted and a restore is proven (27 Aug).** The Phase 1
   acceptance criterion that had never been met. `BACKUP_ENCRYPTION_KEY` is set,
   a backup uploaded reporting `"encrypted": true`, and
@@ -104,8 +156,20 @@ before cutover rather than discovering it afterwards.
   is what makes it proof of the passphrase rather than proof of a passphrase.
   The dry run decrypts before reporting, and the format is AES-256-GCM, so a
   wrong key fails the authentication tag rather than producing garbage.
-  Two unencrypted archives remain in the bucket and should be deleted; see
-  item 1 above.
+
+  **The plaintext archives are gone (29 Aug).** There were **seven**, not the
+  two this file previously claimed — every nightly run from 22 Aug until
+  encryption was turned on at 09:13 on 27 Aug. The count was never checked
+  against the bucket; listing it first is what corrected it. A fourth encrypted
+  backup was taken before deleting, so removing seven objects left three rather
+  than two inside a nineteen-hour window. The bucket now holds encrypted
+  archives only.
+
+  Listing is not a first-class operation in `backup-database.ts` — `--dry-run`
+  reports `existingBackups` as a count, and the keys are only visible through
+  `wouldPrune`, which needs `--keep 1` to name them all. That flag is read-only
+  **only** in combination with `--dry-run`; on a real run it would prune the
+  bucket down to a single object. Worth a `--list` flag if this comes up again.
 
 - **The paying-subscriber question is closed (27 Aug).** Measured rather than
   assumed: every post is `public`, and Ghost reports **zero paying members**. So
@@ -145,7 +209,7 @@ before cutover rather than discovering it afterwards.
     [`SEO_AND_REDIRECTS.md`](SEO_AND_REDIRECTS.md#validating-them).
 
   Not yet run against staging or production: that is part of the rehearsal
-  (item 2 above), and it needs a host this repository's CI cannot reach.
+  above, and it needs a host this repository's CI cannot reach.
 
 - **Trailing slashes, decided.** `next.config.ts` sets `trailingSlash: true` to
   match the Ghost permalinks the site is migrating, described in
@@ -202,7 +266,7 @@ before cutover rather than discovering it afterwards.
   environment above: 2 authors, 10 tags, 117 posts, 2 pages, 110/110 media
   imported with zero failures, 1 redirect created. `pnpm migrate:validate`
   confirms `"ok": true` with every collection's expected count matching
-  actual. Members are still not imported — see item 3 below, still open.
+  actual. Members are still not imported — see the members CSV item, still open.
 - **R2 configured and the lost media recovered (22 Aug).** Two buckets, media
   and backups deliberately separate; 109 of 110 images restored from the site
   archive with filenames and document ids intact; first database backup
@@ -313,7 +377,7 @@ running it: 0 B transferred.
 
 1. **Set `BACKUP_ENCRYPTION_KEY`.** The first backup uploaded unencrypted and
    said so on the run. A dump carries the users table, OAuth records, and — once
-   item 1 below is done — every member email and Stripe identifier. Generate with
+   the members import is done — every member email and Stripe identifier. Generate with
    `openssl rand -base64 32`, put it in `.env`, keep a copy somewhere that is
    neither this server nor the backup bucket, then re-run the backup and confirm
    `"encrypted": true`.

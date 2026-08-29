@@ -13,6 +13,12 @@
 // See `docs/CONTENT_SECURITY_POLICY.md` for the rollout, what each phase is
 // worth, and the known limits of the current phase.
 
+// Relative, not `@/`. This module is reachable from `next.config.ts` (via
+// `headers.ts`), which Next compiles on its own before the path aliases exist —
+// an aliased import here fails the build with a bare MODULE_NOT_FOUND. Anything
+// this file pulls in inherits the same constraint.
+import { analyticsConfigured } from '../analytics/tag'
+
 type Env = Record<string, string | undefined>
 
 /**
@@ -40,8 +46,15 @@ export const CSP_REPORT_GROUP = 'csp-endpoint'
 /**
  * Google Tag Manager and GA4 origins.
  *
- * Only added when `NEXT_PUBLIC_GA_ID` is set, because `Analytics` only renders
- * the tag then. `region1` is the regional collector GA4 falls back to.
+ * Added when either `NEXT_PUBLIC_GTM_ID` or `NEXT_PUBLIC_GA_ID` is set, since
+ * both tags load from `googletagmanager.com` and both report to the GA4
+ * collectors. Keyed on configuration rather than on the noindex gate that
+ * decides whether a tag actually renders: permitting an origin the page then
+ * does not use costs nothing, while withholding one it does use breaks the tag.
+ * `region1` is the regional collector GA4 falls back to.
+ *
+ * These cover Google's own requests only. Anything a Tag Manager container
+ * fires beyond them needs `CSP_SCRIPT_SRC` and friends below.
  */
 const ANALYTICS_SCRIPT_ORIGINS = ['https://www.googletagmanager.com']
 const ANALYTICS_CONNECT_ORIGINS = [
@@ -96,11 +109,46 @@ export function mediaOrigin(env: Env = process.env): string | null {
  * this list from the reports, not from guesswork.
  */
 export function frameOrigins(env: Env = process.env): string[] {
-  const raw = env.CSP_FRAME_SRC ?? ''
-  return raw
+  return originList(env.CSP_FRAME_SRC)
+}
+
+/**
+ * Parse a whitespace- or comma-separated origin list from one variable.
+ *
+ * Shared by the four extension points below so they behave identically; an
+ * operator should not have to remember which separator a given variable takes.
+ */
+function originList(raw: string | undefined): string[] {
+  return (raw ?? '')
     .split(/[\s,]+/)
     .map((value) => value.trim())
     .filter(Boolean)
+}
+
+/**
+ * Operator-supplied additions to `script-src`, `connect-src` and `img-src`.
+ *
+ * These exist for Google Tag Manager. A container's whole purpose is firing
+ * third-party tags chosen in a web interface, long after this policy was
+ * written — an ad pixel, a heatmap recorder, a consent platform — and each
+ * loads from an origin no list here could have predicted. Without a way to
+ * extend the policy, adopting a container means either a policy that blocks
+ * half of it or no policy at all.
+ *
+ * Fill these from the violation reports rather than from guesswork, the same
+ * way `CSP_FRAME_SRC` is filled: report-only mode names the exact origin each
+ * blocked request wanted. See `docs/ANALYTICS.md`.
+ */
+export function extraScriptOrigins(env: Env = process.env): string[] {
+  return originList(env.CSP_SCRIPT_SRC)
+}
+
+export function extraConnectOrigins(env: Env = process.env): string[] {
+  return originList(env.CSP_CONNECT_SRC)
+}
+
+export function extraImgOrigins(env: Env = process.env): string[] {
+  return originList(env.CSP_IMG_SRC)
 }
 
 export interface CspOptions {
@@ -122,7 +170,7 @@ export function buildCspPolicy(options: CspOptions = {}): string {
   const env = options.env ?? process.env
   const dev = options.isDevelopment ?? false
   const media = mediaOrigin(env)
-  const analytics = Boolean(env.NEXT_PUBLIC_GA_ID)
+  const analytics = analyticsConfigured(env)
   const frames = frameOrigins(env)
 
   const scriptSrc = [
@@ -135,6 +183,7 @@ export function buildCspPolicy(options: CspOptions = {}): string {
     "'unsafe-inline'",
     ...(dev ? ["'unsafe-eval'"] : []),
     ...(analytics ? ANALYTICS_SCRIPT_ORIGINS : []),
+    ...extraScriptOrigins(env),
   ]
 
   const styleSrc = [
@@ -152,12 +201,14 @@ export function buildCspPolicy(options: CspOptions = {}): string {
     'blob:',
     ...(media ? [media] : []),
     ...(analytics ? ANALYTICS_IMG_ORIGINS : []),
+    ...extraImgOrigins(env),
   ]
 
   const connectSrc = [
     "'self'",
     ...(media ? [media] : []),
     ...(analytics ? ANALYTICS_CONNECT_ORIGINS : []),
+    ...extraConnectOrigins(env),
     // The dev server's HMR socket.
     ...(dev ? ['ws:'] : []),
   ]

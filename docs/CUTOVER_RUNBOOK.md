@@ -14,12 +14,23 @@ on cutover day.
 - [ ] The `backup` service is running and has produced at least one backup.
 - [ ] DNS TTL for the domain reduced (e.g. to 300s) so the flip propagates fast.
 - [ ] Administrator account exists in production Payload.
+- [ ] **Search Console verification does not depend on Ghost** — check
+      Settings → Ownership verification. An HTML file or `<meta>` tag is served
+      by Ghost and dies with it, and Google eventually unverifies the property;
+      a DNS record survives. Data is never deleted, but an unverified property
+      cannot be read, and that is a poor thing to discover mid-cutover.
+- [ ] **Analytics tag carried across** — whatever Ghost injects today,
+      reproduced in the production `.env`: `NEXT_PUBLIC_GTM_ID` for a Tag
+      Manager container, `NEXT_PUBLIC_GA_ID` for a direct GA4 tag. **One, never
+      both** — a container fires GA4 itself and the pair double-counts every
+      page view irreversibly. Read at runtime, so no rebuild; gated on
+      `!isNoindex()`, so it starts firing at the flip and never on staging. See
+      [`ANALYTICS.md`](ANALYTICS.md).
 - [ ] **Search baseline captured from the Ghost site** — Search Console queries
-      and pages (top 100 each, three months, sorted by impressions) and the GA4
-      organic landing pages for the same window. This is the only item here that
-      cannot be done afterwards: once DNS moves, there is no way back to what
-      the site ranked for before. The post-launch list below compares against
-      it. See [`SEO_CUTOVER_RISK.md`](SEO_CUTOVER_RISK.md#capture-the-baseline-before-the-flip).
+      and pages (three months, sorted by impressions), the indexed page count,
+      and GA4 sessions and organic landing pages for the same window. The
+      post-launch list below compares against it. Procedure:
+      [`SEO_BASELINE_CAPTURE.md`](SEO_BASELINE_CAPTURE.md).
 
 ## Cutover
 
@@ -75,7 +86,9 @@ on cutover day.
 - [ ] Take a fresh backup: `pnpm backup:db`.
 - [ ] Confirm HTTPS is valid (Caddy provisioned the certificate).
 - [ ] Submit the new sitemap in Google Search Console.
-- [ ] Confirm analytics is receiving traffic (`NEXT_PUBLIC_GA_ID`).
+- [ ] Confirm analytics is receiving traffic — GA4 **Reports → Realtime**,
+      within seconds of loading the site. This is the first moment the tag can
+      be verified at all, because the `noindex` gate keeps it off on staging.
 - [ ] Verify a password-reset email is delivered.
 
 ## Post-launch monitoring (first weeks)

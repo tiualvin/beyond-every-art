@@ -251,16 +251,40 @@ implements) and `report-to` with a matching `Reporting-Endpoints` header.
 
 ## Configuration
 
-| Variable         | Default       | Meaning                                                                      |
-| ---------------- | ------------- | ---------------------------------------------------------------------------- |
-| `CSP_MODE`       | `report-only` | `report-only`, `enforce`, or `off`. Unset never enforces and never disables. |
-| `CSP_FRAME_SRC`  | empty         | Space- or comma-separated origins allowed in `frame-src`.                    |
-| `CSP_REPORT_URI` | `/csp-report` | External collector, if not the built-in endpoint.                            |
+| Variable          | Default       | Meaning                                                                      |
+| ----------------- | ------------- | ---------------------------------------------------------------------------- |
+| `CSP_MODE`        | `report-only` | `report-only`, `enforce`, or `off`. Unset never enforces and never disables. |
+| `CSP_FRAME_SRC`   | empty         | Space- or comma-separated origins allowed in `frame-src`.                    |
+| `CSP_SCRIPT_SRC`  | empty         | Same format; additional `script-src` origins.                                |
+| `CSP_CONNECT_SRC` | empty         | Same format; additional `connect-src` origins.                               |
+| `CSP_IMG_SRC`     | empty         | Same format; additional `img-src` origins.                                   |
+| `CSP_REPORT_URI`  | `/csp-report` | External collector, if not the built-in endpoint.                            |
 
-`S3_PUBLIC_URL` and `NEXT_PUBLIC_GA_ID` are read from the existing
-configuration — the policy derives the media origin the same way
+`S3_PUBLIC_URL`, `NEXT_PUBLIC_GTM_ID` and `NEXT_PUBLIC_GA_ID` are read from the
+existing configuration — the policy derives the media origin the same way
 `next.config.ts` derives `images.remotePatterns`, and admits the analytics
-origins only when the tag is actually configured.
+origins only when a tag is actually configured.
+
+The analytics allowance keys on **configuration**, not on the `noindex` gate
+that decides whether a tag renders. The policy is built in middleware and must
+permit whatever the page may load: permitting an origin the page then does not
+use costs nothing, while withholding one it does use breaks the tag under
+enforcement.
+
+### The three script/connect/img variables exist for Tag Manager
+
+A container fires third-party tags chosen in a web interface long after this
+policy was written, each loading from an origin no built-in list could predict.
+Without a way to extend the policy, adopting a container means either a policy
+that blocks half of it or no policy at all.
+
+Fill them the same way as `CSP_FRAME_SRC` — from the report-only findings, which
+name the exact origin each blocked request wanted, rather than from guesswork.
+Two container problems these variables do **not** solve: a custom HTML tag may
+need `'unsafe-eval'`, which is granted only in development, and Tag Manager's
+Preview mode opens a debug connection the policy may block. Both are reasons to
+keep report-only while building out a container. See
+[`ANALYTICS.md`](ANALYTICS.md).
 
 ## Rollback
 
