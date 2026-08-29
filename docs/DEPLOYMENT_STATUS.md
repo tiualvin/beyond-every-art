@@ -27,41 +27,33 @@ See [`SEO_CUTOVER_RISK.md`](SEO_CUTOVER_RISK.md).
 
 In dependency order, what is left before the public cutover:
 
-1. **One loose end, minutes.**
-   - Remove `CADDY_IMAGE` from the production `.env` and confirm the published
-     multi-architecture image pulls and runs:
-     `docker compose pull caddy && docker compose up -d caddy`, then
-     `sleep 15 && docker compose ps caddy` — `Up`, not `Restarting`. The pin was
-     added by hand on 27 Aug to restore service and now only holds the server on
-     whatever it last built locally.
-
-2. **Work [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md) end to end.** Every
+1. **Work [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md) end to end.** Every
    box in §4–§6 is unticked, and this is the bulk of what is left. Newly
    unblocked: `pnpm validate:redirects` is deployed and must exit zero, the media
    check can pass, and staging no longer requires Basic Auth so the crawl
    comparison and the validator need no credentials. Includes the
    email-delivery test.
 
-3. **Members CSV.** Export from Ghost Admin and import. Low stakes now — there
+2. **Members CSV.** Export from Ghost Admin and import. Low stakes now — there
    are no paying members, so this is the newsletter list rather than billing
    identifiers, and the Stripe takeover is off the critical path to cancelling
    Ghost.
 
-4. **Edge protection** — [`EDGE_PROTECTION.md`](EDGE_PROTECTION.md). The token
+3. **Edge protection** — [`EDGE_PROTECTION.md`](EDGE_PROTECTION.md). The token
    exists and the repository side is done: `CADDY_ACME=acme-cloudflare` in `.env`
    switches every site block to DNS-01. What remains is that switch, confirming
    a certificate is obtained through it, the orange cloud, `TRUST_CLOUDFLARE_IP=1`,
    and firewall pass two. **Its own quiet deploy, not cutover-day work**, and
    validate the Caddyfile before deploying.
 
-5. **Branch protection (operator action).** Promoted out of the "not done yet"
+4. **Branch protection (operator action).** Promoted out of the "not done yet"
    list because it stopped being housekeeping on 28 Aug: three Dependabot pull
    requests, each green on its own branch, merged into a `pnpm-lock.yaml` that
    no YAML parser accepts, and `main` could not deploy until it was regenerated
    (#120). Requiring branches to be up to date before merging is the check that
    would have caught it. Cheap now; expensive on cutover day.
 
-6. **Flip.** Unset `NEXT_PUBLIC_NOINDEX`, move `SITE_ADDRESS` and
+5. **Flip.** Unset `NEXT_PUBLIC_NOINDEX`, move `SITE_ADDRESS` and
    `NEXT_PUBLIC_SITE_URL` to the production domain, then change DNS.
    `STAGING_BASIC_AUTH` is already unset — staging has been deliberately public
    since 28 Aug, which is why `NEXT_PUBLIC_NOINDEX` is now the **only** thing
@@ -96,6 +88,23 @@ before cutover rather than discovering it afterwards.
 
   Three ceilings, none of which the pipeline could see: architecture, memory,
   disk. All three are now instrumented or removed.
+
+  **The pin is off and the published image is proven (29 Aug).**
+  `CADDY_IMAGE=beyond-every-art-caddy` had held the server on whatever it last
+  built locally. Before removing it, the replacement was checked rather than
+  assumed: `docker pull` of `ghcr.io/tiualvin/beyond-every-art-caddy:main`
+  succeeded **anonymously**, so the GHCR package is public, and
+  `docker image inspect --format '{{.Os}}/{{.Architecture}}'` reported
+  `linux/arm64` — the manifest list resolves per-architecture, which is the
+  specific thing that failed on 27 Aug. Caddy then came up on the pulled image
+  and stayed `Up`.
+
+  And the check the outage was missing: `curl` against
+  `https://staging.beyondeveryart.com/` returned **200**. That request crosses
+  the proxy. The deploy's own probe fetches `/health` from inside the app
+  container, so it cannot distinguish a working proxy from a dead one — which
+  is exactly how a downed site reported a successful deploy. Any future change
+  to Caddy is worth confirming from outside the stack, not from within it.
 
 - **Backups are encrypted and a restore is proven (27 Aug).** The Phase 1
   acceptance criterion that had never been met. `BACKUP_ENCRYPTION_KEY` is set,
@@ -158,7 +167,7 @@ before cutover rather than discovering it afterwards.
     [`SEO_AND_REDIRECTS.md`](SEO_AND_REDIRECTS.md#validating-them).
 
   Not yet run against staging or production: that is part of the rehearsal
-  (item 2 above), and it needs a host this repository's CI cannot reach.
+  above, and it needs a host this repository's CI cannot reach.
 
 - **Trailing slashes, decided.** `next.config.ts` sets `trailingSlash: true` to
   match the Ghost permalinks the site is migrating, described in
@@ -215,7 +224,7 @@ before cutover rather than discovering it afterwards.
   environment above: 2 authors, 10 tags, 117 posts, 2 pages, 110/110 media
   imported with zero failures, 1 redirect created. `pnpm migrate:validate`
   confirms `"ok": true` with every collection's expected count matching
-  actual. Members are still not imported — see item 3 below, still open.
+  actual. Members are still not imported — see the members CSV item, still open.
 - **R2 configured and the lost media recovered (22 Aug).** Two buckets, media
   and backups deliberately separate; 109 of 110 images restored from the site
   archive with filenames and document ids intact; first database backup
@@ -326,7 +335,7 @@ running it: 0 B transferred.
 
 1. **Set `BACKUP_ENCRYPTION_KEY`.** The first backup uploaded unencrypted and
    said so on the run. A dump carries the users table, OAuth records, and — once
-   item 1 below is done — every member email and Stripe identifier. Generate with
+   the members import is done — every member email and Stripe identifier. Generate with
    `openssl rand -base64 32`, put it in `.env`, keep a copy somewhere that is
    neither this server nor the backup bucket, then re-run the backup and confirm
    `"encrypted": true`.
