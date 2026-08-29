@@ -97,8 +97,19 @@ discrepancy. Fix the root cause and re-run until it reports `"ok": true`.
 - [ ] **Recent posts** render correctly, including embeds and captions.
 - [ ] **Drafts** are still drafts and are not publicly reachable.
 - [ ] **Media** loads from R2 (not the old Ghost domain) with alt text intact.
-- [ ] **URLs** preserve the original slugs and trailing-slash structure.
-- [ ] **Redirects** validated in full by the command below — not spot-checked.
+- [x] **URLs** preserve the original slugs and trailing-slash structure.
+      Verified 29 Aug against real content: every URL in Ghost's four sitemaps —
+      113 posts, 3 pages, 9 tags, 2 authors, **127 in total** — was requested on
+      staging and **all returned 200**. Served directly, not redirected, which
+      is the stronger result: the domain, the paths and the trailing slash are
+      all unchanged, so there is nothing to forward.
+- [x] **Redirects** validated in full by the command below — not spot-checked.
+      Verified 29 Aug: 5 checks, 0 warnings. The one real Ghost redirect plus
+      the built-in probes for `/page/2/`, `/page/3/`, `/tag/<slug>/page/2/` and
+      `/author/<slug>/page/2/` — the pagination shapes no export covers. Both
+      Ghost exports on the VPS contain exactly one rule and it is in the table,
+      so nothing was dropped at import. `/ads.txt` failed and is now served by
+      Caddy (#123).
 - [ ] **Canonical URLs**, meta titles, and descriptions are preserved.
 - [ ] **Sitemap** (`/sitemap.xml`), **RSS** (`/rss`), and **robots** are correct.
 - [ ] **Payload admin** loads and editing works.
@@ -110,6 +121,17 @@ discrepancy. Fix the root cause and re-run until it reports `"ok": true`.
 The redirect line above is the one item on this list that a spot-check cannot
 stand in for: a broken rule looks exactly like a URL nobody has asked for yet,
 so checking "several" of them says nothing about the rest. Check all of them.
+
+**Pass `--tag` and `--author` with real slugs.** Without them the run silently
+covers only `/page/2/` and `/page/3/`, leaves the tag and author pagination
+rules untested, and still reports success. That is the larger surface and the
+part no Ghost export mentions.
+
+**Take the URL list from Ghost, never from staging.** A post that failed to
+migrate is absent from staging's sitemap too, so sampling there confirms only
+that staging is consistent with itself. Ghost's sitemap index is at
+`/sitemap.xml` and splits into `sitemap-posts.xml`, `-pages.xml`, `-tags.xml`
+and `-authors.xml`; the apex 301s to the `www` form, so follow redirects.
 
 ```bash
 pnpm validate:redirects --target https://staging.<domain> \

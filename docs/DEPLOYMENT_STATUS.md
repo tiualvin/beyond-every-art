@@ -23,8 +23,14 @@ gained 4GB of swap and went from 2.3GB free to 19GB.
 
 Closed on 29 Aug, clearing the whole "minutes each" group: the plaintext backups
 are deleted, Caddy is unpinned onto the published arm64 image, the box has been
-rebooted and its swap comes back, and `main` is protected by a ruleset. What is
-left is verification work against real content, not setup.
+rebooted and its swap comes back, and `main` is protected by a ruleset.
+
+Also closed on 29 Aug: **the redirect layer**, and **edge protection except for
+closing the origin**. 127 indexed Ghost URLs were checked against staging and
+every one returned 200 — served directly, no redirect needed, because the domain
+and the paths do not change. And DNS-01 now issues certificates from behind
+Cloudflare's proxy, proven with a real challenge rather than inferred from a
+site that still serves.
 
 Newly on the list and easy to miss: **capture the pre-migration search
 baseline**, and check that Search Console's verification does not depend on
@@ -46,12 +52,18 @@ In dependency order, what is left before the public cutover:
    identifiers, and the Stripe takeover is off the critical path to cancelling
    Ghost.
 
-3. **Edge protection** — [`EDGE_PROTECTION.md`](EDGE_PROTECTION.md). The token
-   exists and the repository side is done: `CADDY_ACME=acme-cloudflare` in `.env`
-   switches every site block to DNS-01. What remains is that switch, confirming
-   a certificate is obtained through it, the orange cloud, `TRUST_CLOUDFLARE_IP=1`,
-   and firewall pass two. **Its own quiet deploy, not cutover-day work**, and
-   validate the Caddyfile before deploying.
+3. **Close the origin** — [`EDGE_PROTECTION.md`](EDGE_PROTECTION.md#closing-the-origin),
+   step 6, and the only part of edge protection still open. Steps 1–5 are done
+   (29 Aug): DNS-01 is live and **proven end to end**, `staging` is proxied
+   behind Full (strict), `cms` is deliberately left unproxied so the MCP
+   endpoint keeps answering non-browser clients, and `TRUST_CLOUDFLARE_IP=1` is
+   set.
+
+   Proxying hides the origin from DNS but does not stop anyone who already
+   recorded the address, and this one has been public since July — so until this
+   is done, an attacker with the old IP bypasses every protection just added. It
+   is the step where a wrong rule locks the operator out too, so it wants a
+   fresh sitting rather than being tacked onto the end of another change.
 
 4. **Flip.** Unset `NEXT_PUBLIC_NOINDEX`, move `SITE_ADDRESS` and
    `NEXT_PUBLIC_SITE_URL` to the production domain, then change DNS.
