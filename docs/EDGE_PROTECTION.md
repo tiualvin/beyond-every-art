@@ -187,15 +187,20 @@ inside the app container, so it never crosses the proxy.
    wrong in the other direction is worse than leaving it unset: every visitor
    would share a handful of buckets and throttle each other.
 
-   `docker compose up -d app` may print `Running` rather than `Started` and
-   leave the container untouched, because it does not always treat an `env_file`
-   edit as a reason to recreate. Confirm the value is actually inside the
-   container rather than only in the file:
+   `docker compose up -d app` prints `Running` rather than `Started` when it
+   judges the container already current, and that line alone does not tell you
+   whether the new value reached the process. Ask the container rather than
+   reading the file:
 
    ```bash
    docker compose exec app printenv TRUST_CLOUDFLARE_IP   # want: 1
-   docker compose up -d --force-recreate app              # if it is not
+   docker compose up -d --force-recreate app              # only if it is not
    ```
+
+   On 29 Aug it had in fact been applied despite the `Running` line, so this is
+   a verification step and not a known defect. Also check the variable appears
+   **once**: `>>` appends, and running the same command twice leaves two lines
+   whose precedence is not worth reasoning about.
 
 6. **Close the origin to direct traffic.** Proxying hides the IP from DNS but
    does not stop anyone who already has it — and this address has been public
