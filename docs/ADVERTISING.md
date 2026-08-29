@@ -23,13 +23,12 @@ ship yet, for reasons that have nothing to do with the code:
 2. There is no consent management platform. For EEA/UK traffic that is not a
    nice-to-have, it is the thing Google requires before it will serve ads at
    all.
-3. `/ads.txt` is served on Ghost by a redirect, and neither that redirect nor
-   the root file survives the cutover — the redirect because middleware skips
-   dotted paths, the file because Next does not serve the repository root.
-   Still open, and worth reading because the redirect half fails silently.
+3. `/ads.txt` is now served by Caddy from the repository-root file (§1).
+   Closed on 29 Aug, with one operator action left: delete the dead redirect
+   row in Payload, which can never run and which `validate:redirects` reports.
 
-The order that follows from this is: settle ads.txt at cutover, build consent,
-cut over, apply, then wire the ad layer behind a flag. §7 lays it out, §8 plans
+The order that follows from this is: build consent, cut over, apply, then wire
+the ad layer behind a flag. `ads.txt` is no longer part of that sequence. §7 lays it out, §8 plans
 the placements, and §9 evaluates the consent platforms.
 
 The more important point is in §6: **the ceiling on RPM is traffic, not
@@ -76,39 +75,50 @@ not a degraded `ads.txt` — buyers treat an unreadable file as an absent one,
 which makes the inventory unauthorised. The file exists precisely to prevent
 that, so a broken one inverts its own purpose.
 
-**Where it stands.** The file stays at the repository root, as the record of
-what the Ghost redirect points at, and the application does not serve it. That
-is the arrangement the site runs on today, and it is deliberate — the point of
-this section is that it has an expiry date, not that it is wrong now.
+**Settled on 29 Aug: Caddy serves the file.** A `handle /ads.txt` block in the
+public site block, evaluated before the catch-all `reverse_proxy`, serving the
+repository-root file bind-mounted read-only at `/srv/ads.txt`.
+
+This was found by running `pnpm validate:redirects` against staging rather than
+by reading code on cutover day. It reported both halves as errors — the
+middleware matcher skipping the path, and the path answering 404 — which is
+what that tool exists for.
+
+Three reasons this beats the two options previously written here:
+
+- **One copy.** The committed file is the file served. `public/ads.txt` would
+  have been a second source of truth for a third party's records, and
+  `output: 'standalone'` skips `public`, so it would have worked under
+  `next dev` and 404'd in production — correct exactly where nobody checks.
+- **No target to host.** A `redir` needs somewhere to redirect _to_, which for
+  a self-hosted file means hosting it twice over.
+- **Clear of `trailingSlash`.** Answering before the proxy means the question
+  of whether `/ads.txt` reaches Next as `/ads.txt` or `/ads.txt/` never arises.
+
+Verified against a real Caddy binary before shipping: `GET /ads.txt` returns
+200 with `Content-Type: text/plain; charset=utf-8` and the file's body, with no
+redirect to the slashed form, while other paths still reach the app.
+
+**One operator action remains.** The `/ads.txt` row in the `Redirects`
+collection is dead configuration — the middleware can never run it — and it is
+what `validate:redirects` still reports. Delete it in Payload admin. Caddy
+answers the path now, so the row protects nothing and only produces a
+recurring error in a tool whose value depends on a clean run meaning something.
+
+The redirect becomes the better answer again the day a managed partner hosts
+the file — see the end of §6. At that point replace the `handle` block with a
+`redir`, and delete the mount.
 
 [`../tests/seo/ads-txt.test.ts`](../tests/seo/ads-txt.test.ts) pins it: the
-file is at the root, it is not in `public`, its records parse, and it ends with
-a newline (it was originally committed without one, and some parsers drop an
-unterminated final record — which, in a one-record file, is all of them). The
-`public` check is there because moving the file is how the serving mechanism
-would change by accident rather than by decision.
+file is at the root and not in `public`, the Caddyfile serves it at exactly
+`/ads.txt`, `docker-compose.yml` mounts it read-only, its records parse, and it
+ends with a newline (it was originally committed without one, and some parsers
+drop an unterminated final record — which, in a one-record file, is all of
+them). The serving path spans two files and either alone is a 404, which no
+build or app-level test would catch.
 
-**So `/ads.txt` has to be settled before cutover, and there are two ways.**
-They are mutually exclusive, because a file the app serves is never reached by
-a redirect:
-
-- _Keep the redirect._ A Caddy rule, not a middleware change: `redir /ads.txt
-<target> permanent` in the site block, evaluated before the catch-all
-  `reverse_proxy`. Prefer this to loosening the middleware matcher, which would
-  put every dotted path through a redirect-map lookup to fix one file. This
-  becomes the clearly better answer the day a managed partner hosts the file —
-  see the end of §6.
-- _Serve it from the app._ Move the file to `public/ads.txt` **and** add
-  `COPY --from=builder --chown=nextjs:nodejs /app/public ./public` to the
-  `Dockerfile` runner stage in the same change. Neither half works alone: with
-  no `COPY` the file 404s in production while working under `next dev`, and
-  with no `public` directory the `COPY` fails the build outright. `trailingSlash:
-true` does not apply to files in `public`; they are served at the exact
-  path.
-
-Either way this is a cutover checklist item rather than a launch-day discovery.
-Whichever is chosen, verify it by fetching `https://<domain>/ads.txt` and
-reading the body, not the status code.
+Verify after cutover by fetching `https://<domain>/ads.txt` and reading the
+body, not the status code.
 
 ## 2. Consent is the real blocker
 

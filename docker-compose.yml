@@ -208,6 +208,10 @@ services:
       - '443:443'
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Served at /ads.txt by the handle block in the Caddyfile. Mounted rather
+      # than copied so the committed file is the one buyers read, with no second
+      # copy to drift; read-only because nothing should ever write it back.
+      - ./ads.txt:/srv/ads.txt:ro
       - caddy_data:/data
       - caddy_config:/config
 
