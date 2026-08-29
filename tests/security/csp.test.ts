@@ -99,6 +99,71 @@ describe('buildCspPolicy', () => {
     )
   })
 
+  it('admits the analytics origins for a Tag Manager container too', () => {
+    // Both tags load from googletagmanager.com and both report to the GA4
+    // collectors, so the container needs the same allowances the direct tag
+    // does.
+    const policy = buildCspPolicy({
+      env: { NEXT_PUBLIC_GTM_ID: 'GTM-ABC1234' },
+    })
+    expect(directive(policy, 'script-src')).toContain(
+      'https://www.googletagmanager.com',
+    )
+    expect(directive(policy, 'connect-src')).toContain(
+      'https://www.google-analytics.com',
+    )
+  })
+
+  it('admits the analytics origins while the tag is hidden by noindex', () => {
+    // The policy keys on configuration, not on the gate. Withholding an origin
+    // the page does use breaks the tag under enforcement; permitting one it
+    // does not use costs nothing.
+    const policy = buildCspPolicy({
+      env: { NEXT_PUBLIC_NOINDEX: '1', NEXT_PUBLIC_GTM_ID: 'GTM-ABC1234' },
+    })
+    expect(directive(policy, 'script-src')).toContain(
+      'https://www.googletagmanager.com',
+    )
+  })
+
+  it('admits operator-supplied origins for what a container fires', () => {
+    // A container's tags load from origins chosen in a web interface long
+    // after this policy was written, so the policy has to be extensible or
+    // adopting a container means abandoning it.
+    const policy = buildCspPolicy({
+      env: {
+        CSP_SCRIPT_SRC: 'https://connect.facebook.net https://cdn.example.com',
+        CSP_CONNECT_SRC: 'https://api.example.com',
+        CSP_IMG_SRC: 'https://pixel.example.com',
+      },
+    })
+    expect(directive(policy, 'script-src')).toContain(
+      'https://connect.facebook.net',
+    )
+    expect(directive(policy, 'script-src')).toContain('https://cdn.example.com')
+    expect(directive(policy, 'connect-src')).toContain(
+      'https://api.example.com',
+    )
+    expect(directive(policy, 'img-src')).toContain('https://pixel.example.com')
+  })
+
+  it('accepts commas as well as spaces in the operator origin lists', () => {
+    // Same parser as CSP_FRAME_SRC: an operator should not have to remember
+    // which separator a given variable takes.
+    const policy = buildCspPolicy({
+      env: { CSP_SCRIPT_SRC: 'https://a.example.com, https://b.example.com' },
+    })
+    expect(directive(policy, 'script-src')).toContain('https://a.example.com')
+    expect(directive(policy, 'script-src')).toContain('https://b.example.com')
+  })
+
+  it('adds nothing when the operator origin lists are unset or blank', () => {
+    const policy = buildCspPolicy({ env: { CSP_SCRIPT_SRC: '  ' } })
+    expect(directive(policy, 'script-src')).toBe(
+      "script-src 'self' 'unsafe-inline'",
+    )
+  })
+
   it('admits the media origin so R2 images are not violations', () => {
     const policy = buildCspPolicy({
       env: { S3_PUBLIC_URL: 'https://cdn.example.com' },

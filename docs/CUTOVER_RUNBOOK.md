@@ -19,10 +19,13 @@ on cutover day.
       by Ghost and dies with it, and Google eventually unverifies the property;
       a DNS record survives. Data is never deleted, but an unverified property
       cannot be read, and that is a poor thing to discover mid-cutover.
-- [ ] **GA4 measurement ID carried across** — `NEXT_PUBLIC_GA_ID` in the
-      production `.env`, the same `G-` id Ghost injects today, so the series is
-      continuous through the migration. Read at runtime, so no rebuild; gated on
-      `!isNoindex()`, so it starts firing at the flip and never on staging.
+- [ ] **Analytics tag carried across** — whatever Ghost injects today,
+      reproduced in the production `.env`: `NEXT_PUBLIC_GTM_ID` for a Tag
+      Manager container, `NEXT_PUBLIC_GA_ID` for a direct GA4 tag. **One, never
+      both** — a container fires GA4 itself and the pair double-counts every
+      page view irreversibly. Read at runtime, so no rebuild; gated on
+      `!isNoindex()`, so it starts firing at the flip and never on staging. See
+      [`ANALYTICS.md`](ANALYTICS.md).
 - [ ] **Search baseline captured from the Ghost site** — Search Console queries
       and pages (three months, sorted by impressions), the indexed page count,
       and GA4 sessions and organic landing pages for the same window. The
@@ -83,7 +86,9 @@ on cutover day.
 - [ ] Take a fresh backup: `pnpm backup:db`.
 - [ ] Confirm HTTPS is valid (Caddy provisioned the certificate).
 - [ ] Submit the new sitemap in Google Search Console.
-- [ ] Confirm analytics is receiving traffic (`NEXT_PUBLIC_GA_ID`).
+- [ ] Confirm analytics is receiving traffic — GA4 **Reports → Realtime**,
+      within seconds of loading the site. This is the first moment the tag can
+      be verified at all, because the `noindex` gate keeps it off on staging.
 - [ ] Verify a password-reset email is delivered.
 
 ## Post-launch monitoring (first weeks)

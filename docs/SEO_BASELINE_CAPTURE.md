@@ -56,15 +56,26 @@ definition and covers every subdomain, which is the more robust arrangement if
 you are setting one up anyway. It also means `staging.` traffic would appear in
 the same property — harmless, since staging is `noindex`.
 
-### 2. Carry the GA4 measurement ID across
+### 2. Carry the analytics tag across
 
 The tag on the Ghost site is injected through Ghost's code injection settings,
-so it stops firing when Ghost does. Find the measurement ID (`G-XXXXXXXXXX`) in
-**GA4 → Admin → Data Streams → the web stream**, and set it on the new site:
+so it stops firing when Ghost does. Whatever is there has to be reproduced on
+the new site, or cutover day shows traffic falling to zero because nothing is
+counting it.
 
-```
-NEXT_PUBLIC_GA_ID=G-XXXXXXXXXX
-```
+**Check View Page Source on the live site** — not Inspect, which shows tags
+Tag Manager injected after load and cannot tell you which is in charge:
+
+- `GTM-` present → a Tag Manager container. Set `NEXT_PUBLIC_GTM_ID`.
+- `gtag/js?id=G-` present → GA4 loaded directly. Set `NEXT_PUBLIC_GA_ID`.
+
+Set **one**, never both: a container almost always fires GA4 itself, and
+loading the direct tag as well double-counts every page view in a way GA4
+cannot undo. [`ANALYTICS.md`](ANALYTICS.md) covers the choice, and the CSP
+origins a container's other tags will need.
+
+The measurement ID is in **GA4 → Admin → Data streams → the web stream**; the
+container ID is in Tag Manager's header, shaped `GTM-XXXXXXX`.
 
 Two things worth knowing about how this one behaves here:
 
@@ -84,8 +95,8 @@ Two things worth knowing about how this one behaves here:
   and starts firing when `NEXT_PUBLIC_NOINDEX` comes off at the flip. Staging
   traffic never reaches the property.
 
-Same ID as Ghost used means one continuous series across the migration, which
-is exactly what makes the after comparable to the before.
+Same property as Ghost reported into means one continuous series across the
+migration, which is exactly what makes the after comparable to the before.
 
 ## Search Console export
 
