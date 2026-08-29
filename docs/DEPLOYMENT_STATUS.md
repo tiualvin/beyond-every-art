@@ -270,7 +270,7 @@ errors`, and `/swapfile` is `-rw-------`. Its one warning — "non-bind mount
 - **R2 configured and the lost media recovered (22 Aug).** Two buckets, media
   and backups deliberately separate; 109 of 110 images restored from the site
   archive with filenames and document ids intact; first database backup
-  uploaded. Full account, and the two steps still outstanding, in item 0.4.
+  uploaded. Full account, and the one step still outstanding, in item 0.4.
 - **Fixed three bugs found while getting the above working**, all merged to
   `main`:
   - The `app` container had been reporting `unhealthy` since it was created
@@ -315,29 +315,7 @@ success and changes nothing.
 What is left is therefore the token, the DNS-01 configuration, the proxy
 toggle, `TRUST_CLOUDFLARE_IP=1`, and one edit to two existing firewall rules.
 
-0. **One-time migration baseline (operator action, before the next deploy).**
-   Schema migrations now exist and automatic push is off. The VPS database was
-   built by push, so it must be told the initial migration is already applied
-   before the first deploy that carries this change — otherwise that migration
-   tries to `CREATE TABLE` over live tables and the deploy fails. Take a backup,
-   then run the baseline commands in
-   [`DATABASE_MIGRATIONS.md`](DATABASE_MIGRATIONS.md). The script refuses
-   anything that is not a pre-migrations database, and is safe to rerun.
-   CI history matches that story on both ends: the `deploy` job failed with
-   exit code 1 on the very first push that shipped schema migrations (#48,
-   2026-07-28), then kept failing through the next few pushes while the
-   `HOSTNAME`, `NewsletterBand`, and `DATABASE_URI` bugs above were being
-   tracked down. Starting with the fix for the second of those (2026-08-09,
-   "Don't show the newsletter promo band on the newsletter page", #54), the
-   `deploy` job has succeeded on every push to `main` since — 25+ consecutive
-   green deploys through 2026-08-22 (#98), with no failures in between. That
-   is strong circumstantial evidence the baseline was applied correctly, but
-   it is still inferred from a green `docker compose run --rm migrate` exit
-   code rather than a direct read of the migrations table. An operator can
-   retire this line for good with one command:
-   `docker compose run --rm migrate pnpm migrate:db:status`.
-
-0.4. **Media loss and R2 — recovered on 22 Aug. Two small steps left.**
+0.4. **Media loss and R2 — recovered on 22 Aug. One small step left.**
 
 Recorded in full because the failure was invisible for three weeks and the
 recovery this note originally prescribed would not have worked.
@@ -373,20 +351,11 @@ running it: 0 B transferred.
   preserved, derivatives rebuilt, images confirmed rendering on staging.
 - First database backup taken and uploaded: 2.3 MB, no errors.
 
-**Still to do (minutes of work):**
+Setting `BACKUP_ENCRYPTION_KEY`, proving a restore, and deleting the unencrypted
+backups are all done — see "Backups are encrypted and a restore is proven" and
+"The plaintext archives are gone" above. One item is still open:
 
-1. **Set `BACKUP_ENCRYPTION_KEY`.** The first backup uploaded unencrypted and
-   said so on the run. A dump carries the users table, OAuth records, and — once
-   the members import is done — every member email and Stripe identifier. Generate with
-   `openssl rand -base64 32`, put it in `.env`, keep a copy somewhere that is
-   neither this server nor the backup bucket, then re-run the backup and confirm
-   `"encrypted": true`.
-2. **Prove a restore works.** Not yet done, and it is a Phase 1 acceptance
-   criterion in the handoff:
-   `docker compose run --rm --entrypoint tsx backup scripts/restore-database.ts --latest --dry-run`
-3. **Delete the unencrypted backup** once an encrypted one exists and step 2 has
-   passed — not before, since it is currently the only one.
-4. **Media id 4** (`photo-1689659721022-3aa475803e19`) has no copy in the archive
+1. **Media id 4** (`photo-1689659721022-3aa475803e19`) has no copy in the archive
    and carries no file extension, which suggests it was linked directly rather
    than stored in Ghost. Check with
    `SELECT ghost_u_r_l FROM media WHERE id = 4;` and
@@ -434,32 +403,7 @@ to the Claude connector. See [`MCP_SERVER.md`](MCP_SERVER.md).
      login is confirmed working for every account that needs access.
    - The deploy SSH user (`VPS_USER`) is currently `root`. Consider a
      dedicated low-privilege deploy user in the `docker` group instead.
-4. **The VPS has no swap, and it is now failing deploys (operator action).**
-   Measured 27 Aug: 3.7GB of RAM, **`Swap: 0B`**, about 2.0GB available with
-   the stack running. The Next.js production build peaks near that on its own,
-   so the deploy of #118 was killed outright by the OOM killer
-   (`failed to execute bake: signal: killed`) — after the same build had
-   succeeded twice earlier the same day. That is a coin flip, not a margin, and
-   it will land on cutover day eventually.
-
-   Add a swapfile. It needs disk, so check first:
-
-   ```bash
-   df -h /
-   fallocate -l 4G /swapfile && chmod 600 /swapfile
-   mkswap /swapfile && swapon /swapfile
-   echo '/swapfile none swap sw 0 0' >> /etc/fstab
-   sysctl -w vm.swappiness=10
-   echo 'vm.swappiness=10' > /etc/sysctl.d/99-swappiness.conf
-   free -h
-   ```
-
-   Low swappiness keeps it as overflow for build spikes rather than something
-   the kernel reaches for while serving. The deploy now also builds the two
-   images one at a time rather than letting bake run them in parallel, which
-   halves the peak — insurance, not a substitute.
-
-5. **Docker image/layer cleanup (operator action).** Nothing automatically
+4. **Docker image/layer cleanup (operator action).** Nothing automatically
    prunes old images or layers on the VPS. That is intentional: an unattended
    prune can remove rollback material and consume I/O at the worst time.
    Periodically inspect `docker system df`, then have an operator review and
@@ -471,12 +415,7 @@ to the Claude connector. See [`MCP_SERVER.md`](MCP_SERVER.md).
    cache safely; images want the review this item describes, since one of them
    is the rollback.
 
-6. **GitHub branch protection (operator action).** Configure the `main` branch
-   in repository settings to require the `checks`, `browser-smoke`,
-   `backup-image`, and `app-image` jobs and disallow bypasses appropriate to
-   the team. The workflow does not mutate repository protection rules or infer
-   who should have bypass authority.
-7. **Lower priority / only if needed later:**
+5. **Lower priority / only if needed later:**
    - ~~Move the image build off the production VPS~~ — **done for Caddy, and it
      was not lower priority.** Compiling Caddy with the Cloudflare module ran
      seventeen minutes on this box without finishing and killed the deploy of
@@ -493,9 +432,10 @@ to the Claude connector. See [`MCP_SERVER.md`](MCP_SERVER.md).
      443, and the deploy reported success anyway. The image is a two-architecture
      manifest list now, and the deploy asserts Caddy is actually running rather
      than trusting `--wait`, which for a service with no healthcheck treats
-     "running" as ready. **Remove `CADDY_IMAGE` from the production `.env`** —
-     it was added by hand to restore service and now only pins the server to
-     whatever it last built.
+     "running" as ready. `CADDY_IMAGE` — added by hand to restore service, and
+     until 29 Aug the only thing pinning the server to whatever it last
+     built — is removed from the production `.env`; see "The pin is off and
+     the published image is proven" above.
 
    - The **app** image is still built on the VPS, deliberately: its
      `NEXT_PUBLIC_CHECKOUT_URL_*` build arguments come from the production
