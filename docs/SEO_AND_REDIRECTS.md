@@ -128,6 +128,40 @@ public one). Give both and a rule present in the export but missing from the
 table is reported too: an import that did not land, which checking the table
 alone would never show.
 
+**Running it on the VPS**, where the repository is checked out but Node and
+`pnpm` are not installed on the host:
+
+```bash
+cd /root/beyond-every-art
+docker compose run --rm \
+  --entrypoint ./node_modules/.bin/tsx migrate \
+  scripts/validate-redirects.ts \
+  --target https://staging.beyondeveryart.com \
+  --redirects-map https://cms.beyondeveryart.com/redirects-map/ \
+  --tag art --author alvin
+```
+
+Two details that cost a round each the first time:
+
+- `--entrypoint tsx` fails with `executable file not found in $PATH`. The
+  `backup` image installs `tsx` globally; the `migrator` image keeps the full
+  dependency tree instead, so it is at `./node_modules/.bin/tsx`.
+- `--input ghost-export/redirects.json` cannot be read from inside that
+  container: `ghost-export` is in `.dockerignore`, so the export is not in the
+  image. Bind-mount it (`-v /root/beyond-every-art/ghost-export:/app/ghost-export:ro`)
+  or use `--redirects-map`, which tests the live table and is the better check
+  once the import has run.
+
+**Pass `--tag` and `--author` with real slugs.** Without them the built-in
+probes cover only `/page/2/` and `/page/3/`, and the tag and author pagination
+rules — the larger surface, and the ones no export covers — go unchecked while
+the run still reports success. Find slugs with:
+
+```bash
+curl -s https://staging.beyondeveryart.com/ | grep -o '/tag/[^"/]*' | head -3
+curl -s https://staging.beyondeveryart.com/sitemap.xml | grep -o '/author/[^<"]*' | head -3
+```
+
 For each rule it asserts four things, of which only the first is what a manual
 spot-check covers:
 

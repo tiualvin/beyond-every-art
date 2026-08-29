@@ -1,20 +1,24 @@
-// `ads.txt` lives at the repository root, and the application does not serve it.
+// `ads.txt` lives at the repository root, and Caddy serves it from there.
 //
-// That is deliberate and it is not the obvious arrangement, so it is worth
-// stating plainly: on Ghost a redirect answers `/ads.txt`, and the file here is
-// the record of what that redirect points at. Next.js serves static assets from
-// `public` and nowhere else, so a file at the root is never a URL — which is
-// correct while the redirect is the serving mechanism, and a bug the day it
-// stops being.
+// The arrangement changed on 29 Aug and the reason is worth keeping: on Ghost a
+// redirect answered `/ads.txt`, and this file was only the record of what that
+// redirect pointed at. Neither half survives the cutover. Next serves static
+// assets from `public` and nowhere else — and `output: 'standalone'` skips even
+// that — so a file at the root was never a URL. And the redirect cannot be
+// migrated: `middleware.ts` excludes any path containing a dot, so a row for
+// `/ads.txt` sits in the `Redirects` collection looking perfectly configured
+// and never runs.
 //
-// See `docs/ADVERTISING.md` §1 for the cutover consequence, which is the part
-// that fails quietly: the Ghost redirect is importable into the `Redirects`
-// collection, but the middleware matcher skips any path containing a dot, so a
-// redirect row for `/ads.txt` can look perfectly configured and never run.
+// So the Caddyfile answers it before the proxy, from this file bind-mounted at
+// /srv/ads.txt. That keeps one copy rather than two, and keeps the path clear
+// of `trailingSlash: true`, which would otherwise decide whether a crawler
+// asking for `/ads.txt` gets the file or a redirect to `/ads.txt/`.
 //
-// What is checked here is the file's contract with ad buyers, which holds
-// wherever it is eventually served from: a malformed record is dropped by
-// parsers, and a dropped record means unauthorised inventory.
+// What is checked here is the file's contract with ad buyers — a malformed
+// record is dropped by parsers, and a dropped record means unauthorised
+// inventory — plus the two halves of the serving path, which are in different
+// files and would otherwise be free to drift apart. See `docs/ADVERTISING.md`
+// §1.
 
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
@@ -34,14 +38,36 @@ describe('ads.txt', () => {
     expect(adsTxt).not.toBe('')
   })
 
-  it('is not in public/, where it would silently start being served', () => {
-    // Moving it there changes who answers `/ads.txt` — the app rather than the
-    // redirect — which is a decision about a third party's records, not a
-    // tidy-up. It also needs a `COPY` of `public` added to the Dockerfile in
-    // the same change, or the file is served in `next dev` and 404s in
-    // production. Make that move deliberately; do not let it happen as a
-    // side effect of moving a file somewhere it looks like it belongs.
+  it('is not in public/, where a second copy could answer instead', () => {
+    // Caddy serves the root file. A copy in `public/` would be a second source
+    // of truth for a third party's records, and `output: 'standalone'` means it
+    // would be served in `next dev` and absent in production — the worst
+    // combination, since it looks correct exactly where nobody is checking.
     expect(existsSync(join(root, 'public', 'ads.txt'))).toBe(false)
+  })
+
+  // The serving path is two edits in two files, and either alone is a 404: a
+  // handle block that reads a file nothing mounts, or a mount nothing reads.
+  // Neither failure shows up in a build or a unit test of the app.
+  it('is served by the Caddyfile at exactly /ads.txt', () => {
+    const caddyfile = readFileSync(join(root, 'Caddyfile'), 'utf8')
+
+    // `handle /ads.txt` and not `/ads.txt*`: the exact path is what crawlers
+    // request, and a prefix match would also capture paths this must not serve.
+    expect(caddyfile).toMatch(/handle\s+\/ads\.txt\s*\{/)
+    // Verified against a real Caddy binary: the request returns 200 with
+    // `text/plain; charset=utf-8` and no redirect to the slashed form.
+    expect(caddyfile).toMatch(
+      /handle\s+\/ads\.txt\s*\{[^}]*root\s+\*\s+\/srv[^}]*file_server/,
+    )
+  })
+
+  it('is mounted into the Caddy container read-only', () => {
+    const compose = readFileSync(join(root, 'docker-compose.yml'), 'utf8')
+
+    // Read-only because nothing should ever write back to a file whose contents
+    // are a statement to ad buyers about who may sell this inventory.
+    expect(compose).toContain('./ads.txt:/srv/ads.txt:ro')
   })
 
   it('declares each selling relationship on its own line', () => {
