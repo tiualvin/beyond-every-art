@@ -41,6 +41,11 @@ collection allowlist, adding an MCP tool, or changing any agent-facing write
 path into Payload — and keep the plugin allowlist and the custom tools in step,
 so the allowlist never understates the real surface.
 
+[`docs/SCREENSHOTS.md`](docs/SCREENSHOTS.md) covers `pnpm screenshot`, a
+Playwright script for full-page QA captures against staging or production. It
+also documents the TLS workaround needed for Chromium to reach the network at
+all from inside the Claude Code sandbox.
+
 ## Open risk: the origin has no edge protection
 
 Cloudflare is DNS-only, so nothing absorbs traffic in front of the VPS and the

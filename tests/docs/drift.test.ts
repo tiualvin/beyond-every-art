@@ -213,6 +213,11 @@ describe('environment variables', () => {
     'CI',
     'GITHUB_ENV',
     'HOME',
+    // Set by the Claude Code sandbox's agent proxy and its pre-installed
+    // Playwright browsers when in use, never by .env — see
+    // docs/SCREENSHOTS.md.
+    'HTTPS_PROXY',
+    'PLAYWRIGHT_BROWSERS_PATH',
     // Set by Next.js inside `instrumentation.ts`, not by anyone deploying this.
     'NEXT_RUNTIME',
     'NODE_ENV',

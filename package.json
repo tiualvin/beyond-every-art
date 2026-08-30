@@ -17,6 +17,7 @@
     "test:e2e:local": "pnpm migrate:db && pnpm seed:dev && pnpm seed:e2e && playwright test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "screenshot": "tsx scripts/screenshot.ts",
     "payload": "payload",
     "generate:types": "payload generate:types",
     "generate:importmap": "payload generate:importmap",
