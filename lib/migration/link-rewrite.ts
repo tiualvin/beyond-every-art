@@ -55,3 +55,52 @@ export function findGhostUrlPlaceholders(
   const pattern = new RegExp(`${GHOST_URL_PLACEHOLDER}[^"'<>\\s]*`, 'g')
   return [...new Set(html.match(pattern) ?? [])]
 }
+
+// ---------------------------------------------------------------------------
+// Escaped-quote artefacts.
+//
+// One migrated post arrived from Ghost with every `href` value wrapped in a
+// backslash-escaped entity:
+//
+//   <a href="\&quot;https://example.com/\&quot;">text</a>
+//
+// The browser decodes the entities and reads the attribute as
+// `\"https://example.com/\"` — a *relative* path beginning with `\"`, resolved
+// against the current article. Every one of that post's seven links 404s. The
+// same body carries `\"` in its prose, where it renders as visible backslashes
+// around quoted words.
+//
+// `\&quot;` is removed rather than turned into a quote: the attribute already
+// has its real delimiters, so substituting one would produce `href=""url""`
+// and break the markup a second way. `\"` in text becomes the quote it was
+// meant to be.
+//
+// This shipped from Ghost, so the old site has the same dead links. It is
+// repaired here rather than left alone because migrating breakage forward is a
+// choice, and this one costs a string replacement.
+
+/** The two artefacts, longest first so neither can clip the other. */
+const ESCAPED_ARTEFACTS: Array<[string, string]> = [
+  ['\\&quot;', ''],
+  ['\\"', '"'],
+]
+
+/**
+ * Repair backslash-escaped quote artefacts in a migrated body.
+ *
+ * Idempotent — a repaired body contains neither pattern, so a rerun replaces
+ * nothing and reports zero.
+ */
+export function repairEscapedQuotes(
+  html: string | null | undefined,
+): PlaceholderRewrite {
+  if (!html) return { html: html ?? '', replaced: 0 }
+  let output = html
+  let replaced = 0
+  for (const [pattern, replacement] of ESCAPED_ARTEFACTS) {
+    const parts = output.split(pattern)
+    replaced += parts.length - 1
+    output = parts.join(replacement)
+  }
+  return { html: output, replaced }
+}

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   findGhostUrlPlaceholders,
+  repairEscapedQuotes,
   stripGhostUrlPlaceholders,
 } from '../../lib/migration/link-rewrite'
 
@@ -89,5 +90,58 @@ describe('findGhostUrlPlaceholders', () => {
   it('returns nothing for a clean body', () => {
     expect(findGhostUrlPlaceholders('<p>clean</p>')).toEqual([])
     expect(findGhostUrlPlaceholders(null)).toEqual([])
+  })
+})
+
+describe('repairEscapedQuotes', () => {
+  it('unwraps an href whose value was wrapped in escaped entities', () => {
+    const result = repairEscapedQuotes(
+      '<a href="\\&quot;https://www.nature.com/collections/fbaaejdihf\\&quot;">npj</a>',
+    )
+    expect(result.html).toBe(
+      '<a href="https://www.nature.com/collections/fbaaejdihf">npj</a>',
+    )
+    expect(result.replaced).toBe(2)
+  })
+
+  it('removes the entity rather than substituting a quote', () => {
+    // Substituting would give href=""url"" — broken a second way.
+    expect(
+      repairEscapedQuotes('<a href="\\&quot;/x/\\&quot;">x</a>').html,
+    ).not.toContain('""')
+  })
+
+  it('turns a backslash-quote in prose into the quote it meant', () => {
+    expect(repairEscapedQuotes('their \\"drying\\" ability').html).toBe(
+      'their "drying" ability',
+    )
+  })
+
+  it('repairs both artefacts in one body without either clipping the other', () => {
+    const result = repairEscapedQuotes(
+      'their \\"drying\\" ability, see <a href="\\&quot;https://e.com/\\&quot;">e</a>',
+    )
+    expect(result.html).toBe(
+      'their "drying" ability, see <a href="https://e.com/">e</a>',
+    )
+    expect(result.replaced).toBe(4)
+  })
+
+  it('is idempotent', () => {
+    const once = repairEscapedQuotes('<a href="\\&quot;/x/\\&quot;">x</a>')
+    const twice = repairEscapedQuotes(once.html)
+    expect(twice.html).toBe(once.html)
+    expect(twice.replaced).toBe(0)
+  })
+
+  it('leaves an ordinary body and a legitimate entity alone', () => {
+    const html =
+      '<p>A &quot;quoted&quot; word and <a href="/x/">a link</a>.</p>'
+    expect(repairEscapedQuotes(html)).toEqual({ html, replaced: 0 })
+  })
+
+  it('treats null and empty bodies as nothing to do', () => {
+    expect(repairEscapedQuotes(null)).toEqual({ html: '', replaced: 0 })
+    expect(repairEscapedQuotes('')).toEqual({ html: '', replaced: 0 })
   })
 })
