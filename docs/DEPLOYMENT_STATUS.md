@@ -11,7 +11,12 @@ Related: [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md),
 
 ## Pick up here
 
-Last worked on **29 Aug 2026**. The deploy pipeline broke and was repaired; the
+Last worked on **30 Aug 2026**. The content audit below closed most of the
+rehearsal's §4 list and found four real defects, none of which a crawl of
+staging would have surfaced. Read "The content audit" under Done before
+touching content again.
+
+Previously worked on **29 Aug 2026**. The deploy pipeline broke and was repaired; the
 detail is in "The 27–28 Aug deploy outage" below, and it is worth reading before
 the next infrastructure change because two of the three failures were invisible
 to CI. The server now runs everything through #121.
@@ -40,12 +45,17 @@ Procedure in [`SEO_BASELINE_CAPTURE.md`](SEO_BASELINE_CAPTURE.md).
 
 In dependency order, what is left before the public cutover:
 
-1. **Work [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md) end to end.** Every
-   box in §4–§6 is unticked, and this is the bulk of what is left. Newly
-   unblocked: `pnpm validate:redirects` is deployed and must exit zero, the media
-   check can pass, and staging no longer requires Basic Auth so the crawl
-   comparison and the validator need no credentials. Includes the
-   email-delivery test.
+1. **Work [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md) end to end.** Much
+   of §4 closed on 30 Aug by querying Postgres rather than crawling — see "The
+   content audit" below. What is left there needs a browser or a live probe:
+   the one post carrying a `<table>`, draft URLs actually returning 404, the
+   admin panel and draft preview, the forms, the email-delivery test, and §5–§6.
+
+   Two items from that audit are still open and both are small: **media id 4
+   has no bytes in R2** and needs re-uploading through the admin under a
+   filename ending `.jpeg`, and the **tag count** is 10 in Payload against 9 in
+   Ghost's sitemap, which an unpublished or empty tag would explain but nobody
+   has confirmed.
 
 2. **Members CSV.** Export from Ghost Admin and import. Low stakes now — there
    are no paying members, so this is the newsletter list rather than billing
@@ -76,6 +86,91 @@ The reboot that was pending here is done — see "The swap survives a reboot"
 below.
 
 ## Done
+
+- **The content audit (30 Aug).** Every article body, every media record and the
+  Ghost export itself, checked by querying Postgres directly rather than by
+  crawling staging. That choice is the reason this found anything: a crawl
+  cannot see drafts, and three of the four defects below sat in documents or
+  fields a crawler never reaches.
+
+  **Nothing hotlinks Ghost.** The original worry — bodies still pointing at
+  `/content/images`, which would 404 the moment DNS moved — is empty, and for a
+  structural reason worth recording: **no article body contains an inline image
+  at all.** Across 117 posts there are zero `<img>` tags, zero `src=`
+  attributes in any quoting, zero `<figure>`, zero `figcaption`, zero
+  `<iframe>` and zero `srcset`. Bodies are prose, 7.8KB to 56.8KB, averaging
+  30KB. Every image in the publication is a feature image rendered by Payload
+  from `featuredImage`, and R2 holds exactly 327 objects — 3 × 109, an original
+  plus `card` plus `og` for every image except media 4.
+
+  So the srcset gap in `lib/migration/media.ts` is real (the header comment
+  claims `ATTR_URL` matches srcset entries; it cannot, because `src` followed
+  by `set=` fails the `\s*=`) but this content never exercises it. Worth
+  knowing before importing anything else.
+
+  **Four defects, three fixed.**
+
+  1. **35 `__GHOST_URL__` links, 23 of them on published documents.** The
+     import resolves that placeholder for media only, so a placeholder in an
+     ordinary `href` shipped verbatim; a browser reads it as a relative path
+     and 404s. Fixed by `pnpm fix:ghost-links` and verified by re-querying all
+     four tables, including the version tables. All 25 links on published
+     documents resolved to real targets, so the repair needed no editorial
+     judgement; the 10 that point nowhere are all in drafts 116 and 117 and
+     stay an editorial question.
+  2. **110 photo credits dropped.** Ghost keeps `feature_image_caption` in
+     `posts_meta`, a table `plan.ts` already loads and reads four other fields
+     from — the field simply was not on `GhostPostMeta`. Every one is
+     `Photo by <name> / Unsplash`, 102 distinct. Restored by
+     `pnpm repair:content` into `media.credit`, which `FeaturedFigure` already
+     renders, rather than `media.caption`: these are attributions, not
+     description. Confirmed rendering on a real page.
+  3. **One post with seven dead links.** Every `href` in
+     `the-alchemical-canvas-…` was wrapped in `\&quot;`, which decodes to a
+     relative path and 404s; the same body carried `\"` in its prose. It
+     arrived from Ghost that way, so the old site has the same dead links.
+     Repaired in the same pass.
+  4. **Media id 4 has no bytes in R2 — still open.** The orphan question left
+     in item 0.4.4 below is answered: it is an Unsplash URL that was linked
+     rather than stored, it _is_ used (feature image of a published post), and
+     the 22 Aug restore never recovered it. Its source URL still returns 200
+     with 222497 bytes, matching the row's `filesize` exactly, so it is
+     recoverable.
+
+     It also has **no file extension**, and that is a second, independent
+     defect: `trailingSlash: true` adds a slash to any path without a dot, and
+     Payload's route only answers the unslashed form, so an extensionless media
+     filename is permanently unreachable through the app. Re-uploading it
+     through the admin under `photo-1689659721022-3aa475803e19.jpeg` fixes both
+     at once. **Any future upload without an extension will break the same way,
+     silently** — worth a `beforeChange` hook on Media if it recurs.
+
+  **Two things that looked like problems and were not.** Ghost had no alt text
+  to lose: 118 `posts_meta` rows, zero non-empty `feature_image_alt`. The
+  filenames the importer put in `alt` never reach a reader either, because
+  `toAltText` in `lib/content/media.ts` already collapses an alt equal to its
+  filename to the empty string — confirmed in the rendered HTML, where both
+  images carry `alt=""`. And a bracket-and-parenthesis construct that looked
+  like a markdown link in a published body was an artefact of how a URL rendered when
+  terminal output was pasted; `has_markdown_link` is 0 across all 117.
+
+  **The counts are settled, and by set equality rather than by matching
+  totals.** 113 published posts + 4 drafts + 2 published pages, against Ghost's
+  sitemap of 113 posts and 3 pages (one being the homepage), and 119 rows in
+  the export's `posts` table, which holds pages too. Because the 29 Aug audit
+  requested all 127 indexed Ghost URLs on staging and every one returned 200,
+  every Ghost post is known to exist here — so equal totals mean identical
+  sets, not a coincidence of arithmetic. The one loose thread is tags: 10
+  imported against 9 in Ghost's sitemap, which an empty or unpublished tag
+  would explain and nobody has checked.
+
+  **A methodological note worth keeping.** Counting matches is not the same as
+  proving the query works. Every scan in this audit carried a positive control
+  — a column that had to be non-zero if the query was running against real
+  data — and the first one earned its keep immediately: a clean-looking result
+  of all zeros turned out to mean "no body references an image in any form",
+  which is a completely different fact from "no body hotlinks Ghost", and only
+  the control distinguished them.
 
 - **The 27–28 Aug deploy outage, and what it cost.** Recorded in full because
   two of the three failures were invisible to CI, and the same blind spots would
