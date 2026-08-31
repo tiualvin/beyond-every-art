@@ -19,9 +19,19 @@
 // moved. A 404 is a reported sitemap failure. A 301 to the live sitemap answers
 // the question that was actually asked.
 //
-// This test guards the pairing rather than the redirect itself — the Caddyfile
-// and this reasoning live in different files and would otherwise be free to
-// drift apart. See `docs/SEO_AND_REDIRECTS.md`.
+// **On the shape of these assertions.** The first version of this file checked
+// that the Caddyfile contained `redir /sitemap.xml 301` inside a `handle`
+// block, and that string is wrong: `redir` takes an optional matcher as its
+// first argument, so Caddy read `/sitemap.xml` as the matcher and `301` as the
+// destination, adapting to `status: 302, Location: "301"` on a route that could
+// never match — and the handle block, left with nothing to do, answered 200
+// with an empty body. The test passed. It was asserting the author's
+// assumption, not the behaviour.
+//
+// So what is checked here is the shape that cannot be misread — a named matcher
+// first — plus an explicit guard against the ambiguous form ever coming back.
+// Verified against a real Caddy 2.8.4 binary with `caddy adapt`, which is the
+// only thing that can actually settle it. See `docs/SEO_AND_REDIRECTS.md`.
 
 import { readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
@@ -41,49 +51,66 @@ const GHOST_SITEMAPS = [
   '/sitemap-authors.xml',
 ]
 
+/** The Caddyfile with comment lines removed, so `#` prose cannot satisfy a match. */
+const directives = caddyfile
+  .split('\n')
+  .filter((line) => !line.trim().startsWith('#'))
+  .join('\n')
+
 describe("Ghost's child sitemaps", () => {
-  it('are all named in the Caddyfile matcher', () => {
-    const matcher = caddyfile.match(/@ghostSitemaps\s+path\s+(.+)/)
+  it('are all named in the matcher', () => {
+    const matcher = directives.match(/@ghostSitemaps\s+path\s+(.+)/)
     expect(matcher).not.toBeNull()
     for (const path of GHOST_SITEMAPS) {
       expect(matcher![1]).toContain(path)
     }
   })
 
-  it('redirect permanently to the sitemap this site actually publishes', () => {
-    expect(caddyfile).toMatch(
-      /handle\s+@ghostSitemaps\s*\{[^}]*redir\s+\/sitemap\.xml\s+301/,
+  it('redirect permanently to the sitemap this site publishes', () => {
+    // Named matcher first: `redir @name <to> <code>` cannot be reparsed as
+    // `redir <matcher> <to>` the way a leading-slash argument can.
+    expect(directives).toMatch(
+      /redir\s+@ghostSitemaps\s+\/sitemap\.xml\s+301\b/,
     )
   })
 
-  it('are matched exactly, not by prefix', () => {
-    // A `*` here would also capture paths this must not answer for.
-    const matcher = caddyfile.match(/@ghostSitemaps\s+path\s+(.+)/)![1]
+  it('never uses the form where Caddy reads the target as a matcher', () => {
+    // `redir [<matcher>] <to> [<code>]`. A first argument beginning with `/` is
+    // a path matcher, so `redir /somewhere 301` silently means "redirect
+    // requests for /somewhere to the literal URL 301, with a 302". This is the
+    // bug that shipped; it is cheap to make it impossible to reintroduce.
+    const ambiguous = directives
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => /^redir\s+\//.test(line))
+    expect(ambiguous).toEqual([])
+  })
+
+  it('is a site-level directive, not wrapped in a handle block', () => {
+    // `redir` sorts ahead of `handle` in Caddy's directive order, so it is
+    // reached before the catch-all `handle { reverse_proxy app:3000 }`. Inside
+    // a handle block it would depend on Caddy's specificity sorting instead.
+    expect(directives).not.toMatch(/handle\s+@ghostSitemaps/)
+  })
+
+  it('matches exactly, not by prefix', () => {
+    const matcher = directives.match(/@ghostSitemaps\s+path\s+(.+)/)![1]
     expect(matcher).not.toContain('*')
-  })
-
-  it('are answered before the reverse proxy, not after it', () => {
-    // Caddy evaluates `handle` blocks in file order, so the catch-all proxy to
-    // the app must come last or it swallows these first.
-    const matcherAt = caddyfile.indexOf('@ghostSitemaps')
-    const proxyAt = caddyfile.indexOf('reverse_proxy app:3000')
-    expect(matcherAt).toBeGreaterThan(-1)
-    expect(proxyAt).toBeGreaterThan(matcherAt)
-  })
-
-  it('would be unservable as redirect rows, which is why Caddy has them', () => {
-    // The premise of this whole arrangement. If the matcher ever stopped
-    // skipping dotted paths, a redirect row would become the simpler home for
-    // these and this Caddy block could go.
-    expect(unservableRedirectSources(GHOST_SITEMAPS).sort()).toEqual(
-      [...GHOST_SITEMAPS].sort(),
-    )
   })
 
   it("leaves the site's own sitemap to the application", () => {
     // `/sitemap.xml` is served by Next and is the redirect target here, so
-    // matching it at the edge would be a loop.
-    const matcher = caddyfile.match(/@ghostSitemaps\s+path\s+(.+)/)![1]
+    // matching it would be a loop.
+    const matcher = directives.match(/@ghostSitemaps\s+path\s+(.+)/)![1]
     expect(matcher).not.toMatch(/(^|\s)\/sitemap\.xml(\s|$)/)
+  })
+
+  it('would be unservable as redirect rows, which is why Caddy has them', () => {
+    // The premise the whole arrangement rests on. If the middleware matcher
+    // ever stopped skipping dotted paths, a redirect row would become the
+    // simpler home for these and this Caddy block could go.
+    expect(unservableRedirectSources(GHOST_SITEMAPS).sort()).toEqual(
+      [...GHOST_SITEMAPS].sort(),
+    )
   })
 })

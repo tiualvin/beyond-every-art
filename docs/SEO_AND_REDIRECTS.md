@@ -76,6 +76,16 @@ answer to "where is the sitemap" is not "nowhere". `/content/images/…` needs n
 handler on this publication: no article body contains an inline image, so
 nothing points there (`DEPLOYMENT_STATUS.md`, the content audit).
 
+A Caddy change needs probing from outside, not just a config that loads. The
+sitemap redirects above shipped twice before working: once as a Caddyfile the
+running container never saw — single-file bind mounts bind the inode, and
+`caddy reload` re-read the stale one and reported success — and once as
+`redir /sitemap.xml 301` inside a `handle` block, which Caddy parses as matcher
+`/sitemap.xml`, destination `301`, status 302. That form adapts cleanly, starts
+cleanly, and answers 200 with an empty body. `caddy adapt --config Caddyfile`
+prints the JSON and is what settles it locally; a `curl` against the live host
+is what settles it for real.
+
 `lib/seo/middleware-coverage.ts` models the matcher so this is checkable rather
 than remembered. `pnpm migrate:redirects` prints a warning naming any imported
 rule that cannot run, and `pnpm validate:redirects` reports it as an error

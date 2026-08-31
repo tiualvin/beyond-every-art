@@ -120,11 +120,21 @@
   #
   # Answering at the edge also keeps these clear of `trailingSlash: true`, which
   # would otherwise put a dotted path's redirect target at its slashed form.
+  # Written as a site-level `redir` with a named matcher, not as a `redir`
+  # inside a `handle`. `redir` takes an optional matcher as its *first*
+  # argument — `redir [<matcher>] <to> [<code>]` — so `redir /sitemap.xml 301`
+  # inside a handle block does not mean what it looks like: Caddy reads
+  # `/sitemap.xml` as the matcher and `301` as the destination, and defaults
+  # the status to 302. Adapting that form produces
+  # `status: 302, Location: "301"` on a route that can never match, and the
+  # handle block, left with nothing to do, answers 200 with an empty body.
+  # That shipped once and had to be caught by probing the live host.
+  #
+  # A named matcher cannot be confused for a destination, so this form says
+  # what it does. `redir` also sorts ahead of `handle` in Caddy's directive
+  # order, which keeps it clear of the catch-all proxy below.
   @ghostSitemaps path /sitemap-posts.xml /sitemap-pages.xml /sitemap-tags.xml /sitemap-authors.xml
-
-  handle @ghostSitemaps {
-    redir /sitemap.xml 301
-  }
+  redir @ghostSitemaps /sitemap.xml 301
 
   @staffOnly {
     path /api* /admin* /redirects-map* /oauth* /.well-known/oauth-*
