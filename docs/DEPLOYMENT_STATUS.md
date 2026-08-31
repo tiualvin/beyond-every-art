@@ -103,13 +103,22 @@ below.
   page returned **200 with 43KB of HTML** and every script loaded — so from
   outside it looked entirely healthy.
 
-  **Regenerating needs the S3 variables set**, or the same gap comes straight
-  back. Placeholders are enough; the generator reads the config's shape, never
-  the bucket:
+  **The cause is fixed structurally, not by remembering to set variables.** The
+  first attempt did regenerate the map with S3 set, and the admin was still
+  blank — because a build that regenerates the map does so with whatever
+  environment it has, and Docker's build has no S3 variables. Telling people to
+  remember something was never going to hold.
 
-  ```
-  S3_BUCKET=x S3_ENDPOINT=https://x pnpm generate:importmap
-  ```
+  `s3Storage` is now registered unconditionally with `enabled: useR2`, matching
+  the pattern the `mcp()` plugin directly above it already documents: always
+  registered, behaviour decided inside, so the config's shape does not change
+  with the environment. Proven rather than asserted — generating the map with
+  and without the S3 variables now produces byte-identical output, and Payload
+  itself reports "No new imports found" on the second run. Both builds succeed.
+
+  `alwaysInsertFields` is deliberately left off: it would add the plugin's
+  prefix field to the media schema, which is a migration, and this is not the
+  week for one.
 
   Three separate reasons the existing guard could not see it, all now fixed.
   Its `REQUIRED` list did not name the S3 key. Its key regex was `[A-Za-z]+`,

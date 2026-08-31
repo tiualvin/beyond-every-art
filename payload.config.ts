@@ -120,22 +120,29 @@ export default buildConfig({
     // so the database schema does not change with MCP_ENABLED. Whether the
     // endpoint is mounted is decided inside.
     mcp(),
-    ...(useR2
-      ? [
-          s3Storage({
-            bucket: process.env.S3_BUCKET!,
-            collections: { media: true },
-            config: {
-              credentials: {
-                accessKeyId: process.env.S3_ACCESS_KEY_ID!,
-                secretAccessKey: process.env.S3_SECRET_ACCESS_KEY!,
-              },
-              endpoint: process.env.S3_ENDPOINT,
-              region: process.env.S3_REGION || 'auto',
-            },
-          }),
-        ]
-      : []),
+    // Always registered, for the same reason `mcp()` above is: a plugin that is
+    // conditionally *added* makes the config a different shape in every
+    // environment, and the admin import map is generated from that shape. A map
+    // generated where S3 was unset was complete for that machine and missing
+    // `S3ClientUploadHandler` on the server, which rendered the admin blank
+    // from 22 Aug to 31 Aug. `enabled` decides the behaviour; the shape stays
+    // constant. See docs/DEPLOYMENT_STATUS.md.
+    //
+    // `alwaysInsertFields` is deliberately left at its default: it would add
+    // the plugin's prefix field to the media schema, which is a migration.
+    s3Storage({
+      enabled: useR2,
+      bucket: process.env.S3_BUCKET ?? '',
+      collections: { media: true },
+      config: {
+        credentials: {
+          accessKeyId: process.env.S3_ACCESS_KEY_ID ?? '',
+          secretAccessKey: process.env.S3_SECRET_ACCESS_KEY ?? '',
+        },
+        endpoint: process.env.S3_ENDPOINT,
+        region: process.env.S3_REGION || 'auto',
+      },
+    }),
   ],
   // Throws rather than defaulting when this is missing or is one of the
   // placeholder values published in this repository — see lib/security/secret.ts
