@@ -87,6 +87,50 @@ below.
 
 ## Done
 
+- **Caddy serves a stale config until its container is recreated (31 Aug).**
+  The single most likely thing to waste an hour on cutover day, so it is first.
+
+  `Caddyfile` and `ads.txt` reach the container through single-file bind mounts,
+  which bind the _inode_, not the path. Git never edits in place — it writes a
+  new file and renames it over the old — so after any checkout the running
+  container keeps serving what it started with, and `docker compose up -d` will
+  not replace it, because the service definition is unchanged and Compose does
+  not hash the contents of mounted files.
+
+  **Editing either file needs `docker compose up -d --force-recreate caddy`.
+  A reload is not enough**: `caddy reload` re-read the stale inode and reported
+  success, which is how a change that had not deployed looked exactly like one
+  that had. The deploy job now compares both files against the container,
+  recreates when they differ, and fails if a mount is still stale afterwards.
+
+  `ads.txt` had the same exposure and nobody had noticed: `ADVERTISING.md`
+  reasons that mounting it keeps one copy so buyers always read the committed
+  file, which was true only until the next deploy touched it.
+
+- **Ghost's four child sitemaps are answered (31 Aug).** `/sitemap-posts.xml`,
+  `-pages`, `-tags` and `-authors` were 404s — Ghost's URL shape, which this
+  site does not use, and which no redirect row can serve because the middleware
+  matcher skips dotted paths. They now 301 to `/sitemap.xml`, verified against
+  the live host: all four redirect, following one lands on 200 `application/xml`,
+  and `/ads.txt` and `/sitemap.xml` are unaffected.
+
+  It took two wrong attempts, both of which _looked_ like they had worked. The
+  first never reached Caddy (the bind mount above). The second used
+  `redir /sitemap.xml 301` inside a `handle` block — but `redir` takes an
+  optional matcher first, so Caddy read `/sitemap.xml` as the matcher and `301`
+  as the destination, adapting to `status: 302, Location: "301"` on a route that
+  could never fire; the handle block then answered 200 with an empty body. Its
+  test passed throughout, because it asserted the file _contained_ that string.
+  `caddy adapt --config Caddyfile` prints the adapted JSON and is what settled
+  it. **A Caddy change is not verified until it is probed from outside the
+  stack** — the same lesson as the 27 Aug outage below.
+
+  Also measured while there: `/sitemap.xml` carries 129 URLs and reconciles
+  exactly — 113 published posts, 2 pages, the homepage, `/journal/`, 10 tags,
+  2 authors — and **no published post or page is missing from it**. `/tag/news/`
+  is in it and is an empty tag, so it answers 200 with page chrome and no posts:
+  a soft 404 rather than a broken one. Deleting the tag closes it.
+
 - **The content audit (30 Aug).** Every article body, every media record and the
   Ghost export itself, checked by querying Postgres directly rather than by
   crawling staging. That choice is the reason this found anything: a crawl
