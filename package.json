@@ -33,6 +33,8 @@
     "migrate:redirects": "tsx scripts/migrate-redirects.ts",
     "migrate:members": "tsx scripts/migrate-members.ts",
     "migrate:validate": "tsx scripts/validate-migration.ts",
+    "fix:ghost-links": "tsx scripts/fix-ghost-url-placeholders.ts",
+    "repair:content": "tsx scripts/repair-migrated-content.ts",
     "backfill:media": "tsx scripts/backfill-media-sizes.ts",
     "restore:media": "tsx scripts/restore-media-from-ghost.ts",
     "migration:compare": "tsx scripts/compare-sites.ts",

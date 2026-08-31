@@ -54,6 +54,11 @@ export interface GhostPostMeta {
   meta_description?: string | null
   og_image?: string | null
   twitter_image?: string | null
+  // Ghost keeps the feature image's alt and caption here rather than on the
+  // post, which is why an import that only reads `posts` finds neither.
+  // `lib/migration/feature-image-credits.ts` is the consumer.
+  feature_image_alt?: string | null
+  feature_image_caption?: string | null
 }
 
 export interface GhostJoin {

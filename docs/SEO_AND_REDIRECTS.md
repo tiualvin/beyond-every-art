@@ -64,6 +64,28 @@ migration meets three more classes of it:
 | `/content/images/…`          | every image hotlink and Google Images result     |
 | `/ads.txt`                   | ad buyers, once display advertising is live      |
 
+Two of the three are now closed. `/ads.txt` is served by Caddy from the
+repository root, and Ghost's four child sitemaps — `/sitemap-posts.xml`,
+`-pages`, `-tags`, `-authors` — redirect there permanently to `/sitemap.xml`,
+the single flat sitemap this site publishes. Measured on staging on 31 Aug
+before the change: `/sitemap.xml` answered 200 with 129 `<loc>` entries and all
+four children answered 404 with Next's HTML error page. The redirect rather
+than a 410 is deliberate — Google holds those four URLs independently of the
+pages they list, from Ghost's sitemap index and from Search Console, and the
+answer to "where is the sitemap" is not "nowhere". `/content/images/…` needs no
+handler on this publication: no article body contains an inline image, so
+nothing points there (`DEPLOYMENT_STATUS.md`, the content audit).
+
+A Caddy change needs probing from outside, not just a config that loads. The
+sitemap redirects above shipped twice before working: once as a Caddyfile the
+running container never saw — single-file bind mounts bind the inode, and
+`caddy reload` re-read the stale one and reported success — and once as
+`redir /sitemap.xml 301` inside a `handle` block, which Caddy parses as matcher
+`/sitemap.xml`, destination `301`, status 302. That form adapts cleanly, starts
+cleanly, and answers 200 with an empty body. `caddy adapt --config Caddyfile`
+prints the JSON and is what settles it locally; a `curl` against the live host
+is what settles it for real.
+
 `lib/seo/middleware-coverage.ts` models the matcher so this is checkable rather
 than remembered. `pnpm migrate:redirects` prints a warning naming any imported
 rule that cannot run, and `pnpm validate:redirects` reports it as an error
