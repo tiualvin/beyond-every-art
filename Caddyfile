@@ -98,6 +98,34 @@
     file_server
   }
 
+  # Ghost's four child sitemaps, sent to the one this site publishes.
+  #
+  # Ghost split its sitemap into `/sitemap-posts.xml`, `-pages`, `-tags` and
+  # `-authors`, with `/sitemap.xml` as an index over them. This site publishes a
+  # single flat `/sitemap.xml` instead, so the four children have nothing behind
+  # them and 404 — confirmed on staging, where each returned Next's HTML error
+  # page rather than XML.
+  #
+  # They cannot be redirected in the application, for the same reason `/ads.txt`
+  # cannot be served by it: `middleware.ts` excludes any path containing a dot,
+  # so a redirect row for one of these imports cleanly, shows as enabled, and
+  # never fires. `docs/SEO_AND_REDIRECTS.md` names this class explicitly.
+  #
+  # It matters because Google holds these URLs independently of the pages they
+  # list — from Ghost's sitemap index and from Search Console — and keeps asking
+  # for them after the pages have moved. A 404 there is a reported sitemap
+  # failure rather than a lost page, which is why this is a 301 to the live
+  # sitemap rather than a 410: the answer to "where is the sitemap" is not
+  # "nowhere", it is "over here".
+  #
+  # Answering at the edge also keeps these clear of `trailingSlash: true`, which
+  # would otherwise put a dotted path's redirect target at its slashed form.
+  @ghostSitemaps path /sitemap-posts.xml /sitemap-pages.xml /sitemap-tags.xml /sitemap-authors.xml
+
+  handle @ghostSitemaps {
+    redir /sitemap.xml 301
+  }
+
   @staffOnly {
     path /api* /admin* /redirects-map* /oauth* /.well-known/oauth-*
     not path /api/media/file/* /api/preview*
