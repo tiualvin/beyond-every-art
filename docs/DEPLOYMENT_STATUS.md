@@ -87,6 +87,46 @@ below.
 
 ## Done
 
+- **The admin panel has been blank since 22 Aug, and why nothing caught it
+  (31 Aug).** Found by finally opening it — the rehearsal's "Payload admin
+  loads and editing works" box had never been ticked.
+
+  `payload.config.ts` adds the S3 storage plugin **conditionally**, only when
+  `S3_BUCKET` and `S3_ENDPOINT` are set. The import map was generated on a
+  machine without them, so it was complete for that machine and missing
+  `@payloadcms/storage-s3/client#S3ClientUploadHandler` everywhere else. The map
+  was filled in on 16 Aug (#…, "Fill in the admin import map"); R2 was
+  configured on the server on 22 Aug. From that moment Payload asked for a
+  component the map did not have, and rendered nothing.
+
+  The only symptom was a `getFromImportMap` line in the container logs. The
+  page returned **200 with 43KB of HTML** and every script loaded — so from
+  outside it looked entirely healthy.
+
+  **Regenerating needs the S3 variables set**, or the same gap comes straight
+  back. Placeholders are enough; the generator reads the config's shape, never
+  the bucket:
+
+  ```
+  S3_BUCKET=x S3_ENDPOINT=https://x pnpm generate:importmap
+  ```
+
+  Three separate reasons the existing guard could not see it, all now fixed.
+  Its `REQUIRED` list did not name the S3 key. Its key regex was `[A-Za-z]+`,
+  which cannot match `S3ClientUploadHandler` because of the digit — so the one
+  key that mattered was invisible to the assertions written for exactly this
+  failure. And CI runs without S3 configured, so regenerating there produces
+  the same incomplete map and reports no drift. The test now names the key and
+  admits digits, confirmed by reverting the map and watching it go red.
+
+  **Two diagnostic notes worth keeping.** A keyword-filtered `docker compose
+logs` showed the map as `{ }` and led to a wrong conclusion — the filter
+  matched the first and last lines of a multi-line object and dropped the
+  contents. `--since 90s` after a deliberate page reload is what produced the
+  real key. And the browser console's only message was a CSP warning about
+  `upgrade-insecure-requests` in a report-only policy, which is unrelated
+  noise: this failure is entirely server-side.
+
 - **Caddy serves a stale config until its container is recreated (31 Aug).**
   The single most likely thing to waste an hour on cutover day, so it is first.
 
