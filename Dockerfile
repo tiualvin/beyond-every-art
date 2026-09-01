@@ -13,6 +13,23 @@ RUN pnpm install --frozen-lockfile
 # and skips `pnpm build` because a migration never renders a page.
 FROM base AS migrator
 COPY --from=dependencies /app/node_modules ./node_modules
+# Busts the layer cache for the source copy below, once per commit.
+#
+# `COPY . .` is content-addressed and should invalidate on its own. On 1 Sep it
+# did not: in one deploy, from one checkout of b00266c, the `migrator` stage
+# copied the new sources (`#12 DONE 23.0s`) while this stage was answered from
+# cache (`#12 CACHED`) — so `pnpm build` re-ran against the *previous* commit's
+# tree and produced a bundle with a fresh build id and none of the fix in it.
+# Production stayed broken through a deploy that reported success, containers
+# recreated and health verified, because everything downstream of a wrong
+# `COPY` is faithfully built from the wrong thing.
+#
+# SOURCE_COMMIT changes every commit, so the layer below it can never be
+# answered from a previous build's cache. It costs one context transfer per
+# deploy (~20s) and leaves the `dependencies` stage — the slow one — cached.
+# Empty by default, which keeps local builds behaving as they always have.
+ARG SOURCE_COMMIT=""
+ENV SOURCE_COMMIT=$SOURCE_COMMIT
 COPY . .
 # The Ghost importer writes uploads here, so this stage needs the directory to
 # exist with the runtime image's ownership: whichever service touches the media
@@ -23,6 +40,10 @@ CMD ["pnpm", "migrate:db"]
 
 FROM base AS builder
 COPY --from=dependencies /app/node_modules ./node_modules
+# Same cache break as the `migrator` stage above, and the stage it was actually
+# observed on. See the comment there.
+ARG SOURCE_COMMIT=""
+ENV SOURCE_COMMIT=$SOURCE_COMMIT
 COPY . .
 # `NEXT_PUBLIC_*` values are read at build time, not at run time: Next.js
 # substitutes them into the client bundle during `pnpm build`, so a value that

@@ -60,6 +60,10 @@ services:
       args:
         NEXT_PUBLIC_CHECKOUT_URL_MONTHLY: ${NEXT_PUBLIC_CHECKOUT_URL_MONTHLY:-}
         NEXT_PUBLIC_CHECKOUT_URL_YEARLY: ${NEXT_PUBLIC_CHECKOUT_URL_YEARLY:-}
+        # Changes every commit so the source copy in the builder stage cannot be
+        # answered from a previous build's cache. See the comment in Dockerfile;
+        # the deploy sets it, and an empty value locally keeps today's behaviour.
+        SOURCE_COMMIT: ${SOURCE_COMMIT:-}
     restart: unless-stopped
     # Container logs are a fixed-size resource on this box. Docker's json-file
     # driver keeps them forever by default, so a noisy loop — or an
@@ -242,6 +246,10 @@ services:
     build:
       context: .
       target: migrator
+      args:
+        # As above: a stale copy in this stage runs the previous commit's
+        # migrations against the real database.
+        SOURCE_COMMIT: ${SOURCE_COMMIT:-}
     profiles: ['migrate']
     depends_on:
       postgres:
