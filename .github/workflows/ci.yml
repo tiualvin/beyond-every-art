@@ -572,7 +572,22 @@ jobs:
           # a substitute for swap on this box, which is the actual fix — see
           # docs/DEPLOYMENT_STATUS.md — but it stops the deploy being the thing
           # that discovers the ceiling.
-          docker compose build app
+          # `--no-cache`, because three deploys proved the cache cannot be
+          # trusted here. `COPY . .` is content-addressed and should invalidate
+          # on its own; on this machine it does not. In one build the `migrator`
+          # stage copied the new tree (`DONE 24.3s`) while `builder` was
+          # answered `CACHED` from the same context, and `pnpm build` then spent
+          # four honest minutes compiling the previous commit. Two attempts to
+          # force it from the Dockerfile — an `ENV` above the copy, then a `RUN`
+          # — both deployed and both changed nothing.
+          #
+          # This costs the `dependencies` layer (`pnpm install`) on every
+          # deploy, a couple of minutes on top of the ~4 the app build already
+          # takes, well inside the 35-minute budget. A deploy that reliably
+          # ships the wrong commit is not worth the minutes it saves: the admin
+          # panel was blank from 22 Aug to 1 Sep, and four deploys reported
+          # success while serving code that predated the fix.
+          docker compose build --no-cache app
           docker compose build backup
 
           docker compose up -d --wait --wait-timeout 180
@@ -681,9 +696,13 @@ jobs:
           # Next build id even changed each time, which looks like proof of a
           # rebuild and is not.
           #
-          # The image is stamped with the commit it was built from, so this is
-          # a direct comparison. A deploy that ships the wrong source now fails
-          # here instead of reporting success.
+          # The image is stamped with the commit it was built from. Note what
+          # this can and cannot prove: `ENV` is image metadata, so the runner
+          # stage picks up the new SHA even when the code copied out of
+          # `builder` is stale. It caught nothing on 1 Sep for exactly that
+          # reason, and the artifact assertion below is the one that would
+          # have. Keep both — this one still catches a container that was never
+          # replaced at all.
           running_sha=$(docker compose exec -T app printenv SOURCE_COMMIT 2>/dev/null | tr -d '\r\n' || true)
           if [ "$running_sha" != "$DEPLOY_SHA" ]; then
             echo "The running image was built from '${running_sha:-<unset>}', not $DEPLOY_SHA." >&2
@@ -691,6 +710,21 @@ jobs:
             exit 1
           fi
           echo "Verified the running image was built from $DEPLOY_SHA"
+
+          # What the image actually contains, which is the part metadata cannot
+          # fake. `S3ClientUploadHandler` is in `importMap.ts`, so the admin
+          # bundle carries it in any build made from a tree that has the fix —
+          # and carries it in none of the four builds that shipped while the
+          # panel was blank. A stale `COPY` reaches here with the component
+          # missing however convincing every other signal looks.
+          if ! docker compose exec -T app \
+            grep -rlq S3ClientUploadHandler .next/static/chunks 2>/dev/null; then
+            echo "The running bundle has no S3ClientUploadHandler, so this image was built" >&2
+            echo "from a tree without the admin import-map fix — the deploy shipped stale" >&2
+            echo "sources even though the checkout and the stamped commit both look right." >&2
+            exit 1
+          fi
+          echo "Verified the running bundle contains the admin import-map component"
           trap - EXIT
           REMOTE
       - name: Remove the SSH key
