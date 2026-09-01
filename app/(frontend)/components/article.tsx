@@ -16,21 +16,29 @@ import { Reveal } from './motion/reveal'
 import { StaggerChildren, StaggerItem } from './motion/stagger'
 
 /**
- * The featured image keeps the text width — 42rem — at every desktop size.
- * It is the LCP element on this template (`priority` below says so), and the
- * figures that bleed into the notes margin are the ones further down the page,
- * where a larger source costs nothing that a reader waits for.
+ * The featured image is the LCP element on this template — `priority` below
+ * says so — and in the split hero it is narrower than the reading column
+ * rather than wider: 456px at 1280, 608px at 1440, 768px from 1600. Those are
+ * the second track of `.article__hero` in `app/globals.css`, and
+ * tests/design/article-layout.test.ts recomputes them from the stylesheet so
+ * this string cannot quietly stop describing the box it fills.
  */
-const FIGURE_SIZES = '(max-width: 47rem) 100vw, 42rem'
+const FIGURE_SIZES =
+  '(max-width: 47rem) 100vw, (max-width: 79.99rem) 42rem, (max-width: 89.99rem) 456px, (max-width: 99.99rem) 608px, 768px'
 
 /**
- * A post, in three tracks.
+ * A post, in three tracks under a split hero.
  *
  * The reading column keeps its measure and is pinned to the left of the block
  * from 1280 up; the space that used to sit empty either side of it becomes a
- * notes margin that captions hang in, and a rail beside that. The grid is in
- * `app/globals.css` under "Article layout", and `docs/POST_PAGE_LAYOUT.md` has
- * the measured widths and why the text column did not get any wider.
+ * notes margin that captions hang in, and a rail beside that. Above both, the
+ * title and the featured image sit side by side rather than stacked, which
+ * brings the first paragraph roughly 440px further up the page and, at 1280
+ * and 1440, makes the LCP element smaller than the column it replaced.
+ *
+ * The grid is in `app/globals.css` under "Article layout", and
+ * `docs/POST_PAGE_LAYOUT.md` has the measured widths and why the text column
+ * did not get any wider.
  */
 export function Article({
   post,
@@ -59,7 +67,7 @@ export function Article({
     <main>
       <article className="article">
         <div className="article__shell">
-          <div className="article__reading">
+          <div className="article__hero">
             <header className="article__header">
               {primaryTag && (
                 <FadeIn delay={0}>
@@ -95,7 +103,9 @@ export function Article({
                 <FeaturedFigure image={post.image} />
               </FadeIn>
             )}
+          </div>
 
+          <div className="article__reading">
             <ArticleBody
               body={post.body}
               className={post.restricted ? 'prose prose--teaser' : 'prose'}

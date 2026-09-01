@@ -3196,6 +3196,13 @@ ol.feature-list__items .feature-list__title::before {
   max-width: calc(var(--text-w) + var(--bleed));
 }
 
+/* Title and featured image, stacked until there is room to set them side by
+   side. Below 1280 this is the header the template always had. */
+.article__hero > * {
+  max-width: var(--text-w);
+  margin-inline: auto;
+}
+
 .article__rail {
   display: none;
   min-width: 0;
@@ -3227,6 +3234,39 @@ ol.feature-list__items .feature-list__title::before {
 
   .article__rail {
     display: block;
+  }
+
+  /* The split hero: title on the measure, image in what is left of the block.
+     It spans both tracks, so the rail starts level with the body rather than
+     with the title — which is also where docs/ADVERTISING.md wants the first
+     rail slot to begin, below the hero and clear of the LCP element.
+
+     The image is 456px at 1280, 608px at 1440 and 768px from 1600 — narrower
+     than the reading column at the first two, which is where recovering the
+     vertical space and shrinking the LCP element are the same change. */
+  .article__hero {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: var(--text-w) minmax(0, 1fr);
+    column-gap: var(--gap);
+    align-items: center;
+    margin-bottom: 3rem;
+  }
+
+  .article__hero > * {
+    max-width: none;
+    margin-inline: 0;
+  }
+
+  .article__hero .article__header {
+    margin-bottom: 0;
+  }
+
+  /* No notes margin up here to hang a caption in — the rail is beside the
+     hero, not the text — so the credit sits under the image as it always did. */
+  .article__hero .article__figure {
+    display: block;
+    margin-bottom: 0;
   }
 
   .prose > .module--gallery,

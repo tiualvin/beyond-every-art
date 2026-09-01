@@ -55,6 +55,28 @@ function shellAt(viewport: number): Record<string, string> {
   return declarations
 }
 
+/** The `sizes` string a component hands `next/image`. */
+function sizesFrom(file: string, constant: string): string {
+  const source = readFileSync(
+    resolve(import.meta.dirname, '../..', file),
+    'utf8',
+  )
+  const match = new RegExp(`const ${constant} =\\s*'([^']+)'`).exec(source)
+  expect(match, `${constant} is missing from ${file}`).toBeTruthy()
+  return match![1]
+}
+
+/** Which clause of a `sizes` string applies at a viewport width. */
+function evaluateSizes(sizes: string, viewport: number): string {
+  for (const clause of sizes.split(',').map((part) => part.trim())) {
+    const query = /^\(max-width: ([\d.]+)(rem|px)\) (.+)$/.exec(clause)
+    if (!query) return clause
+    const at = Number(query[1]) * (query[2] === 'rem' ? REM : 1)
+    if (viewport <= at) return query[3]
+  }
+  return ''
+}
+
 function px(value: string): number {
   const rem = /^([\d.]+)rem$/.exec(value)
   if (rem) return Number(rem[1]) * REM
@@ -128,6 +150,66 @@ describe('the article shell', () => {
       expect(bleed).toBeGreaterThanOrEqual(0)
       expect(text + bleed + rail + PADDING).toBeLessThanOrEqual(block)
     }
+  })
+})
+
+describe('the split hero', () => {
+  /** The second track of `.article__hero`: what the featured image fills. */
+  function heroImage(viewport: number): number {
+    const shell = shellAt(viewport)
+    const block = Math.min(px(shell['--shell']), viewport)
+    return block - PADDING - px(shell['--text-w']) - px(shell['--gap'])
+  }
+
+  const sizes = sizesFrom(
+    'app/(frontend)/components/article.tsx',
+    'FIGURE_SIZES',
+  )
+
+  /** What `sizes` promises the browser at a given viewport. */
+  function promised(viewport: number): string {
+    return evaluateSizes(sizes, viewport)
+  }
+  // A `sizes` that has stopped describing the box is the failure mode with no
+  // symptom: the layout is right, the browser fetches a source too small for
+  // it, and the picture is soft. It was already wrong once — both figure
+  // hints still said 44rem after the column moved.
+  it('promises the browser the width the image actually gets', () => {
+    for (const viewport of [1280, 1440, 1600, 1920]) {
+      expect(promised(viewport)).toBe(`${heroImage(viewport)}px`)
+    }
+  })
+
+  it('is smaller than the column it replaced where it matters most', () => {
+    // 1280 and 1440 are where the LCP budget is tightest, and both come out
+    // under the 672px the stacked header gave the image.
+    expect(heroImage(1280)).toBeLessThan(672)
+    expect(heroImage(1440)).toBeLessThan(672)
+  })
+
+  it('spans both tracks, so the rail starts level with the body', () => {
+    expect(css).toMatch(/\.article__hero \{\s*grid-column: 1 \/ -1;/)
+  })
+})
+
+describe('media that bleeds', () => {
+  // The same failure as the hero's, on the block that reaches furthest: a
+  // gallery row fills the bleed width, and a hint left at the measure fetches
+  // a source two steps too small for it.
+  it('tells the browser how wide a gallery row really gets', () => {
+    const sizes = sizesFrom(
+      'app/(frontend)/components/blocks/gallery.tsx',
+      'ROW_SIZES',
+    )
+
+    for (const viewport of [1280, 1440, 1600, 1920]) {
+      expect(evaluateSizes(sizes, viewport)).toBe(
+        `${tracks(viewport).figure}px`,
+      )
+    }
+
+    // Below the rail breakpoint nothing bleeds, so the hint is the measure.
+    expect(evaluateSizes(sizes, 1152)).toBe('42rem')
   })
 })
 
