@@ -516,6 +516,19 @@ jobs:
           git reset --hard "$DEPLOY_SHA"
           echo "Deploying tested commit $(git rev-parse HEAD)"
 
+          # Read by `docker-compose.yml` and passed into the image builds, where
+          # it sits immediately above `COPY . .` so that layer changes with every
+          # commit. `COPY . .` is content-addressed and should invalidate on its
+          # own; on 1 Sep it did not. One deploy of b00266c copied the new tree
+          # in the `migrator` stage (`#12 DONE 23.0s`) and took the `builder`
+          # stage from cache (`#12 CACHED`), so `pnpm build` ran against the
+          # previous commit and shipped a bundle with a new build id and none of
+          # the change in it. The deploy reported success — containers recreated,
+          # health verified — and the admin panel stayed broken, because
+          # everything after a wrong `COPY` is built correctly from the wrong
+          # source. Nothing downstream can notice that.
+          export SOURCE_COMMIT="$DEPLOY_SHA"
+
           # Schema migrations run to completion before any container is
           # replaced. A migration that fails then leaves the previous release
           # serving an unchanged database, instead of starting a new release
