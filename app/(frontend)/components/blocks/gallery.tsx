@@ -7,8 +7,15 @@ import { toMediaImage } from '@/lib/content/media'
 // A grid cell is at most half the body column on a phone and a third of it on
 // a wide screen. Stated so the browser does not download a full-width file to
 // paint a thumbnail.
-const GRID_SIZES = '(max-width: 40rem) 50vw, (max-width: 64rem) 33vw, 22rem'
-const ROW_SIZES = '(max-width: 47rem) 100vw, 44rem'
+//
+// A gallery is one of the blocks allowed out of the text column, so the widths
+// past 1280 are the bleed widths from `app/globals.css`, not the measure: 828
+// at 1280, 980 at 1440, 1140 at 1600 and above. A `sizes` still claiming 44rem
+// would have the browser fetch the 750w source for a 1140px frame and upscale
+// it — soft, on exactly the material photography this site is about.
+const GRID_SIZES = '(max-width: 40rem) 50vw, (max-width: 64rem) 33vw, 24rem'
+const ROW_SIZES =
+  '(max-width: 60rem) 100vw, (max-width: 80rem) 56rem, (max-width: 90rem) 828px, (max-width: 100rem) 980px, 1140px'
 
 function toLayout(value: GalleryData['layout']): GalleryLayout {
   return GALLERY_LAYOUTS.includes(value as GalleryLayout)

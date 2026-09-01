@@ -3133,6 +3133,279 @@ ol.feature-list__items .feature-list__title::before {
   color: var(--color-burgundy);
 }
 
+/* --- Article layout: text, notes, rail ------------------------------------
+   The post template put every element in one 44rem column — 656px once
+   `.container`'s padding comes out of it under `border-box` — and left 392px
+   of empty page either side at 1440. The measure was never the problem: 656px
+   sets about 67 characters, which is inside the comfortable range. What sat
+   beside it was.
+
+   So the text column keeps its width and the recovered space becomes two
+   tracks to its right: a notes margin that captions and credits hang in, and a
+   300px rail. From 1280 the text is pinned to the left of the block; the block
+   itself still centres, because anchoring it to the viewport's left edge
+   leaves a dead margin to the right of the rail on a wide screen.
+
+   These rules sit here, after the migrated `kg-*` card rules, because the
+   figure treatment below has to win against them. `.article__inner` further up
+   is untouched: a Page still renders through it, having neither a rail's worth
+   of content nor any ad slot.
+
+   docs/POST_PAGE_LAYOUT.md carries the measured track widths and the
+   reasoning; tests/frontend/article-layout.test.ts pins the numbers. */
+
+.article__shell {
+  /* One source of truth for the tracks. Each breakpoint below changes only
+     `--shell` and `--gap`, and `--bleed` follows from them, so a change to the
+     block width cannot leave the figures reaching the wrong distance. */
+  --shell: var(--maxw);
+  --gap: 2.5rem;
+  --text-w: 42rem;
+  --rail-w: 300px;
+  --notes-gap: 2rem;
+  /* How far a figure may reach past the text column: the gap in front of the
+     notes margin, plus the margin. Zero until there is a rail to make room. */
+  --bleed: 0px;
+  --notes-w: calc(var(--bleed) - var(--notes-gap));
+
+  width: 100%;
+  max-width: var(--shell);
+  margin: 0 auto;
+  padding: 0 1.5rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  column-gap: var(--gap);
+}
+
+/* `min-width: 0` on both tracks: a grid item's automatic minimum size is its
+   content, so one long word or a wide table would otherwise push the track
+   past its share and take the rail off the screen. */
+.article__reading {
+  min-width: 0;
+}
+
+.article__reading > * {
+  max-width: var(--text-w);
+  margin-inline: auto;
+}
+
+/* The featured figure stays at the text width, but its box reaches into the
+   notes margin so the caption has somewhere to hang. The cap is on the
+   wrapper `FadeIn` renders, which is what is actually a child of the grid. */
+.article__reading > .article__figure-frame {
+  max-width: calc(var(--text-w) + var(--bleed));
+}
+
+.article__rail {
+  display: none;
+  min-width: 0;
+}
+
+/* Nothing widens below 1280. An earlier pass let media widen symmetrically
+   there too, and it was wrong twice over: an over-constrained block with
+   `margin-inline: auto` is not centred — CSS 2.1 §10.3.3 makes both margins
+   zero, so it hangs off one side — and `100vw`, the only way to know the
+   viewport from inside the column, counts the scrollbar Chromium then takes
+   away. Both were visible as a horizontally scrolling page at 800px. The
+   widths from 1280 up are exact instead: the block is capped below its own
+   breakpoint at every step, so each track is a fixed number. */
+
+@media (min-width: 80rem) {
+  .article__shell {
+    --shell: 76rem;
+    --bleed: calc(
+      var(--shell) - 3rem - var(--rail-w) - var(--gap) - var(--text-w)
+    );
+
+    grid-template-columns: minmax(0, 1fr) var(--rail-w);
+  }
+
+  /* Pinned left. Everything the page gained is now on the right of the text. */
+  .article__reading > * {
+    margin-inline: 0;
+  }
+
+  .article__rail {
+    display: block;
+  }
+
+  .prose > .module--gallery,
+  .prose > .module--table,
+  .prose > .kg-width-wide,
+  .prose > .kg-width-full,
+  .prose > .kg-gallery-card {
+    width: calc(100% + var(--bleed));
+    margin-inline: 0;
+  }
+
+  /* A caption hangs in the notes margin beside its image rather than sitting
+     underneath it. The figure becomes a two-track grid, so the row is as tall
+     as the taller of image and caption and a long caption cannot overlap the
+     paragraph below.
+
+     `:not(.module)` keeps this to plain image figures — the migrated Ghost
+     image cards and the featured image. A block that renders a figure of its
+     own (pull quote, embed, gallery, comparison) has a layout already. */
+  .article__figure,
+  .prose > figure:not(.module) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) var(--notes-gap) var(--notes-w);
+    align-items: start;
+  }
+
+  .prose > figure:not(.module) {
+    width: calc(100% + var(--bleed));
+  }
+
+  .article__figure > *,
+  .prose > figure:not(.module) > * {
+    grid-column: 1;
+  }
+
+  .article__figure > figcaption,
+  .prose > figure:not(.module) > figcaption {
+    grid-column: 3;
+    margin-top: 0;
+  }
+
+  /* A figure that bleeds has spent the margin it would have hung a caption in,
+     so that caption goes back underneath, held to the text width. */
+  .prose > figure.kg-width-wide,
+  .prose > figure.kg-width-full {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .prose > figure.kg-width-wide > figcaption,
+  .prose > figure.kg-width-full > figcaption {
+    grid-column: 1;
+    margin-top: 0.7rem;
+    max-width: var(--text-w);
+  }
+}
+
+@media (min-width: 90rem) {
+  .article__shell {
+    --shell: 86rem;
+    --gap: 3rem;
+  }
+}
+
+@media (min-width: 100rem) {
+  .article__shell {
+    --shell: 96rem;
+  }
+}
+
+/* --- The rail -------------------------------------------------------------
+   Editorial only. Every module here has to hold up on its own: the rail is
+   what a reader sees for the whole scroll, and docs/ADVERTISING.md puts a slot
+   in it later that will be absent for members, for anyone running a blocker,
+   and on every staging deployment. A rail that is an ad with decoration around
+   it is a hole on those visits.
+
+   Nothing in it carries a thumbnail. The rail is hidden below 1280 rather than
+   reflowed — every module it holds already reaches a phone another way, the
+   related list through "Read next" and the newsletter through the band — and a
+   hidden `<img>` is still a download on the device that can least afford it. */
+
+.rail__mod {
+  margin-bottom: 2.5rem;
+}
+
+.rail__label {
+  font-family: var(--font-sans);
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-weight: 600;
+  color: var(--color-burgundy);
+  border-bottom: 2px solid var(--color-burgundy);
+  padding-bottom: 0.5rem;
+  margin: 0 0 0.85rem;
+}
+
+.rail__toc {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rail__toc li {
+  border-bottom: 1px solid var(--color-line);
+}
+
+.rail__toc a {
+  display: block;
+  padding: 0.5rem 0;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: var(--color-muted);
+}
+
+.rail__toc a:hover {
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+.rail__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1.1rem;
+}
+
+.rail__item {
+  display: block;
+}
+
+.rail__item h3 {
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.25;
+  margin: 0 0 0.25rem;
+}
+
+.rail__item:hover h3 {
+  color: var(--color-burgundy);
+}
+
+.rail__meta {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The last module sticks, so the rail keeps a presence through a long read
+   rather than running out a screen in. `--masthead-h` is the bar's height: it
+   hides on scroll down and returns on scroll up (motion/scroll-header.tsx), so
+   this clears it when it is there and is merely generous when it is not. */
+.rail__sticky {
+  position: sticky;
+  top: calc(var(--masthead-h) + 1rem);
+}
+
+.rail__signup {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  padding: 1.1rem;
+}
+
+.rail__signup p {
+  margin: 0 0 0.9rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+
+.rail__signup .button {
+  width: 100%;
+  text-align: center;
+}
+
 .read-next {
   border-top: 1px solid var(--color-line);
   background: var(--color-surface);
