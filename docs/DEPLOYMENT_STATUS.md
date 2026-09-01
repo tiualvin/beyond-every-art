@@ -87,42 +87,80 @@ below.
 
 ## Done
 
-- **The admin panel rendered blank in production (1 Sep).** The CMS was
-  reported down. `cms.beyondeveryart.com/admin` answered 200 in about half a
-  second, served all seventeen assets, held a valid certificate to 7 Nov, and
-  carried a complete and correct RSC payload with the login view inside it —
-  and painted an empty page. No console error, no failed request, nothing above
-  a 200 anywhere. Postgres, Caddy, the container and `/api/users/login` (a
-  correct 401) were all healthy throughout.
+- **The admin panel was blank from 22 Aug to 1 Sep, and why nothing caught it.**
+  Found by finally opening it — the rehearsal's "Payload admin loads and
+  editing works" box had never been ticked — and reported again on 1 Sep as
+  "the CMS is down".
 
-  `app/(payload)/admin/importMap.ts` was missing
-  `@payloadcms/storage-s3/client#S3ClientUploadHandler`. Payload's response to a
-  component it cannot resolve is to abandon the admin render and log
-  `getFromImportMap: PayloadComponent not found in importMap` on the server —
-  nothing reaches the browser, which is why every external check passed.
+  `payload.config.ts` used to add the S3 storage plugin **conditionally**, only
+  when `S3_BUCKET` and `S3_ENDPOINT` are set. The import map was generated on a
+  machine without them, so it was complete for that machine and missing
+  `@payloadcms/storage-s3/client#S3ClientUploadHandler` everywhere else. The map
+  was filled in on 16 Aug; R2 was configured on the server on 22 Aug. From that
+  moment Payload asked for a component the map did not have, and rendered
+  nothing.
 
-  **The trap is that the map depends on the environment it is generated in.**
-  `payload.config.ts` registers `s3Storage` only when `S3_BUCKET` and
-  `S3_ENDPOINT` are set, so `pnpm generate:importmap` on a machine without R2
-  credentials — every developer machine, and CI — writes a map that looks
-  complete and silently omits that key. Production has R2, asks for the
-  component, and blanks. Regenerate with both variables set (any non-empty
-  values; only their presence selects the plugin) before copying the generated
-  `importMap.js` over the tracked `.ts`.
+  Payload's response to a component it cannot resolve is to abandon the admin
+  render and log `getFromImportMap: PayloadComponent not found in importMap` on
+  the server. Nothing reaches the browser, which is why every external check
+  passed: the page answered **200 in about half a second**, served every asset,
+  held a valid certificate, and carried a complete and correct RSC payload with
+  the login view inside it — and painted an empty document. No console error,
+  no failed request, nothing above a 200 anywhere. Postgres, Caddy, the
+  container and `POST /api/users/login` (a correct 401) were healthy throughout.
 
-  This is the second blank admin from this one file — the first was the empty
-  map that blanked the dashboard, which `tests/design/import-map.test.ts` was
-  written to stop. It did not stop this one for two reasons, both now fixed:
-  the key was not in `REQUIRED`, and the test's key-matching pattern was
-  `[A-Za-z]+`, which cannot match an export name containing a digit, so
-  `S3ClientUploadHandler` was invisible to every assertion in the file.
+  **The cause is fixed structurally, not by remembering to set variables.**
+  `s3Storage` is now registered unconditionally with `enabled: useR2`, matching
+  the pattern the `mcp()` plugin directly above it already documents: always
+  registered, behaviour decided inside, so the config's shape does not change
+  with the environment. Generating the map with and without the S3 variables
+  now produces byte-identical output, and Payload reports "No new imports
+  found" on the second run.
 
-  What made it survivable for so long is that **nothing rendered the admin in a
-  browser.** `csp.spec.ts` fetched `/admin` with `request.get` to read a header;
-  `oauth.spec.ts` asserted a `Location` string. Both pass against a blank page.
-  `e2e/admin.spec.ts` now loads the login page, submits it, and asserts the
-  dashboard's collection links, and `playwright.config.ts` gives the test server
-  R2 variables so CI exercises the plugin set production actually runs.
+  `alwaysInsertFields` is deliberately left off: it would add the plugin's
+  prefix field to the media schema, which is a migration, and this is not the
+  week for one.
+
+  One correction to an earlier note here, because it sends the next person the
+  wrong way: the Docker build does **not** regenerate the map. `Dockerfile`
+  runs `pnpm build` and nothing else, and a build run with no S3 variables
+  leaves `importMap.ts` byte-identical (checked by hash) while the resulting
+  server, started with R2 configured, renders the admin correctly. The tracked
+  map is what ships. Registering the plugin unconditionally is still the right
+  fix — it removes the environment-dependence from `generate:importmap` itself —
+  but the committed file, not the build, is what production reads.
+
+  Four separate reasons the existing guard could not see it, all now fixed. Its
+  `REQUIRED` list did not name the S3 key. Its key regex was `[A-Za-z]+`, which
+  cannot match `S3ClientUploadHandler` because of the digit — so the one key
+  that mattered was invisible to the assertions written for exactly this
+  failure. CI ran without S3 configured, so regenerating there produced the same
+  incomplete map and reported no drift; `playwright.config.ts` now gives the
+  test server R2 variables so CI exercises the plugin set production runs. And
+  **nothing rendered the admin in a browser at all**: `csp.spec.ts` fetched
+  `/admin` with `request.get` to read a header, `oauth.spec.ts` asserted a
+  `Location` string, and both pass against a blank page. `e2e/admin.spec.ts` now
+  loads the login page, submits it, and asserts the dashboard's collection
+  links. Every one of these was confirmed by reverting the map and watching the
+  assertions go red.
+
+  **Diagnostic notes worth keeping.** A keyword-filtered `docker compose logs`
+  showed the map as `{ }` and led to a wrong conclusion — the filter matched the
+  first and last lines of a multi-line object and dropped the contents.
+  `--since 90s` after a deliberate page reload is what produced the real key.
+  The browser console's only message was a CSP warning about
+  `upgrade-insecure-requests` in a report-only policy, which is unrelated noise:
+  this failure is entirely server-side. And the give-away in the RSC payload is
+  the layout's `children` slot serialising to `null` where a working render has
+  the parallel-router outlet.
+
+  **The deploy guard then refused the fix.** The VPS checkout had been advanced
+  to a commit on `claude/beyond-every-art-cutover-qu4apc` that was never merged,
+  so `main` could not fast-forward onto it and `deploy` failed with "Refusing a
+  non-fast-forward deployment" — with the checkout advanced and the containers
+  never replaced, which is why production stayed blank while running a commit
+  that contained the fix. Deploying from a branch that is not an ancestor of
+  `main` puts the box in a state only a merge or a manual reset can leave.
 
 - **Caddy serves a stale config until its container is recreated (31 Aug).**
   The single most likely thing to waste an hour on cutover day, so it is first.
