@@ -233,7 +233,7 @@ inspected in a browser; the ad layer should be a third instance of that, in a
 | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `config`      | Read the environment into a resolved configuration, or null when ads are off. One place that decides "are ads on".                                                         |
 | `providers`   | The provider contract, and an AdSense implementation of it. A provider declares its script origins, frame origins, connect origins, its loader, and how it renders a slot. |
-| `placements`  | Placement names as a public contract — `article-top`, `article-mid`, `article-end`, `archive-inline`.                                                                      |
+| `placements`  | Placement names as a public contract — the ID column of §8's inventory, which is what a component asks for by name.                                                        |
 | `eligibility` | One predicate: should this request see ads.                                                                                                                                |
 
 The placement names are the part that does the futureproofing, and they work
@@ -357,14 +357,27 @@ Placements are decided here, in advance, rather than discovered by dragging
 units around a live site. Two constraints from this codebase set most of the
 answers, and both are measured rather than assumed.
 
-**The reading column is 704px, so a leaderboard does not fit in it.**
-`.article__inner` is `max-width: 44rem` and `.container` adds `1.5rem` of
-padding either side. The usable width inside an article is therefore 704px at
-every viewport above that — narrower than the 728px of a standard leaderboard,
-and far narrower than 970px. In-article units must be sized for 704px or less:
-336×280, 300×250, or a responsive unit capped at the column. The 72rem
-container on listing pages is a different story — 1104px usable, where the wide
-formats do fit.
+**The reading column is 672px, and there are two tracks beside it.** This
+paragraph used to say 704px and it was wrong twice over: `.article__inner` is
+`max-width: 44rem` with `.container`'s `1.5rem` padding coming out of it under
+`border-box`, so the column was 656px, not 704 — and the post template has
+since been rebuilt in three tracks, which is what
+[`POST_PAGE_LAYOUT.md`](POST_PAGE_LAYOUT.md) records and
+[`../tests/design/article-layout.test.ts`](../tests/design/article-layout.test.ts)
+pins. The widths a unit can be sized against are now:
+
+| Track                | 1280 | 1440 | ≥1600 |
+| -------------------- | ---- | ---- | ----- |
+| Text column          | 672  | 672  | 672   |
+| Notes margin         | 124  | 276  | 436   |
+| Rail                 | 300  | 300  | 300   |
+| Full block, less pad | 1168 | 1328 | 1488  |
+
+An in-column unit is still sized for the measure — 336×280, 300×250, or a
+responsive unit capped at 672 — because a leaderboard does not fit in a reading
+column at any width. What changed is that a 300px rail now exists, and that an
+end-of-article unit placed across the whole block has room for 970×250. The
+72rem container on listing pages is unchanged at 1104px usable.
 
 **The featured image is the LCP element.** `FeaturedFigure` renders with
 `priority`, which is Next telling the browser this is the largest contentful
@@ -374,31 +387,60 @@ in this plan, at any breakpoint. That is the single most valuable inventory
 slot on most sites and it is deliberately left empty here; taking it would cost
 LCP on every article, which is the page type the whole site exists to serve.
 
+The split hero sharpens this rather than softening it. Title and image now sit
+side by side from 1280 up, so the hero spans both tracks and the rail begins
+level with the body — which is exactly where the first rail slot goes, below
+the hero and clear of the element the browser is painting for LCP. A unit
+beside the image rather than above it still competes for the same network, so
+that slot's request is deferred to idle.
+
 ### Inventory
 
-| ID                 | Template             | Position                               | Desktop             | Mobile  | Reserved    |
-| ------------------ | -------------------- | -------------------------------------- | ------------------- | ------- | ----------- |
-| `article-inline-1` | `/[slug]` post       | After the 3rd body block               | 336×280             | 300×250 | 280 / 250px |
-| `article-inline-2` | `/[slug]` post       | After the 9th body block               | 336×280             | 300×250 | 280 / 250px |
-| `article-inline-3` | `/[slug]` post       | After the 15th body block              | 336×280             | 300×250 | 280 / 250px |
-| `article-end`      | `/[slug]` post       | Below the author card, above Read Next | 728×90 → capped 704 | 300×250 | 90 / 250px  |
-| `archive-inline`   | journal, tag, author | After every 6th entry row              | 970×250             | 300×250 | 250px       |
-| `home-mid`         | `/`                  | Between Featured and Topics            | 970×250             | 300×250 | 250px       |
+| ID                 | Track / template        | Position                                     | Desktop | Mobile  | Reserved    |
+| ------------------ | ----------------------- | -------------------------------------------- | ------- | ------- | ----------- |
+| `rail-1`           | Rail, `/[slug]`         | Top of the rail, which starts below the hero | 300×250 | —       | 250px       |
+| `rail-2`           | Rail, `/[slug]`         | 100vh of clearance below `rail-1`            | 300×600 | —       | 600px       |
+| `rail-3`           | Rail, `/[slug]`         | Last rail module, sticky                     | 300×600 | —       | 600px       |
+| `article-inline-1` | Text, `/[slug]`         | After the 5th body block                     | 336×280 | 300×250 | 280 / 250px |
+| `article-end`      | Block, `/[slug]`        | Below the author card, above Read Next       | 970×250 | 300×250 | 250px       |
+| `archive-inline`   | journal, tag, author    | After every 6th entry row                    | 970×250 | 300×250 | 250px       |
+| `home-mid`         | `/`                     | Between Featured and Topics                  | 970×250 | 300×250 | 250px       |
+| `notes-1`          | Notes margin, `/[slug]` | Beside the body, ≥1600 only                  | 300×250 | —       | 250px       |
 
-Six identified placements, of which **three should be live at launch**:
-`article-inline-1`, `article-end`, and `archive-inline`. The rest are defined
-so the slots exist and the names are stable, and enabled later against
-measurements rather than optimism.
+Eight identified placements, of which **five should be live at launch**:
+`rail-1`, `rail-2`, `article-inline-1`, `article-end` and `archive-inline`.
+That is one more live placement than the previous plan and **one unit inside
+the reading column instead of three** — the rail is where that inventory went.
+`article-inline-2` and `-3` are retired.
+
+`notes-1` is defined and not enabled. A 300×250 hanging 32px from the body text
+is the most intrusive position on the page: closer to the reader's eye than
+anything in the rail, close enough that Google's requirement for ads to be
+clearly distinguishable from content becomes a design constraint rather than a
+formality, and in competition with the captions and pull quotes that are what
+make the margin worth having. The name exists so the slot can be turned on
+later against per-slot numbers; nothing renders.
 
 ### Rules that go with it
 
-**Cap in-article density by length, not by count.** `article-inline-2` renders
-only if the body has at least 14 block-level children, `-3` only at 20. A
-600-word piece gets one unit; a 4,000-word pigment-chemistry essay gets three.
-The alternative — a fixed count — puts three units in a short post, which is
-where ad density complaints and Better Ads Standards violations come from. Keep
-total ad area under roughly 30% of page height on mobile, which is the
+**Two rail units never share a screen; the one in-column unit may.** Space the
+rail slots with `margin-top: 100vh` rather than a pixel value — measured from
+whatever precedes them, so an intervening editorial module only widens the gap,
+and the rule holds on a 768px laptop and a 1440px monitor alike without
+anything in the layout needing to know the viewport height. The one place two
+units do meet is `article-inline-1` passing a rail unit about a third of the
+way down: 336×280 plus 300×600 is 21% of a 1440×900 screen, against the 30%
 Coalition for Better Ads threshold Chrome enforces.
+
+This was measured rather than reasoned. A first pass spaced the rail at
+`140vh`, claimed one unit visible per screen, and put three in one screen at a
+scroll offset a third of the way down a 9-minute article.
+
+**Cap density by length.** `rail-2` renders only if the body has at least 14
+block-level children and `rail-3` only at 20, the same thresholds the retired
+in-column units used. A short piece gets `rail-1` and one in-column unit; a
+4,000-word pigment-chemistry essay gets the ladder. A fixed count is what puts
+three units in a short post, which is where density complaints come from.
 
 **Never split a figure from its caption.** Insertion counts top-level block
 children of the body and must skip a position that would land between a
