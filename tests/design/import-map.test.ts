@@ -29,12 +29,13 @@ const source = readFileSync(
 /**
  * Every `'<module>#<Export>'` key the map registers.
  *
- * The export half matches digits as well as letters. Payload's own export
- * names contain them — `S3ClientUploadHandler` is the one this deployment
- * needs — and a letters-only class silently skips those keys, so a map that
- * was missing one still satisfied every assertion below.
+ * `[A-Za-z0-9_]` rather than `[A-Za-z]`: the first version of this could not
+ * see `S3ClientUploadHandler`, because of the digit. So the one key whose
+ * absence actually broke the admin was invisible to the assertions written to
+ * catch exactly that, and a `REQUIRED` entry for it would have failed even
+ * once the map was correct.
  */
-const keys = [...source.matchAll(/['"]([^'"]+#[A-Za-z0-9]+)['"]\s*:/g)].map(
+const keys = [...source.matchAll(/['"]([^'"]+#[A-Za-z0-9_]+)['"]\s*:/g)].map(
   (match) => match[1]!,
 )
 
@@ -48,21 +49,18 @@ const REQUIRED = [
   // The server entries the editor field itself renders through.
   '@payloadcms/richtext-lexical/rsc#RscEntryLexicalField',
   '@payloadcms/richtext-lexical/rsc#RscEntryLexicalCell',
-  // The R2 upload handler, and the one entry whose absence is invisible to
-  // everyone who regenerates the map. `payload.config.ts` registers
-  // `s3Storage` only when S3_BUCKET and S3_ENDPOINT are set, so a map
-  // generated on a machine without R2 credentials — which is every developer
-  // machine and CI — silently omits this key while looking complete.
+  // The R2 upload handler. The map was filled in on 16 Aug, R2 was configured
+  // on the server on 22 Aug, and the admin rendered blank from that day until
+  // 31 Aug — `/admin` answering 200 with a correct RSC payload and an empty
+  // screen, no console error and no failed request, the only symptom a
+  // `getFromImportMap` line in the container logs. Every status- and
+  // header-level check in this repository passed against it.
   //
-  // Production has R2 configured, so it asks for the component, does not find
-  // it, and Payload abandons the admin render: `/admin` answered 200 with a
-  // correct RSC payload and a blank screen, no console error and no failed
-  // request. Every status- and header-level check passed against it.
-  //
-  // Run `pnpm generate:importmap` with S3_BUCKET and S3_ENDPOINT set (any
-  // non-empty values will do — only their presence selects the plugin) before
-  // copying the generated sibling over the tracked file, or this key is lost
-  // again.
+  // `payload.config.ts` now registers `s3Storage` unconditionally with
+  // `enabled: useR2`, so the config's shape — and therefore this map — no
+  // longer changes with the environment, and regenerating on a machine without
+  // R2 credentials can no longer drop this key. That is what keeps the entry
+  // present; this assertion is what notices if it ever goes missing again.
   '@payloadcms/storage-s3/client#S3ClientUploadHandler',
 ]
 
@@ -80,8 +78,11 @@ describe('admin import map', () => {
     const imported = new Set(
       [...source.matchAll(/import \{ \w+ as (\w+) \}/g)].map((m) => m[1]!),
     )
+    // Same `[A-Za-z0-9_]` as `keys` above, and for the same reason — and
+    // `\s*` has to cross a newline, because Prettier puts a long key's value
+    // on the line below it.
     const bound = [
-      ...source.matchAll(/['"][^'"]+#[A-Za-z0-9]+['"]:\s*(\w+)/g),
+      ...source.matchAll(/['"][^'"]+#[A-Za-z0-9_]+['"]:\s*(\w+)/g),
     ].map((m) => m[1]!)
 
     expect(bound.length).toBe(keys.length)
