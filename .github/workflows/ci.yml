@@ -669,6 +669,28 @@ jobs:
                 process.exit(1)
               })
           '
+
+          # What is actually running, asked of the running container rather
+          # than inferred from the steps above.
+          #
+          # Health is not identity. On 1 Sep two deploys passed every check
+          # here — checkout advanced, containers recreated, /health returning
+          # ok — while serving the previous commit, because a cached `COPY` fed
+          # `pnpm build` the wrong tree. The old code is healthy, so nothing
+          # above can notice; the admin panel stayed blank through both. The
+          # Next build id even changed each time, which looks like proof of a
+          # rebuild and is not.
+          #
+          # The image is stamped with the commit it was built from, so this is
+          # a direct comparison. A deploy that ships the wrong source now fails
+          # here instead of reporting success.
+          running_sha=$(docker compose exec -T app printenv SOURCE_COMMIT 2>/dev/null | tr -d '\r\n' || true)
+          if [ "$running_sha" != "$DEPLOY_SHA" ]; then
+            echo "The running image was built from '${running_sha:-<unset>}', not $DEPLOY_SHA." >&2
+            echo "The deploy completed but shipped the wrong sources; check for a cached COPY in the app image build." >&2
+            exit 1
+          fi
+          echo "Verified the running image was built from $DEPLOY_SHA"
           trap - EXIT
           REMOTE
       - name: Remove the SSH key

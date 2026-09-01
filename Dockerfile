@@ -28,8 +28,18 @@ COPY --from=dependencies /app/node_modules ./node_modules
 # answered from a previous build's cache. It costs one context transfer per
 # deploy (~20s) and leaves the `dependencies` stage — the slow one — cached.
 # Empty by default, which keeps local builds behaving as they always have.
+#
+# It has to be a `RUN`, not the `ENV` this was first written as. BuildKit
+# treats `ENV` and `ARG` as metadata: they change the image config and not the
+# filesystem state, and a `COPY` is keyed on the state it builds upon — so an
+# `ENV` above it changes nothing about its cache key. That version deployed on
+# 1 Sep and the build was still answered `#12 CACHED`. A `RUN` produces a real
+# state vertex whose key includes the expanded command, so a new SHA forces
+# every step beneath it. The same reason is why neither shows up in BuildKit's
+# `[builder 2/3]` step count, which is what made the failed attempt look like
+# it had not been deployed at all.
 ARG SOURCE_COMMIT=""
-ENV SOURCE_COMMIT=$SOURCE_COMMIT
+RUN echo "$SOURCE_COMMIT" > /etc/source-commit
 COPY . .
 # The Ghost importer writes uploads here, so this stage needs the directory to
 # exist with the runtime image's ownership: whichever service touches the media
@@ -43,7 +53,7 @@ COPY --from=dependencies /app/node_modules ./node_modules
 # Same cache break as the `migrator` stage above, and the stage it was actually
 # observed on. See the comment there.
 ARG SOURCE_COMMIT=""
-ENV SOURCE_COMMIT=$SOURCE_COMMIT
+RUN echo "$SOURCE_COMMIT" > /etc/source-commit
 COPY . .
 # `NEXT_PUBLIC_*` values are read at build time, not at run time: Next.js
 # substitutes them into the client bundle during `pnpm build`, so a value that
@@ -94,6 +104,22 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # is mounted over it — see the migrator stage above, and the `media_data` volume
 # in docker-compose.yml for why the directory cannot just live in the container.
 RUN mkdir -p /app/media && chown nextjs:nodejs /app/media
+
+# The commit this image was built from, so the deploy can ask the *running
+# container* what it actually is instead of inferring it.
+#
+# On 1 Sep two deploys reported success — checkout advanced, containers
+# recreated, `/health` verified — while shipping the previous commit's code,
+# because a cached `COPY` fed `pnpm build` the wrong tree. Nothing downstream
+# could tell: the old code is healthy, so every check passed. Even the Next
+# build id changed each time, which is the one thing that looks like proof of a
+# rebuild and is not.
+#
+# `ENV` is right here — this is identification, not cache busting, and the
+# barrier above is what forces the rebuild.
+ARG SOURCE_COMMIT=""
+ENV SOURCE_COMMIT=$SOURCE_COMMIT
+
 USER nextjs
 EXPOSE 3000
 CMD ["node", "server.js"]
