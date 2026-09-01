@@ -2,10 +2,12 @@ import Image from 'next/image'
 import Link from 'next/link'
 
 import { thumbnailSrc, type MediaImage } from '@/lib/content/media'
-import type { AuthorSummary, PostDetail } from '@/lib/content/queries'
+import type { AuthorSummary, PostCard, PostDetail } from '@/lib/content/queries'
+import { extractHeadings } from '@/lib/content/toc'
 import { formatDate } from '@/lib/format'
 import { authorPath, tagPath } from '@/lib/seo/site'
 
+import { ArticleRail } from './article-rail'
 import { ArticleBody } from './body'
 import { MembershipGate } from './membership-gate'
 import { FadeIn } from './motion/fade-in'
@@ -22,19 +24,22 @@ import { StaggerChildren, StaggerItem } from './motion/stagger'
 const FIGURE_SIZES = '(max-width: 47rem) 100vw, 42rem'
 
 /**
- * A post, in tracks rather than one column.
+ * A post, in three tracks.
  *
  * The reading column keeps its measure and is pinned to the left of the block
  * from 1280 up; the space that used to sit empty either side of it becomes a
- * notes margin that captions hang in, and a track for the rail. The grid is in
+ * notes margin that captions hang in, and a rail beside that. The grid is in
  * `app/globals.css` under "Article layout", and `docs/POST_PAGE_LAYOUT.md` has
  * the measured widths and why the text column did not get any wider.
  */
 export function Article({
   post,
+  related = [],
   preview = false,
 }: {
   post: PostDetail
+  /** Related pieces for the rail; "Read next" is given its own share. */
+  related?: PostCard[]
   preview?: boolean
 }) {
   const primaryTag = post.tags[0]
@@ -45,6 +50,10 @@ export function Article({
   ]
     .filter(Boolean)
     .join(' · ')
+
+  // Derived here rather than in the route: it is a pure function of the body
+  // this component already holds, and no other caller needs it.
+  const headings = extractHeadings(post.body)
 
   return (
     <main>
@@ -122,6 +131,8 @@ export function Article({
               </Reveal>
             )}
           </div>
+
+          <ArticleRail headings={headings} related={related} />
         </div>
       </article>
     </main>
