@@ -89,3 +89,35 @@ describe('admin import map', () => {
     for (const identifier of bound) expect(imported).toContain(identifier)
   })
 })
+
+describe('the generated import map cannot shadow the tracked one', () => {
+  // Every assertion above reads `importMap.ts`. The admin page imports
+  // `./admin/importMap` without an extension, and webpack resolves `.js`
+  // first — so a generated `importMap.js` sitting beside it is what actually
+  // gets compiled, and this whole file passes while the build ignores the file
+  // it just checked.
+  //
+  // That is what kept the admin panel blank for ten days. The tracked map was
+  // correct and merged; a stale generated sibling left on the server from an
+  // earlier `pnpm generate:importmap` shadowed it, so every build — including a
+  // full `--no-cache` rebuild — compiled a map with no `S3ClientUploadHandler`
+  // in it. Confirmed by building both ways: present, and the component is in no
+  // client chunk; absent, and it is there.
+  //
+  // `.dockerignore` is what makes the image immune, so that is what this
+  // asserts. `.gitignore` keeps it out of commits, which is a different
+  // guarantee and was never the one that failed.
+  const dockerignore = readFileSync(
+    resolve(import.meta.dirname, '../../.dockerignore'),
+    'utf8',
+  )
+
+  it('is excluded from the Docker build context', () => {
+    const entries = dockerignore
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith('#'))
+
+    expect(entries).toContain('app/(payload)/admin/importMap.js')
+  })
+})
