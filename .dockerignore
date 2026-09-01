@@ -9,3 +9,24 @@ media
 ghost-export
 *.dump
 *.sql
+
+# Payload's generated import map, which must never reach a build.
+#
+# `layout.tsx` and the admin page import `./admin/importMap` with no extension,
+# and webpack resolves `.js` before `.ts`. So whenever this generated sibling
+# exists it *shadows* the tracked `importMap.ts` — the file everything in this
+# repository assumes is the one being used, including the comment beside it in
+# `.gitignore` and the assertions in `tests/design/import-map.test.ts`, which
+# read the `.ts` and can therefore pass against a build that never loaded it.
+#
+# It is gitignored, so `git reset --hard` on the server does not remove it, and
+# nothing in `.dockerignore` used to stop `COPY . .` from copying it in. One
+# left on the VPS from an earlier `pnpm generate:importmap` is why the admin
+# panel stayed blank through five deploys and a full `--no-cache` rebuild: every
+# build was faithful, and every one of them compiled the stale map.
+#
+# Excluding it here means the image can only ever be built from the tracked
+# file. Proven by building both ways: with the stale sibling present the bundle
+# contains no `S3ClientUploadHandler` at all, and without it the component is
+# there and the page chunk changes.
+app/(payload)/admin/importMap.js

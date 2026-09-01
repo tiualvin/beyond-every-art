@@ -154,6 +154,32 @@ below.
   the layout's `children` slot serialising to `null` where a working render has
   the parallel-router outlet.
 
+  **What actually kept it broken was a gitignored file.** The tracked
+  `importMap.ts` was correct and merged, and the admin stayed blank through
+  five deploys — including a manual `docker compose build --no-cache app` on
+  the box, which rebuilt every layer from scratch and still produced a bundle
+  with no `S3ClientUploadHandler` in it. The build was faithful every time; the
+  source it compiled was not the file anyone was looking at.
+
+  `layout.tsx` and the admin page import `./admin/importMap` with no extension,
+  and webpack resolves `.js` before `.ts`. Payload's generator writes
+  `importMap.js` beside the tracked `.ts`, so whenever that sibling exists it
+  **shadows** the tracked file. One left on the server from an earlier
+  `pnpm generate:importmap` is what every build was reading. It is gitignored,
+  so `git reset --hard` never removed it, and `.dockerignore` did not exclude
+  it, so `COPY . .` copied it into every image.
+
+  Proven by building the same tree twice: with the stale sibling present the
+  bundle contains the component in no chunk at all and the admin page chunk is
+  one hash; with it absent the component is in `chunks/7148-*.js` and the page
+  chunk is another. `.dockerignore` now excludes it, so an image can only be
+  built from the tracked file, and `tests/design/import-map.test.ts` asserts
+  that exclusion — every other assertion in that file reads the `.ts` and would
+  pass against a build that never loaded it.
+
+  The comment in `.gitignore` claimed the opposite ("this generated sibling is
+  not" what the admin imports). That belief is why nobody looked here.
+
   **The deploy guard then refused the fix.** The VPS checkout had been advanced
   to a commit on `claude/beyond-every-art-cutover-qu4apc` that was never merged,
   so `main` could not fast-forward onto it and `deploy` failed with "Refusing a

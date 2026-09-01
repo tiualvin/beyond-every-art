@@ -62,5 +62,10 @@ seo-baseline/*
 payload-types.ts
 
 # Payload rewrites the admin import map on every dev boot. The tracked
-# `importMap.ts` is what the admin page imports; this generated sibling is not.
+# `importMap.ts` is what the admin page is meant to use — but the import is
+# extensionless and webpack resolves `.js` first, so this generated sibling
+# silently shadows it whenever it exists. That is not hypothetical: one left on
+# the server blanked the admin panel for ten days. It is excluded from the Docker
+# build context in `.dockerignore` so an image can never be built from it; delete
+# it locally after generating, once the entries are copied into the `.ts`.
 app/(payload)/admin/importMap.js
