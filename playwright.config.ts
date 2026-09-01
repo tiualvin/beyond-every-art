@@ -76,6 +76,27 @@ const mcpEnvironment = {
   CMS_ADDRESS: '127.0.0.1:3000',
 }
 
+/**
+ * Production stores media in Cloudflare R2, and `payload.config.ts` registers
+ * the `s3Storage` plugin only when S3_BUCKET and S3_ENDPOINT are both set.
+ * That plugin brings an admin component with it, so the deployment that has R2
+ * configured asks the import map for a component the suite would otherwise
+ * never request — and a map missing it renders the whole admin panel blank
+ * while every status code and header stays correct. `admin.spec.ts` is what
+ * notices; this is what puts it in front of the same plugin set production
+ * runs.
+ *
+ * The values only have to exist: nothing here is dialled, because no spec
+ * uploads a file. Registering the plugin is the entire point.
+ */
+const storageEnvironment = {
+  S3_BUCKET: 'e2e-not-a-real-bucket',
+  S3_ENDPOINT: 'https://e2e.invalid',
+  S3_REGION: 'auto',
+  S3_ACCESS_KEY_ID: 'e2e-not-a-real-key',
+  S3_SECRET_ACCESS_KEY: 'e2e-not-a-real-secret',
+}
+
 const productionServer = {
   command: 'node .next/standalone/server.js',
   env: {
@@ -83,12 +104,13 @@ const productionServer = {
     NODE_ENV: 'production',
     PORT: '3000',
     ...mcpEnvironment,
+    ...storageEnvironment,
     ...rateLimitOverrides,
   },
 }
 const developmentServer = {
   command: 'pnpm exec next dev --hostname 127.0.0.1 --port 3000',
-  env: { ...mcpEnvironment, ...rateLimitOverrides },
+  env: { ...mcpEnvironment, ...storageEnvironment, ...rateLimitOverrides },
 }
 
 export default defineConfig({

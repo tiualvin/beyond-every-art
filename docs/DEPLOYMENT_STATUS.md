@@ -87,6 +87,43 @@ below.
 
 ## Done
 
+- **The admin panel rendered blank in production (1 Sep).** The CMS was
+  reported down. `cms.beyondeveryart.com/admin` answered 200 in about half a
+  second, served all seventeen assets, held a valid certificate to 7 Nov, and
+  carried a complete and correct RSC payload with the login view inside it —
+  and painted an empty page. No console error, no failed request, nothing above
+  a 200 anywhere. Postgres, Caddy, the container and `/api/users/login` (a
+  correct 401) were all healthy throughout.
+
+  `app/(payload)/admin/importMap.ts` was missing
+  `@payloadcms/storage-s3/client#S3ClientUploadHandler`. Payload's response to a
+  component it cannot resolve is to abandon the admin render and log
+  `getFromImportMap: PayloadComponent not found in importMap` on the server —
+  nothing reaches the browser, which is why every external check passed.
+
+  **The trap is that the map depends on the environment it is generated in.**
+  `payload.config.ts` registers `s3Storage` only when `S3_BUCKET` and
+  `S3_ENDPOINT` are set, so `pnpm generate:importmap` on a machine without R2
+  credentials — every developer machine, and CI — writes a map that looks
+  complete and silently omits that key. Production has R2, asks for the
+  component, and blanks. Regenerate with both variables set (any non-empty
+  values; only their presence selects the plugin) before copying the generated
+  `importMap.js` over the tracked `.ts`.
+
+  This is the second blank admin from this one file — the first was the empty
+  map that blanked the dashboard, which `tests/design/import-map.test.ts` was
+  written to stop. It did not stop this one for two reasons, both now fixed:
+  the key was not in `REQUIRED`, and the test's key-matching pattern was
+  `[A-Za-z]+`, which cannot match an export name containing a digit, so
+  `S3ClientUploadHandler` was invisible to every assertion in the file.
+
+  What made it survivable for so long is that **nothing rendered the admin in a
+  browser.** `csp.spec.ts` fetched `/admin` with `request.get` to read a header;
+  `oauth.spec.ts` asserted a `Location` string. Both pass against a blank page.
+  `e2e/admin.spec.ts` now loads the login page, submits it, and asserts the
+  dashboard's collection links, and `playwright.config.ts` gives the test server
+  R2 variables so CI exercises the plugin set production actually runs.
+
 - **Caddy serves a stale config until its container is recreated (31 Aug).**
   The single most likely thing to waste an hour on cutover day, so it is first.
 

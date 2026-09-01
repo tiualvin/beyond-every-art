@@ -26,8 +26,15 @@ const source = readFileSync(
   'utf8',
 )
 
-/** Every `'<module>#<Export>'` key the map registers. */
-const keys = [...source.matchAll(/['"]([^'"]+#[A-Za-z]+)['"]\s*:/g)].map(
+/**
+ * Every `'<module>#<Export>'` key the map registers.
+ *
+ * The export half matches digits as well as letters. Payload's own export
+ * names contain them — `S3ClientUploadHandler` is the one this deployment
+ * needs — and a letters-only class silently skips those keys, so a map that
+ * was missing one still satisfied every assertion below.
+ */
+const keys = [...source.matchAll(/['"]([^'"]+#[A-Za-z0-9]+)['"]\s*:/g)].map(
   (match) => match[1]!,
 )
 
@@ -41,6 +48,22 @@ const REQUIRED = [
   // The server entries the editor field itself renders through.
   '@payloadcms/richtext-lexical/rsc#RscEntryLexicalField',
   '@payloadcms/richtext-lexical/rsc#RscEntryLexicalCell',
+  // The R2 upload handler, and the one entry whose absence is invisible to
+  // everyone who regenerates the map. `payload.config.ts` registers
+  // `s3Storage` only when S3_BUCKET and S3_ENDPOINT are set, so a map
+  // generated on a machine without R2 credentials — which is every developer
+  // machine and CI — silently omits this key while looking complete.
+  //
+  // Production has R2 configured, so it asks for the component, does not find
+  // it, and Payload abandons the admin render: `/admin` answered 200 with a
+  // correct RSC payload and a blank screen, no console error and no failed
+  // request. Every status- and header-level check passed against it.
+  //
+  // Run `pnpm generate:importmap` with S3_BUCKET and S3_ENDPOINT set (any
+  // non-empty values will do — only their presence selects the plugin) before
+  // copying the generated sibling over the tracked file, or this key is lost
+  // again.
+  '@payloadcms/storage-s3/client#S3ClientUploadHandler',
 ]
 
 describe('admin import map', () => {
@@ -58,7 +81,7 @@ describe('admin import map', () => {
       [...source.matchAll(/import \{ \w+ as (\w+) \}/g)].map((m) => m[1]!),
     )
     const bound = [
-      ...source.matchAll(/['"][^'"]+#[A-Za-z]+['"]:\s*(\w+)/g),
+      ...source.matchAll(/['"][^'"]+#[A-Za-z0-9]+['"]:\s*(\w+)/g),
     ].map((m) => m[1]!)
 
     expect(bound.length).toBe(keys.length)
