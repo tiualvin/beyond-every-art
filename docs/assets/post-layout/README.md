@@ -32,6 +32,22 @@ ad layer to fill it.
 | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | ![The body before: text at 656px, with the rest of the screen empty.](post-before-1440-body.jpg) | ![The body after: justified paragraphs at 704px, and beside them the sticky rail group — space reserved for a square ad, the related pieces, and the newsletter card — pinned as the article scrolls past.](post-after-1440-body.jpg) |
 
+## 1440x800 — the sticky group on a short window
+
+A different harness from the shots above: the real `app/globals.css` and the
+real markup of `ArticleRail`, at a viewport 800px tall, scrolled far enough for
+the group to be pinned. Only the stylesheet differs between the pair. The crop
+is the rail and a slice of the column beside it.
+
+| Before                                                                                                                                                                                                    | After                                                                                                                                                                                                                          |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| ![The rail before: a 290px empty band, then all three related pieces, then the newsletter card cut through the middle of its Join the list button by the bottom of the screen.](rail-before-1440x800.jpg) | ![The rail after: a 250px band, two related pieces and part of a third in a list that scrolls, and the whole newsletter card — heading, line of copy and button — clear of the bottom of the screen.](rail-after-1440x800.jpg) |
+
+800px of viewport is a 1440x900 laptop with the browser chrome taken off. The
+group is 737px before and the cap is 692px, so 45px of it had nowhere to go —
+and the card, being last, is what went. After, the related list is the only
+module that may shrink, so it absorbs the 45px and the card stays whole.
+
 ## 390
 
 ![The post at 390px: a single column, no rail, no notes margin — the same layout the template had.](post-after-390.jpg)

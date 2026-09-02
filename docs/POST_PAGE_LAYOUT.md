@@ -12,7 +12,7 @@ Enforced by [`../tests/design/article-layout.test.ts`](../tests/design/article-l
 which recomputes every width below from the stylesheet. If a number here and a
 number there disagree, that test is the one to believe.
 
-Before and after screenshots, at 1440 and 390, are in
+Before and after screenshots, at 1440x900, 1440x800 and 390, are in
 [`assets/post-layout/`](assets/post-layout/README.md).
 
 ## What it was
