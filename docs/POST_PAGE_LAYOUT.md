@@ -12,7 +12,7 @@ Enforced by [`../tests/design/article-layout.test.ts`](../tests/design/article-l
 which recomputes every width below from the stylesheet. If a number here and a
 number there disagree, that test is the one to believe.
 
-Before and after screenshots, at 1440 and 390, are in
+Before and after screenshots, at 1440x900, 1440x800 and 390, are in
 [`assets/post-layout/`](assets/post-layout/README.md).
 
 ## What it was
@@ -83,16 +83,37 @@ newsletter card. The group travels with the reader for the rest of the scroll;
 the contents list does not, because a reader below the sections it names is
 done with it.
 
-The group is capped at the height of the space it pins into and scrolls inside
-itself if it ever exceeds it, which is what keeps a sticky box from hanging its
-bottom off the screen where nothing can reach it. On a window taller than about
-860px the cap never binds and no scrollbar appears.
+The group is capped at the height of the space it pins into, which is what
+keeps a sticky box from hanging its bottom off the screen where nothing can
+reach it. The group is 721px and the cap is the viewport less 108px, so it
+binds under about 830px of viewport — which is most windows, and means
+something in the group has to give.
 
-That cap replaced a `@media (min-height: 820px)` guard, which was the same
-protection done badly: the group is about 700px tall, a laptop at 1440×900 has
-roughly 800px of viewport once browser chrome is taken off, and a window that
-is not maximised has less — so on most screens there was no sticky at all and
-it looked like the feature had never been built.
+**Which module gives is decided, not left to the scrollbar.** The unit keeps
+its 250px and the newsletter card keeps its height; the related list is the
+only module allowed to shrink and scroll inside itself. Capping the group and
+scrolling it whole had made the card — the last thing in the group, and the
+only thing in it a reader is meant to act on — the first thing off the bottom.
+
+| Viewport | Cap  | Group | Related list | What the reader sees     |
+| -------- | ---- | ----- | ------------ | ------------------------ |
+| ≥830     | ≥722 | 721   | 184          | all three pieces         |
+| 800      | 692  | 692   | 155          | two, and part of a third |
+| 720      | 612  | 612   | 75           | one                      |
+| ≤700     | —    | 456   | —            | the unit and the card    |
+
+Under 700px the list would be a 15px window under its heading, so it is dropped
+instead — the related pieces close the article on every device, so nothing in
+the rail is only in the rail. That is a `max-height` guard, and it is not the
+`@media (min-height: 820px)` one it replaced upstream: that turned the sticky
+group off entirely, on a group about 700px tall against a 1440×900 laptop's
+roughly 800px of viewport, so on most screens there was no sticky at all and it
+looked like the feature had never been built. This one drops one supplementary
+module on the windows that provably cannot hold it.
+
+The space above "More on this" is the unit and a gap — 250px and 1.5rem — not
+the unit and a second band. At the 2.5rem module rhythm it read as 290px of
+nothing, and those 16px were also 16px the card did not have.
 
 ## Decisions worth not relitigating
 
@@ -183,6 +204,6 @@ content before believing a change here:
 1. A migrated Ghost post with figures, a wide card and a gallery, at 1280 and
    1440 — the archive is most of the site, and it is the content this grid has
    to hold rather than the seeded examples.
-2. A short viewport. 1280×800 and 1366×768 are where the sticky group's height
-   cap starts to bind, and it should scroll inside itself rather than lose the
-   newsletter card off the bottom of the screen.
+2. A short viewport. 1280×800 and 1366×768 are where the height cap binds. The
+   newsletter card should be whole at every height, the reserved 250px should
+   still be 250px, and the related list should be the only thing that gives.

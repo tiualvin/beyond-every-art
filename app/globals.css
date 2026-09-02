@@ -3335,10 +3335,14 @@ ol.feature-list__items .feature-list__title::before {
 /* Space kept for a square unit above "More on this", per docs/ADVERTISING.md
    §8. It renders empty until there is an ad layer to fill it — the reservation
    is the point, so that turning ads on is a fill rather than a re-layout, and
-   so the rail is designed around the height it will actually have. */
+   so the rail is designed around the height it will actually have.
+
+   The reservation is the unit and a gap, not the unit and a second band: at
+   the module rhythm of 2.5rem it read as 290px of nothing above the related
+   list, and those 16px were also 16px the newsletter card did not have. */
 .rail__slot {
   min-height: 250px;
-  margin-bottom: 2.5rem;
+  margin-bottom: 1.5rem;
 }
 
 /* The ad slot, the related pieces and the newsletter travel together and stay
@@ -3356,16 +3360,68 @@ ol.feature-list__items .feature-list__title::before {
    The guard was there because a sticky box taller than the space it pins into
    hangs its bottom off the screen where nothing can scroll to it. The height
    cap below closes that properly: on a tall window it never binds, and on a
-   short one the group scrolls inside itself rather than losing the newsletter
-   card off the end. `dvh` second so a browser without it keeps the `vh` rule. */
+   short one the group gives somewhere rather than hanging off the end. `dvh`
+   second so a browser without it keeps the `vh` rule.
+
+   Which module gives is the part that had to be decided rather than left to
+   the scrollbar. Capping the group and scrolling it whole meant the newsletter
+   card — the last thing in it, and the only thing in it a reader is meant to
+   act on — was the first thing off the bottom, on every window shorter than
+   about 845px of viewport, which is most of them. So the group is a column:
+   the ad keeps its 250px and the newsletter card keeps its height, and the
+   related list is the one module allowed to shrink and scroll inside itself.
+   The group's own scrollbar stays as a backstop for a window too short to
+   hold even the ad and the card. */
 .rail__sticky {
   position: sticky;
   top: calc(var(--masthead-h) + 1rem);
   max-height: calc(100vh - var(--masthead-h) - 2rem);
   max-height: calc(100dvh - var(--masthead-h) - 2rem);
+  display: flex;
+  flex-direction: column;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
+}
+
+/* Everything in the group holds its height... */
+.rail__sticky > * {
+  flex: none;
+}
+
+/* ...except the related list, which is what absorbs a short window. `flex:
+   0 1 auto` rather than `1 1 auto`: it may shrink, but it must not grow into
+   the space left over on a tall one, or the newsletter card would be pushed
+   to the bottom of the box with a gap above it. `min-height: 0` twice because
+   a flex item's automatic minimum is its content, and without it neither the
+   module nor the list inside it can go below its natural height. */
+.rail__sticky > .rail__related {
+  flex: 0 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.rail__related .rail__list {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+/* Past a point shrinking stops being graceful. The fixed parts of the group —
+   the 250px unit, its gap, the label, and the newsletter card — come to 537px,
+   so under about 700px of viewport the list is a 15px window under a heading,
+   which reads as broken rather than tight. It is dropped instead: the related
+   pieces close the article on every device, so nothing here is only here.
+
+   This is a `max-height`, not the `min-height` guard it replaced upstream. That
+   one turned the sticky group off entirely on most windows; this one drops one
+   supplementary module on the windows that provably cannot hold it. */
+@media (max-height: 700px) {
+  .rail__sticky > .rail__related {
+    display: none;
+  }
 }
 
 /* The last module in the group carries no bottom margin of its own, so the

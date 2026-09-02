@@ -224,6 +224,21 @@ describe('the rail', () => {
     expect(css).toMatch(/\.rail__slot \{\s*min-height: 250px;/)
   })
 
+  // The reservation is the unit and a gap. At the module rhythm it was the
+  // unit and a second band — 290px of nothing above "More on this" — and those
+  // 16px were also 16px the newsletter card did not have.
+  it('reserves the unit and a gap, not the unit and a band', () => {
+    const slot = /\.rail__slot \{([^}]*)\}/.exec(css)
+    const mod = /\.rail__mod \{([^}]*)\}/.exec(css)
+    expect(slot, '.rail__slot is missing from globals.css').toBeTruthy()
+    expect(mod, '.rail__mod is missing from globals.css').toBeTruthy()
+
+    const gap = (rule: string) =>
+      px(/margin-bottom: ([\d.]+rem)/.exec(rule)![1])
+
+    expect(gap(slot![1])).toBeLessThan(gap(mod![1]))
+  })
+
   it('clears the masthead when it sticks', () => {
     expect(css).toMatch(
       /\.rail__sticky \{[\s\S]*?top: calc\(var\(--masthead-h\)/,
@@ -251,6 +266,57 @@ describe('the rail', () => {
     const rule = /\.rail__sticky \{([^}]*)\}/.exec(css)
     expect(rule![1]).toMatch(/max-height: calc\(100dvh/)
     expect(rule![1]).toMatch(/overflow-y: auto/)
+  })
+
+  // Capping the group and scrolling it whole made the newsletter card — the
+  // last thing in it, and the only thing in it a reader is meant to act on —
+  // the first thing off the bottom, on every window under about 845px of
+  // viewport. So the group is a column and only one module in it may shrink.
+  it('gives the related list rather than the newsletter card', () => {
+    const sticky = /\.rail__sticky \{([^}]*)\}/.exec(css)
+    expect(sticky![1]).toMatch(/display: flex/)
+    expect(sticky![1]).toMatch(/flex-direction: column/)
+
+    // Everything holds its height...
+    expect(css).toMatch(/\.rail__sticky > \* \{\s*flex: none;\s*\}/)
+
+    // ...except the list. `0 1` and not `1 1`: it may shrink, but growing into
+    // the space left over on a tall window would push the card to the bottom
+    // of the box with a gap above it.
+    const related = /\.rail__sticky > \.rail__related \{([^}]*)\}/.exec(css)
+    expect(related, '.rail__related is missing from globals.css').toBeTruthy()
+    expect(related![1]).toMatch(/flex: 0 1 auto/)
+    expect(related![1]).toMatch(/min-height: 0/)
+
+    const list = /\.rail__related \.rail__list \{([^}]*)\}/.exec(css)
+    expect(list, 'the related list is not the module that scrolls').toBeTruthy()
+    expect(list![1]).toMatch(/min-height: 0/)
+    expect(list![1]).toMatch(/overflow-y: auto/)
+  })
+
+  // Under about 700px of viewport the list is a 15px window under a heading,
+  // which reads as broken rather than tight. Note this is a `max-height`: it
+  // drops one supplementary module on the windows that cannot hold it, where
+  // the `min-height` guard above turned the whole feature off on most windows.
+  it('drops the list rather than showing a sliver of it', () => {
+    expect(css).toMatch(
+      /@media \(max-height: 700px\) \{\s*\.rail__sticky > \.rail__related \{\s*display: none;/,
+    )
+  })
+
+  // The elastic module is the related one, and the stylesheet can only know
+  // that if the component says so.
+  it('marks the related module as the one that gives', () => {
+    const rail = readFileSync(
+      resolve(
+        import.meta.dirname,
+        '../../app/(frontend)/components/article-rail.tsx',
+      ),
+      'utf8',
+    )
+    expect(rail).toMatch(/className="rail__mod rail__related"/)
+    // One module carries it, and it is not the newsletter card.
+    expect(rail.match(/className="[^"]*rail__related[^"]*"/g)!.length).toBe(1)
   })
 })
 

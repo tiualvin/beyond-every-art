@@ -409,7 +409,9 @@ that slot's request is deferred to idle.
 
 Five identified placements, of which **four should be live at launch**: all but
 `home-mid`. `.rail__slot` in `app/globals.css` already reserves `rail-1`'s
-250px, so turning it on is a fill rather than a re-layout.
+250px, so turning it on is a fill rather than a re-layout — and the reservation
+holds at every window height, because the sticky group shrinks its related list
+rather than the unit or the newsletter card (`docs/POST_PAGE_LAYOUT.md`).
 
 **The rail carries one unit, not three.** An earlier version of this table had a
 ladder of three, spaced a viewport apart down a rail that scrolled with the
