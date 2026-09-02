@@ -185,6 +185,15 @@ describe('the split hero', () => {
   it('spans both tracks, so the rail starts level with the body', () => {
     expect(css).toMatch(/\.article__hero \{\s*grid-column: 1 \/ -1;/)
   })
+
+  // Centred, the image starts below the title and its credit finishes level
+  // with the rule above the byline, which reads as a misalignment rather than
+  // a choice. Top-aligned, both clear that rule and the columns start together.
+  it('aligns the image to the top of the row rather than floating it', () => {
+    const rule = /\.article__hero \{([^}]*)\}/.exec(css)
+    expect(rule, '.article__hero is missing from globals.css').toBeTruthy()
+    expect(rule![1]).toMatch(/align-items: start/)
+  })
 })
 
 describe('media in the body', () => {
@@ -221,13 +230,27 @@ describe('the rail', () => {
     )
   })
 
-  // A sticky box taller than the screen pins its top and hangs its bottom off
-  // the end, and nothing can scroll to the part underneath. The group is about
-  // 700px with the slot filled, so it only sticks where the whole of it fits.
-  it('only sticks where the whole group fits on the screen', () => {
-    expect(css).toMatch(
-      /@media \(min-height: \d+px\) \{\s*\.rail__sticky \{\s*position: sticky;/,
+  // This was once behind `@media (min-height: 820px)` and the guard was the
+  // bug. The group is about 700px tall, and a laptop at 1440×900 has roughly
+  // 800px of viewport once browser chrome is taken off — so on most windows
+  // there was no sticky at all, and it looked like the feature had never been
+  // built.
+  it('sticks at every window height', () => {
+    expect(css).not.toMatch(
+      /@media \(min-height: [^)]+\)[\s\S]{0,300}?\.rail__sticky/,
     )
+    const rule = /\.rail__sticky \{([^}]*)\}/.exec(css)
+    expect(rule, '.rail__sticky is missing from globals.css').toBeTruthy()
+    expect(rule![1]).toMatch(/position: sticky/)
+  })
+
+  // What the height guard was protecting against, closed properly: a sticky
+  // box taller than the space it pins into hangs its bottom off the screen
+  // where nothing can scroll to it.
+  it('is never taller than the space it pins into', () => {
+    const rule = /\.rail__sticky \{([^}]*)\}/.exec(css)
+    expect(rule![1]).toMatch(/max-height: calc\(100dvh/)
+    expect(rule![1]).toMatch(/overflow-y: auto/)
   })
 })
 
