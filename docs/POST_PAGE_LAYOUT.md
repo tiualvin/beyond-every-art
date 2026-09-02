@@ -35,110 +35,126 @@ used 1104px of the same screen. The article — the page the site exists to serv
 
 ## What the measure is for
 
-**The reading column was never the problem.** Measured in Chromium at
-`1.1rem/1.75` Inter, against 876 characters of real body copy:
+**The reading column is what the width is for, up to a point.** Measured in
+Chromium at `1.1rem/1.75` Inter, against 876 characters of real body copy:
 
 | Column     | 608 | 640 | 656 | 672 | 704 | 736 | 800 |
 | ---------- | --- | --- | --- | --- | --- | --- | --- |
 | Characters | 63  | 67  | 67  | 73  | 73  | 80  | 88  |
 
-656px sets about 67 characters and 672px about 73. Both sit inside the
-comfortable 45–75; 736px does not. So the recovered width could not go into the
-text, and the layout below spends it on tracks beside the text instead. The
-column moved from 656 to 672 and stops there.
+45–75 characters is the comfortable range. 704px sets about 73 and 736px sets
+80, so **704px is the widest the column can be** and still be a column someone
+wants to read. Everything beyond that has to go somewhere other than the text.
 
 ## The tracks
 
-Text pinned to the left of the block from 1280 up, everything gained
-accumulating to its right. The block itself still centres — anchoring it to the
-left edge of the viewport leaves a dead margin to the right of the rail at 1920
-that reads as a broken page rather than a composed one.
+Two, from 1280 up: the reading column and a 300px rail. The block is exactly as
+wide as those two and the gap between them, so no part of it is empty by
+construction.
 
-| Viewport  | Block | Left gutter | Text | Notes margin | Figure bleeds to | Rail |
-| --------- | ----- | ----------- | ---- | ------------ | ---------------- | ---- |
-| ≤1279     | 72rem | centred     | 672  | —            | 672              | —    |
-| 1280–1439 | 76rem | 56px        | 672  | 124          | 828              | 300  |
-| 1440–1599 | 86rem | 56px        | 672  | 276          | 980              | 300  |
-| ≥1600     | 96rem | 56px+       | 672  | 436          | 1140             | 300  |
+| Viewport | Block | Left gutter | Text | Rail | Featured image |
+| -------- | ----- | ----------- | ---- | ---- | -------------- |
+| ≤1279    | ≤1100 | centred     | 704  | —    | 704            |
+| ≥1280    | 1100  | 90px+       | 704  | 300  | 456            |
 
-Two properties hold the arithmetic together, and the test asserts both:
+One block width at every desktop size, and it is not written down anywhere: the
+stylesheet declares it as `--text-w + --gap + --rail-w + --pad * 2`. Change the
+measure or the rail and the block follows, which is the only way to keep four
+numbers in agreement without remembering to.
 
-- **The block is capped below its own breakpoint at every step.** 76rem is
-  1216px and the band starts at 1280; 86rem is 1376 and starts at 1440; 96rem
-  is 1536 and starts at 1600. So every track is a fixed number in its band, and
-  the text never starts less than 56px from the edge of the screen. A block as
-  wide as its own breakpoint would put the first word 24px from the glass.
-- **`--bleed` is derived, not written out.** It is
-  `--shell - 3rem - --rail-w - --gap - --text-w`: what is left of the block
-  once the padding, the rail and the gap in front of the notes margin are paid
-  for. Widening the block therefore cannot leave the figures reaching the wrong
-  distance.
+The gutter grows past 1280 rather than the block: 90px at 1280, 170 at 1440,
+410 at 1920. That is the honest cost of a fixed measure beside a fixed rail —
+see "What the empty space is for" below.
 
 ## What goes in each track
 
-**Text — 672px.** Unchanged content at an unchanged measure. What it gains is
-starting 56px from the edge of the block instead of 392px from the edge of the
-screen.
+**Text — 704px.** The article, and everything in it. Figures, galleries and
+comparison tables fill the column and stop there, because the column is the
+whole track.
 
-**Notes margin — 124 / 276 / 436px.** Captions and credits hang here, beside
-the image rather than under it, which is the move that makes the column read as
-a page rather than a post. A figure becomes a two-track grid to do it, so the
-row is as tall as the taller of image and caption and a long caption cannot
-overlap the paragraph below. Ghost's own `kg-width-wide` and `kg-width-full`
-finally mean something too: they bleed across text and notes, where before both
-resolved to the same width as body text.
+Paragraphs are justified, with `hyphens: auto` doing the work that keeps
+justification from rivering. `<html lang="en">` in the frontend layout is what
+gives the browser a language to hyphenate against; without it the property is
+inert, which is the one way this can silently stop working.
 
-**Rail — 300px, from 1280.** A contents list, three related pieces, and the
-newsletter card, which is last and sticks. It is editorial on purpose:
-[`ADVERTISING.md`](ADVERTISING.md) puts an ad slot in here eventually, and that
-slot is absent for members, for anyone running a blocker, and on every staging
-deployment. A rail built around one is a hole on those visits; built around
-reading aids, the slot is one module among them.
+**Rail — 300px, from 1280.** A contents list in flow at the top, then a sticky
+group of three: space reserved for a square ad, the related pieces, and the
+newsletter card. The group travels with the reader for the rest of the scroll;
+the contents list does not, because a reader below the sections it names is
+done with it.
+
+The group only sticks where the whole of it fits on the screen —
+`@media (min-height: 820px)`. A sticky box taller than the viewport pins its
+top and hangs its bottom off the end, and nothing can scroll to the part
+underneath: the newsletter card would be permanently unreachable on a 768px
+laptop.
 
 ## Decisions worth not relitigating
 
-**The rail arrives at 1280, not 1200.** At 1200 a 672px column plus a 300px
-rail leaves the text 24px from the edge of the screen. That is cramped, and the
-band below 1280 keeps the centred column instead.
+**There is no notes margin.** The first pass put one between the text and the
+rail for captions and credits to hang in. It was removed because most articles
+have no captions worth hanging, so on most pages it was a third of the block
+doing nothing — and an empty column reads worse than white space, because white
+space looks deliberate and an empty column looks broken.
 
-**Nothing widens below 1280.** An earlier pass let media widen symmetrically
-there too. It was wrong twice: an over-constrained block with
-`margin-inline: auto` is not centred — CSS 2.1 §10.3.3 makes both margins zero,
-so it hangs off one side — and `100vw`, the only way to read the viewport from
-inside the column, counts a scrollbar Chromium then takes away. Both showed up
-as a horizontally scrolling page at 800px. Above 1280 the block is capped, so
-every width is exact and none of this arises.
+What it cost is the wide figures. A gallery or a comparison table reached 828
+to 1140px with the margin in place and now reaches 704. The comparison table is
+the one that feels it: a five-column table scrolls sideways inside its own box
+again at 704, which is the thing the margin fixed. If that becomes the
+complaint, the answer is a per-block bleed — a table that escapes the column on
+its own — not the return of a margin every article pays for.
+
+**The measure went to 704, not to 980.** Removing the margin freed 276px and
+the text took 32 of it. The rest went into the block getting narrower. A 980px
+column is about 105 characters, which is not a reading column.
+
+**The rail arrives at 1280.** Below that, 704 of text plus 300 of rail leaves
+the text against the edge of the screen.
 
 **The rail is hidden below 1280 rather than reflowed.** Everything in it
 reaches a phone another way — the related posts through "Read next", the
 newsletter through the band — and it carries no thumbnails, because a hidden
 `<img>` is still a download on the device least able to afford one.
 
-**The hero spans both tracks.** Title on the measure, featured image in what is
-left of the block: 456px at 1280, 608px at 1440, 768px from 1600. It brings the
-first paragraph about 440px further up the page and, at 1280 and 1440, makes
-the LCP element _smaller_ than the 672px column that used to hold it. The rail
-starts below it, level with the body, which is also where §8 wants the first
-rail slot.
+**The hero's columns are a ratio, not the measure and the remainder.** With the
+block only as wide as the text and the rail, "the remainder" would have left
+the featured image exactly the width of the rail. At 1.2fr to 1fr the title
+takes 548px and the image 456px, and because the block is one width everywhere,
+so are they.
 
 **`sizes` breakpoints sit a hundredth of a rem under the stylesheet's.** A
 `sizes` clause is `max-width` and the layout's query is `min-width`, so written
 as the same number both match at exactly 1280 — and the hint then describes the
 layout the page has just stopped using. This is the failure mode with no
 symptom: the layout stays right, the browser fetches a source too small for the
-box, and the picture is quietly soft. The test evaluates both strings against
-the tracks rather than trusting them.
+box, and the picture is quietly soft. The test evaluates the string against the
+tracks rather than trusting it.
 
 **Pages are untouched.** A Page still renders through `.article__inner` at
 44rem. It has neither a rail's worth of related content nor, per §8's exclusion
 list, any ad slot.
 
+## What the empty space is for
+
+At 1920 the gutters are 410px each. That is not the same defect the first pass
+fixed — the block is 1100px against the 656px column it replaced — but it is
+the same arithmetic, and it is worth being explicit that a third track is the
+only thing that absorbs it. The options, if it ever matters:
+
+- **Leave it.** Most desktop traffic is 1280–1600, where the gutters are 90 to
+  250px. This is the current answer.
+- **Widen the rail past 1600.** 336px is a standard unit width and would take
+  36 of it. Small.
+- **Bring back a bleed track, for media only.** Figures and tables would use
+  it and the text would not, which is what the notes margin should have been.
+  It reintroduces an empty column on articles with no media.
+
 ## Not built, deliberately
 
-- **A margin pull quote.** The notes margin can hold one, but the variant is a
-  field on the `pull-quote` block, and a new option there is a schema change
-  with a migration — see [`DATABASE_MIGRATIONS.md`](DATABASE_MIGRATIONS.md).
-  Worth doing on its own, not as a rider on a layout change.
+- **Ads.** No slot renders. `.rail__slot` reserves 250px above the related
+  pieces so that turning ads on is a fill rather than a re-layout, and §7 of
+  [`ADVERTISING.md`](ADVERTISING.md) still puts consent and the cutover ahead
+  of any ad code.
 - **A contents list on every article.** `extractHeadings` stops at the first
   block node. Anchors come from a stateful allocator the renderer shares
   between the body's headings and any block that emits one, so past a block
@@ -146,10 +162,6 @@ list, any ad slot.
   before one is exact; an article with a block above its headings gets no list
   rather than a wrong one. Preserved Ghost markup is read for the ids it
   already carries, and a heading without one is skipped.
-- **Anything to do with ads.** No slot renders. §7 of
-  [`ADVERTISING.md`](ADVERTISING.md) still puts consent and the cutover ahead
-  of any ad code; what this layout does is reserve the shapes so that work is a
-  fill rather than a re-layout.
 
 ## Verifying a change to this
 
@@ -157,10 +169,9 @@ The unit test covers the arithmetic. What it cannot see is whether the page
 looks right, and two things are worth checking in a browser against real
 content before believing a change here:
 
-1. A migrated Ghost post with figures, a wide card and a gallery, at 1280,
-   1440 and 1600 — the archive is most of the site, and it is the content this
-   grid has to hold rather than the seeded examples.
-2. The shortest post on the site. The notes margin is the risk: an article with
-   no figures, no captions and no pull quote leaves it empty, and 436px of
-   blank paper beside the text at 1600 is worse than symmetric white space
-   because it is lopsided.
+1. A migrated Ghost post with figures, a wide card and a gallery, at 1280 and
+   1440 — the archive is most of the site, and it is the content this grid has
+   to hold rather than the seeded examples.
+2. A short viewport. 1280×800 and 1366×768 are where the sticky group stops
+   sticking, and the rail should read as ordinary flow there rather than as
+   something half-applied.

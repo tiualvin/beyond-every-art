@@ -357,27 +357,30 @@ Placements are decided here, in advance, rather than discovered by dragging
 units around a live site. Two constraints from this codebase set most of the
 answers, and both are measured rather than assumed.
 
-**The reading column is 672px, and there are two tracks beside it.** This
-paragraph used to say 704px and it was wrong twice over: `.article__inner` is
+**The reading column is 704px, and there is one track beside it.** This
+paragraph once said 704 for the wrong reason — `.article__inner` is
 `max-width: 44rem` with `.container`'s `1.5rem` padding coming out of it under
 `border-box`, so the column was 656px, not 704 — and the post template has
-since been rebuilt in three tracks, which is what
+since been rebuilt around two tracks, which is what
 [`POST_PAGE_LAYOUT.md`](POST_PAGE_LAYOUT.md) records and
 [`../tests/design/article-layout.test.ts`](../tests/design/article-layout.test.ts)
 pins. The widths a unit can be sized against are now:
 
-| Track                | 1280 | 1440 | ≥1600 |
-| -------------------- | ---- | ---- | ----- |
-| Text column          | 672  | 672  | 672   |
-| Notes margin         | 124  | 276  | 436   |
-| Rail                 | 300  | 300  | 300   |
-| Full block, less pad | 1168 | 1328 | 1488  |
+| Track                | ≥1280 |
+| -------------------- | ----- |
+| Text column          | 704   |
+| Rail                 | 300   |
+| Full block, less pad | 1052  |
 
-An in-column unit is still sized for the measure — 336×280, 300×250, or a
-responsive unit capped at 672 — because a leaderboard does not fit in a reading
-column at any width. What changed is that a 300px rail now exists, and that an
-end-of-article unit placed across the whole block has room for 970×250. The
-72rem container on listing pages is unchanged at 1104px usable.
+Two tracks and one width, at every desktop size. A notes margin between them
+was tried and removed: most articles had nothing to hang in it, and an empty
+column reads worse than white space.
+
+An in-column unit is sized for the measure — 336×280, 300×250, or a responsive
+unit capped at 704 — because a leaderboard does not fit in a reading column at
+any width. What the rail adds is a 300px column, and an end-of-article unit
+placed across the whole block has room for 970×250. The 72rem container on
+listing pages is unchanged at 1104px usable.
 
 **The featured image is the LCP element.** `FeaturedFigure` renders with
 `priority`, which is Next telling the browser this is the largest contentful
@@ -396,51 +399,47 @@ that slot's request is deferred to idle.
 
 ### Inventory
 
-| ID                 | Track / template        | Position                                     | Desktop | Mobile  | Reserved    |
-| ------------------ | ----------------------- | -------------------------------------------- | ------- | ------- | ----------- |
-| `rail-1`           | Rail, `/[slug]`         | Top of the rail, which starts below the hero | 300×250 | —       | 250px       |
-| `rail-2`           | Rail, `/[slug]`         | 100vh of clearance below `rail-1`            | 300×600 | —       | 600px       |
-| `rail-3`           | Rail, `/[slug]`         | Last rail module, sticky                     | 300×600 | —       | 600px       |
-| `article-inline-1` | Text, `/[slug]`         | After the 5th body block                     | 336×280 | 300×250 | 280 / 250px |
-| `article-end`      | Block, `/[slug]`        | Below the author card, above Read Next       | 970×250 | 300×250 | 250px       |
-| `archive-inline`   | journal, tag, author    | After every 6th entry row                    | 970×250 | 300×250 | 250px       |
-| `home-mid`         | `/`                     | Between Featured and Topics                  | 970×250 | 300×250 | 250px       |
-| `notes-1`          | Notes margin, `/[slug]` | Beside the body, ≥1600 only                  | 300×250 | —       | 250px       |
+| ID                 | Track / template     | Position                                          | Desktop | Mobile  | Reserved    |
+| ------------------ | -------------------- | ------------------------------------------------- | ------- | ------- | ----------- |
+| `rail-1`           | Rail, `/[slug]`      | Above the related pieces, inside the sticky group | 300×250 | —       | 250px       |
+| `article-inline-1` | Text, `/[slug]`      | After the 5th body block                          | 336×280 | 300×250 | 280 / 250px |
+| `article-end`      | Block, `/[slug]`     | Below the author card, above Read Next            | 970×250 | 300×250 | 250px       |
+| `archive-inline`   | journal, tag, author | After every 6th entry row                         | 970×250 | 300×250 | 250px       |
+| `home-mid`         | `/`                  | Between Featured and Topics                       | 970×250 | 300×250 | 250px       |
 
-Eight identified placements, of which **five should be live at launch**:
-`rail-1`, `rail-2`, `article-inline-1`, `article-end` and `archive-inline`.
-That is one more live placement than the previous plan and **one unit inside
-the reading column instead of three** — the rail is where that inventory went.
-`article-inline-2` and `-3` are retired.
+Five identified placements, of which **four should be live at launch**: all but
+`home-mid`. `.rail__slot` in `app/globals.css` already reserves `rail-1`'s
+250px, so turning it on is a fill rather than a re-layout.
 
-`notes-1` is defined and not enabled. A 300×250 hanging 32px from the body text
-is the most intrusive position on the page: closer to the reader's eye than
-anything in the rail, close enough that Google's requirement for ads to be
-clearly distinguishable from content becomes a design constraint rather than a
-formality, and in competition with the captions and pull quotes that are what
-make the margin worth having. The name exists so the slot can be turned on
-later against per-slot numbers; nothing renders.
+**The rail carries one unit, not three.** An earlier version of this table had a
+ladder of three, spaced a viewport apart down a rail that scrolled with the
+page. The rail's modules are now a single sticky group — the slot, the related
+pieces and the newsletter travel with the reader — and a sticky group has room
+for exactly one. That is a real trade: three sequential impressions become one
+with near-perfect viewability, and by the rule below it cannot be refreshed to
+recover the other two. Whether long exposure on one unit beats three glances is
+a per-slot measurement rather than something to settle here.
+
+`article-inline-2` and `-3` remain retired: one unit inside the reading column
+rather than three.
 
 ### Rules that go with it
 
-**Two rail units never share a screen; the one in-column unit may.** Space the
-rail slots with `margin-top: 100vh` rather than a pixel value — measured from
-whatever precedes them, so an intervening editorial module only widens the gap,
-and the rule holds on a 768px laptop and a 1440px monitor alike without
-anything in the layout needing to know the viewport height. The one place two
-units do meet is `article-inline-1` passing a rail unit about a third of the
-way down: 336×280 plus 300×600 is 21% of a 1440×900 screen, against the 30%
-Coalition for Better Ads threshold Chrome enforces.
+**Two units can share a screen, and only two.** The sticky rail unit is in view
+for most of the article by design, so `article-inline-1` passes it once. That
+screen is the ceiling: 336×280 plus 300×250 is 13% of a 1440×900 screen,
+against the 30% Coalition for Better Ads threshold Chrome enforces. There is no
+third unit above the fold to add to it, which is what the single-unit rail buys
+back.
 
-This was measured rather than reasoned. A first pass spaced the rail at
-`140vh`, claimed one unit visible per screen, and put three in one screen at a
-scroll offset a third of the way down a 9-minute article.
+An earlier version of this section reasoned rather than measured: it claimed one
+unit visible per screen and spaced a three-unit rail at `140vh`, and the built
+layout put three in one screen a third of the way down a 9-minute article. The
+rail carrying one unit removes the question.
 
-**Cap density by length.** `rail-2` renders only if the body has at least 14
-block-level children and `rail-3` only at 20, the same thresholds the retired
-in-column units used. A short piece gets `rail-1` and one in-column unit; a
-4,000-word pigment-chemistry essay gets the ladder. A fixed count is what puts
-three units in a short post, which is where density complaints come from.
+**The sticky unit is not refreshed.** A unit that stays in view for a whole
+article is the classic case for refresh, and refresh is the classic way to turn
+a rail into a nuisance. One impression, high viewability, no reload.
 
 **Never split a figure from its caption.** Insertion counts top-level block
 children of the body and must skip a position that would land between a

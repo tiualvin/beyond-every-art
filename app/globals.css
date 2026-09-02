@@ -1797,6 +1797,18 @@ img {
   margin-top: 1.4rem;
 }
 
+/* Justified, with hyphenation doing the work that keeps it from rivering.
+   `hyphens: auto` needs a language to hyphenate against, which `<html lang>`
+   in app/(frontend)/layout.tsx supplies.
+   
+   Direct children only. A block renders its own paragraphs — a callout, a
+   pull quote, the text half of a media-and-text — and several of them set an
+   alignment of their own that a blanket `.prose p` would overrule. */
+.prose > p {
+  text-align: justify;
+  hyphens: auto;
+}
+
 .prose > p:first-of-type::first-letter {
   float: left;
   font-family: var(--font-serif);
@@ -3133,45 +3145,39 @@ ol.feature-list__items .feature-list__title::before {
   color: var(--color-burgundy);
 }
 
-/* --- Article layout: text, notes, rail ------------------------------------
-   The post template put every element in one 44rem column — 656px once
-   `.container`'s padding comes out of it under `border-box` — and left 392px
-   of empty page either side at 1440. The measure was never the problem: 656px
-   sets about 67 characters, which is inside the comfortable range. What sat
-   beside it was.
+/* --- Article layout: text and rail ----------------------------------------
+   Two tracks from 1280 up: the reading column, and a 300px rail beside it.
+   The block is exactly as wide as those two and the gap between them, so
+   nothing on the page is empty by construction.
 
-   So the text column keeps its width and the recovered space becomes two
-   tracks to its right: a notes margin that captions and credits hang in, and a
-   300px rail. From 1280 the text is pinned to the left of the block; the block
-   itself still centres, because anchoring it to the viewport's left edge
-   leaves a dead margin to the right of the rail on a wide screen.
+   That is a change of mind from the first pass, which put a notes margin
+   between them for captions to hang in. Most articles have no captions worth
+   hanging, so on most pages it was a third of the block doing nothing, and an
+   empty column reads worse than white space.
 
-   These rules sit here, after the migrated `kg-*` card rules, because the
-   figure treatment below has to win against them. `.article__inner` further up
-   is untouched: a Page still renders through it, having neither a rail's worth
-   of content nor any ad slot.
+   Removing it costs the wide figures. A gallery or a comparison table now
+   fills the reading column and stops there, because the reading column is all
+   there is. What it buys is a wider measure — 704px, the widest that stays
+   inside a comfortable line length — and a page with no dead track on it.
 
-   docs/POST_PAGE_LAYOUT.md carries the measured track widths and the
-   reasoning; tests/frontend/article-layout.test.ts pins the numbers. */
+   The block cannot drift, because it is not written down: it is the sum of
+   its parts. Change `--text-w` or `--rail-w` and the block follows.
+
+   docs/POST_PAGE_LAYOUT.md carries the measured widths and the reasoning;
+   tests/design/article-layout.test.ts recomputes them from this file. */
 
 .article__shell {
-  /* One source of truth for the tracks. Each breakpoint below changes only
-     `--shell` and `--gap`, and `--bleed` follows from them, so a change to the
-     block width cannot leave the figures reaching the wrong distance. */
-  --shell: var(--maxw);
-  --gap: 2.5rem;
-  --text-w: 42rem;
+  --gap: 3rem;
+  --text-w: 44rem;
   --rail-w: 300px;
-  --notes-gap: 2rem;
-  /* How far a figure may reach past the text column: the gap in front of the
-     notes margin, plus the margin. Zero until there is a rail to make room. */
-  --bleed: 0px;
-  --notes-w: calc(var(--bleed) - var(--notes-gap));
+  --pad: 1.5rem;
+  /* Text, rail, the gap between them, and the padding either side. */
+  --shell: calc(var(--text-w) + var(--gap) + var(--rail-w) + var(--pad) * 2);
 
   width: 100%;
   max-width: var(--shell);
   margin: 0 auto;
-  padding: 0 1.5rem;
+  padding: 0 var(--pad);
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   column-gap: var(--gap);
@@ -3184,20 +3190,9 @@ ol.feature-list__items .feature-list__title::before {
   min-width: 0;
 }
 
-.article__reading > * {
-  max-width: var(--text-w);
-  margin-inline: auto;
-}
-
-/* The featured figure stays at the text width, but its box reaches into the
-   notes margin so the caption has somewhere to hang. The cap is on the
-   wrapper `FadeIn` renders, which is what is actually a child of the grid. */
-.article__reading > .article__figure-frame {
-  max-width: calc(var(--text-w) + var(--bleed));
-}
-
-/* Title and featured image, stacked until there is room to set them side by
-   side. Below 1280 this is the header the template always had. */
+/* Below the rail breakpoint the column centres in whatever width there is.
+   From 1280 the track is the measure, so there is nothing left to centre. */
+.article__reading > *,
 .article__hero > * {
   max-width: var(--text-w);
   margin-inline: auto;
@@ -3208,27 +3203,14 @@ ol.feature-list__items .feature-list__title::before {
   min-width: 0;
 }
 
-/* Nothing widens below 1280. An earlier pass let media widen symmetrically
-   there too, and it was wrong twice over: an over-constrained block with
-   `margin-inline: auto` is not centred — CSS 2.1 §10.3.3 makes both margins
-   zero, so it hangs off one side — and `100vw`, the only way to know the
-   viewport from inside the column, counts the scrollbar Chromium then takes
-   away. Both were visible as a horizontally scrolling page at 800px. The
-   widths from 1280 up are exact instead: the block is capped below its own
-   breakpoint at every step, so each track is a fixed number. */
-
 @media (min-width: 80rem) {
   .article__shell {
-    --shell: 76rem;
-    --bleed: calc(
-      var(--shell) - 3rem - var(--rail-w) - var(--gap) - var(--text-w)
-    );
-
     grid-template-columns: minmax(0, 1fr) var(--rail-w);
   }
 
-  /* Pinned left. Everything the page gained is now on the right of the text. */
-  .article__reading > * {
+  .article__reading > *,
+  .article__hero > * {
+    max-width: none;
     margin-inline: 0;
   }
 
@@ -3236,103 +3218,30 @@ ol.feature-list__items .feature-list__title::before {
     display: block;
   }
 
-  /* The split hero: title on the measure, image in what is left of the block.
-     It spans both tracks, so the rail starts level with the body rather than
-     with the title — which is also where docs/ADVERTISING.md wants the first
-     rail slot to begin, below the hero and clear of the LCP element.
+  /* The split hero spans both tracks, so the rail starts level with the body
+     rather than with the title — which is also where docs/ADVERTISING.md wants
+     the first rail slot to begin, below the hero and clear of the LCP element.
 
-     The image is 456px at 1280, 608px at 1440 and 768px from 1600 — narrower
-     than the reading column at the first two, which is where recovering the
-     vertical space and shrinking the LCP element are the same change. */
+     The columns are a ratio rather than the measure and the remainder: with
+     the block now only as wide as the text and the rail, "the remainder" would
+     leave the featured image the width of the rail. At 1.2fr to 1fr the title
+     takes 548px and the image 456px, and because the block is one width at
+     every desktop size, so are they. */
   .article__hero {
     grid-column: 1 / -1;
     display: grid;
-    grid-template-columns: var(--text-w) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
     column-gap: var(--gap);
     align-items: center;
     margin-bottom: 3rem;
-  }
-
-  .article__hero > * {
-    max-width: none;
-    margin-inline: 0;
   }
 
   .article__hero .article__header {
     margin-bottom: 0;
   }
 
-  /* No notes margin up here to hang a caption in — the rail is beside the
-     hero, not the text — so the credit sits under the image as it always did. */
   .article__hero .article__figure {
-    display: block;
     margin-bottom: 0;
-  }
-
-  .prose > .module--gallery,
-  .prose > .module--table,
-  .prose > .kg-width-wide,
-  .prose > .kg-width-full,
-  .prose > .kg-gallery-card {
-    width: calc(100% + var(--bleed));
-    margin-inline: 0;
-  }
-
-  /* A caption hangs in the notes margin beside its image rather than sitting
-     underneath it. The figure becomes a two-track grid, so the row is as tall
-     as the taller of image and caption and a long caption cannot overlap the
-     paragraph below.
-
-     `:not(.module)` keeps this to plain image figures — the migrated Ghost
-     image cards and the featured image. A block that renders a figure of its
-     own (pull quote, embed, gallery, comparison) has a layout already. */
-  .article__figure,
-  .prose > figure:not(.module) {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) var(--notes-gap) var(--notes-w);
-    align-items: start;
-  }
-
-  .prose > figure:not(.module) {
-    width: calc(100% + var(--bleed));
-  }
-
-  .article__figure > *,
-  .prose > figure:not(.module) > * {
-    grid-column: 1;
-  }
-
-  .article__figure > figcaption,
-  .prose > figure:not(.module) > figcaption {
-    grid-column: 3;
-    margin-top: 0;
-  }
-
-  /* A figure that bleeds has spent the margin it would have hung a caption in,
-     so that caption goes back underneath, held to the text width. */
-  .prose > figure.kg-width-wide,
-  .prose > figure.kg-width-full {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .prose > figure.kg-width-wide > figcaption,
-  .prose > figure.kg-width-full > figcaption {
-    grid-column: 1;
-    margin-top: 0.7rem;
-    max-width: var(--text-w);
-  }
-}
-
-@media (min-width: 90rem) {
-  .article__shell {
-    --shell: 86rem;
-    --gap: 3rem;
-  }
-}
-
-@media (min-width: 100rem) {
-  .article__shell {
-    --shell: 96rem;
   }
 }
 
@@ -3418,13 +3327,38 @@ ol.feature-list__items .feature-list__title::before {
   font-variant-numeric: tabular-nums;
 }
 
-/* The last module sticks, so the rail keeps a presence through a long read
-   rather than running out a screen in. `--masthead-h` is the bar's height: it
-   hides on scroll down and returns on scroll up (motion/scroll-header.tsx), so
-   this clears it when it is there and is merely generous when it is not. */
-.rail__sticky {
-  position: sticky;
-  top: calc(var(--masthead-h) + 1rem);
+/* Space kept for a square unit above "More on this", per docs/ADVERTISING.md
+   §8. It renders empty until there is an ad layer to fill it — the reservation
+   is the point, so that turning ads on is a fill rather than a re-layout, and
+   so the rail is designed around the height it will actually have. */
+.rail__slot {
+  min-height: 250px;
+  margin-bottom: 2.5rem;
+}
+
+/* The ad slot, the related pieces and the newsletter travel together and stay
+   with the reader for the rest of the scroll. `--masthead-h` is the bar's
+   height: it hides on scroll down and returns on scroll up
+   (motion/scroll-header.tsx), so this clears it when it is there and is merely
+   generous when it is not.
+
+   Only where the viewport can show the whole group. A sticky box taller than
+   the screen pins its top and hangs its bottom off the end, and the part
+   underneath can never be scrolled to — the newsletter card would be
+   permanently out of reach on a 768px laptop. The group is about 700px with
+   the slot filled, so 820px of viewport is where it starts being safe; below
+   that the rail scrolls with the page, which is what it did before. */
+@media (min-height: 820px) {
+  .rail__sticky {
+    position: sticky;
+    top: calc(var(--masthead-h) + 1rem);
+  }
+}
+
+/* The last module in the group carries no bottom margin of its own, so the
+   sticky box is exactly as tall as its content. */
+.rail__sticky > .rail__mod:last-child {
+  margin-bottom: 0;
 }
 
 .rail__signup {

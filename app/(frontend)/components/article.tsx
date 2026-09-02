@@ -17,24 +17,24 @@ import { StaggerChildren, StaggerItem } from './motion/stagger'
 
 /**
  * The featured image is the LCP element on this template — `priority` below
- * says so — and in the split hero it is narrower than the reading column
- * rather than wider: 456px at 1280, 608px at 1440, 768px from 1600. Those are
- * the second track of `.article__hero` in `app/globals.css`, and
- * tests/design/article-layout.test.ts recomputes them from the stylesheet so
- * this string cannot quietly stop describing the box it fills.
+ * says so — and in the split hero it is 456px, narrower than the reading
+ * column rather than wider. One number, because the block is one width at
+ * every desktop size. That is the second track of `.article__hero` in
+ * `app/globals.css`, and tests/design/article-layout.test.ts recomputes it
+ * from the stylesheet so this string cannot quietly stop describing the box it
+ * fills.
  */
 const FIGURE_SIZES =
-  '(max-width: 47rem) 100vw, (max-width: 79.99rem) 42rem, (max-width: 89.99rem) 456px, (max-width: 99.99rem) 608px, 768px'
+  '(max-width: 47rem) 100vw, (max-width: 79.99rem) 44rem, 456px'
 
 /**
- * A post, in three tracks under a split hero.
+ * A post, in two tracks under a split hero.
  *
- * The reading column keeps its measure and is pinned to the left of the block
- * from 1280 up; the space that used to sit empty either side of it becomes a
- * notes margin that captions hang in, and a rail beside that. Above both, the
- * title and the featured image sit side by side rather than stacked, which
- * brings the first paragraph roughly 440px further up the page and, at 1280
- * and 1440, makes the LCP element smaller than the column it replaced.
+ * The reading column runs at 704px from 1280 up with a 300px rail beside it,
+ * and the block is exactly as wide as the two of them — so no track on the
+ * page is empty. Above both, the title and the featured image sit side by side
+ * rather than stacked, which brings the first paragraph roughly 440px further
+ * up the page and makes the LCP element smaller than the column it replaced.
  *
  * The grid is in `app/globals.css` under "Article layout", and
  * `docs/POST_PAGE_LAYOUT.md` has the measured widths and why the text column

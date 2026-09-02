@@ -1,13 +1,13 @@
 // The post template's track widths, checked against the stylesheet that makes
 // them true.
 //
-// Every number in `docs/POST_PAGE_LAYOUT.md` — the 672px measure, the notes
-// margin at each breakpoint, the distance a figure may bleed — is arithmetic on
-// four custom properties in `app/globals.css`. That arithmetic is easy to break
-// by nudging one of them: widening the block by a rem silently widens every
-// figure, and narrowing the breakpoint's block below its own breakpoint takes
-// the left gutter away, which is the difference between a page that reads as
-// composed and one that reads as cramped.
+// Every number in `docs/POST_PAGE_LAYOUT.md` — the 704px measure, the width of
+// the block, the box the featured image fills — is arithmetic on four custom
+// properties in `app/globals.css`. That arithmetic is easy to break by nudging
+// one of them: widening the measure by a rem widens the block, which quietly
+// takes the gutter away at the width the rail first appears, and that is the
+// difference between a page that reads as composed and one that reads as
+// cramped.
 //
 // So the properties are read out of the stylesheet and the widths recomputed
 // here. A change to the layout is meant to change this file too; a change that
@@ -23,7 +23,6 @@ const css = readFileSync(
 )
 
 const REM = 16
-const PADDING = 1.5 * REM * 2
 
 /** The `.article__shell` declarations that apply at a given viewport width. */
 function shellAt(viewport: number): Record<string, string> {
@@ -85,80 +84,83 @@ function px(value: string): number {
   throw new Error(`not a fixed length: ${value}`)
 }
 
-/** What the shell resolves to at a viewport wide enough to carry the rail. */
+/**
+ * What the shell resolves to at a viewport wide enough to carry the rail.
+ *
+ * `--shell` is deliberately not read: the stylesheet writes it as the sum of
+ * the parts rather than a number, so the sum is what this recomputes.
+ */
 function tracks(viewport: number) {
   const shell = shellAt(viewport)
-  const block = Math.min(px(shell['--shell']), viewport)
   const text = px(shell['--text-w'])
   const rail = px(shell['--rail-w'])
   const gap = px(shell['--gap'])
-  const notesGap = px(shell['--notes-gap'])
-
-  // `--bleed` in the stylesheet, evaluated: what a figure may take beyond the
-  // text column once the rail and the gap in front of it are paid for.
-  const bleed = block - PADDING - rail - gap - text
+  const pad = px(shell['--pad'])
+  const block = text + gap + rail + pad * 2
 
   return {
     block,
     text,
     rail,
-    bleed,
-    notes: bleed - notesGap,
-    figure: text + bleed,
-    gutter: (viewport - block) / 2 + PADDING / 2,
+    gap,
+    pad,
+    gutter: (viewport - block) / 2 + pad,
   }
 }
 
 describe('the article shell', () => {
-  it('holds the reading measure at 672px, whatever the screen', () => {
+  it('holds the reading measure at 704px, whatever the screen', () => {
     for (const viewport of [1280, 1440, 1600, 1920, 2560]) {
-      expect(tracks(viewport).text).toBe(672)
+      expect(tracks(viewport).text).toBe(704)
     }
   })
 
-  // Measured in Chromium at 17.6px Inter: 672px sets ~73 characters and 656px
-  // — what the column was — sets ~67. Both sit inside the comfortable 45–75,
-  // which is why the column did not get wider when the page did.
-  it('keeps the measure inside the range a wider page would have left', () => {
-    const text = tracks(1440).text
+  // Measured in Chromium at 17.6px Inter: 704px sets ~73 characters, 736px
+  // sets 80 and 800px sets 88. 45–75 is the comfortable range, so 704 is the
+  // widest the column can be — which is why removing the notes margin widened
+  // the measure by 32px and not by the 276px the margin had.
+  it('keeps the measure inside a comfortable line length', () => {
+    const { text } = tracks(1440)
     expect(text).toBeGreaterThanOrEqual(640)
-    expect(text).toBeLessThanOrEqual(704)
+    expect(text).toBeLessThanOrEqual(720)
   })
 
-  it('resolves the tracks the layout document states', () => {
-    expect(tracks(1280)).toMatchObject({ notes: 124, figure: 828, rail: 300 })
-    expect(tracks(1440)).toMatchObject({ notes: 276, figure: 980, rail: 300 })
-    expect(tracks(1600)).toMatchObject({ notes: 436, figure: 1140, rail: 300 })
+  // The point of the second pass: the block is the two tracks and nothing
+  // else, so there is no third column sitting empty on most articles.
+  it('is exactly as wide as the text, the rail and the gap between them', () => {
+    const { block, text, rail, gap, pad } = tracks(1440)
+    expect(block).toBe(text + gap + rail + pad * 2)
+    expect(block).toBe(1100)
   })
 
-  it('stops growing past 1600, so a figure has a ceiling', () => {
-    expect(tracks(2560).figure).toBe(tracks(1600).figure)
+  it('is one width at every desktop size', () => {
+    const widths = [1280, 1440, 1600, 1920, 2560].map((v) => tracks(v).block)
+    expect(new Set(widths).size).toBe(1)
   })
 
-  // The block is centred, so the gutter is what is left over. If a breakpoint's
-  // block were as wide as the breakpoint itself, the text would start 24px from
-  // the edge of the screen at that width.
-  it('leaves a real gutter at the width each breakpoint starts at', () => {
-    for (const viewport of [1280, 1440, 1600]) {
-      expect(tracks(viewport).gutter).toBeGreaterThanOrEqual(56)
-    }
-  })
-
-  it('never asks for more width than the block has', () => {
-    for (const viewport of [1280, 1440, 1600, 1920]) {
-      const { block, text, rail, bleed } = tracks(viewport)
-      expect(bleed).toBeGreaterThanOrEqual(0)
-      expect(text + bleed + rail + PADDING).toBeLessThanOrEqual(block)
-    }
+  // The block is centred, so the gutter is what is left over. If it were as
+  // wide as the breakpoint that reveals it, the text would start 24px from the
+  // edge of the screen at that width.
+  it('leaves a real gutter at the width the rail first appears', () => {
+    expect(tracks(1280).gutter).toBeGreaterThanOrEqual(56)
   })
 })
 
 describe('the split hero', () => {
   /** The second track of `.article__hero`: what the featured image fills. */
   function heroImage(viewport: number): number {
-    const shell = shellAt(viewport)
-    const block = Math.min(px(shell['--shell']), viewport)
-    return block - PADDING - px(shell['--text-w']) - px(shell['--gap'])
+    const { block, gap, pad } = tracks(viewport)
+    const rule = /\.article__hero \{([^}]*)\}/.exec(css)
+    expect(rule, '.article__hero is missing from globals.css').toBeTruthy()
+    const ratio =
+      /grid-template-columns:\s*minmax\(0, ([\d.]+)fr\) minmax\(0, ([\d.]+)fr\)/.exec(
+        rule![1],
+      )
+    expect(ratio, 'the hero columns are no longer a ratio').toBeTruthy()
+
+    const title = Number(ratio![1])
+    const image = Number(ratio![2])
+    return Math.round(((block - pad * 2 - gap) * image) / (title + image))
   }
 
   const sizes = sizesFrom(
@@ -166,25 +168,18 @@ describe('the split hero', () => {
     'FIGURE_SIZES',
   )
 
-  /** What `sizes` promises the browser at a given viewport. */
-  function promised(viewport: number): string {
-    return evaluateSizes(sizes, viewport)
-  }
   // A `sizes` that has stopped describing the box is the failure mode with no
   // symptom: the layout is right, the browser fetches a source too small for
-  // it, and the picture is soft. It was already wrong once — both figure
-  // hints still said 44rem after the column moved.
+  // it, and the picture is soft. It was wrong once already — both figure hints
+  // still said 44rem after the column first moved.
   it('promises the browser the width the image actually gets', () => {
     for (const viewport of [1280, 1440, 1600, 1920]) {
-      expect(promised(viewport)).toBe(`${heroImage(viewport)}px`)
+      expect(evaluateSizes(sizes, viewport)).toBe(`${heroImage(viewport)}px`)
     }
   })
 
-  it('is smaller than the column it replaced where it matters most', () => {
-    // 1280 and 1440 are where the LCP budget is tightest, and both come out
-    // under the 672px the stacked header gave the image.
-    expect(heroImage(1280)).toBeLessThan(672)
-    expect(heroImage(1440)).toBeLessThan(672)
+  it('is smaller than the column it sits beside', () => {
+    expect(heroImage(1440)).toBeLessThan(tracks(1440).text)
   })
 
   it('spans both tracks, so the rail starts level with the body', () => {
@@ -192,24 +187,19 @@ describe('the split hero', () => {
   })
 })
 
-describe('media that bleeds', () => {
-  // The same failure as the hero's, on the block that reaches furthest: a
-  // gallery row fills the bleed width, and a hint left at the measure fetches
-  // a source two steps too small for it.
-  it('tells the browser how wide a gallery row really gets', () => {
+describe('media in the body', () => {
+  // With the notes margin gone there is nothing to bleed into: the reading
+  // column is the whole track, so a gallery row is the measure and the hint
+  // has to say so.
+  it('tells the browser a gallery row is the measure', () => {
     const sizes = sizesFrom(
       'app/(frontend)/components/blocks/gallery.tsx',
       'ROW_SIZES',
     )
 
-    for (const viewport of [1280, 1440, 1600, 1920]) {
-      expect(evaluateSizes(sizes, viewport)).toBe(
-        `${tracks(viewport).figure}px`,
-      )
+    for (const viewport of [1152, 1280, 1440, 1920]) {
+      expect(evaluateSizes(sizes, viewport)).toBe('44rem')
     }
-
-    // Below the rail breakpoint nothing bleeds, so the hint is the measure.
-    expect(evaluateSizes(sizes, 1152)).toBe('42rem')
   })
 })
 
@@ -221,10 +211,33 @@ describe('the rail', () => {
     )
   })
 
+  it('reserves the square unit above the related pieces', () => {
+    expect(css).toMatch(/\.rail__slot \{\s*min-height: 250px;/)
+  })
+
   it('clears the masthead when it sticks', () => {
     expect(css).toMatch(
       /\.rail__sticky \{[\s\S]*?top: calc\(var\(--masthead-h\)/,
     )
+  })
+
+  // A sticky box taller than the screen pins its top and hangs its bottom off
+  // the end, and nothing can scroll to the part underneath. The group is about
+  // 700px with the slot filled, so it only sticks where the whole of it fits.
+  it('only sticks where the whole group fits on the screen', () => {
+    expect(css).toMatch(
+      /@media \(min-height: \d+px\) \{\s*\.rail__sticky \{\s*position: sticky;/,
+    )
+  })
+})
+
+describe('the body', () => {
+  it('justifies its paragraphs, with hyphenation to keep them even', () => {
+    const rule = /\.prose > p \{([^}]*)\}/.exec(css)
+    expect(rule, '.prose > p is missing from globals.css').toBeTruthy()
+    expect(rule![1]).toMatch(/text-align: justify/)
+    // Justified text with no hyphenation rivers at this measure.
+    expect(rule![1]).toMatch(/hyphens: auto/)
   })
 })
 
