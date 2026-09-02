@@ -83,11 +83,16 @@ newsletter card. The group travels with the reader for the rest of the scroll;
 the contents list does not, because a reader below the sections it names is
 done with it.
 
-The group only sticks where the whole of it fits on the screen —
-`@media (min-height: 820px)`. A sticky box taller than the viewport pins its
-top and hangs its bottom off the end, and nothing can scroll to the part
-underneath: the newsletter card would be permanently unreachable on a 768px
-laptop.
+The group is capped at the height of the space it pins into and scrolls inside
+itself if it ever exceeds it, which is what keeps a sticky box from hanging its
+bottom off the screen where nothing can reach it. On a window taller than about
+860px the cap never binds and no scrollbar appears.
+
+That cap replaced a `@media (min-height: 820px)` guard, which was the same
+protection done badly: the group is about 700px tall, a laptop at 1440×900 has
+roughly 800px of viewport once browser chrome is taken off, and a window that
+is not maximised has less — so on most screens there was no sticky at all and
+it looked like the feature had never been built.
 
 ## Decisions worth not relitigating
 
@@ -115,6 +120,12 @@ the text against the edge of the screen.
 reaches a phone another way — the related posts through "Read next", the
 newsletter through the band — and it carries no thumbnails, because a hidden
 `<img>` is still a download on the device least able to afford one.
+
+**The hero is top-aligned.** Centred, the featured image starts below the title
+and its credit line finishes level with the rule above the byline — near enough
+to read as a misalignment rather than a choice. Aligned to the top, the image
+and its credit both sit clear above that rule and the two columns start
+together.
 
 **The hero's columns are a ratio, not the measure and the remainder.** With the
 block only as wide as the text and the rail, "the remainder" would have left
@@ -172,6 +183,6 @@ content before believing a change here:
 1. A migrated Ghost post with figures, a wide card and a gallery, at 1280 and
    1440 — the archive is most of the site, and it is the content this grid has
    to hold rather than the seeded examples.
-2. A short viewport. 1280×800 and 1366×768 are where the sticky group stops
-   sticking, and the rail should read as ordinary flow there rather than as
-   something half-applied.
+2. A short viewport. 1280×800 and 1366×768 are where the sticky group's height
+   cap starts to bind, and it should scroll inside itself rather than lose the
+   newsletter card off the bottom of the screen.

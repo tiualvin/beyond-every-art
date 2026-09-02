@@ -3232,7 +3232,12 @@ ol.feature-list__items .feature-list__title::before {
     display: grid;
     grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
     column-gap: var(--gap);
-    align-items: center;
+    /* Top-aligned, not centred. Centring floats the image against nothing: it
+       starts below the title and its credit line finishes level with the rule
+       above the byline, which reads as a misalignment rather than a choice.
+       Aligned to the top, the image and its credit both sit clear above that
+       rule and the two columns start together. */
+    align-items: start;
     margin-bottom: 3rem;
   }
 
@@ -3342,17 +3347,25 @@ ol.feature-list__items .feature-list__title::before {
    (motion/scroll-header.tsx), so this clears it when it is there and is merely
    generous when it is not.
 
-   Only where the viewport can show the whole group. A sticky box taller than
-   the screen pins its top and hangs its bottom off the end, and the part
-   underneath can never be scrolled to — the newsletter card would be
-   permanently out of reach on a 768px laptop. The group is about 700px with
-   the slot filled, so 820px of viewport is where it starts being safe; below
-   that the rail scrolls with the page, which is what it did before. */
-@media (min-height: 820px) {
-  .rail__sticky {
-    position: sticky;
-    top: calc(var(--masthead-h) + 1rem);
-  }
+   This was behind `@media (min-height: 820px)` and the guard was the bug. The
+   group is about 700px tall, so any window shorter than that — a laptop at
+   1440×900 has roughly 800px of viewport once browser chrome is taken off, and
+   a window that is not maximised has less — got no sticky at all, which is
+   most windows. It looked like the feature had simply not been built.
+
+   The guard was there because a sticky box taller than the space it pins into
+   hangs its bottom off the screen where nothing can scroll to it. The height
+   cap below closes that properly: on a tall window it never binds, and on a
+   short one the group scrolls inside itself rather than losing the newsletter
+   card off the end. `dvh` second so a browser without it keeps the `vh` rule. */
+.rail__sticky {
+  position: sticky;
+  top: calc(var(--masthead-h) + 1rem);
+  max-height: calc(100vh - var(--masthead-h) - 2rem);
+  max-height: calc(100dvh - var(--masthead-h) - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
 }
 
 /* The last module in the group carries no bottom margin of its own, so the
