@@ -15,6 +15,14 @@ For post-migration website design work, also read
 the supplied desktop and mobile concepts as a directional brief, not as approval
 to redesign during Phase 1.
 
+[`docs/POST_PAGE_LAYOUT.md`](docs/POST_PAGE_LAYOUT.md) records what the post
+template does with the width of a desktop screen: three tracks, the measured
+width of each, and why the reading measure did not get any wider when the page
+did. Read it before touching `.article__shell`, the notes margin, or any
+`sizes` hint on that template — the widths are recomputed from the stylesheet
+by `tests/design/article-layout.test.ts`, so a change made in one place and not
+the other fails rather than drifts.
+
 [`docs/PUBLICATION_SYSTEM.md`](docs/PUBLICATION_SYSTEM.md) records the planned
 self-hosted digital publication system—the `/publication` archive, issue landing
 pages, the full-screen reader, PDF processing worker, interactive hotspots,
