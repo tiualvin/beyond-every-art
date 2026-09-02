@@ -8,19 +8,12 @@ import { toMediaImage } from '@/lib/content/media'
 // a wide screen. Stated so the browser does not download a full-width file to
 // paint a thumbnail.
 //
-// A gallery is one of the blocks allowed out of the text column, so the widths
-// past 1280 are the bleed widths from `app/globals.css`, not the measure: 828
-// at 1280, 980 at 1440, 1140 at 1600 and above. A `sizes` still claiming 44rem
-// would have the browser fetch the 750w source for a 1140px frame and upscale
-// it — soft, on exactly the material photography this site is about.
-//
-// The breakpoints are a hundredth under the stylesheet's, because a `sizes`
-// clause is `max-width` and the layout's query is `min-width`: written as the
-// same number, both match at exactly 1280 and the hint describes the layout
-// the page has just stopped using.
-const GRID_SIZES = '(max-width: 40rem) 50vw, (max-width: 64rem) 33vw, 24rem'
-const ROW_SIZES =
-  '(max-width: 47rem) 100vw, (max-width: 79.99rem) 42rem, (max-width: 89.99rem) 828px, (max-width: 99.99rem) 980px, 1140px'
+// A row fills the reading column and stops there: with the notes margin gone
+// the column is the whole track, so 44rem is both the measure and the widest a
+// gallery ever gets. tests/design/article-layout.test.ts checks that against
+// the stylesheet rather than trusting this comment.
+const GRID_SIZES = '(max-width: 40rem) 50vw, (max-width: 64rem) 33vw, 22rem'
+const ROW_SIZES = '(max-width: 47rem) 100vw, 44rem'
 
 function toLayout(value: GalleryData['layout']): GalleryLayout {
   return GALLERY_LAYOUTS.includes(value as GalleryLayout)
