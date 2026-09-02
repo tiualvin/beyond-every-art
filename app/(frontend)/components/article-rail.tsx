@@ -24,6 +24,11 @@ const MIN_TOC_ENTRIES = 3
  * once. The contents list stays in flow above it: it belongs to the top of the
  * piece, and a reader below the sections it names is done with it.
  *
+ * The group is taller than a laptop's viewport, so one module in it has to
+ * give. It is the related list — the ad cannot shrink and the newsletter card
+ * is the one thing here a reader is meant to act on. `.rail__related` in
+ * `app/globals.css` is what says so.
+ *
  * No thumbnails, deliberately. The rail is hidden below 1280 rather than
  * reflowed, because everything in it reaches a phone another way — the related
  * posts through "Read next", the newsletter through the band — and a hidden
@@ -69,8 +74,12 @@ export function ArticleRail({
             turning ads on is a fill rather than a re-layout. */}
         <div className="rail__slot" aria-hidden="true" />
 
+        {/* The elastic module. The ad keeps its 250px and the newsletter card
+            keeps its height; on a window too short for all three, this list
+            is what shrinks and scrolls, so the card a reader is meant to act
+            on is never the thing that falls off the bottom. */}
         {related.length > 0 && (
-          <div className="rail__mod">
+          <div className="rail__mod rail__related">
             <p className="rail__label" id="rail-related">
               More on this
             </p>
