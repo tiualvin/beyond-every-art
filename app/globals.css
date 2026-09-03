@@ -3342,7 +3342,7 @@ ol.feature-list__items .feature-list__title::before {
    list, and those 16px were also 16px the newsletter card did not have. */
 .rail__slot {
   min-height: 250px;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 
 /* The ad slot, the related pieces and the newsletter travel together and stay
@@ -3374,14 +3374,21 @@ ol.feature-list__items .feature-list__title::before {
    hold even the ad and the card. */
 .rail__sticky {
   position: sticky;
-  top: calc(var(--masthead-h) + 1rem);
-  max-height: calc(100vh - var(--masthead-h) - 2rem);
-  max-height: calc(100dvh - var(--masthead-h) - 2rem);
+  top: calc(var(--masthead-h) + 0.75rem);
+  max-height: calc(100vh - var(--masthead-h) - 1.5rem);
+  max-height: calc(100dvh - var(--masthead-h) - 1.5rem);
   display: flex;
   flex-direction: column;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
+}
+
+/* The group runs to a tighter rhythm than the rail above it. Every pixel here
+   is a pixel the related list gets on a short window, and the modules read as
+   one block rather than three when they are travelling together anyway. */
+.rail__sticky > .rail__mod {
+  margin-bottom: 1.5rem;
 }
 
 /* Everything in the group holds its height... */
@@ -3410,15 +3417,23 @@ ol.feature-list__items .feature-list__title::before {
 }
 
 /* Past a point shrinking stops being graceful. The fixed parts of the group —
-   the 250px unit, its gap, the label, and the newsletter card — come to 537px,
-   so under about 700px of viewport the list is a 15px window under a heading,
-   which reads as broken rather than tight. It is dropped instead: the related
+   the 250px unit, its gap, the label, and the newsletter card — come to 500px
+   against a cap of the viewport less 100, so under 650px of viewport the list
+   has nothing whole left to show and becomes a sliver under a heading, which
+   reads as broken rather than tight. It is dropped there instead: the related
    pieces close the article on every device, so nothing here is only here.
+
+   650 and not 700. The first version of this guard cost 50px more, which put
+   the cutoff above a large share of real windows — a laptop with a bookmarks
+   bar sits just under 700 — and the module simply vanished for them. The
+   spacing above was tightened to buy that back rather than the threshold being
+   moved on its own: 649 is now a window that genuinely cannot hold the module,
+   not one that was merely close.
 
    This is a `max-height`, not the `min-height` guard it replaced upstream. That
    one turned the sticky group off entirely on most windows; this one drops one
    supplementary module on the windows that provably cannot hold it. */
-@media (max-height: 700px) {
+@media (max-height: 649px) {
   .rail__sticky > .rail__related {
     display: none;
   }
@@ -3434,11 +3449,11 @@ ol.feature-list__items .feature-list__title::before {
   background: var(--color-surface);
   border: 1px solid var(--color-line);
   border-radius: var(--radius);
-  padding: 1.1rem;
+  padding: 0.9rem;
 }
 
 .rail__signup p {
-  margin: 0 0 0.9rem;
+  margin: 0 0 0.75rem;
   font-size: 0.85rem;
   line-height: 1.5;
   color: var(--color-muted);

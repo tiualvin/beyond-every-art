@@ -294,14 +294,33 @@ describe('the rail', () => {
     expect(list![1]).toMatch(/overflow-y: auto/)
   })
 
-  // Under about 700px of viewport the list is a 15px window under a heading,
-  // which reads as broken rather than tight. Note this is a `max-height`: it
-  // drops one supplementary module on the windows that cannot hold it, where
-  // the `min-height` guard above turned the whole feature off on most windows.
+  // Under 650px of viewport the list has nothing whole left to show and becomes
+  // a sliver under a heading, which reads as broken rather than tight. Note
+  // this is a `max-height`: it drops one supplementary module on the windows
+  // that cannot hold it, where the `min-height` guard above turned the whole
+  // feature off on most windows.
   it('drops the list rather than showing a sliver of it', () => {
     expect(css).toMatch(
-      /@media \(max-height: 700px\) \{\s*\.rail__sticky > \.rail__related \{\s*display: none;/,
+      /@media \(max-height: \d+px\) \{\s*\.rail__sticky > \.rail__related \{\s*display: none;/,
     )
+  })
+
+  // The threshold is the thing that goes wrong quietly. It shipped at 700px,
+  // which is above a large share of real windows — a laptop with a bookmarks
+  // bar sits just under it — so the module vanished for them and looked like a
+  // bug rather than a decision. Measured in Chromium against the current
+  // spacing, one whole related item survives to 650. A threshold above that is
+  // hiding the module from windows that could have held it.
+  it('hides the list only where the geometry says it cannot fit', () => {
+    const guard =
+      /@media \(max-height: (\d+)px\) \{\s*\.rail__sticky > \.rail__related/.exec(
+        css,
+      )
+    expect(
+      guard,
+      'the short-window guard is missing from globals.css',
+    ).toBeTruthy()
+    expect(Number(guard![1])).toBeLessThanOrEqual(650)
   })
 
   // The elastic module is the related one, and the stylesheet can only know
