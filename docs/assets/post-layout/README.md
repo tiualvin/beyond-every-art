@@ -44,9 +44,15 @@ is the rail and a slice of the column beside it.
 | ![The rail before: a 290px empty band, then all three related pieces, then the newsletter card cut through the middle of its Join the list button by the bottom of the screen.](rail-before-1440x800.jpg) | ![The rail after: a 250px band, two related pieces and part of a third in a list that scrolls, and the whole newsletter card — heading, line of copy and button — clear of the bottom of the screen.](rail-after-1440x800.jpg) |
 
 800px of viewport is a 1440x900 laptop with the browser chrome taken off. The
-group is 737px before and the cap is 692px, so 45px of it had nowhere to go —
-and the card, being last, is what went. After, the related list is the only
-module that may shrink, so it absorbs the 45px and the card stays whole.
+group was 737px before and the cap 692px, so 45px of it had nowhere to go — and
+the card, being last, is what went.
+
+After, two things changed. The related list is the only module allowed to
+shrink, so the card can no longer be the thing that gives; and the group's
+spacing was tightened by 37px, which is why at this height nothing has to give
+at all — the group is 686px against a 700px cap, so all three pieces and the
+whole card fit with no scrolling. On a shorter window the list is what absorbs
+the difference, down to 650px of viewport where it is dropped instead.
 
 ## 390
 
