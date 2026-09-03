@@ -3,6 +3,7 @@ import Link from 'next/link'
 import type { NavLink } from '@/lib/content/queries'
 import { APPS_PATH, JOURNAL_PATH, NEWSLETTER_PATH } from '@/lib/seo/site'
 
+import { BrandLockup } from './logo'
 import { ScrollHeader } from './motion/scroll-header'
 import { SiteChrome } from './site-chrome'
 
@@ -31,8 +32,12 @@ export function SiteHeader({
     <ScrollHeader>
       <header className="site-header">
         <div className="container site-header__inner">
-          <Link href="/" className="brand">
-            {siteTitle}
+          <Link
+            href="/"
+            className="brand brand--lockup"
+            aria-label={`${siteTitle} — home`}
+          >
+            <BrandLockup siteTitle={siteTitle} />
           </Link>
           <nav className="site-nav" aria-label="Primary">
             {nav.map((link) => (

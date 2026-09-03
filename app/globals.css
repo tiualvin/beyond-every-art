@@ -10,6 +10,12 @@
   --color-on-dark: #f3ede4;
   --color-line: #e4ddd2;
   --color-rule: color-mix(in srgb, var(--color-ink) 26%, var(--color-paper));
+  /* The mark's ink, a separate token rather than a reuse of the burgundy above:
+     the logo is a deeper, more saturated red than the interface accent, and
+     repainting it to match would be redrawing the identity to suit the site
+     rather than the other way round. The wordmark is set in it flat; the mark
+     itself carries the gradient it is drawn with (`lib/design/logo.ts`). */
+  --color-logo-ink: #7a0206;
 
   /* Type — expressive serif display paired with a restrained sans. */
   --font-serif: var(--font-playfair), Georgia, 'Times New Roman', serif;
@@ -299,6 +305,38 @@ img {
   text-transform: uppercase;
 }
 
+/* The masthead lockup: the mark, then the site's name as the wordmark.
+   `--masthead-h` is a fixed number the search drawer and the mobile menu are
+   positioned against, so the lockup is sized to stay inside the height the
+   subscribe button already sets — 1.6rem of mark against a 1rem wordmark, the
+   proportion the supplied artwork is drawn at, is a little over half of it. */
+.brand--lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color-logo-ink);
+}
+
+.brand__mark {
+  /* The drawing is wider than it is tall and its viewBox is cropped to the ink,
+     so height alone sizes it and the aspect ratio supplies the rest. `block`
+     because an inline SVG otherwise sits on the text baseline and adds the
+     descender gap to the bar's height. */
+  display: block;
+  height: 1.6rem;
+  width: auto;
+  flex-shrink: 0;
+}
+
+.brand__word {
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.005em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .site-nav {
   display: flex;
   gap: 1.5rem;
@@ -504,6 +542,16 @@ img {
 
   .brand {
     font-size: 1rem;
+  }
+
+  /* The phone bar is 3.25rem tall and carries 44px touch targets, so the lockup
+     comes down with it rather than setting the height itself. */
+  .brand__mark {
+    height: 1.35rem;
+  }
+
+  .brand__word {
+    font-size: 0.9rem;
   }
 }
 

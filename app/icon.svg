@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="4 19 498 498" role="img" aria-label="Beyond Every Art">
+  <defs>
+    <linearGradient id="bea-mark-ink" x1="0.05" y1="0.05" x2="0.95" y2="0.95">
+      <stop offset="0" stop-color="#6b0000" />
+      <stop offset="1" stop-color="#8f0409" />
+    </linearGradient>
+  </defs>
+  <path fill="url(#bea-mark-ink)" fill-rule="evenodd" d="M24 456V202A122 122 0 0 1 268 202V240A126 126 0 1 1 356 456ZM48 432V202A98 98 0 0 1 146 104V432ZM170 432V107A98 98 0 0 1 244 202V240A24 24 0 0 0 285 257A102 102 0 0 0 356 432Z" />
+</svg>

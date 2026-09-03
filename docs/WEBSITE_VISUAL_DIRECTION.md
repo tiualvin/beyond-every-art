@@ -63,6 +63,13 @@ warm, tactile, and spacious rather than like a generic SaaS marketing site.
 - A compact editorial masthead carries the Beyond Every Art mark on the left,
   primary navigation across the desktop header, and a high-emphasis burgundy
   consultation call to action on the right.
+- The mark itself — the book whose outer page swells into a heart — is drawn as
+  geometry in [`lib/design/logo.ts`](../lib/design/logo.ts) rather than kept as
+  an image, so the masthead lockup and the tab icons are one drawing. The
+  favicons in `app/` are rendered from it by `pnpm build:icons`. It carries its
+  own reds, deeper than the interface burgundy, exposed to the stylesheet as
+  `--color-logo-ink`; the wordmark beside it stays live text so renaming the
+  publication in Payload renames it here too.
 - The concept navigation includes About, Art & Stories, Services, Collections,
   Journal, and Contact, with Art & Stories and Services shown as expandable
   (dropdown) items. Final labels, destinations, and which items expand must
