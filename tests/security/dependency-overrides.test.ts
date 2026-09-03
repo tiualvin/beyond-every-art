@@ -31,9 +31,12 @@ const OVERRIDES: Record<string, { floor: string; reason: string }> = {
       '@payloadcms/next. Sanitiser bugs reach the admin panel.',
   },
   'fast-uri': {
-    floor: '3.1.5',
+    floor: '3.1.6',
     reason:
-      'Host confusion via backslash authority, via @payloadcms/plugin-mcp.',
+      'Host confusion via backslash authority, plus four more high-severity ' +
+      'fast-uri advisories (IDN canonicalization, IPv6 SSRF, hostname ' +
+      'percent-decoding SSRF, percent-encoded scheme host confusion) all ' +
+      'fixed in 3.1.6, via @payloadcms/plugin-mcp.',
   },
   hono: {
     floor: '4.12.34',
