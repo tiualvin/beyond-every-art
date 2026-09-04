@@ -81,7 +81,10 @@ export async function generateMetadata({
     const canonical =
       page.canonicalURL || absoluteUrl(pagePath(page.slug), siteUrl)
     return {
-      title: page.metaTitle || page.title,
+      // `absolute`, so the layout's ` - Beyond Every Art` suffix is not
+      // appended: Ghost served page titles bare (`About this site`), and a
+      // title the flip rewrites is a changed search result for every page.
+      title: { absolute: page.metaTitle || page.title },
       description: page.metaDescription || undefined,
       alternates: { canonical },
       openGraph: { type: 'website', title: page.title, url: canonical },
@@ -106,7 +109,10 @@ export async function generateMetadata({
       ]
     : undefined
   return {
-    title: post.metaTitle || post.title,
+    // Bare, as Ghost served it. Three of the 113 migrated posts carry a
+    // hand-written ` | beyondeveryart` suffix of their own, which the layout's
+    // template would have doubled.
+    title: { absolute: post.metaTitle || post.title },
     description,
     alternates: { canonical },
     openGraph: {
