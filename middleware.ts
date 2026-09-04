@@ -72,6 +72,29 @@ const previewLimiter = new FixedWindowRateLimiter(
 )
 
 /**
+ * The image optimizer, which was the last public endpoint with no bound at all.
+ *
+ * `/_next/image` runs sharp on demand and fetches from object storage on a miss,
+ * and nothing else covers it: Caddy's `@staffOnly` matcher lists `/api*`,
+ * `/admin*`, `/oauth*` and `/redirects-map*` but not `/_next/*`, and this
+ * middleware excluded it from the matcher deliberately. `lib/security/images.ts`
+ * bounds what one request may *ask for* — one quality, sixteen widths, one path
+ * prefix on one host — but nothing bounded how many could be sent, and a miss
+ * against object storage is a billed operation that is not cached, so each one
+ * was payable again on the next request.
+ *
+ * Generous, because this is on the path of every image a reader sees and a
+ * limit that bites a real visitor is worse than the abuse it prevents. An
+ * article carries perhaps twenty images and the browser caches them, so 240 a
+ * minute is a reader opening a fresh page of thumbnails every few seconds and
+ * still four requests a second below the cap.
+ */
+const imageLimiter = new FixedWindowRateLimiter(
+  configuredLimit('RATE_LIMIT_IMAGE_PER_MINUTE', 240),
+  60_000,
+)
+
+/**
  * The `/api` routes this middleware bounds, matched against the pathname each
  * is served on.
  *
@@ -126,6 +149,23 @@ const redirectMap = new RedirectMapCache({
 })
 
 export async function middleware(request: NextRequest): Promise<NextResponse> {
+  // Matched only so it can be rate limited, and returning here for the same
+  // reason the `/api` routes below do. Returning early also preserves what
+  // already happened: `_next/image` was excluded from the matcher entirely, so
+  // it has never passed through the staging Basic Auth gate, and routing it
+  // through one now would put a credential prompt in front of every image on a
+  // staging deploy.
+  if (request.nextUrl.pathname === '/_next/image') {
+    const allowance = imageLimiter.check(clientKey(request.headers))
+    if (!allowance.allowed) {
+      return NextResponse.json(
+        TOO_MANY_REQUESTS_BODY,
+        tooManyRequestsInit(allowance.resetAt),
+      )
+    }
+    return NextResponse.next()
+  }
+
   // The `/api` routes above are matched only so they can be rate limited. They
   // return here rather than falling through: the Basic Auth gate below has
   // never covered `/api` and enabling it now would answer the admin panel's own
@@ -236,5 +276,11 @@ export const config = {
     // matches, so nothing else in this middleware applies to them.
     '/api/users/:path*',
     '/api/preview/:path*',
+    // The exception to the `_next/image` exclusion above, and the same shape:
+    // matched only to be rate limited, returned from immediately. Listed as the
+    // exact path because that is the only one the optimizer is served on — the
+    // width and quality arrive in the query string, which a matcher does not
+    // see.
+    '/_next/image',
   ],
 }

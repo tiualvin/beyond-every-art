@@ -59,18 +59,59 @@ export const LOCAL_IMAGE_PATTERN = {
 } as const
 
 /**
- * Remote hosts the optimizer may fetch from.
+ * Remote hosts the optimizer may fetch from, and where on them.
  *
  * Only the object-storage origin, and only when one is configured. An empty
  * list is not a gap: with no `S3_PUBLIC_URL` every media URL is root-relative
  * and covered by the local pattern above.
+ *
+ * The `pathname` is the half that was missing. A pattern naming only a hostname
+ * matches every path on it, and Next resolves a remote `url` by *fetching it*
+ * before it can decide the response is not an image — so
+ * `/_next/image?url=https://<bucket-host>/<anything>&w=640&q=75` made the
+ * server issue a request to object storage for a key that need not exist. The
+ * 400 the caller got back was the cheap half; the billed GET against R2 had
+ * already happened, and a miss is not written to `.next/cache/images`, so the
+ * same URL bought another one every time it was sent. One inbound request, one
+ * metered storage operation, repeatable for as long as somebody cared to.
+ *
+ * Scoping to the prefix `S3_PUBLIC_URL` actually carries does not make that
+ * free — a real object still costs its fetch — but it bounds the reachable key
+ * space to the one media lives under. The volume half is `middleware.ts`,
+ * which now rate limits `/_next/image`; neither is sufficient alone.
+ *
+ * `search: ''` for the same reason `LOCAL_IMAGE_PATTERN` has it: Payload's
+ * storage URLs carry no query string, so anything appended to one is somebody
+ * else's idea.
  */
 export function imageRemotePatterns(
   env: Env = process.env,
 ): ImageConfig['remotePatterns'] {
   const publicUrl = env.S3_PUBLIC_URL
   if (!publicUrl) return []
-  return [{ hostname: new URL(publicUrl).hostname, protocol: 'https' }]
+
+  let parsed: URL
+  try {
+    parsed = new URL(publicUrl)
+  } catch {
+    // A malformed value used to throw here and take the whole config with it,
+    // which fails the build rather than the variable. An unusable public URL
+    // means no remote host is allowed — the same answer as not setting one.
+    return []
+  }
+
+  // `https://media.example.com` and `https://media.example.com/files` are both
+  // valid values, and the second is a prefix every media URL sits under.
+  const prefix = parsed.pathname.replace(/\/+$/, '')
+
+  return [
+    {
+      hostname: parsed.hostname,
+      protocol: 'https',
+      pathname: `${prefix}/**`,
+      search: '',
+    },
+  ]
 }
 
 /** The whole `images` block, as `next.config.ts` should hand it to Next.js. */
