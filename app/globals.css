@@ -1797,6 +1797,18 @@ img {
   margin-top: 1.4rem;
 }
 
+/* Justified, with hyphenation doing the work that keeps it from rivering.
+   `hyphens: auto` needs a language to hyphenate against, which `<html lang>`
+   in app/(frontend)/layout.tsx supplies.
+   
+   Direct children only. A block renders its own paragraphs — a callout, a
+   pull quote, the text half of a media-and-text — and several of them set an
+   alignment of their own that a blanket `.prose p` would overrule. */
+.prose > p {
+  text-align: justify;
+  hyphens: auto;
+}
+
 .prose > p:first-of-type::first-letter {
   float: left;
   font-family: var(--font-serif);
@@ -3131,6 +3143,325 @@ ol.feature-list__items .feature-list__title::before {
   text-transform: uppercase;
   font-weight: 600;
   color: var(--color-burgundy);
+}
+
+/* --- Article layout: text and rail ----------------------------------------
+   Two tracks from 1280 up: the reading column, and a 300px rail beside it.
+   The block is exactly as wide as those two and the gap between them, so
+   nothing on the page is empty by construction.
+
+   That is a change of mind from the first pass, which put a notes margin
+   between them for captions to hang in. Most articles have no captions worth
+   hanging, so on most pages it was a third of the block doing nothing, and an
+   empty column reads worse than white space.
+
+   Removing it costs the wide figures. A gallery or a comparison table now
+   fills the reading column and stops there, because the reading column is all
+   there is. What it buys is a wider measure — 704px, the widest that stays
+   inside a comfortable line length — and a page with no dead track on it.
+
+   The block cannot drift, because it is not written down: it is the sum of
+   its parts. Change `--text-w` or `--rail-w` and the block follows.
+
+   docs/POST_PAGE_LAYOUT.md carries the measured widths and the reasoning;
+   tests/design/article-layout.test.ts recomputes them from this file. */
+
+.article__shell {
+  --gap: 3rem;
+  --text-w: 44rem;
+  --rail-w: 300px;
+  --pad: 1.5rem;
+  /* Text, rail, the gap between them, and the padding either side. */
+  --shell: calc(var(--text-w) + var(--gap) + var(--rail-w) + var(--pad) * 2);
+
+  width: 100%;
+  max-width: var(--shell);
+  margin: 0 auto;
+  padding: 0 var(--pad);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  column-gap: var(--gap);
+}
+
+/* `min-width: 0` on both tracks: a grid item's automatic minimum size is its
+   content, so one long word or a wide table would otherwise push the track
+   past its share and take the rail off the screen. */
+.article__reading {
+  min-width: 0;
+}
+
+/* Below the rail breakpoint the column centres in whatever width there is.
+   From 1280 the track is the measure, so there is nothing left to centre. */
+.article__reading > *,
+.article__hero > * {
+  max-width: var(--text-w);
+  margin-inline: auto;
+}
+
+.article__rail {
+  display: none;
+  min-width: 0;
+}
+
+@media (min-width: 80rem) {
+  .article__shell {
+    grid-template-columns: minmax(0, 1fr) var(--rail-w);
+  }
+
+  .article__reading > *,
+  .article__hero > * {
+    max-width: none;
+    margin-inline: 0;
+  }
+
+  .article__rail {
+    display: block;
+  }
+
+  /* The split hero spans both tracks, so the rail starts level with the body
+     rather than with the title — which is also where docs/ADVERTISING.md wants
+     the first rail slot to begin, below the hero and clear of the LCP element.
+
+     The columns are a ratio rather than the measure and the remainder: with
+     the block now only as wide as the text and the rail, "the remainder" would
+     leave the featured image the width of the rail. At 1.2fr to 1fr the title
+     takes 548px and the image 456px, and because the block is one width at
+     every desktop size, so are they. */
+  .article__hero {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    column-gap: var(--gap);
+    /* Top-aligned, not centred. Centring floats the image against nothing: it
+       starts below the title and its credit line finishes level with the rule
+       above the byline, which reads as a misalignment rather than a choice.
+       Aligned to the top, the image and its credit both sit clear above that
+       rule and the two columns start together. */
+    align-items: start;
+    margin-bottom: 3rem;
+  }
+
+  .article__hero .article__header {
+    margin-bottom: 0;
+  }
+
+  .article__hero .article__figure {
+    margin-bottom: 0;
+  }
+}
+
+/* --- The rail -------------------------------------------------------------
+   Editorial only. Every module here has to hold up on its own: the rail is
+   what a reader sees for the whole scroll, and docs/ADVERTISING.md puts a slot
+   in it later that will be absent for members, for anyone running a blocker,
+   and on every staging deployment. A rail that is an ad with decoration around
+   it is a hole on those visits.
+
+   Nothing in it carries a thumbnail. The rail is hidden below 1280 rather than
+   reflowed — every module it holds already reaches a phone another way, the
+   related list through "Read next" and the newsletter through the band — and a
+   hidden `<img>` is still a download on the device that can least afford it. */
+
+.rail__mod {
+  margin-bottom: 2.5rem;
+}
+
+.rail__label {
+  font-family: var(--font-sans);
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-weight: 600;
+  color: var(--color-burgundy);
+  border-bottom: 2px solid var(--color-burgundy);
+  padding-bottom: 0.5rem;
+  margin: 0 0 0.85rem;
+}
+
+.rail__toc {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rail__toc li {
+  border-bottom: 1px solid var(--color-line);
+}
+
+.rail__toc a {
+  display: block;
+  padding: 0.5rem 0;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: var(--color-muted);
+}
+
+.rail__toc a:hover {
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+.rail__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1.1rem;
+}
+
+.rail__item {
+  display: block;
+}
+
+.rail__item h3 {
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.25;
+  margin: 0 0 0.25rem;
+}
+
+.rail__item:hover h3 {
+  color: var(--color-burgundy);
+}
+
+.rail__meta {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Space kept for a square unit above "More on this", per docs/ADVERTISING.md
+   §8. It renders empty until there is an ad layer to fill it — the reservation
+   is the point, so that turning ads on is a fill rather than a re-layout, and
+   so the rail is designed around the height it will actually have.
+
+   The reservation is the unit and a gap, not the unit and a second band: at
+   the module rhythm of 2.5rem it read as 290px of nothing above the related
+   list, and those 16px were also 16px the newsletter card did not have. */
+.rail__slot {
+  min-height: 250px;
+  margin-bottom: 1rem;
+}
+
+/* The ad slot, the related pieces and the newsletter travel together and stay
+   with the reader for the rest of the scroll. `--masthead-h` is the bar's
+   height: it hides on scroll down and returns on scroll up
+   (motion/scroll-header.tsx), so this clears it when it is there and is merely
+   generous when it is not.
+
+   This was behind `@media (min-height: 820px)` and the guard was the bug. The
+   group is about 700px tall, so any window shorter than that — a laptop at
+   1440×900 has roughly 800px of viewport once browser chrome is taken off, and
+   a window that is not maximised has less — got no sticky at all, which is
+   most windows. It looked like the feature had simply not been built.
+
+   The guard was there because a sticky box taller than the space it pins into
+   hangs its bottom off the screen where nothing can scroll to it. The height
+   cap below closes that properly: on a tall window it never binds, and on a
+   short one the group gives somewhere rather than hanging off the end. `dvh`
+   second so a browser without it keeps the `vh` rule.
+
+   Which module gives is the part that had to be decided rather than left to
+   the scrollbar. Capping the group and scrolling it whole meant the newsletter
+   card — the last thing in it, and the only thing in it a reader is meant to
+   act on — was the first thing off the bottom, on every window shorter than
+   about 845px of viewport, which is most of them. So the group is a column:
+   the ad keeps its 250px and the newsletter card keeps its height, and the
+   related list is the one module allowed to shrink and scroll inside itself.
+   The group's own scrollbar stays as a backstop for a window too short to
+   hold even the ad and the card. */
+.rail__sticky {
+  position: sticky;
+  top: calc(var(--masthead-h) + 0.75rem);
+  max-height: calc(100vh - var(--masthead-h) - 1.5rem);
+  max-height: calc(100dvh - var(--masthead-h) - 1.5rem);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+/* The group runs to a tighter rhythm than the rail above it. Every pixel here
+   is a pixel the related list gets on a short window, and the modules read as
+   one block rather than three when they are travelling together anyway. */
+.rail__sticky > .rail__mod {
+  margin-bottom: 1.5rem;
+}
+
+/* Everything in the group holds its height... */
+.rail__sticky > * {
+  flex: none;
+}
+
+/* ...except the related list, which is what absorbs a short window. `flex:
+   0 1 auto` rather than `1 1 auto`: it may shrink, but it must not grow into
+   the space left over on a tall one, or the newsletter card would be pushed
+   to the bottom of the box with a gap above it. `min-height: 0` twice because
+   a flex item's automatic minimum is its content, and without it neither the
+   module nor the list inside it can go below its natural height. */
+.rail__sticky > .rail__related {
+  flex: 0 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.rail__related .rail__list {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+/* Past a point shrinking stops being graceful. The fixed parts of the group —
+   the 250px unit, its gap, the label, and the newsletter card — come to 500px
+   against a cap of the viewport less 100, so under 650px of viewport the list
+   has nothing whole left to show and becomes a sliver under a heading, which
+   reads as broken rather than tight. It is dropped there instead: the related
+   pieces close the article on every device, so nothing here is only here.
+
+   650 and not 700. The first version of this guard cost 50px more, which put
+   the cutoff above a large share of real windows — a laptop with a bookmarks
+   bar sits just under 700 — and the module simply vanished for them. The
+   spacing above was tightened to buy that back rather than the threshold being
+   moved on its own: 649 is now a window that genuinely cannot hold the module,
+   not one that was merely close.
+
+   This is a `max-height`, not the `min-height` guard it replaced upstream. That
+   one turned the sticky group off entirely on most windows; this one drops one
+   supplementary module on the windows that provably cannot hold it. */
+@media (max-height: 649px) {
+  .rail__sticky > .rail__related {
+    display: none;
+  }
+}
+
+/* The last module in the group carries no bottom margin of its own, so the
+   sticky box is exactly as tall as its content. */
+.rail__sticky > .rail__mod:last-child {
+  margin-bottom: 0;
+}
+
+.rail__signup {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  padding: 0.9rem;
+}
+
+.rail__signup p {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+
+.rail__signup .button {
+  width: 100%;
+  text-align: center;
 }
 
 .read-next {

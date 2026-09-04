@@ -92,13 +92,60 @@ discrepancy. Fix the root cause and re-run until it reports `"ok": true`.
 > So spend the attention on what only real content can show: media loading from
 > R2 with alt text, embeds and captions inside migrated bodies, metadata that
 > Ghost carried, and the counts matching Ghost admin.
+>
+> **And query the database rather than crawling.** The 30 Aug audit did, and it
+> is the reason it found anything: a crawl cannot see drafts, and it cannot see
+> a field that exists in the export but never reached Payload. Three of the four
+> defects it turned up were invisible from outside. Give every scan a positive
+> control — a column that must be non-zero if the query is really running
+> against real data — because an all-zero result reads identically whether it
+> means "clean" or "this query does not match your data", and on the first scan
+> here it meant the latter.
 
 - [ ] **Content counts** match the Ghost admin (posts, pages, tags, authors).
+      Posts, pages and authors are settled (30 Aug): 113 published + 4 draft
+      posts and 2 published pages, against Ghost's sitemap of 113 posts and 3
+      pages — one of those being the homepage — and 119 rows in the export's
+      `posts` table, which carries pages too. This is set equality rather than
+      matching totals: the 29 Aug audit requested all 127 indexed Ghost URLs on
+      staging and every one returned 200, so every Ghost post is known to be
+      here. **Tags are the one open piece**: 10 imported against 9 in Ghost's
+      sitemap, which a tag with no published posts would explain.
 - [ ] **Recent posts** render correctly, including embeds and captions.
-- [ ] **Drafts** are still drafts and are not publicly reachable.
+      Mostly answered in bulk (30 Aug) rather than by sampling, because there is
+      nothing to sample: across 117 bodies there are **zero embeds, zero inline
+      images and zero figcaptions**. Feature-image credits were dropped by the
+      import and have been restored — see `DEPLOYMENT_STATUS.md`. What still
+      needs a browser is the single post carrying a `<table>`
+      (`limited-edition-vs-open-edition-prints-which-is-right-for-you`, the only
+      one of 117 with Ghost card markup) and a general look at a few articles.
+- [ ] **Drafts** are still drafts and are not publicly reachable. The count has
+      survived two write passes at 4 (30 Aug), which is the half of this a query
+      can answer. Whether a draft URL actually 404s is still unverified.
 - [ ] **Media** loads from R2 (not the old Ghost domain) with alt text intact.
-- [ ] **URLs** preserve the original slugs and trailing-slash structure.
-- [ ] **Redirects** validated in full by the command below — not spot-checked.
+      Loading is verified (30 Aug): 110 records, all `migrated`, R2 holding 327
+      objects, and **no body anywhere references the Ghost domain** — see the
+      content audit in `DEPLOYMENT_STATUS.md`. One exception: **media id 4 has
+      no bytes in R2** and needs re-uploading. "Alt text intact" is neither pass
+      nor fail as written, because **Ghost had none** — 118 `posts_meta` rows,
+      zero non-empty `feature_image_alt` — so nothing was lost. The importer
+      fills `alt` with the filename because the field is required, and
+      `toAltText` in `lib/content/media.ts` collapses that to an empty string
+      before it reaches a reader, which is correct: a filename read aloud is
+      worse than an image marked decorative. Confirmed in the rendered HTML.
+- [x] **URLs** preserve the original slugs and trailing-slash structure.
+      Verified 29 Aug against real content: every URL in Ghost's four sitemaps —
+      113 posts, 3 pages, 9 tags, 2 authors, **127 in total** — was requested on
+      staging and **all returned 200**. Served directly, not redirected, which
+      is the stronger result: the domain, the paths and the trailing slash are
+      all unchanged, so there is nothing to forward.
+- [x] **Redirects** validated in full by the command below — not spot-checked.
+      Verified 29 Aug: 5 checks, 0 warnings. The one real Ghost redirect plus
+      the built-in probes for `/page/2/`, `/page/3/`, `/tag/<slug>/page/2/` and
+      `/author/<slug>/page/2/` — the pagination shapes no export covers. Both
+      Ghost exports on the VPS contain exactly one rule and it is in the table,
+      so nothing was dropped at import. `/ads.txt` failed and is now served by
+      Caddy (#123).
 - [ ] **Canonical URLs**, meta titles, and descriptions are preserved.
 - [ ] **Sitemap** (`/sitemap.xml`), **RSS** (`/rss`), and **robots** are correct.
 - [ ] **Payload admin** loads and editing works.
@@ -110,6 +157,17 @@ discrepancy. Fix the root cause and re-run until it reports `"ok": true`.
 The redirect line above is the one item on this list that a spot-check cannot
 stand in for: a broken rule looks exactly like a URL nobody has asked for yet,
 so checking "several" of them says nothing about the rest. Check all of them.
+
+**Pass `--tag` and `--author` with real slugs.** Without them the run silently
+covers only `/page/2/` and `/page/3/`, leaves the tag and author pagination
+rules untested, and still reports success. That is the larger surface and the
+part no Ghost export mentions.
+
+**Take the URL list from Ghost, never from staging.** A post that failed to
+migrate is absent from staging's sitemap too, so sampling there confirms only
+that staging is consistent with itself. Ghost's sitemap index is at
+`/sitemap.xml` and splits into `sitemap-posts.xml`, `-pages.xml`, `-tags.xml`
+and `-authors.xml`; the apex 301s to the `www` form, so follow redirects.
 
 ```bash
 pnpm validate:redirects --target https://staging.<domain> \

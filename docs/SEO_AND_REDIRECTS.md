@@ -64,6 +64,28 @@ migration meets three more classes of it:
 | `/content/images/…`          | every image hotlink and Google Images result     |
 | `/ads.txt`                   | ad buyers, once display advertising is live      |
 
+Two of the three are now closed. `/ads.txt` is served by Caddy from the
+repository root, and Ghost's four child sitemaps — `/sitemap-posts.xml`,
+`-pages`, `-tags`, `-authors` — redirect there permanently to `/sitemap.xml`,
+the single flat sitemap this site publishes. Measured on staging on 31 Aug
+before the change: `/sitemap.xml` answered 200 with 129 `<loc>` entries and all
+four children answered 404 with Next's HTML error page. The redirect rather
+than a 410 is deliberate — Google holds those four URLs independently of the
+pages they list, from Ghost's sitemap index and from Search Console, and the
+answer to "where is the sitemap" is not "nowhere". `/content/images/…` needs no
+handler on this publication: no article body contains an inline image, so
+nothing points there (`DEPLOYMENT_STATUS.md`, the content audit).
+
+A Caddy change needs probing from outside, not just a config that loads. The
+sitemap redirects above shipped twice before working: once as a Caddyfile the
+running container never saw — single-file bind mounts bind the inode, and
+`caddy reload` re-read the stale one and reported success — and once as
+`redir /sitemap.xml 301` inside a `handle` block, which Caddy parses as matcher
+`/sitemap.xml`, destination `301`, status 302. That form adapts cleanly, starts
+cleanly, and answers 200 with an empty body. `caddy adapt --config Caddyfile`
+prints the JSON and is what settles it locally; a `curl` against the live host
+is what settles it for real.
+
 `lib/seo/middleware-coverage.ts` models the matcher so this is checkable rather
 than remembered. `pnpm migrate:redirects` prints a warning naming any imported
 rule that cannot run, and `pnpm validate:redirects` reports it as an error
@@ -127,6 +149,40 @@ actually reads — served only on the CMS hostname, since Caddy 404s it on the
 public one). Give both and a rule present in the export but missing from the
 table is reported too: an import that did not land, which checking the table
 alone would never show.
+
+**Running it on the VPS**, where the repository is checked out but Node and
+`pnpm` are not installed on the host:
+
+```bash
+cd /root/beyond-every-art
+docker compose run --rm \
+  --entrypoint ./node_modules/.bin/tsx migrate \
+  scripts/validate-redirects.ts \
+  --target https://staging.beyondeveryart.com \
+  --redirects-map https://cms.beyondeveryart.com/redirects-map/ \
+  --tag art --author alvin
+```
+
+Two details that cost a round each the first time:
+
+- `--entrypoint tsx` fails with `executable file not found in $PATH`. The
+  `backup` image installs `tsx` globally; the `migrator` image keeps the full
+  dependency tree instead, so it is at `./node_modules/.bin/tsx`.
+- `--input ghost-export/redirects.json` cannot be read from inside that
+  container: `ghost-export` is in `.dockerignore`, so the export is not in the
+  image. Bind-mount it (`-v /root/beyond-every-art/ghost-export:/app/ghost-export:ro`)
+  or use `--redirects-map`, which tests the live table and is the better check
+  once the import has run.
+
+**Pass `--tag` and `--author` with real slugs.** Without them the built-in
+probes cover only `/page/2/` and `/page/3/`, and the tag and author pagination
+rules — the larger surface, and the ones no export covers — go unchecked while
+the run still reports success. Find slugs with:
+
+```bash
+curl -s https://staging.beyondeveryart.com/ | grep -o '/tag/[^"/]*' | head -3
+curl -s https://staging.beyondeveryart.com/sitemap.xml | grep -o '/author/[^<"]*' | head -3
+```
 
 For each rule it asserts four things, of which only the first is what a manual
 spot-check covers:

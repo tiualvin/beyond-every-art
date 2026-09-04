@@ -11,7 +11,12 @@ Related: [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md),
 
 ## Pick up here
 
-Last worked on **29 Aug 2026**. The deploy pipeline broke and was repaired; the
+Last worked on **30 Aug 2026**. The content audit below closed most of the
+rehearsal's §4 list and found four real defects, none of which a crawl of
+staging would have surfaced. Read "The content audit" under Done before
+touching content again.
+
+Previously worked on **29 Aug 2026**. The deploy pipeline broke and was repaired; the
 detail is in "The 27–28 Aug deploy outage" below, and it is worth reading before
 the next infrastructure change because two of the three failures were invisible
 to CI. The server now runs everything through #121.
@@ -23,8 +28,14 @@ gained 4GB of swap and went from 2.3GB free to 19GB.
 
 Closed on 29 Aug, clearing the whole "minutes each" group: the plaintext backups
 are deleted, Caddy is unpinned onto the published arm64 image, the box has been
-rebooted and its swap comes back, and `main` is protected by a ruleset. What is
-left is verification work against real content, not setup.
+rebooted and its swap comes back, and `main` is protected by a ruleset.
+
+Also closed on 29 Aug: **the redirect layer**, and **edge protection except for
+closing the origin**. 127 indexed Ghost URLs were checked against staging and
+every one returned 200 — served directly, no redirect needed, because the domain
+and the paths do not change. And DNS-01 now issues certificates from behind
+Cloudflare's proxy, proven with a real challenge rather than inferred from a
+site that still serves.
 
 Newly on the list and easy to miss: **capture the pre-migration search
 baseline**, and check that Search Console's verification does not depend on
@@ -34,24 +45,35 @@ Procedure in [`SEO_BASELINE_CAPTURE.md`](SEO_BASELINE_CAPTURE.md).
 
 In dependency order, what is left before the public cutover:
 
-1. **Work [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md) end to end.** Every
-   box in §4–§6 is unticked, and this is the bulk of what is left. Newly
-   unblocked: `pnpm validate:redirects` is deployed and must exit zero, the media
-   check can pass, and staging no longer requires Basic Auth so the crawl
-   comparison and the validator need no credentials. Includes the
-   email-delivery test.
+1. **Work [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md) end to end.** Much
+   of §4 closed on 30 Aug by querying Postgres rather than crawling — see "The
+   content audit" below. What is left there needs a browser or a live probe:
+   the one post carrying a `<table>`, draft URLs actually returning 404, the
+   admin panel and draft preview, the forms, the email-delivery test, and §5–§6.
+
+   Two items from that audit are still open and both are small: **media id 4
+   has no bytes in R2** and needs re-uploading through the admin under a
+   filename ending `.jpeg`, and the **tag count** is 10 in Payload against 9 in
+   Ghost's sitemap, which an unpublished or empty tag would explain but nobody
+   has confirmed.
 
 2. **Members CSV.** Export from Ghost Admin and import. Low stakes now — there
    are no paying members, so this is the newsletter list rather than billing
    identifiers, and the Stripe takeover is off the critical path to cancelling
    Ghost.
 
-3. **Edge protection** — [`EDGE_PROTECTION.md`](EDGE_PROTECTION.md). The token
-   exists and the repository side is done: `CADDY_ACME=acme-cloudflare` in `.env`
-   switches every site block to DNS-01. What remains is that switch, confirming
-   a certificate is obtained through it, the orange cloud, `TRUST_CLOUDFLARE_IP=1`,
-   and firewall pass two. **Its own quiet deploy, not cutover-day work**, and
-   validate the Caddyfile before deploying.
+3. **Close the origin** — [`EDGE_PROTECTION.md`](EDGE_PROTECTION.md#closing-the-origin),
+   step 6, and the only part of edge protection still open. Steps 1–5 are done
+   (29 Aug): DNS-01 is live and **proven end to end**, `staging` is proxied
+   behind Full (strict), `cms` is deliberately left unproxied so the MCP
+   endpoint keeps answering non-browser clients, and `TRUST_CLOUDFLARE_IP=1` is
+   set.
+
+   Proxying hides the origin from DNS but does not stop anyone who already
+   recorded the address, and this one has been public since July — so until this
+   is done, an attacker with the old IP bypasses every protection just added. It
+   is the step where a wrong rule locks the operator out too, so it wants a
+   fresh sitting rather than being tacked onto the end of another change.
 
 4. **Flip.** Unset `NEXT_PUBLIC_NOINDEX`, move `SITE_ADDRESS` and
    `NEXT_PUBLIC_SITE_URL` to the production domain, then change DNS.
@@ -64,6 +86,236 @@ The reboot that was pending here is done — see "The swap survives a reboot"
 below.
 
 ## Done
+
+- **The admin panel was blank from 22 Aug to 1 Sep, and why nothing caught it.**
+  Found by finally opening it — the rehearsal's "Payload admin loads and
+  editing works" box had never been ticked — and reported again on 1 Sep as
+  "the CMS is down".
+
+  `payload.config.ts` used to add the S3 storage plugin **conditionally**, only
+  when `S3_BUCKET` and `S3_ENDPOINT` are set. The import map was generated on a
+  machine without them, so it was complete for that machine and missing
+  `@payloadcms/storage-s3/client#S3ClientUploadHandler` everywhere else. The map
+  was filled in on 16 Aug; R2 was configured on the server on 22 Aug. From that
+  moment Payload asked for a component the map did not have, and rendered
+  nothing.
+
+  Payload's response to a component it cannot resolve is to abandon the admin
+  render and log `getFromImportMap: PayloadComponent not found in importMap` on
+  the server. Nothing reaches the browser, which is why every external check
+  passed: the page answered **200 in about half a second**, served every asset,
+  held a valid certificate, and carried a complete and correct RSC payload with
+  the login view inside it — and painted an empty document. No console error,
+  no failed request, nothing above a 200 anywhere. Postgres, Caddy, the
+  container and `POST /api/users/login` (a correct 401) were healthy throughout.
+
+  **The cause is fixed structurally, not by remembering to set variables.**
+  `s3Storage` is now registered unconditionally with `enabled: useR2`, matching
+  the pattern the `mcp()` plugin directly above it already documents: always
+  registered, behaviour decided inside, so the config's shape does not change
+  with the environment. Generating the map with and without the S3 variables
+  now produces byte-identical output, and Payload reports "No new imports
+  found" on the second run.
+
+  `alwaysInsertFields` is deliberately left off: it would add the plugin's
+  prefix field to the media schema, which is a migration, and this is not the
+  week for one.
+
+  One correction to an earlier note here, because it sends the next person the
+  wrong way: the Docker build does **not** regenerate the map. `Dockerfile`
+  runs `pnpm build` and nothing else, and a build run with no S3 variables
+  leaves `importMap.ts` byte-identical (checked by hash) while the resulting
+  server, started with R2 configured, renders the admin correctly. The tracked
+  map is what ships. Registering the plugin unconditionally is still the right
+  fix — it removes the environment-dependence from `generate:importmap` itself —
+  but the committed file, not the build, is what production reads.
+
+  Four separate reasons the existing guard could not see it, all now fixed. Its
+  `REQUIRED` list did not name the S3 key. Its key regex was `[A-Za-z]+`, which
+  cannot match `S3ClientUploadHandler` because of the digit — so the one key
+  that mattered was invisible to the assertions written for exactly this
+  failure. CI ran without S3 configured, so regenerating there produced the same
+  incomplete map and reported no drift; `playwright.config.ts` now gives the
+  test server R2 variables so CI exercises the plugin set production runs. And
+  **nothing rendered the admin in a browser at all**: `csp.spec.ts` fetched
+  `/admin` with `request.get` to read a header, `oauth.spec.ts` asserted a
+  `Location` string, and both pass against a blank page. `e2e/admin.spec.ts` now
+  loads the login page, submits it, and asserts the dashboard's collection
+  links. Every one of these was confirmed by reverting the map and watching the
+  assertions go red.
+
+  **Diagnostic notes worth keeping.** A keyword-filtered `docker compose logs`
+  showed the map as `{ }` and led to a wrong conclusion — the filter matched the
+  first and last lines of a multi-line object and dropped the contents.
+  `--since 90s` after a deliberate page reload is what produced the real key.
+  The browser console's only message was a CSP warning about
+  `upgrade-insecure-requests` in a report-only policy, which is unrelated noise:
+  this failure is entirely server-side. And the give-away in the RSC payload is
+  the layout's `children` slot serialising to `null` where a working render has
+  the parallel-router outlet.
+
+  **What actually kept it broken was a gitignored file.** The tracked
+  `importMap.ts` was correct and merged, and the admin stayed blank through
+  five deploys — including a manual `docker compose build --no-cache app` on
+  the box, which rebuilt every layer from scratch and still produced a bundle
+  with no `S3ClientUploadHandler` in it. The build was faithful every time; the
+  source it compiled was not the file anyone was looking at.
+
+  `layout.tsx` and the admin page import `./admin/importMap` with no extension,
+  and webpack resolves `.js` before `.ts`. Payload's generator writes
+  `importMap.js` beside the tracked `.ts`, so whenever that sibling exists it
+  **shadows** the tracked file. One left on the server from an earlier
+  `pnpm generate:importmap` is what every build was reading. It is gitignored,
+  so `git reset --hard` never removed it, and `.dockerignore` did not exclude
+  it, so `COPY . .` copied it into every image.
+
+  Proven by building the same tree twice: with the stale sibling present the
+  bundle contains the component in no chunk at all and the admin page chunk is
+  one hash; with it absent the component is in `chunks/7148-*.js` and the page
+  chunk is another. `.dockerignore` now excludes it, so an image can only be
+  built from the tracked file, and `tests/design/import-map.test.ts` asserts
+  that exclusion — every other assertion in that file reads the `.ts` and would
+  pass against a build that never loaded it.
+
+  The comment in `.gitignore` claimed the opposite ("this generated sibling is
+  not" what the admin imports). That belief is why nobody looked here.
+
+  **The deploy guard then refused the fix.** The VPS checkout had been advanced
+  to a commit on `claude/beyond-every-art-cutover-qu4apc` that was never merged,
+  so `main` could not fast-forward onto it and `deploy` failed with "Refusing a
+  non-fast-forward deployment" — with the checkout advanced and the containers
+  never replaced, which is why production stayed blank while running a commit
+  that contained the fix. Deploying from a branch that is not an ancestor of
+  `main` puts the box in a state only a merge or a manual reset can leave.
+
+- **Caddy serves a stale config until its container is recreated (31 Aug).**
+  The single most likely thing to waste an hour on cutover day, so it is first.
+
+  `Caddyfile` and `ads.txt` reach the container through single-file bind mounts,
+  which bind the _inode_, not the path. Git never edits in place — it writes a
+  new file and renames it over the old — so after any checkout the running
+  container keeps serving what it started with, and `docker compose up -d` will
+  not replace it, because the service definition is unchanged and Compose does
+  not hash the contents of mounted files.
+
+  **Editing either file needs `docker compose up -d --force-recreate caddy`.
+  A reload is not enough**: `caddy reload` re-read the stale inode and reported
+  success, which is how a change that had not deployed looked exactly like one
+  that had. The deploy job now compares both files against the container,
+  recreates when they differ, and fails if a mount is still stale afterwards.
+
+  `ads.txt` had the same exposure and nobody had noticed: `ADVERTISING.md`
+  reasons that mounting it keeps one copy so buyers always read the committed
+  file, which was true only until the next deploy touched it.
+
+- **Ghost's four child sitemaps are answered (31 Aug).** `/sitemap-posts.xml`,
+  `-pages`, `-tags` and `-authors` were 404s — Ghost's URL shape, which this
+  site does not use, and which no redirect row can serve because the middleware
+  matcher skips dotted paths. They now 301 to `/sitemap.xml`, verified against
+  the live host: all four redirect, following one lands on 200 `application/xml`,
+  and `/ads.txt` and `/sitemap.xml` are unaffected.
+
+  It took two wrong attempts, both of which _looked_ like they had worked. The
+  first never reached Caddy (the bind mount above). The second used
+  `redir /sitemap.xml 301` inside a `handle` block — but `redir` takes an
+  optional matcher first, so Caddy read `/sitemap.xml` as the matcher and `301`
+  as the destination, adapting to `status: 302, Location: "301"` on a route that
+  could never fire; the handle block then answered 200 with an empty body. Its
+  test passed throughout, because it asserted the file _contained_ that string.
+  `caddy adapt --config Caddyfile` prints the adapted JSON and is what settled
+  it. **A Caddy change is not verified until it is probed from outside the
+  stack** — the same lesson as the 27 Aug outage below.
+
+  Also measured while there: `/sitemap.xml` carries 129 URLs and reconciles
+  exactly — 113 published posts, 2 pages, the homepage, `/journal/`, 10 tags,
+  2 authors — and **no published post or page is missing from it**. `/tag/news/`
+  is in it and is an empty tag, so it answers 200 with page chrome and no posts:
+  a soft 404 rather than a broken one. Deleting the tag closes it.
+
+- **The content audit (30 Aug).** Every article body, every media record and the
+  Ghost export itself, checked by querying Postgres directly rather than by
+  crawling staging. That choice is the reason this found anything: a crawl
+  cannot see drafts, and three of the four defects below sat in documents or
+  fields a crawler never reaches.
+
+  **Nothing hotlinks Ghost.** The original worry — bodies still pointing at
+  `/content/images`, which would 404 the moment DNS moved — is empty, and for a
+  structural reason worth recording: **no article body contains an inline image
+  at all.** Across 117 posts there are zero `<img>` tags, zero `src=`
+  attributes in any quoting, zero `<figure>`, zero `figcaption`, zero
+  `<iframe>` and zero `srcset`. Bodies are prose, 7.8KB to 56.8KB, averaging
+  30KB. Every image in the publication is a feature image rendered by Payload
+  from `featuredImage`, and R2 holds exactly 327 objects — 3 × 109, an original
+  plus `card` plus `og` for every image except media 4.
+
+  So the srcset gap in `lib/migration/media.ts` is real (the header comment
+  claims `ATTR_URL` matches srcset entries; it cannot, because `src` followed
+  by `set=` fails the `\s*=`) but this content never exercises it. Worth
+  knowing before importing anything else.
+
+  **Four defects, three fixed.**
+
+  1. **35 `__GHOST_URL__` links, 23 of them on published documents.** The
+     import resolves that placeholder for media only, so a placeholder in an
+     ordinary `href` shipped verbatim; a browser reads it as a relative path
+     and 404s. Fixed by `pnpm fix:ghost-links` and verified by re-querying all
+     four tables, including the version tables. All 25 links on published
+     documents resolved to real targets, so the repair needed no editorial
+     judgement; the 10 that point nowhere are all in drafts 116 and 117 and
+     stay an editorial question.
+  2. **110 photo credits dropped.** Ghost keeps `feature_image_caption` in
+     `posts_meta`, a table `plan.ts` already loads and reads four other fields
+     from — the field simply was not on `GhostPostMeta`. Every one is
+     `Photo by <name> / Unsplash`, 102 distinct. Restored by
+     `pnpm repair:content` into `media.credit`, which `FeaturedFigure` already
+     renders, rather than `media.caption`: these are attributions, not
+     description. Confirmed rendering on a real page.
+  3. **One post with seven dead links.** Every `href` in
+     `the-alchemical-canvas-…` was wrapped in `\&quot;`, which decodes to a
+     relative path and 404s; the same body carried `\"` in its prose. It
+     arrived from Ghost that way, so the old site has the same dead links.
+     Repaired in the same pass.
+  4. **Media id 4 has no bytes in R2 — still open.** The orphan question left
+     in item 0.4.4 below is answered: it is an Unsplash URL that was linked
+     rather than stored, it _is_ used (feature image of a published post), and
+     the 22 Aug restore never recovered it. Its source URL still returns 200
+     with 222497 bytes, matching the row's `filesize` exactly, so it is
+     recoverable.
+
+     It also has **no file extension**, and that is a second, independent
+     defect: `trailingSlash: true` adds a slash to any path without a dot, and
+     Payload's route only answers the unslashed form, so an extensionless media
+     filename is permanently unreachable through the app. Re-uploading it
+     through the admin under `photo-1689659721022-3aa475803e19.jpeg` fixes both
+     at once. **Any future upload without an extension will break the same way,
+     silently** — worth a `beforeChange` hook on Media if it recurs.
+
+  **Two things that looked like problems and were not.** Ghost had no alt text
+  to lose: 118 `posts_meta` rows, zero non-empty `feature_image_alt`. The
+  filenames the importer put in `alt` never reach a reader either, because
+  `toAltText` in `lib/content/media.ts` already collapses an alt equal to its
+  filename to the empty string — confirmed in the rendered HTML, where both
+  images carry `alt=""`. And a bracket-and-parenthesis construct that looked
+  like a markdown link in a published body was an artefact of how a URL rendered when
+  terminal output was pasted; `has_markdown_link` is 0 across all 117.
+
+  **The counts are settled, and by set equality rather than by matching
+  totals.** 113 published posts + 4 drafts + 2 published pages, against Ghost's
+  sitemap of 113 posts and 3 pages (one being the homepage), and 119 rows in
+  the export's `posts` table, which holds pages too. Because the 29 Aug audit
+  requested all 127 indexed Ghost URLs on staging and every one returned 200,
+  every Ghost post is known to exist here — so equal totals mean identical
+  sets, not a coincidence of arithmetic. The one loose thread is tags: 10
+  imported against 9 in Ghost's sitemap, which an empty or unpublished tag
+  would explain and nobody has checked.
+
+  **A methodological note worth keeping.** Counting matches is not the same as
+  proving the query works. Every scan in this audit carried a positive control
+  — a column that had to be non-zero if the query was running against real
+  data — and the first one earned its keep immediately: a clean-looking result
+  of all zeros turned out to mean "no body references an image in any form",
+  which is a completely different fact from "no body hotlinks Ghost", and only
+  the control distinguished them.
 
 - **The 27–28 Aug deploy outage, and what it cost.** Recorded in full because
   two of the three failures were invisible to CI, and the same blind spots would

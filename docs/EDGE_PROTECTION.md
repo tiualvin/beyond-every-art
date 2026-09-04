@@ -122,7 +122,9 @@ inside the app container, so it never crosses the proxy.
    for: the image and the challenge change never share a deploy, so a site that
    stops serving has one suspect rather than two.
 
-3. **Move every site block to DNS-01.** This is now one line in the production
+3. **Move every site block to DNS-01** — **done (29 Aug)**. See "How DNS-01 was
+   actually proven" below; the short version is that the obvious tests all pass
+   without exercising the credential once. This is one line in the production
    `.env`, not an edit to tracked files:
 
    ```
@@ -159,14 +161,46 @@ inside the app container, so it never crosses the proxy.
    > start at all. A typo'd snippet name fails the same way — hence the
    > validate step above.
 
-4. **Only now, turn on the orange cloud** for the site record in Cloudflare.
-   Set SSL/TLS mode to **Full (strict)**; anything less lets the edge accept an
-   invalid origin certificate, and "Flexible" sends plain HTTP to the origin.
+4. **Only now, turn on the orange cloud** for the site record in Cloudflare —
+   **done for `staging` (29 Aug)**. Set SSL/TLS mode to **Full (strict)** first;
+   anything less lets the edge accept an invalid origin certificate, and
+   "Flexible" sends plain HTTP to the origin, which Caddy redirects back to
+   HTTPS — a loop.
+
+   **Verify from somewhere that is not this server.** A box curling its own
+   public hostname is the least reliable place to ask whether a proxy sits in
+   front of it: the VPS held the pre-proxy address in its resolver cache and
+   kept answering itself directly long after the toggle took effect, which reads
+   exactly like a toggle that did not work. From a laptop:
+
+   ```bash
+   curl -sSI https://staging.beyondeveryart.com/ | grep -iE 'cf-ray|^server'
+   dig +short staging.beyondeveryart.com
+   ```
+
+   `cf-ray` and `server: cloudflare` are the facts; Cloudflare adds both to
+   every proxied response. Do not grep a truncated header dump — in HTTP/2 the
+   headers are lowercase and `cf-ray` sorts late, so `head -5` hides it.
 
 5. **Set `TRUST_CLOUDFLARE_IP=1`** in the production `.env`, so the rate limiters
    key on the real visitor rather than on Cloudflare's edge address. Getting this
    wrong in the other direction is worse than leaving it unset: every visitor
    would share a handful of buckets and throttle each other.
+
+   `docker compose up -d app` prints `Running` rather than `Started` when it
+   judges the container already current, and that line alone does not tell you
+   whether the new value reached the process. Ask the container rather than
+   reading the file:
+
+   ```bash
+   docker compose exec app printenv TRUST_CLOUDFLARE_IP   # want: 1
+   docker compose up -d --force-recreate app              # only if it is not
+   ```
+
+   On 29 Aug it had in fact been applied despite the `Running` line, so this is
+   a verification step and not a known defect. Also check the variable appears
+   **once**: `>>` appends, and running the same command twice leaves two lines
+   whose precedence is not worth reasoning about.
 
 6. **Close the origin to direct traffic.** Proxying hides the IP from DNS but
    does not stop anyone who already has it — and this address has been public
@@ -192,6 +226,93 @@ inside the app container, so it never crosses the proxy.
    credential-_presence_ check, not authentication — Payload still decides
    whether a session or key is valid. What it removes is the anonymous case,
    which is the one that reaches Postgres before anything is checked.
+
+## How DNS-01 was actually proven
+
+Worth writing down, because every obvious test passed while the Cloudflare
+credential had not been exercised once. The failure this guards against is
+silent for sixty days and then presents as a browser warning.
+
+**What proved nothing:**
+
+- **`caddy validate` passing.** It parses the config. It does not call
+  Cloudflare.
+- **The site still serving 200 after the switch.** The existing certificate
+  keeps working regardless of which challenge is configured — that is the whole
+  reason this is dangerous.
+- **Deleting a certificate and watching Caddy re-issue it.** This looked like
+  the honest test and is not. Let's Encrypt caches a _valid authorization_ per
+  account and identifier for about 30 days, so a new order for a hostname
+  validated recently is created already-authorized: no challenge runs at all.
+  The tell is the timing — issuance completed in **three seconds** with no line
+  mentioning a challenge, a TXT record, or Cloudflare. A DNS-01 challenge cannot
+  finish that fast; it has to write a record and wait for it to be visible.
+
+**What did prove it**, in two parts.
+
+First, the credential, against Cloudflare's API directly — this isolates the
+question and takes seconds. Token validity, zone visibility, and then the part
+that matters, because read access passes the first two and fails every renewal:
+
+```bash
+TOKEN=$(grep -E '^CLOUDFLARE_API_TOKEN=' .env | cut -d= -f2-)
+ZONE=<zone id from the zones call>
+
+# create a throwaway TXT record — the exact permission DNS-01 needs
+curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  --data '{"type":"TXT","name":"_acme-permission-check","content":"dns-01 write test","ttl":60}' \
+  "https://api.cloudflare.com/client/v4/zones/$ZONE/dns_records"
+# then DELETE it by the returned id
+```
+
+The token only ever travels in a header, never through `echo`.
+
+Second, a real challenge, using a hostname Let's Encrypt has **no cached
+authorization for**. `SITE_REDIRECT_FROM` is already a site block, so this needs
+no code change and no DNS record — DNS-01 does not require the name to resolve
+to this server:
+
+```bash
+echo 'SITE_REDIRECT_FROM=www.beyondeveryart.com' >> .env
+docker compose up -d caddy
+docker compose logs -f caddy
+# then revert: sed -i '/^SITE_REDIRECT_FROM=/d' .env && docker compose up -d caddy
+```
+
+The lines that constitute proof:
+
+```
+trying to solve challenge   challenge_type: "dns-01"
+authorization finalized     authz_status: "valid"
+certificate obtained successfully
+```
+
+Nine seconds between the first and second — a TXT record written, propagated,
+and read back. Revert the variable afterwards: it means something different at
+cutover, when it becomes the apex redirecting to the canonical host. The
+certificate stays in storage, which is one fewer thing to obtain on the day.
+
+### A known error the switch introduces
+
+Selecting `acme-cloudflare` makes Caddy retry a public certificate for
+`redirect-disabled.localhost` — the placeholder host used when
+`SITE_REDIRECT_FROM` is unset — forever, with backoff:
+
+```
+[redirect-disabled.localhost] Obtain: subject 'redirect-disabled.localhost'
+does not qualify for a public certificate
+```
+
+This corrects reasoning previously written here and in #107, which held that
+non-public names are unaffected because Caddy issues those from its internal CA
+regardless of the configured issuer. **It does not.** Naming an explicit ACME
+issuer in a `tls` block overrides the automatic internal-CA selection, so a
+`.localhost` subject gets an ACME attempt that can never succeed.
+
+It is noise rather than breakage: real certificates are unaffected, the site
+serves, and the retry backs off. It disappears when `SITE_REDIRECT_FROM` is set
+to a real hostname at cutover. A proper fix would give that block `tls internal`
+when the name cannot hold a public certificate.
 
 ## Closing the origin
 

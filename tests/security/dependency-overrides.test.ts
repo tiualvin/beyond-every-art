@@ -34,9 +34,10 @@ const OVERRIDES: Record<string, { floor: string; reason: string }> = {
     floor: '3.1.6',
     reason:
       'Host confusion via backslash authority, plus four more high-severity ' +
-      'fast-uri advisories (IDN canonicalization, IPv6 SSRF, hostname ' +
-      'percent-decoding SSRF, percent-encoded scheme host confusion) all ' +
-      'fixed in 3.1.6, via @payloadcms/plugin-mcp.',
+      'advisories from September — IDN canonicalization, percent-encoded ' +
+      'scheme normalization, malformed-IPv6 SSRF, and SSRF through repeated ' +
+      'hostname percent-decoding — all fixed in 3.1.6. Via ' +
+      '@payloadcms/plugin-mcp, which reaches it through the MCP SDK’s ajv.',
   },
   hono: {
     floor: '4.12.34',

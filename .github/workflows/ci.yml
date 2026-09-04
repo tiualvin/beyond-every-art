@@ -488,11 +488,18 @@ jobs:
           set -eu
           cd "$DEPLOY_PATH"
 
+          # Which step was running when it died. The container dump below is
+          # a hundred lines long, so without this the one line that says what
+          # actually failed is somewhere in the middle of a fortnight of
+          # postgres checkpoints — which is how the 2 Sep failure read.
+          stage=start
+
           deployment_diagnostics() {
             status=$?
             trap - EXIT
             if [ "$status" -ne 0 ]; then
-              echo "Deployment failed; current container state:" >&2
+              echo "Deployment failed during: $stage" >&2
+              echo "Current container state:" >&2
               docker compose ps --all >&2 || true
               echo "Recent service logs:" >&2
               docker compose logs --no-color --tail=100 \
@@ -502,7 +509,29 @@ jobs:
           }
           trap deployment_diagnostics EXIT
 
-          git fetch --no-tags origin main:refs/remotes/origin/main
+          # Anonymous over HTTPS: this repository is public, so the fetch needs
+          # no credential at all. On 2 Sep it asked for one anyway and the
+          # deploy died at the first command with `could not read Username for
+          # 'https://github.com'` — a host-side problem, not a bad commit, and
+          # nothing on the box had been touched when it happened.
+          #
+          # The message says so, because the failure looks alarming and is not:
+          # a fetch that never ran leaves the previous release serving.
+          stage="fetching origin/main"
+          if ! git fetch --no-tags origin main:refs/remotes/origin/main; then
+            echo "Could not fetch origin/main on the deploy host." >&2
+            echo "This repository is public, so an anonymous HTTPS fetch needs" >&2
+            echo "no credential. A prompt for a username means the remote URL" >&2
+            echo "carries one, or a credential helper on this host is forcing" >&2
+            echo "an authenticated request GitHub then refuses." >&2
+            echo "Check 'git remote -v' and" >&2
+            echo "'git config --get-all credential.helper' in the deploy" >&2
+            echo "checkout on the host. The path is not printed here: it comes" >&2
+            echo "from VPS_DEPLOY_PATH, and a secret does not belong in a log." >&2
+            echo "Nothing was deployed and nothing was changed: the previous" >&2
+            echo "release is still running." >&2
+            exit 1
+          fi
           git merge-base --is-ancestor "$DEPLOY_SHA" origin/main
           current_sha=$(git rev-parse HEAD)
           if git merge-base --is-ancestor "$DEPLOY_SHA" "$current_sha"; then
@@ -516,12 +545,27 @@ jobs:
           git reset --hard "$DEPLOY_SHA"
           echo "Deploying tested commit $(git rev-parse HEAD)"
 
+          # Read by `docker-compose.yml` and passed into the image builds, where
+          # it sits immediately above `COPY . .` so that layer changes with every
+          # commit. `COPY . .` is content-addressed and should invalidate on its
+          # own; on 1 Sep it did not. One deploy of b00266c copied the new tree
+          # in the `migrator` stage (`#12 DONE 23.0s`) and took the `builder`
+          # stage from cache (`#12 CACHED`), so `pnpm build` ran against the
+          # previous commit and shipped a bundle with a new build id and none of
+          # the change in it. The deploy reported success — containers recreated,
+          # health verified — and the admin panel stayed broken, because
+          # everything after a wrong `COPY` is built correctly from the wrong
+          # source. Nothing downstream can notice that.
+          export SOURCE_COMMIT="$DEPLOY_SHA"
+
           # Schema migrations run to completion before any container is
           # replaced. A migration that fails then leaves the previous release
           # serving an unchanged database, instead of starting a new release
           # against a schema it does not match. `run` starts the postgres
           # dependency and waits for its health check on its own.
+          stage="building the migrator"
           docker compose build migrate
+          stage="running schema migrations"
           docker compose run --rm migrate
 
           # Caddy is pulled rather than built: compiling it here is what
@@ -559,9 +603,11 @@ jobs:
           # a substitute for swap on this box, which is the actual fix — see
           # docs/DEPLOYMENT_STATUS.md — but it stops the deploy being the thing
           # that discovers the ceiling.
+          stage="building the app image"
           docker compose build app
           docker compose build backup
 
+          stage="starting the containers"
           docker compose up -d --wait --wait-timeout 180
           docker compose ps --all
 
@@ -596,6 +642,50 @@ jobs:
             docker compose logs --no-color --tail=50 caddy >&2
             exit 1
           fi
+
+          # A running Caddy is not necessarily a *current* Caddy.
+          #
+          # `Caddyfile` and `ads.txt` reach the container through single-file
+          # bind mounts, and a single-file mount binds the inode rather than the
+          # path. `git reset --hard` above does not edit files in place: it
+          # writes new files and renames them over the old ones, giving new
+          # inodes. The container goes on serving the ones it started with, and
+          # `docker compose up -d` sees no reason to replace it because the
+          # service *definition* is unchanged — only the contents of a file it
+          # mounts.
+          #
+          # Measured on 2026-08-31, which is why this exists: the host Caddyfile
+          # carried a new redirect block, the container's did not, the two files
+          # had different inodes, and `caddy reload` reported success having
+          # faithfully re-read the stale one. Every symptom said the change had
+          # deployed.
+          #
+          # So compare, and recreate when they differ rather than assuming.
+          # Recreating Caddy is cheap and safe: it holds no state, its
+          # certificates and config live in named volumes, and the cost is a
+          # sub-second blip against a change silently not shipping.
+          caddy_file_stale() {
+            host_sum=$(sha256sum "$1" | cut -d' ' -f1)
+            container_sum=$(docker compose exec -T caddy sha256sum "$2" 2>/dev/null \
+              | awk '{print $1}')
+            [ "$host_sum" != "$container_sum" ]
+          }
+
+          if caddy_file_stale Caddyfile /etc/caddy/Caddyfile \
+            || caddy_file_stale ads.txt /srv/ads.txt; then
+            echo "Caddy is serving a stale bind-mounted file; recreating it."
+            docker compose up -d --force-recreate caddy
+            sleep 10
+          fi
+
+          # Re-read rather than trust the recreate. A mount that is still stale
+          # here is a broken deploy however green everything above it looked.
+          if caddy_file_stale Caddyfile /etc/caddy/Caddyfile \
+            || caddy_file_stale ads.txt /srv/ads.txt; then
+            echo "Caddy is still serving a stale file after a forced recreate." >&2
+            docker compose logs --no-color --tail=50 caddy >&2
+            exit 1
+          fi
           docker compose exec -T app node -e '
             fetch("http://127.0.0.1:3000/health/", {
               signal: AbortSignal.timeout(10000),
@@ -612,6 +702,28 @@ jobs:
                 process.exit(1)
               })
           '
+
+          # What is actually running, asked of the running container rather
+          # than inferred from the steps above.
+          #
+          # Health is not identity. On 1 Sep two deploys passed every check
+          # here — checkout advanced, containers recreated, /health returning
+          # ok — while serving the previous commit, because a cached `COPY` fed
+          # `pnpm build` the wrong tree. The old code is healthy, so nothing
+          # above can notice; the admin panel stayed blank through both. The
+          # Next build id even changed each time, which looks like proof of a
+          # rebuild and is not.
+          #
+          # The image is stamped with the commit it was built from, so this is
+          # a direct comparison. A deploy that ships the wrong source now fails
+          # here instead of reporting success.
+          running_sha=$(docker compose exec -T app printenv SOURCE_COMMIT 2>/dev/null | tr -d '\r\n' || true)
+          if [ "$running_sha" != "$DEPLOY_SHA" ]; then
+            echo "The running image was built from '${running_sha:-<unset>}', not $DEPLOY_SHA." >&2
+            echo "The deploy completed but shipped the wrong sources; check for a cached COPY in the app image build." >&2
+            exit 1
+          fi
+          echo "Verified the running image was built from $DEPLOY_SHA"
           trap - EXIT
           REMOTE
       - name: Remove the SSH key

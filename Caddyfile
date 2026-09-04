@@ -72,6 +72,70 @@
   # the redirect table, which it does by connecting to the app's own loopback
   # address rather than through this proxy, so refusing it here costs the site
   # nothing and stops an anonymous caller reading the migration's URL map.
+  # `/ads.txt` is answered here rather than by the application.
+  #
+  # Neither route through the app works today, and the second fails quietly:
+  # `output: 'standalone'` skips `public/`, and the file lives at the
+  # repository root anyway, which was never a URL Next would answer; and
+  # `middleware.ts` excludes any path containing a dot, so a redirect row for
+  # this path can sit in Payload looking perfectly configured and never run.
+  # `pnpm validate:redirects` reports both as errors, which is how this was
+  # found rather than discovered on cutover day.
+  #
+  # Serving it at the edge also keeps it clear of `trailingSlash: true`, which
+  # puts every Next route at its slashed form while an ads.txt crawler asks for
+  # `/ads.txt` exactly. Answering before the proxy means that question never
+  # has to be settled.
+  #
+  # An unreadable ads.txt is not a degraded one: buyers treat it as absent,
+  # which makes the inventory unauthorised. See docs/ADVERTISING.md §1.
+  #
+  # The file is bind-mounted from the repository root (docker-compose.yml), so
+  # the committed file is the one served and there is no second copy to drift
+  # out of step with it.
+  handle /ads.txt {
+    root * /srv
+    file_server
+  }
+
+  # Ghost's four child sitemaps, sent to the one this site publishes.
+  #
+  # Ghost split its sitemap into `/sitemap-posts.xml`, `-pages`, `-tags` and
+  # `-authors`, with `/sitemap.xml` as an index over them. This site publishes a
+  # single flat `/sitemap.xml` instead, so the four children have nothing behind
+  # them and 404 — confirmed on staging, where each returned Next's HTML error
+  # page rather than XML.
+  #
+  # They cannot be redirected in the application, for the same reason `/ads.txt`
+  # cannot be served by it: `middleware.ts` excludes any path containing a dot,
+  # so a redirect row for one of these imports cleanly, shows as enabled, and
+  # never fires. `docs/SEO_AND_REDIRECTS.md` names this class explicitly.
+  #
+  # It matters because Google holds these URLs independently of the pages they
+  # list — from Ghost's sitemap index and from Search Console — and keeps asking
+  # for them after the pages have moved. A 404 there is a reported sitemap
+  # failure rather than a lost page, which is why this is a 301 to the live
+  # sitemap rather than a 410: the answer to "where is the sitemap" is not
+  # "nowhere", it is "over here".
+  #
+  # Answering at the edge also keeps these clear of `trailingSlash: true`, which
+  # would otherwise put a dotted path's redirect target at its slashed form.
+  # Written as a site-level `redir` with a named matcher, not as a `redir`
+  # inside a `handle`. `redir` takes an optional matcher as its *first*
+  # argument — `redir [<matcher>] <to> [<code>]` — so `redir /sitemap.xml 301`
+  # inside a handle block does not mean what it looks like: Caddy reads
+  # `/sitemap.xml` as the matcher and `301` as the destination, and defaults
+  # the status to 302. Adapting that form produces
+  # `status: 302, Location: "301"` on a route that can never match, and the
+  # handle block, left with nothing to do, answers 200 with an empty body.
+  # That shipped once and had to be caught by probing the live host.
+  #
+  # A named matcher cannot be confused for a destination, so this form says
+  # what it does. `redir` also sorts ahead of `handle` in Caddy's directive
+  # order, which keeps it clear of the catch-all proxy below.
+  @ghostSitemaps path /sitemap-posts.xml /sitemap-pages.xml /sitemap-tags.xml /sitemap-authors.xml
+  redir @ghostSitemaps /sitemap.xml 301
+
   @staffOnly {
     path /api* /admin* /redirects-map* /oauth* /.well-known/oauth-*
     not path /api/media/file/* /api/preview*

@@ -12,6 +12,7 @@ import {
   type PostDetail,
 } from '@/lib/content/queries'
 import { shareImageSrc } from '@/lib/content/media'
+import { RELATED_QUERY_LIMIT, splitRelated } from '@/lib/content/related'
 import { logMissingRoute } from '@/lib/observability/missing-route'
 import { getPreviewMode } from '@/lib/preview/mode'
 import {
@@ -178,11 +179,16 @@ export default async function SlugPage({
   const { post } = resolved
   const [settings, related] = await Promise.all([
     getSiteSettings(),
+    // Six rather than three, split between the rail and "Read next" below.
+    // One query either way: `getRelatedPosts` takes the limit and `cachedRead`
+    // keys on its arguments, so this is the same round trip it always was.
     getRelatedPosts(
       post.slug,
       post.tags.map((tag) => tag.slug),
+      RELATED_QUERY_LIMIT,
     ),
   ])
+  const { readNext, rail } = splitRelated(related)
   const siteUrl = getSiteUrl()
   const url = post.canonicalURL || absoluteUrl(postPath(post.slug), siteUrl)
 
@@ -216,8 +222,8 @@ export default async function SlugPage({
         <BlockJsonLd key={index} node={node} />
       ))}
       {showBanner && <DraftBanner />}
-      <Article post={post} preview={draft} />
-      <ReadNext posts={related} topic={post.tags[0]?.name} />
+      <Article post={post} related={rail} preview={draft} />
+      <ReadNext posts={readNext} topic={post.tags[0]?.name} />
     </>
   )
 }

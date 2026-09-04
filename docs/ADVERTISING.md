@@ -23,13 +23,12 @@ ship yet, for reasons that have nothing to do with the code:
 2. There is no consent management platform. For EEA/UK traffic that is not a
    nice-to-have, it is the thing Google requires before it will serve ads at
    all.
-3. `/ads.txt` is served on Ghost by a redirect, and neither that redirect nor
-   the root file survives the cutover — the redirect because middleware skips
-   dotted paths, the file because Next does not serve the repository root.
-   Still open, and worth reading because the redirect half fails silently.
+3. `/ads.txt` is now served by Caddy from the repository-root file (§1).
+   Closed on 29 Aug, with one operator action left: delete the dead redirect
+   row in Payload, which can never run and which `validate:redirects` reports.
 
-The order that follows from this is: settle ads.txt at cutover, build consent,
-cut over, apply, then wire the ad layer behind a flag. §7 lays it out, §8 plans
+The order that follows from this is: build consent, cut over, apply, then wire
+the ad layer behind a flag. `ads.txt` is no longer part of that sequence. §7 lays it out, §8 plans
 the placements, and §9 evaluates the consent platforms.
 
 The more important point is in §6: **the ceiling on RPM is traffic, not
@@ -76,39 +75,50 @@ not a degraded `ads.txt` — buyers treat an unreadable file as an absent one,
 which makes the inventory unauthorised. The file exists precisely to prevent
 that, so a broken one inverts its own purpose.
 
-**Where it stands.** The file stays at the repository root, as the record of
-what the Ghost redirect points at, and the application does not serve it. That
-is the arrangement the site runs on today, and it is deliberate — the point of
-this section is that it has an expiry date, not that it is wrong now.
+**Settled on 29 Aug: Caddy serves the file.** A `handle /ads.txt` block in the
+public site block, evaluated before the catch-all `reverse_proxy`, serving the
+repository-root file bind-mounted read-only at `/srv/ads.txt`.
+
+This was found by running `pnpm validate:redirects` against staging rather than
+by reading code on cutover day. It reported both halves as errors — the
+middleware matcher skipping the path, and the path answering 404 — which is
+what that tool exists for.
+
+Three reasons this beats the two options previously written here:
+
+- **One copy.** The committed file is the file served. `public/ads.txt` would
+  have been a second source of truth for a third party's records, and
+  `output: 'standalone'` skips `public`, so it would have worked under
+  `next dev` and 404'd in production — correct exactly where nobody checks.
+- **No target to host.** A `redir` needs somewhere to redirect _to_, which for
+  a self-hosted file means hosting it twice over.
+- **Clear of `trailingSlash`.** Answering before the proxy means the question
+  of whether `/ads.txt` reaches Next as `/ads.txt` or `/ads.txt/` never arises.
+
+Verified against a real Caddy binary before shipping: `GET /ads.txt` returns
+200 with `Content-Type: text/plain; charset=utf-8` and the file's body, with no
+redirect to the slashed form, while other paths still reach the app.
+
+**One operator action remains.** The `/ads.txt` row in the `Redirects`
+collection is dead configuration — the middleware can never run it — and it is
+what `validate:redirects` still reports. Delete it in Payload admin. Caddy
+answers the path now, so the row protects nothing and only produces a
+recurring error in a tool whose value depends on a clean run meaning something.
+
+The redirect becomes the better answer again the day a managed partner hosts
+the file — see the end of §6. At that point replace the `handle` block with a
+`redir`, and delete the mount.
 
 [`../tests/seo/ads-txt.test.ts`](../tests/seo/ads-txt.test.ts) pins it: the
-file is at the root, it is not in `public`, its records parse, and it ends with
-a newline (it was originally committed without one, and some parsers drop an
-unterminated final record — which, in a one-record file, is all of them). The
-`public` check is there because moving the file is how the serving mechanism
-would change by accident rather than by decision.
+file is at the root and not in `public`, the Caddyfile serves it at exactly
+`/ads.txt`, `docker-compose.yml` mounts it read-only, its records parse, and it
+ends with a newline (it was originally committed without one, and some parsers
+drop an unterminated final record — which, in a one-record file, is all of
+them). The serving path spans two files and either alone is a 404, which no
+build or app-level test would catch.
 
-**So `/ads.txt` has to be settled before cutover, and there are two ways.**
-They are mutually exclusive, because a file the app serves is never reached by
-a redirect:
-
-- _Keep the redirect._ A Caddy rule, not a middleware change: `redir /ads.txt
-<target> permanent` in the site block, evaluated before the catch-all
-  `reverse_proxy`. Prefer this to loosening the middleware matcher, which would
-  put every dotted path through a redirect-map lookup to fix one file. This
-  becomes the clearly better answer the day a managed partner hosts the file —
-  see the end of §6.
-- _Serve it from the app._ Move the file to `public/ads.txt` **and** add
-  `COPY --from=builder --chown=nextjs:nodejs /app/public ./public` to the
-  `Dockerfile` runner stage in the same change. Neither half works alone: with
-  no `COPY` the file 404s in production while working under `next dev`, and
-  with no `public` directory the `COPY` fails the build outright. `trailingSlash:
-true` does not apply to files in `public`; they are served at the exact
-  path.
-
-Either way this is a cutover checklist item rather than a launch-day discovery.
-Whichever is chosen, verify it by fetching `https://<domain>/ads.txt` and
-reading the body, not the status code.
+Verify after cutover by fetching `https://<domain>/ads.txt` and reading the
+body, not the status code.
 
 ## 2. Consent is the real blocker
 
@@ -223,7 +233,7 @@ inspected in a browser; the ad layer should be a third instance of that, in a
 | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `config`      | Read the environment into a resolved configuration, or null when ads are off. One place that decides "are ads on".                                                         |
 | `providers`   | The provider contract, and an AdSense implementation of it. A provider declares its script origins, frame origins, connect origins, its loader, and how it renders a slot. |
-| `placements`  | Placement names as a public contract — `article-top`, `article-mid`, `article-end`, `archive-inline`.                                                                      |
+| `placements`  | Placement names as a public contract — the ID column of §8's inventory, which is what a component asks for by name.                                                        |
 | `eligibility` | One predicate: should this request see ads.                                                                                                                                |
 
 The placement names are the part that does the futureproofing, and they work
@@ -347,14 +357,30 @@ Placements are decided here, in advance, rather than discovered by dragging
 units around a live site. Two constraints from this codebase set most of the
 answers, and both are measured rather than assumed.
 
-**The reading column is 704px, so a leaderboard does not fit in it.**
-`.article__inner` is `max-width: 44rem` and `.container` adds `1.5rem` of
-padding either side. The usable width inside an article is therefore 704px at
-every viewport above that — narrower than the 728px of a standard leaderboard,
-and far narrower than 970px. In-article units must be sized for 704px or less:
-336×280, 300×250, or a responsive unit capped at the column. The 72rem
-container on listing pages is a different story — 1104px usable, where the wide
-formats do fit.
+**The reading column is 704px, and there is one track beside it.** This
+paragraph once said 704 for the wrong reason — `.article__inner` is
+`max-width: 44rem` with `.container`'s `1.5rem` padding coming out of it under
+`border-box`, so the column was 656px, not 704 — and the post template has
+since been rebuilt around two tracks, which is what
+[`POST_PAGE_LAYOUT.md`](POST_PAGE_LAYOUT.md) records and
+[`../tests/design/article-layout.test.ts`](../tests/design/article-layout.test.ts)
+pins. The widths a unit can be sized against are now:
+
+| Track                | ≥1280 |
+| -------------------- | ----- |
+| Text column          | 704   |
+| Rail                 | 300   |
+| Full block, less pad | 1052  |
+
+Two tracks and one width, at every desktop size. A notes margin between them
+was tried and removed: most articles had nothing to hang in it, and an empty
+column reads worse than white space.
+
+An in-column unit is sized for the measure — 336×280, 300×250, or a responsive
+unit capped at 704 — because a leaderboard does not fit in a reading column at
+any width. What the rail adds is a 300px column, and an end-of-article unit
+placed across the whole block has room for 970×250. The 72rem container on
+listing pages is unchanged at 1104px usable.
 
 **The featured image is the LCP element.** `FeaturedFigure` renders with
 `priority`, which is Next telling the browser this is the largest contentful
@@ -364,31 +390,58 @@ in this plan, at any breakpoint. That is the single most valuable inventory
 slot on most sites and it is deliberately left empty here; taking it would cost
 LCP on every article, which is the page type the whole site exists to serve.
 
+The split hero sharpens this rather than softening it. Title and image now sit
+side by side from 1280 up, so the hero spans both tracks and the rail begins
+level with the body — which is exactly where the first rail slot goes, below
+the hero and clear of the element the browser is painting for LCP. A unit
+beside the image rather than above it still competes for the same network, so
+that slot's request is deferred to idle.
+
 ### Inventory
 
-| ID                 | Template             | Position                               | Desktop             | Mobile  | Reserved    |
-| ------------------ | -------------------- | -------------------------------------- | ------------------- | ------- | ----------- |
-| `article-inline-1` | `/[slug]` post       | After the 3rd body block               | 336×280             | 300×250 | 280 / 250px |
-| `article-inline-2` | `/[slug]` post       | After the 9th body block               | 336×280             | 300×250 | 280 / 250px |
-| `article-inline-3` | `/[slug]` post       | After the 15th body block              | 336×280             | 300×250 | 280 / 250px |
-| `article-end`      | `/[slug]` post       | Below the author card, above Read Next | 728×90 → capped 704 | 300×250 | 90 / 250px  |
-| `archive-inline`   | journal, tag, author | After every 6th entry row              | 970×250             | 300×250 | 250px       |
-| `home-mid`         | `/`                  | Between Featured and Topics            | 970×250             | 300×250 | 250px       |
+| ID                 | Track / template     | Position                                          | Desktop | Mobile  | Reserved    |
+| ------------------ | -------------------- | ------------------------------------------------- | ------- | ------- | ----------- |
+| `rail-1`           | Rail, `/[slug]`      | Above the related pieces, inside the sticky group | 300×250 | —       | 250px       |
+| `article-inline-1` | Text, `/[slug]`      | After the 5th body block                          | 336×280 | 300×250 | 280 / 250px |
+| `article-end`      | Block, `/[slug]`     | Below the author card, above Read Next            | 970×250 | 300×250 | 250px       |
+| `archive-inline`   | journal, tag, author | After every 6th entry row                         | 970×250 | 300×250 | 250px       |
+| `home-mid`         | `/`                  | Between Featured and Topics                       | 970×250 | 300×250 | 250px       |
 
-Six identified placements, of which **three should be live at launch**:
-`article-inline-1`, `article-end`, and `archive-inline`. The rest are defined
-so the slots exist and the names are stable, and enabled later against
-measurements rather than optimism.
+Five identified placements, of which **four should be live at launch**: all but
+`home-mid`. `.rail__slot` in `app/globals.css` already reserves `rail-1`'s
+250px, so turning it on is a fill rather than a re-layout — and the reservation
+holds at every window height, because the sticky group shrinks its related list
+rather than the unit or the newsletter card (`docs/POST_PAGE_LAYOUT.md`).
+
+**The rail carries one unit, not three.** An earlier version of this table had a
+ladder of three, spaced a viewport apart down a rail that scrolled with the
+page. The rail's modules are now a single sticky group — the slot, the related
+pieces and the newsletter travel with the reader — and a sticky group has room
+for exactly one. That is a real trade: three sequential impressions become one
+with near-perfect viewability, and by the rule below it cannot be refreshed to
+recover the other two. Whether long exposure on one unit beats three glances is
+a per-slot measurement rather than something to settle here.
+
+`article-inline-2` and `-3` remain retired: one unit inside the reading column
+rather than three.
 
 ### Rules that go with it
 
-**Cap in-article density by length, not by count.** `article-inline-2` renders
-only if the body has at least 14 block-level children, `-3` only at 20. A
-600-word piece gets one unit; a 4,000-word pigment-chemistry essay gets three.
-The alternative — a fixed count — puts three units in a short post, which is
-where ad density complaints and Better Ads Standards violations come from. Keep
-total ad area under roughly 30% of page height on mobile, which is the
-Coalition for Better Ads threshold Chrome enforces.
+**Two units can share a screen, and only two.** The sticky rail unit is in view
+for most of the article by design, so `article-inline-1` passes it once. That
+screen is the ceiling: 336×280 plus 300×250 is 13% of a 1440×900 screen,
+against the 30% Coalition for Better Ads threshold Chrome enforces. There is no
+third unit above the fold to add to it, which is what the single-unit rail buys
+back.
+
+An earlier version of this section reasoned rather than measured: it claimed one
+unit visible per screen and spaced a three-unit rail at `140vh`, and the built
+layout put three in one screen a third of the way down a 9-minute article. The
+rail carrying one unit removes the question.
+
+**The sticky unit is not refreshed.** A unit that stays in view for a whole
+article is the classic case for refresh, and refresh is the classic way to turn
+a rail into a nuisance. One impression, high viewability, no reload.
 
 **Never split a figure from its caption.** Insertion counts top-level block
 children of the body and must skip a position that would land between a

@@ -7,6 +7,11 @@ import { toMediaImage } from '@/lib/content/media'
 // A grid cell is at most half the body column on a phone and a third of it on
 // a wide screen. Stated so the browser does not download a full-width file to
 // paint a thumbnail.
+//
+// A row fills the reading column and stops there: with the notes margin gone
+// the column is the whole track, so 44rem is both the measure and the widest a
+// gallery ever gets. tests/design/article-layout.test.ts checks that against
+// the stylesheet rather than trusting this comment.
 const GRID_SIZES = '(max-width: 40rem) 50vw, (max-width: 64rem) 33vw, 22rem'
 const ROW_SIZES = '(max-width: 47rem) 100vw, 44rem'
 
