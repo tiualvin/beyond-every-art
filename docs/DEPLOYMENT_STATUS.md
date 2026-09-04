@@ -92,11 +92,13 @@ In dependency order, what is left before the public cutover:
    the one post carrying a `<table>`, draft URLs actually returning 404, the
    admin panel and draft preview, the forms, the email-delivery test, and §5–§6.
 
-   Two items from that audit are still open and both are small: **media id 4
-   has no bytes in R2** and needs re-uploading through the admin under a
-   filename ending `.jpeg`, and the **tag count** is 10 in Payload against 9 in
-   Ghost's sitemap, which an unpublished or empty tag would explain but nobody
-   has confirmed.
+   One item from that audit is still open, and it is small: **media id 4 has no
+   bytes in R2** and needs re-uploading through the admin under a filename
+   ending `.jpeg`. The **tag count** — 10 in Payload against 9 in Ghost's
+   sitemap — was the other, and the 4 Sep pass closed it: the tenth tag is
+   `news`, filed against no post, and an empty tag archive is a page Ghost 404s
+   and this site served 200. The sitemap now lists only tags with a published
+   post behind them, so the two counts agree.
 
 2. **Members CSV.** Export from Ghost Admin and import. Low stakes now — there
    are no paying members, so this is the newsletter list rather than billing
