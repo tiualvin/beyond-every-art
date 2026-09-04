@@ -13,6 +13,7 @@ import {
   type GhostExport,
   type GhostPost,
 } from './ghost-export'
+import { stripGhostUrlPlaceholders } from './link-rewrite'
 import { collectMediaUrls } from './media'
 import { isReservedRootSlug } from '../seo/reserved-slugs'
 import { isWellFormedSlug } from '../seo/slug-format'
@@ -127,6 +128,26 @@ export interface MigrationPlan {
 
 function undef<T>(value: T | null | undefined): T | undefined {
   return value === null || value === undefined ? undefined : value
+}
+
+/**
+ * A Ghost `canonical_url`, with the site-origin placeholder resolved away.
+ *
+ * Ghost stores an internal canonical as `__GHOST_URL__/some-post/` and expands
+ * the placeholder when it renders the tag. Passing the raw value through gave
+ * one migrated post a canonical of
+ * `https://<host>/__GHOST_URL__/fine-art-home-guide/` — a URL that does not
+ * exist, on a tag whose whole job is to tell a crawler which URL does. Nothing
+ * caught it: `validate.ts` compares the stored value against the export's, and
+ * the export's value is the placeholder, so it round-tripped as "preserved".
+ *
+ * Stripping leaves a root-relative path, which is what the renderer wants. Next
+ * resolves it against `metadataBase`, so it stays correct when the origin
+ * changes at cutover — which an absolute URL baked in at import would not.
+ */
+function canonical(value: string | null | undefined): string | undefined {
+  const resolved = stripGhostUrlPlaceholders(undef(value)).html
+  return resolved === '' ? undefined : resolved
 }
 
 function toStatus(status: GhostPost['status']): ContentStatus {
@@ -245,7 +266,7 @@ export function buildMigrationPlan(ghost: GhostExport): MigrationPlan {
           legacyHTML: html,
           metaTitle: undef(meta?.meta_title),
           metaDescription: undef(meta?.meta_description),
-          canonicalURL: undef(post.canonical_url),
+          canonicalURL: canonical(post.canonical_url),
           ghostID: post.id,
         },
       })
@@ -276,7 +297,7 @@ export function buildMigrationPlan(ghost: GhostExport): MigrationPlan {
         legacyHTML: html,
         metaTitle: undef(meta?.meta_title),
         metaDescription: undef(meta?.meta_description),
-        canonicalURL: undef(post.canonical_url),
+        canonicalURL: canonical(post.canonical_url),
         featured: Boolean(post.featured),
         visibility: toVisibility(post.visibility),
         ghostID: post.id,

@@ -11,7 +11,48 @@ Related: [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md),
 
 ## Pick up here
 
-Last worked on **30 Aug 2026**. The content audit below closed most of the
+Last worked on **4 Sep 2026**. A cutover-readiness pass that compared the
+rendered output of all 113 posts on staging against the same posts on the live
+Ghost site, rather than querying Postgres or crawling staging alone. That choice
+is again the reason it found anything: every defect below is a difference
+between the two sites, and none of them is visible from either one on its own.
+Read "The 4 Sep comparison audit" under Done.
+
+**Four defects, all fixed in code; two need an operator to finish.**
+
+1. `/topics` in the header navigation 404'd on every page of the site — the
+   `header` global is empty, so the code fallback is the live menu, and no route
+   claims that path. Now the homepage's topics section.
+2. `fine-art-home-guide` served a canonical of
+   `.../__GHOST_URL__/fine-art-home-guide/`. The importer strips the placeholder
+   now, so the final production migration repairs it — **or run
+   `docker compose run --rm migrate pnpm fix:ghost-links` sooner**, which now
+   scans `canonicalURL` as well as `legacyHTML`.
+3. The tenth tag is `news`, filed against nothing: a 200 page in the sitemap
+   that Ghost 404s. The sitemap now lists only tags a listed post is filed
+   under.
+4. Titles. The layout appended ` — Beyond Every Art` to everything, so **none of
+   the 113 post titles matched Ghost's**, the median grew from 59 to 78
+   characters, and three posts carrying a hand-written suffix got it twice. The
+   homepage had lost its Ghost title and meta description outright. Ghost's rule
+   is restored: bare on posts and pages, suffixed on the archives,
+   brand-plus-tagline on the homepage.
+
+**Still open from that pass, and needing an operator:** media id 4 is still
+missing from R2 (see §4 of the rehearsal — it is the only broken image on the
+site, on a published post), and the `cms` hostname conflicts with closing the
+origin in a way nobody has decided — see the new note under
+[`EDGE_PROTECTION.md`](EDGE_PROTECTION.md#closing-the-origin), which is now a
+decision the origin-closing sitting has to make before it starts, not after.
+
+What that pass confirmed working, so nobody re-checks it: staging is on the
+current build, is proxied behind Cloudflare, still carries `NEXT_PUBLIC_NOINDEX`
+and its meta tag, answers `/health` with `status: ok`, serves every one of
+Ghost's 127 sitemap URLs, 301s all four Ghost child sitemaps, redirects the
+Ghost pagination shapes, serves `/ads.txt`, and returns identical meta
+descriptions on 113 of 113 posts.
+
+Previously worked on **30 Aug 2026**. The content audit below closed most of the
 rehearsal's §4 list and found four real defects, none of which a crawl of
 staging would have surfaced. Read "The content audit" under Done before
 touching content again.
@@ -86,6 +127,75 @@ The reboot that was pending here is done — see "The swap survives a reboot"
 below.
 
 ## Done
+
+- **The 4 Sep comparison audit.** All 113 posts fetched from the live Ghost
+  site and from staging, and their rendered metadata compared field by field.
+  The method is the finding: the 30 Aug audit queried Postgres against the
+  export and was right about everything it looked at, but a field can survive
+  the import perfectly and still render differently, and only two sites side by
+  side show that. Titles are the case in point — every stored `metaTitle` was
+  correct and every rendered `<title>` was wrong.
+
+  **What was compared, and what it said.** Meta descriptions: 113 of 113
+  identical. Canonicals: 112 of 113 identical. `og:image`: present wherever
+  Ghost had one, and 108 of the 109 resolve. Titles: 0 of 113 identical.
+
+  **1. `/topics` 404'd in the masthead of every page.** `SiteHeader` falls back
+  to a hard-coded menu when the `header` global carries no links, and it carries
+  none — on staging or in production — so the fallback _is_ the navigation. One
+  of its four entries named a route that has never existed. What kept it hidden
+  is worth more than the fix: `scripts/seed-dev.ts` fills that global, so every
+  e2e run navigates the seeded menu and the fallback is never rendered. Its own
+  comment says "menus that point at pages nobody has written yet ship 404s in
+  the site chrome" — in the one place the defect could not occur. The list moved
+  to `lib/content/fallback-nav.ts` and `tests/content/nav-links.test.ts` now
+  resolves every entry against the route tree.
+
+  **2. One post's canonical pointed at a URL that does not exist.**
+  `fine-art-home-guide` declared
+  `<link rel="canonical" href="https://<host>/__GHOST_URL__/fine-art-home-guide/">`.
+  Ghost expands that placeholder when it renders; `plan.ts` passed the raw value
+  through. The 30 Aug repair pass could not have caught it — it scans
+  `legacyHTML` only — and neither could `migrate:validate`, which compares the
+  stored value against the export's, where the placeholder is exactly what the
+  export says. A canonical is the one tag whose whole job is to name the right
+  URL, so a broken one is worse than none. The importer strips it now, leaving a
+  root-relative path (which follows the origin across the flip, as an absolute
+  URL baked in at import would not), and `pnpm fix:ghost-links` scans
+  `canonicalURL` too, so the written row can be repaired without a re-import.
+
+  **3. The tag count is explained, and it was a defect.** The tenth tag is
+  `news`, filed against no post. Ghost 404s an empty tag archive; this site
+  served it 200 with an empty state and listed it in `/sitemap.xml`, which is an
+  invitation to index a page the old site never had. `getTagsWithCounts` already
+  applied the right rule to the topic chips, so the empty tag was linked from
+  nowhere and visible only in the sitemap. `referencedTagIds` applies it there
+  too, with a deliberate fallback: a filter that removes _every_ tag is treated
+  as a broken filter rather than an answer, because losing nine real archive
+  URLs is far worse than keeping one thin one.
+
+  **4. Titles, which was the largest of the four.** `layout.tsx` set
+  `template: '%s — <site title>'`, which Next applies to every route that does
+  not opt out. Ghost's actual rule, read off the live site: posts and pages bare
+  (`Why Titanium White Behaves Differently Than Lead White`), tag and author
+  archives suffixed with a hyphen (`Art - Beyond Every Art`), and the homepage
+  `Beyond Every Art | Inspiration, Creativity & Artistry`. Against that, the
+  new site changed all 113 post titles, took the median from 59 to 78 characters
+  — past the ~60 Google displays, on 109 of 113 rather than 54 — and doubled the
+  suffix on the three posts whose author had written one. The homepage had also
+  lost Ghost's title and its 197-character meta description, the latter replaced
+  by the standfirst, which is visible copy on the page and cannot double as a
+  search snippet. `homeTitle` and `metaDescription` are now separate defaults in
+  `lib/content/queries.ts`, posts and pages set `title.absolute`, the archive
+  suffix is a hyphen, and `tests/seo/document-titles.test.ts` pins all of it.
+
+  **A note on the two the fix does not finish.** Media id 4 still has no bytes
+  in R2 and needs an operator to re-upload it as `.jpeg` through the admin; it
+  is the feature image and sharing card of a published post, and the only broken
+  image on the site. And closing the origin now has a decision in front of it:
+  `cms.beyondeveryart.com` is deliberately unproxied, so narrowing 80 and 443 to
+  Cloudflare takes Payload Admin and MCP down for everyone including the
+  operator. Options are written into `EDGE_PROTECTION.md`.
 
 - **The admin panel was blank from 22 Aug to 1 Sep, and why nothing caught it.**
   Found by finally opening it — the rehearsal's "Payload admin loads and

@@ -3,7 +3,11 @@ import type { MetadataRoute } from 'next'
 import { cachedRead, CONTENT_TAGS } from '@/lib/cache/content'
 import { getPayloadClient } from '@/lib/payload'
 import { getSiteUrl } from '@/lib/seo/site'
-import { buildSitemapEntries, type SitemapDoc } from '@/lib/seo/sitemap'
+import {
+  buildSitemapEntries,
+  listableTags,
+  type SitemapDoc,
+} from '@/lib/seo/sitemap'
 
 // Rendered per request so canonical URLs, feeds and JSON-LD come from the
 // running container's environment rather than the build's; the database reads
@@ -17,6 +21,9 @@ type PublishedDoc = {
   /** Posts and Pages only; the archives have no such field to select. */
   noindex?: boolean
 }
+
+/** Tag rows keep their id, which `toDocs` drops and the count below needs. */
+type TagDoc = PublishedDoc & { id: string | number }
 
 function toDocs(docs: PublishedDoc[]): SitemapDoc[] {
   return docs
@@ -103,10 +110,37 @@ const readSlugs = cachedRead(
       }),
     ])
 
+    // Only tags with published posts behind them. Counted per tag rather than
+    // read off the posts, which is what `readTagsWithCounts` does for the topic
+    // chips — the same question, already answered correctly against this data
+    // in production, so this does not rest on assumptions about what a
+    // relationship `select` returns. It is one query per tag, on a read that is
+    // cached and purged on publish. See `listableTags` for the rule and why it
+    // refuses to empty the section.
+    const tagDocs = tags.docs as TagDoc[]
+    const counted = await Promise.all(
+      tagDocs.map(async (tag) => ({
+        tag,
+        publishedPosts: (
+          await payload.count({
+            collection: 'posts',
+            overrideAccess: true,
+            where: {
+              and: [
+                { tags: { in: [tag.id] } },
+                { _status: { equals: 'published' } },
+              ],
+            },
+          })
+        ).totalDocs,
+      })),
+    )
+    const listedTags = listableTags(counted)
+
     return {
       posts: toDocs(posts.docs as PublishedDoc[]),
       pages: toDocs(pages.docs as PublishedDoc[]),
-      tags: toDocs(tags.docs as PublishedDoc[]),
+      tags: toDocs(listedTags),
       authors: toDocs(authors.docs as PublishedDoc[]),
       apps: toDocs(apps.docs as PublishedDoc[]),
     }

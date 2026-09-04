@@ -11,6 +11,15 @@ on cutover day.
 - [ ] Production stack deployed with real `SITE_ADDRESS`, R2, and email config.
 - [ ] `NEXT_PUBLIC_NOINDEX` and `STAGING_BASIC_AUTH` are **unset** in production.
 - [ ] `NEXT_PUBLIC_SITE_URL` is the production URL; canonical/sitemap/RSS use it.
+- [ ] **`SITE_REDIRECT_FROM=beyondeveryart.com`** is set. The apex and the `www`
+      host are different hosts to a browser, a certificate authority and a
+      search engine; Ghost answers both and 301s the apex to `www`, which is the
+      host every indexed URL uses. Leaving this unset disables the redirect
+      block in the `Caddyfile` entirely — deliberate for staging, where the name
+      does not exist and Caddy would fail to get a certificate for it — so the
+      apex stops redirecting the moment DNS moves, and every apex link and typed
+      address lands nowhere. It is the one flip variable that is not about
+      indexing and the easiest to miss.
 - [ ] The `backup` service is running and has produced at least one backup.
 - [ ] DNS TTL for the domain reduced (e.g. to 300s) so the flip propagates fast.
 - [ ] Administrator account exists in production Payload.
