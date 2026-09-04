@@ -92,11 +92,13 @@ In dependency order, what is left before the public cutover:
    the one post carrying a `<table>`, draft URLs actually returning 404, the
    admin panel and draft preview, the forms, the email-delivery test, and §5–§6.
 
-   Two items from that audit are still open and both are small: **media id 4
-   has no bytes in R2** and needs re-uploading through the admin under a
-   filename ending `.jpeg`, and the **tag count** is 10 in Payload against 9 in
-   Ghost's sitemap, which an unpublished or empty tag would explain but nobody
-   has confirmed.
+   One item from that audit is still open, and it is small: **media id 4 has no
+   bytes in R2** and needs re-uploading through the admin under a filename
+   ending `.jpeg`. The **tag count** — 10 in Payload against 9 in Ghost's
+   sitemap — was the other, and the 4 Sep pass closed it: the tenth tag is
+   `news`, filed against no post, and an empty tag archive is a page Ghost 404s
+   and this site served 200. The sitemap now lists only tags with a published
+   post behind them, so the two counts agree.
 
 2. **Members CSV.** Export from Ghost Admin and import. Low stakes now — there
    are no paying members, so this is the newsletter list rather than billing
@@ -386,7 +388,7 @@ below.
      arrived from Ghost that way, so the old site has the same dead links.
      Repaired in the same pass.
   4. **Media id 4 has no bytes in R2 — still open.** The orphan question left
-     in item 0.4.4 below is answered: it is an Unsplash URL that was linked
+     in item 0.4.1 below is answered: it is an Unsplash URL that was linked
      rather than stored, it _is_ used (feature image of a published post), and
      the 22 Aug restore never recovered it. Its source URL still returns 200
      with 222497 bytes, matching the row's `filesize` exactly, so it is
@@ -632,7 +634,7 @@ errors`, and `/swapfile` is `-rw-------`. Its one warning — "non-bind mount
 - **R2 configured and the lost media recovered (22 Aug).** Two buckets, media
   and backups deliberately separate; 109 of 110 images restored from the site
   archive with filenames and document ids intact; first database backup
-  uploaded. Full account, and the two steps still outstanding, in item 0.4.
+  uploaded. Full account, and the one step still outstanding, in item 0.4.
 - **Fixed three bugs found while getting the above working**, all merged to
   `main`:
   - The `app` container had been reporting `unhealthy` since it was created
@@ -654,52 +656,34 @@ errors`, and `/swapfile` is `-rw-------`. Its one warning — "non-bind mount
 
 ## Not done yet
 
-0.1. **Edge protection — the origin is unprotected (operator action).**
-Cloudflare holds the DNS but every record is "DNS only", so there is no DDoS
-mitigation, no edge cache, and the VPS address is public. This is the largest
-open risk in the deployment and it must be closed before the public cutover.
-The procedure, the prepared Caddy image (`docker/caddy/Dockerfile`), and the
-warning about why the proxy cannot simply be toggled on — it breaks HTTP-01
-certificate renewal — are in
-[`EDGE_PROTECTION.md`](EDGE_PROTECTION.md). Blocked on a Cloudflare API token.
+0.1. **Edge protection — five of six steps done; closing the origin is the one
+left (operator action).** Cloudflare held every record as "DNS only" with the
+VPS address public and no DDoS mitigation or edge cache; that is now mostly
+closed. The procedure, the prepared Caddy image (`docker/caddy/Dockerfile`),
+and the warning about why the proxy cannot simply be toggled on — it breaks
+HTTP-01 certificate renewal — are in
+[`EDGE_PROTECTION.md`](EDGE_PROTECTION.md).
 
-Two of the six steps are done. The `caddy` service builds from the prepared
-image with the `caddy-dns/cloudflare` module (#103), so the DNS-01 switch is a
-configuration change rather than a build. And a Hetzner Cloud Firewall now
-fronts the server (24 Aug), attached, with three inbound rules — TCP 22, 80 and
-443 — each sourced from `Any` for now. That closes every other port; it does
-not yet close the origin, because the sources cannot narrow to Cloudflare until
-Cloudflare is the one connecting. Doing it there rather than in `ufw` is not a
-preference: Docker publishes Caddy's ports with its own iptables rules, which
-are evaluated before the chain `ufw` manages, so a `ufw deny 80/tcp` reports
-success and changes nothing.
+Steps 1–5 are done (29 Aug): the Cloudflare API token exists and DNS-01 issues
+certificates through it, proven end to end rather than inferred; the `caddy`
+service builds from the prepared image with the `caddy-dns/cloudflare` module
+(#103); `staging` is proxied behind Full (strict), with `cms` deliberately left
+unproxied so the MCP endpoint keeps answering non-browser clients; and
+`TRUST_CLOUDFLARE_IP=1` is set and confirmed reaching the container.
 
-What is left is therefore the token, the DNS-01 configuration, the proxy
-toggle, `TRUST_CLOUDFLARE_IP=1`, and one edit to two existing firewall rules.
+What is left is step 6, **closing the origin** — see
+[`EDGE_PROTECTION.md#closing-the-origin`](EDGE_PROTECTION.md#closing-the-origin).
+A Hetzner Cloud Firewall already fronts the server (24 Aug) with three inbound
+rules — TCP 22, 80 and 443 — each sourced from `Any` for now; pass two narrows
+the port 80/443 rules to Cloudflare's published ranges, once the proxy is
+confirmed live. Proxying hides the origin from DNS but does not stop anyone who
+already recorded the address, and this one has been public since July, so until
+this step lands an attacker with the old IP bypasses every protection above.
+This is the step where a wrong rule locks the operator out too, so it wants a
+fresh sitting rather than being tacked onto another change — see "Close the
+origin" under Pick up here.
 
-0. **One-time migration baseline (operator action, before the next deploy).**
-   Schema migrations now exist and automatic push is off. The VPS database was
-   built by push, so it must be told the initial migration is already applied
-   before the first deploy that carries this change — otherwise that migration
-   tries to `CREATE TABLE` over live tables and the deploy fails. Take a backup,
-   then run the baseline commands in
-   [`DATABASE_MIGRATIONS.md`](DATABASE_MIGRATIONS.md). The script refuses
-   anything that is not a pre-migrations database, and is safe to rerun.
-   CI history matches that story on both ends: the `deploy` job failed with
-   exit code 1 on the very first push that shipped schema migrations (#48,
-   2026-07-28), then kept failing through the next few pushes while the
-   `HOSTNAME`, `NewsletterBand`, and `DATABASE_URI` bugs above were being
-   tracked down. Starting with the fix for the second of those (2026-08-09,
-   "Don't show the newsletter promo band on the newsletter page", #54), the
-   `deploy` job has succeeded on every push to `main` since — 25+ consecutive
-   green deploys through 2026-08-22 (#98), with no failures in between. That
-   is strong circumstantial evidence the baseline was applied correctly, but
-   it is still inferred from a green `docker compose run --rm migrate` exit
-   code rather than a direct read of the migrations table. An operator can
-   retire this line for good with one command:
-   `docker compose run --rm migrate pnpm migrate:db:status`.
-
-0.4. **Media loss and R2 — recovered on 22 Aug. Two small steps left.**
+0.4. **Media loss and R2 — recovered on 22 Aug. One small step left.**
 
 Recorded in full because the failure was invisible for three weeks and the
 recovery this note originally prescribed would not have worked.
@@ -735,25 +719,20 @@ running it: 0 B transferred.
   preserved, derivatives rebuilt, images confirmed rendering on staging.
 - First database backup taken and uploaded: 2.3 MB, no errors.
 
-**Still to do (minutes of work):**
+Setting `BACKUP_ENCRYPTION_KEY`, proving a restore, and deleting the unencrypted
+backups are all done — see "Backups are encrypted and a restore is proven" and
+"The plaintext archives are gone" above. One item is still open, and the 30 Aug
+content audit (see "The content audit" above) answered the question this used
+to pose:
 
-1. **Set `BACKUP_ENCRYPTION_KEY`.** The first backup uploaded unencrypted and
-   said so on the run. A dump carries the users table, OAuth records, and — once
-   the members import is done — every member email and Stripe identifier. Generate with
-   `openssl rand -base64 32`, put it in `.env`, keep a copy somewhere that is
-   neither this server nor the backup bucket, then re-run the backup and confirm
-   `"encrypted": true`.
-2. **Prove a restore works.** Not yet done, and it is a Phase 1 acceptance
-   criterion in the handoff:
-   `docker compose run --rm --entrypoint tsx backup scripts/restore-database.ts --latest --dry-run`
-3. **Delete the unencrypted backup** once an encrypted one exists and step 2 has
-   passed — not before, since it is currently the only one.
-4. **Media id 4** (`photo-1689659721022-3aa475803e19`) has no copy in the archive
-   and carries no file extension, which suggests it was linked directly rather
-   than stored in Ghost. Check with
-   `SELECT ghost_u_r_l FROM media WHERE id = 4;` and
-   `SELECT slug FROM posts WHERE featured_image_id = 4;` — if no post uses it,
-   ignore it.
+1. **Media id 4** (`photo-1689659721022-3aa475803e19`) has no bytes in R2. It
+   is an Unsplash URL that was linked rather than stored in Ghost, it **is**
+   used — the feature image of a published post — and its source URL still
+   returns 200 with the exact byte count the row expects, so it is
+   recoverable. It also has no file extension, which makes it permanently
+   unreachable through the app's routing on its own (`trailingSlash: true`
+   appends a slash to any extensionless path). Re-uploading it through the
+   admin under `photo-1689659721022-3aa475803e19.jpeg` fixes both at once.
 
 **Two commands worth knowing before touching any of this.** Every SSH session
 needs the environment loaded first, or `$S3_*` are empty and tools fail in
@@ -796,32 +775,7 @@ to the Claude connector. See [`MCP_SERVER.md`](MCP_SERVER.md).
      login is confirmed working for every account that needs access.
    - The deploy SSH user (`VPS_USER`) is currently `root`. Consider a
      dedicated low-privilege deploy user in the `docker` group instead.
-4. **The VPS has no swap, and it is now failing deploys (operator action).**
-   Measured 27 Aug: 3.7GB of RAM, **`Swap: 0B`**, about 2.0GB available with
-   the stack running. The Next.js production build peaks near that on its own,
-   so the deploy of #118 was killed outright by the OOM killer
-   (`failed to execute bake: signal: killed`) — after the same build had
-   succeeded twice earlier the same day. That is a coin flip, not a margin, and
-   it will land on cutover day eventually.
-
-   Add a swapfile. It needs disk, so check first:
-
-   ```bash
-   df -h /
-   fallocate -l 4G /swapfile && chmod 600 /swapfile
-   mkswap /swapfile && swapon /swapfile
-   echo '/swapfile none swap sw 0 0' >> /etc/fstab
-   sysctl -w vm.swappiness=10
-   echo 'vm.swappiness=10' > /etc/sysctl.d/99-swappiness.conf
-   free -h
-   ```
-
-   Low swappiness keeps it as overflow for build spikes rather than something
-   the kernel reaches for while serving. The deploy now also builds the two
-   images one at a time rather than letting bake run them in parallel, which
-   halves the peak — insurance, not a substitute.
-
-5. **Docker image/layer cleanup (operator action).** Nothing automatically
+4. **Docker image/layer cleanup (operator action).** Nothing automatically
    prunes old images or layers on the VPS. That is intentional: an unattended
    prune can remove rollback material and consume I/O at the worst time.
    Periodically inspect `docker system df`, then have an operator review and
@@ -833,12 +787,7 @@ to the Claude connector. See [`MCP_SERVER.md`](MCP_SERVER.md).
    cache safely; images want the review this item describes, since one of them
    is the rollback.
 
-6. **GitHub branch protection (operator action).** Configure the `main` branch
-   in repository settings to require the `checks`, `browser-smoke`,
-   `backup-image`, and `app-image` jobs and disallow bypasses appropriate to
-   the team. The workflow does not mutate repository protection rules or infer
-   who should have bypass authority.
-7. **Lower priority / only if needed later:**
+5. **Lower priority / only if needed later:**
    - ~~Move the image build off the production VPS~~ — **done for Caddy, and it
      was not lower priority.** Compiling Caddy with the Cloudflare module ran
      seventeen minutes on this box without finishing and killed the deploy of
@@ -855,9 +804,10 @@ to the Claude connector. See [`MCP_SERVER.md`](MCP_SERVER.md).
      443, and the deploy reported success anyway. The image is a two-architecture
      manifest list now, and the deploy asserts Caddy is actually running rather
      than trusting `--wait`, which for a service with no healthcheck treats
-     "running" as ready. **Remove `CADDY_IMAGE` from the production `.env`** —
-     it was added by hand to restore service and now only pins the server to
-     whatever it last built.
+     "running" as ready. `CADDY_IMAGE` — added by hand to restore service, and
+     until 29 Aug the only thing pinning the server to whatever it last
+     built — is removed from the production `.env`; see "The pin is off and
+     the published image is proven" above.
 
    - The **app** image is still built on the VPS, deliberately: its
      `NEXT_PUBLIC_CHECKOUT_URL_*` build arguments come from the production

@@ -387,9 +387,10 @@ under `migrations/`, the deploy applies pending migrations before it replaces
 containers, and CI fails when a schema change arrives without one. See
 [`docs/DATABASE_MIGRATIONS.md`](DATABASE_MIGRATIONS.md).
 
-One operator action remains before any schema change deploys: the existing VPS
-database was built by push and has to be baselined once, which is recorded as
-item 0 in [`DEPLOYMENT_STATUS.md`](DEPLOYMENT_STATUS.md).
+The existing VPS database was built by push and needed baselining once before
+any schema change could deploy; that baseline is confirmed applied — see
+"The migrations baseline, confirmed rather than inferred" in
+[`DEPLOYMENT_STATUS.md`](DEPLOYMENT_STATUS.md).
 
 ### Finding 2: `ghostID` blocks authoring new articles — resolved
 
@@ -702,8 +703,8 @@ already truncates a presented key, and an alert ends up in a chat room.
 ### Phase 0 — prerequisites (not MCP work)
 
 1. ~~Establish the Payload migration workflow.~~ Done — see
-   [`DATABASE_MIGRATIONS.md`](DATABASE_MIGRATIONS.md). The remaining operator
-   step is baselining the existing VPS database, item 0 in
+   [`DATABASE_MIGRATIONS.md`](DATABASE_MIGRATIONS.md). Baselining the existing
+   VPS database is done too — see
    [`DEPLOYMENT_STATUS.md`](DEPLOYMENT_STATUS.md).
 
 ### Phases 1 and 2 — built

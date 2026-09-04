@@ -33,12 +33,11 @@ const OVERRIDES: Record<string, { floor: string; reason: string }> = {
   'fast-uri': {
     floor: '3.1.6',
     reason:
-      'Host confusion via backslash authority and, from the September ' +
-      'advisories, again via percent-encoded scheme normalization, plus ' +
-      'server-side request forgery through repeated hostname ' +
-      'percent-decoding. Via @payloadcms/plugin-mcp, which reaches it ' +
-      'through the MCP SDK’s ajv. The floor was 3.1.5 and the three new ' +
-      'advisories all patch at 3.1.6.',
+      'Host confusion via backslash authority, plus four more high-severity ' +
+      'advisories from September — IDN canonicalization, percent-encoded ' +
+      'scheme normalization, malformed-IPv6 SSRF, and SSRF through repeated ' +
+      'hostname percent-decoding — all fixed in 3.1.6. Via ' +
+      '@payloadcms/plugin-mcp, which reaches it through the MCP SDK’s ajv.',
   },
   hono: {
     floor: '4.12.34',
