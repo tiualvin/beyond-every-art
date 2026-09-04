@@ -386,7 +386,7 @@ below.
      arrived from Ghost that way, so the old site has the same dead links.
      Repaired in the same pass.
   4. **Media id 4 has no bytes in R2 — still open.** The orphan question left
-     in item 0.4.4 below is answered: it is an Unsplash URL that was linked
+     in item 0.4.1 below is answered: it is an Unsplash URL that was linked
      rather than stored, it _is_ used (feature image of a published post), and
      the 22 Aug restore never recovered it. Its source URL still returns 200
      with 222497 bytes, matching the row's `filesize` exactly, so it is
