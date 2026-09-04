@@ -1,5 +1,5 @@
 // CLI entry point for repairing Ghost `__GHOST_URL__` placeholders left in
-// migrated post and page bodies.
+// migrated post and page bodies and canonical URLs.
 //
 //   pnpm fix:ghost-links --dry-run     # report only; no database writes
 //   pnpm fix:ghost-links               # rewrite and verify
@@ -26,6 +26,17 @@
 // A real run re-reads every document afterwards and fails if any placeholder
 // survives. Reporting "12 replaced" proves the writes were attempted; the
 // re-read is what proves they landed.
+//
+// Two fields, not one. The first pass scanned only `legacyHTML` and reported
+// itself clean, while `fine-art-home-guide` went on serving
+// `<link rel="canonical" href="https://<host>/__GHOST_URL__/fine-art-home-guide/">`
+// — a canonical pointing at a URL that does not exist, which is the one tag on
+// a page whose entire job is to name the right URL. `canonicalURL` is the only
+// other field Ghost stores a site-relative URL in; the remaining text fields
+// are prose, where a stray placeholder is visible rather than silently
+// misdirecting a crawler. The importer now strips it too
+// (`lib/migration/plan.ts`), so a re-import cannot reintroduce what this
+// repairs — this exists for the rows already written.
 
 import { writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
@@ -68,11 +79,27 @@ type Doc = {
   id: string | number
   slug?: string | null
   legacyHTML?: string | null
+  canonicalURL?: string | null
   _status?: string | null
 }
 
+/** Every field scanned and repaired, in the order the report lists them. */
+const FIELDS = ['legacyHTML', 'canonicalURL'] as const
+
+function placeholdersIn(doc: Doc): string[] {
+  return [...new Set(FIELDS.flatMap((f) => findGhostUrlPlaceholders(doc[f])))]
+}
+
+function occurrencesIn(doc: Doc): number {
+  return FIELDS.reduce(
+    (sum, f) => sum + stripGhostUrlPlaceholders(doc[f]).replaced,
+    0,
+  )
+}
+
 /**
- * Every document in a collection whose body still carries the placeholder.
+ * Every document in a collection still carrying the placeholder in any of
+ * `FIELDS`.
  *
  * `draft: true` reads the latest version, `draft: false` the published row.
  * They are scanned separately rather than as one number because a fix that
@@ -86,7 +113,11 @@ async function findAffected(
 ): Promise<Affected[]> {
   const found = await payload.find({
     collection: collection as CollectionSlug,
-    where: { legacyHTML: { contains: GHOST_URL_PLACEHOLDER } },
+    where: {
+      or: FIELDS.map((field) => ({
+        [field]: { contains: GHOST_URL_PLACEHOLDER },
+      })),
+    },
     depth: 0,
     draft,
     pagination: false,
@@ -97,8 +128,8 @@ async function findAffected(
     id: doc.id,
     slug: doc.slug ?? null,
     status: doc._status ?? null,
-    placeholders: findGhostUrlPlaceholders(doc.legacyHTML),
-    occurrences: stripGhostUrlPlaceholders(doc.legacyHTML).replaced,
+    placeholders: placeholdersIn(doc),
+    occurrences: occurrencesIn(doc),
   }))
 }
 
@@ -140,7 +171,15 @@ async function main() {
           draft: true,
           overrideAccess: true,
         })) as unknown as Doc
-        const { html } = stripGhostUrlPlaceholders(current.legacyHTML)
+        // `undefined` for a field the document does not carry, so an absent
+        // `canonicalURL` is left absent rather than written back as an empty
+        // string that would then override the computed canonical.
+        const repaired = Object.fromEntries(
+          FIELDS.filter((field) => current[field] != null).map((field) => [
+            field,
+            stripGhostUrlPlaceholders(current[field]).html,
+          ]),
+        )
         // Shaped exactly like the importer's write in `lib/migration/import.ts`
         // — `_status` carried in `data`, no `draft` option. That combination is
         // what produced these four drafts in the first place, so it is the one
@@ -149,7 +188,7 @@ async function main() {
           collection: doc.collection as CollectionSlug,
           id: doc.id,
           data: {
-            legacyHTML: html,
+            ...repaired,
             // Never let this default. See the header.
             _status: current._status,
           } as never,

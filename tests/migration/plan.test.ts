@@ -161,3 +161,55 @@ describe('summarizePlan', () => {
     })
   })
 })
+
+// Ghost stores an internal canonical as `__GHOST_URL__/some-post/` and expands
+// the placeholder at render time. Passing it through gave `fine-art-home-guide`
+// a live canonical of `https://<host>/__GHOST_URL__/fine-art-home-guide/`,
+// found on 4 Sep by comparing all 113 posts' rendered metadata against Ghost's.
+// It was the only difference in 113 canonicals — and invisible to
+// `migrate:validate`, which compares the stored value against the export's own,
+// where the placeholder is exactly what the export says.
+describe('canonical URLs carry no Ghost placeholder', () => {
+  const withCanonical = (canonical: string | null) =>
+    buildMigrationPlan(
+      parseGhostExport({
+        db: [
+          {
+            data: {
+              posts: [
+                {
+                  id: 'post-c',
+                  title: 'Canonical',
+                  slug: 'canonical',
+                  status: 'published',
+                  canonical_url: canonical,
+                },
+              ],
+            },
+          },
+        ],
+      }),
+    ).posts[0]!.data.canonicalURL
+
+  it('strips the placeholder, leaving a root-relative path', () => {
+    // Root-relative rather than absolute on purpose: Next resolves it against
+    // `metadataBase`, so it follows the origin across the cutover flip instead
+    // of pinning the staging host into the database.
+    expect(withCanonical('__GHOST_URL__/fine-art-home-guide/')).toBe(
+      '/fine-art-home-guide/',
+    )
+  })
+
+  it('leaves an external canonical alone', () => {
+    expect(withCanonical('https://elsewhere.example/hello/')).toBe(
+      'https://elsewhere.example/hello/',
+    )
+  })
+
+  it('maps absent and empty values to undefined, not an empty string', () => {
+    // An empty string would be written to the field and would then override
+    // the canonical the route computes, which is the opposite of harmless.
+    expect(withCanonical(null)).toBeUndefined()
+    expect(withCanonical('__GHOST_URL__')).toBeUndefined()
+  })
+})
