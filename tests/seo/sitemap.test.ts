@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildSitemapEntries } from '../../lib/seo/sitemap'
+import { buildSitemapEntries, listableTags } from '../../lib/seo/sitemap'
 
 describe('buildSitemapEntries', () => {
   const siteUrl = 'https://beyondeveryart.com'
@@ -142,5 +142,38 @@ describe('buildSitemapEntries — apps', () => {
     })
 
     expect(entries).toHaveLength(5)
+  })
+})
+
+// Ghost only ever published a tag archive that had posts in it — an empty one
+// 404s there. Payload has no such rule, and `news` — imported with the other
+// nine Ghost tags and never filed against anything — was a 200 page reading
+// "Nothing filed under this topic yet", listed in the sitemap. That is where
+// the 10-against-9 tag count in `MIGRATION_REHEARSAL.md` came from, and it
+// would have offered Google a thin URL the old site never had.
+describe('listableTags', () => {
+  const row = (slug: string, publishedPosts: number) => ({
+    tag: { slug },
+    publishedPosts,
+  })
+
+  it('drops a tag nothing is filed under', () => {
+    expect(
+      listableTags([row('art', 12), row('news', 0), row('palette', 3)]),
+    ).toEqual([{ slug: 'art' }, { slug: 'palette' }])
+  })
+
+  it('keeps every tag when the counts would empty the section', () => {
+    // Counts come from the database. All-zero reads identically whether it
+    // means "no tag has posts" or "this count stopped working", and only one of
+    // those should cost the sitemap its nine real archive URLs.
+    expect(listableTags([row('art', 0), row('palette', 0)])).toEqual([
+      { slug: 'art' },
+      { slug: 'palette' },
+    ])
+  })
+
+  it('returns nothing when there were no tags to begin with', () => {
+    expect(listableTags([])).toEqual([])
   })
 })
