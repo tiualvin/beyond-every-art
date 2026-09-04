@@ -4,15 +4,13 @@ import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 
 import { getPayloadClient } from '@/lib/payload'
+import { isSubmittableEmail } from '@/lib/security/email'
 import {
   clientKey,
   configuredLimit,
   FixedWindowRateLimiter,
 } from '@/lib/security/rate-limit'
 import { APPS_PATH } from '@/lib/seo/site'
-
-/** Same check the newsletter action uses; Payload re-validates on write. */
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 /**
  * The same bound as the newsletter signup, for the same reason.
@@ -89,7 +87,9 @@ export async function joinAppWaitlist(formData: FormData): Promise<void> {
   ].slice(0, MAX_APPS_PER_SUBMISSION)
 
   if (slugs.length === 0) return redirect(`${APPS_PATH}?status=none`)
-  if (!EMAIL_PATTERN.test(email)) return redirect(`${APPS_PATH}?status=invalid`)
+  if (!isSubmittableEmail(email)) {
+    return redirect(`${APPS_PATH}?status=invalid`)
+  }
   if (!limiter.check(clientKey(await headers())).allowed) {
     return redirect(`${APPS_PATH}?status=error`)
   }
