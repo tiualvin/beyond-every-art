@@ -8,7 +8,12 @@ import {
   type PostCard,
 } from '@/lib/content/queries'
 import { formatDate } from '@/lib/format'
-import { JOURNAL_PATH, NEWSLETTER_PATH, postPath } from '@/lib/seo/site'
+import {
+  HOME_TOPICS_ID,
+  JOURNAL_PATH,
+  NEWSLETTER_PATH,
+  postPath,
+} from '@/lib/seo/site'
 
 import { CoverField } from './components/cover-field'
 import { EntryRow } from './components/entry-row'
@@ -106,7 +111,7 @@ export default async function HomePage() {
 
       {/* ── Topics ── */}
       {topics.length > 0 && (
-        <section className="section topics" id="topics">
+        <section className="section topics" id={HOME_TOPICS_ID}>
           <div className="container">
             <Reveal>
               <div className="section__head">

@@ -31,11 +31,16 @@ export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSiteSettings()
   return {
     metadataBase: new URL(getSiteUrl()),
+    // Ghost's rule, which the migration has to keep: generated archives carry
+    // the suffix (`Art - Beyond Every Art`, hyphen and all), content documents
+    // do not. Posts and pages therefore set `title.absolute` — see
+    // `app/(frontend)/[slug]/page.tsx`. Every other route is new to this site
+    // and keeps the suffix.
     title: {
-      default: settings.title,
-      template: `%s — ${settings.title}`,
+      default: settings.homeTitle,
+      template: `%s - ${settings.title}`,
     },
-    description: settings.description,
+    description: settings.metaDescription,
     alternates: {
       canonical: '/',
       types: { 'application/rss+xml': '/rss' },

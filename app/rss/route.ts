@@ -1,4 +1,5 @@
 import { cachedRead, CONTENT_TAGS } from '@/lib/cache/content'
+import { DEFAULT_SITE_SETTINGS } from '@/lib/content/queries'
 import { getPayloadClient } from '@/lib/payload'
 import { renderRssFeed, type RssItem } from '@/lib/seo/rss'
 import { absoluteUrl, FEED_PATH, getSiteUrl, postPath } from '@/lib/seo/site'
@@ -89,8 +90,11 @@ export async function GET(): Promise<Response> {
       }))
 
     const xml = renderRssFeed({
-      title: settingsRecord?.title ?? 'Beyond Every Art',
-      description: settingsRecord?.description ?? '',
+      title: settingsRecord?.title || DEFAULT_SITE_SETTINGS.title,
+      // Ghost's feed carried a channel description; an empty one here is a
+      // regression a reader sees in every feed client.
+      description:
+        settingsRecord?.description || DEFAULT_SITE_SETTINGS.description,
       siteUrl,
       feedUrl,
       items,
@@ -99,8 +103,8 @@ export async function GET(): Promise<Response> {
     return new Response(xml, { headers: rssHeaders })
   } catch {
     const xml = renderRssFeed({
-      title: 'Beyond Every Art',
-      description: '',
+      title: DEFAULT_SITE_SETTINGS.title,
+      description: DEFAULT_SITE_SETTINGS.description,
       siteUrl,
       feedUrl,
       items: [],
