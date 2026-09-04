@@ -544,28 +544,32 @@ errors`, and `/swapfile` is `-rw-------`. Its one warning — "non-bind mount
 
 ## Not done yet
 
-0.1. **Edge protection — the origin is unprotected (operator action).**
-Cloudflare holds the DNS but every record is "DNS only", so there is no DDoS
-mitigation, no edge cache, and the VPS address is public. This is the largest
-open risk in the deployment and it must be closed before the public cutover.
-The procedure, the prepared Caddy image (`docker/caddy/Dockerfile`), and the
-warning about why the proxy cannot simply be toggled on — it breaks HTTP-01
-certificate renewal — are in
-[`EDGE_PROTECTION.md`](EDGE_PROTECTION.md). Blocked on a Cloudflare API token.
+0.1. **Edge protection — five of six steps done; closing the origin is the one
+left (operator action).** Cloudflare held every record as "DNS only" with the
+VPS address public and no DDoS mitigation or edge cache; that is now mostly
+closed. The procedure, the prepared Caddy image (`docker/caddy/Dockerfile`),
+and the warning about why the proxy cannot simply be toggled on — it breaks
+HTTP-01 certificate renewal — are in
+[`EDGE_PROTECTION.md`](EDGE_PROTECTION.md).
 
-Two of the six steps are done. The `caddy` service builds from the prepared
-image with the `caddy-dns/cloudflare` module (#103), so the DNS-01 switch is a
-configuration change rather than a build. And a Hetzner Cloud Firewall now
-fronts the server (24 Aug), attached, with three inbound rules — TCP 22, 80 and
-443 — each sourced from `Any` for now. That closes every other port; it does
-not yet close the origin, because the sources cannot narrow to Cloudflare until
-Cloudflare is the one connecting. Doing it there rather than in `ufw` is not a
-preference: Docker publishes Caddy's ports with its own iptables rules, which
-are evaluated before the chain `ufw` manages, so a `ufw deny 80/tcp` reports
-success and changes nothing.
+Steps 1–5 are done (29 Aug): the Cloudflare API token exists and DNS-01 issues
+certificates through it, proven end to end rather than inferred; the `caddy`
+service builds from the prepared image with the `caddy-dns/cloudflare` module
+(#103); `staging` is proxied behind Full (strict), with `cms` deliberately left
+unproxied so the MCP endpoint keeps answering non-browser clients; and
+`TRUST_CLOUDFLARE_IP=1` is set and confirmed reaching the container.
 
-What is left is therefore the token, the DNS-01 configuration, the proxy
-toggle, `TRUST_CLOUDFLARE_IP=1`, and one edit to two existing firewall rules.
+What is left is step 6, **closing the origin** — see
+[`EDGE_PROTECTION.md#closing-the-origin`](EDGE_PROTECTION.md#closing-the-origin).
+A Hetzner Cloud Firewall already fronts the server (24 Aug) with three inbound
+rules — TCP 22, 80 and 443 — each sourced from `Any` for now; pass two narrows
+the port 80/443 rules to Cloudflare's published ranges, once the proxy is
+confirmed live. Proxying hides the origin from DNS but does not stop anyone who
+already recorded the address, and this one has been public since July, so until
+this step lands an attacker with the old IP bypasses every protection above.
+This is the step where a wrong rule locks the operator out too, so it wants a
+fresh sitting rather than being tacked onto another change — see "Close the
+origin" under Pick up here.
 
 0.4. **Media loss and R2 — recovered on 22 Aug. One small step left.**
 
@@ -605,14 +609,18 @@ running it: 0 B transferred.
 
 Setting `BACKUP_ENCRYPTION_KEY`, proving a restore, and deleting the unencrypted
 backups are all done — see "Backups are encrypted and a restore is proven" and
-"The plaintext archives are gone" above. One item is still open:
+"The plaintext archives are gone" above. One item is still open, and the 30 Aug
+content audit (see "The content audit" above) answered the question this used
+to pose:
 
-1. **Media id 4** (`photo-1689659721022-3aa475803e19`) has no copy in the archive
-   and carries no file extension, which suggests it was linked directly rather
-   than stored in Ghost. Check with
-   `SELECT ghost_u_r_l FROM media WHERE id = 4;` and
-   `SELECT slug FROM posts WHERE featured_image_id = 4;` — if no post uses it,
-   ignore it.
+1. **Media id 4** (`photo-1689659721022-3aa475803e19`) has no bytes in R2. It
+   is an Unsplash URL that was linked rather than stored in Ghost, it **is**
+   used — the feature image of a published post — and its source URL still
+   returns 200 with the exact byte count the row expects, so it is
+   recoverable. It also has no file extension, which makes it permanently
+   unreachable through the app's routing on its own (`trailingSlash: true`
+   appends a slash to any extensionless path). Re-uploading it through the
+   admin under `photo-1689659721022-3aa475803e19.jpeg` fixes both at once.
 
 **Two commands worth knowing before touching any of this.** Every SSH session
 needs the environment loaded first, or `$S3_*` are empty and tools fail in
