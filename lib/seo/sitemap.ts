@@ -37,6 +37,34 @@ function toIso(value: string | Date | null | undefined): string | undefined {
 }
 
 /**
+ * The tags whose archives belong in the sitemap: the ones with at least one
+ * published post behind them.
+ *
+ * Ghost only ever published a tag archive that had posts in it — an empty one
+ * 404s there. Payload has no such rule, and `news` — imported with the other
+ * nine Ghost tags and never filed against anything — became a 200 page reading
+ * "Nothing filed under this topic yet", listed in the sitemap and offered to
+ * Google as a URL the old site never had. That is where the 10-against-9 tag
+ * count in `MIGRATION_REHEARSAL.md` came from. `getTagsWithCounts` already
+ * applies this rule to the topic chips, which is why the empty tag was linked
+ * from nowhere and showed up only here.
+ *
+ * The fallback is the important half. Counts come from the database, and if
+ * they ever all come back zero — a query that stops matching, a relationship
+ * that stops resolving — the filter would remove every tag archive from the
+ * sitemap. Nine real URLs lost is a far worse outcome than the one thin URL
+ * this exists to drop, so a filter that removes *everything* is treated as a
+ * broken filter rather than as an answer.
+ */
+export function listableTags<T>(
+  counted: readonly { tag: T; publishedPosts: number }[],
+): T[] {
+  const kept = counted.filter((row) => row.publishedPosts > 0)
+  const rows = kept.length === 0 && counted.length > 0 ? counted : kept
+  return rows.map((row) => row.tag)
+}
+
+/**
  * Builds sitemap entries for the homepage and journal archive, plus published
  * posts and pages. Pure so it can be unit tested; the route pulls the documents
  * from Payload and hands them here for URL construction.

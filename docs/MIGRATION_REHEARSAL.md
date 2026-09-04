@@ -102,23 +102,32 @@ discrepancy. Fix the root cause and re-run until it reports `"ok": true`.
 > means "clean" or "this query does not match your data", and on the first scan
 > here it meant the latter.
 
-- [ ] **Content counts** match the Ghost admin (posts, pages, tags, authors).
+- [x] **Content counts** match the Ghost admin (posts, pages, tags, authors).
       Posts, pages and authors are settled (30 Aug): 113 published + 4 draft
       posts and 2 published pages, against Ghost's sitemap of 113 posts and 3
       pages — one of those being the homepage — and 119 rows in the export's
       `posts` table, which carries pages too. This is set equality rather than
       matching totals: the 29 Aug audit requested all 127 indexed Ghost URLs on
       staging and every one returned 200, so every Ghost post is known to be
-      here. **Tags are the one open piece**: 10 imported against 9 in Ghost's
-      sitemap, which a tag with no published posts would explain.
+      here. **Tags: answered on 4 Sep, and it was a defect.** The tenth is
+      `news`, filed against nothing. Ghost 404s an empty tag archive; Payload
+      served it 200 with "Nothing filed under this topic yet" and listed it in
+      the sitemap, so cutover would have offered Google a thin URL the old site
+      never had. The sitemap now lists only tags a listed post is filed under
+      (`referencedTagIds` in `lib/seo/sitemap.ts`), which is the rule
+      `getTagsWithCounts` already applied to the topic chips. Staging's sitemap
+      otherwise contains every one of Ghost's 127 URLs — set equality, checked
+      by diffing the two sitemaps rather than comparing totals.
 - [ ] **Recent posts** render correctly, including embeds and captions.
       Mostly answered in bulk (30 Aug) rather than by sampling, because there is
       nothing to sample: across 117 bodies there are **zero embeds, zero inline
       images and zero figcaptions**. Feature-image credits were dropped by the
       import and have been restored — see `DEPLOYMENT_STATUS.md`. What still
-      needs a browser is the single post carrying a `<table>`
+      needs a browser is a general look at a few articles. The single post
+      carrying a `<table>`
       (`limited-edition-vs-open-edition-prints-which-is-right-for-you`, the only
-      one of 117 with Ghost card markup) and a general look at a few articles.
+      one of 117 with Ghost card markup) serves 200 on staging with its table
+      and its one `figcaption` intact (4 Sep).
 - [ ] **Drafts** are still drafts and are not publicly reachable. The count has
       survived two write passes at 4 (30 Aug), which is the half of this a query
       can answer. Whether a draft URL actually 404s is still unverified.
@@ -126,7 +135,13 @@ discrepancy. Fix the root cause and re-run until it reports `"ok": true`.
       Loading is verified (30 Aug): 110 records, all `migrated`, R2 holding 327
       objects, and **no body anywhere references the Ghost domain** — see the
       content audit in `DEPLOYMENT_STATUS.md`. One exception: **media id 4 has
-      no bytes in R2** and needs re-uploading. "Alt text intact" is neither pass
+      no bytes in R2** and needs re-uploading — confirmed still missing on
+      4 Sep, in both the extensionless and `.jpeg` forms, and it is the only
+      broken image on the site: every other post's `og:image` was requested and
+      all 108 returned 200. The post it belongs to is
+      `the-ultimate-guide-to-understanding-different-types-of-art-prints-giclee-lithographs-and-more`,
+      which is published and is missing both its feature image and its sharing
+      card. "Alt text intact" is neither pass
       nor fail as written, because **Ghost had none** — 118 `posts_meta` rows,
       zero non-empty `feature_image_alt` — so nothing was lost. The importer
       fills `alt` with the filename because the field is required, and
@@ -146,8 +161,26 @@ discrepancy. Fix the root cause and re-run until it reports `"ok": true`.
       Ghost exports on the VPS contain exactly one rule and it is in the table,
       so nothing was dropped at import. `/ads.txt` failed and is now served by
       Caddy (#123).
-- [ ] **Canonical URLs**, meta titles, and descriptions are preserved.
-- [ ] **Sitemap** (`/sitemap.xml`), **RSS** (`/rss`), and **robots** are correct.
+- [x] **Canonical URLs**, meta titles, and descriptions are preserved. Checked
+      4 Sep across **all 113 posts**, by fetching each from the live Ghost site
+      and from staging and comparing the rendered metadata rather than sampling.
+      Meta descriptions: 113 of 113 identical. Canonicals: 112 identical, and
+      the one difference was a real defect —
+      `fine-art-home-guide` declared `.../__GHOST_URL__/fine-art-home-guide/`,
+      because the importer passed Ghost's placeholder through and
+      `migrate:validate` compares it against the export, where the placeholder
+      is exactly what the export says. The importer strips it now, and
+      `pnpm fix:ghost-links` repairs the written row. **Titles were the larger
+      find**: none of the 113 matched, because the layout templated a suffix
+      onto every page. Ghost's own rule — bare on posts and pages, suffixed on
+      tag and author archives, brand-plus-tagline on the homepage — is restored
+      and pinned by `tests/seo/document-titles.test.ts`.
+- [x] **Sitemap** (`/sitemap.xml`), **RSS** (`/rss`), and **robots** are correct.
+      Checked 4 Sep on staging: robots serves `Disallow: /` under
+      `NEXT_PUBLIC_NOINDEX` with the matching meta tag, all four Ghost child
+      sitemaps 301 to `/sitemap.xml`, `/rss` 308s to `/rss/` and carries 20
+      items against Ghost's 15. The feed's channel `<description>` was empty
+      against Ghost's and now falls back to the site description.
 - [ ] **Payload admin** loads and editing works.
 - [ ] **Draft preview** works from the admin Preview button.
 - [ ] **Forms** (search, newsletter signup) submit successfully.
