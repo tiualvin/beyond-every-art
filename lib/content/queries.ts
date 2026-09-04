@@ -11,8 +11,22 @@ import type { PreviewUser } from '@/lib/preview/session'
 export type NavLink = { label: string; url: string }
 
 export type SiteSettings = {
+  /** The publication's name: the header brand, and the suffix archive titles carry. */
   title: string
+  /**
+   * The visible standfirst under the homepage cover, and the RSS channel
+   * description. Editorial copy on the page, not a search snippet — which is
+   * why `metaDescription` is a separate field rather than this one reused.
+   */
   description: string
+  /**
+   * The homepage's `<title>`. Ghost served
+   * `Beyond Every Art | Inspiration, Creativity & Artistry` here, which is the
+   * brand plus a tagline rather than the brand alone.
+   */
+  homeTitle: string
+  /** The homepage's meta description: the search snippet, not the standfirst. */
+  metaDescription: string
 }
 
 export type AuthorSummary = {
@@ -43,9 +57,27 @@ export type PostCard = {
   visibility: PostVisibility
 }
 
-const DEFAULT_SETTINGS: SiteSettings = {
+/**
+ * What the site serves when the Site Settings global is empty — which it is on
+ * both staging and production, so these are the values that actually ship.
+ *
+ * `homeTitle` and `metaDescription` are carried over from Ghost verbatim. The
+ * homepage is the most valuable indexed URL the migration has to keep, and its
+ * `<title>` and meta description are the whole of its search snippet; letting
+ * the flip rewrite them is a change nobody chose. They are code defaults rather
+ * than fields on the global on purpose: a schema change means a migration to
+ * run during cutover, and these two values have not changed in the site's
+ * lifetime. Add fields when an editor actually needs to edit them — the reads
+ * below already prefer the global if one ever appears.
+ */
+export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   title: 'Beyond Every Art',
   description: 'Art, color, materials, exhibitions, and creative practice.',
+  homeTitle: 'Beyond Every Art | Inspiration, Creativity & Artistry',
+  metaDescription:
+    'Reflect on what lies beyond art. Exploring the discipline, color theory, ' +
+    'art history, and strategic frameworks that artists need to develop deeper ' +
+    'practices and build cultural literacy.',
 }
 
 /**
@@ -143,11 +175,14 @@ async function readSiteSettings(): Promise<SiteSettings> {
       depth: 0,
     })) as Partial<SiteSettings>
     return {
-      title: settings.title || DEFAULT_SETTINGS.title,
-      description: settings.description || DEFAULT_SETTINGS.description,
+      title: settings.title || DEFAULT_SITE_SETTINGS.title,
+      description: settings.description || DEFAULT_SITE_SETTINGS.description,
+      homeTitle: settings.homeTitle || DEFAULT_SITE_SETTINGS.homeTitle,
+      metaDescription:
+        settings.metaDescription || DEFAULT_SITE_SETTINGS.metaDescription,
     }
   } catch {
-    return DEFAULT_SETTINGS
+    return DEFAULT_SITE_SETTINGS
   }
 }
 

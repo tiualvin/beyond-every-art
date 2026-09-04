@@ -376,6 +376,29 @@ entries in total, comfortably inside Hetzner's per-rule limit. **Both lists go
 into both rules.** This is the pass that actually closes the origin; pass one
 only removes the ports nothing was serving.
 
+**Decide what happens to `cms.beyondeveryart.com` before you run pass two.**
+Step 7 keeps that hostname unproxied so the MCP endpoint answers non-browser
+clients, which means its DNS record points straight at this origin and its
+visitors — the operator's browser, Anthropic's servers, OpenAI's — arrive from
+arbitrary addresses. Pass two as written closes 80 and 443 to everything except
+Cloudflare, so it takes Payload Admin and MCP down for all of them, including
+whoever is running the pass. The two instructions were written separately and
+have never been run together; this is the conflict, not a caveat.
+
+Three ways out, none of them free:
+
+- **Proxy `cms` too**, and turn off anything that challenges a non-browser
+  client for that hostname (Bot Fight Mode, Browser Integrity Check, any
+  managed rule that issues a JS challenge). `docs/MCP_SERVER.md` is what says
+  whether the endpoint survives that; nothing here has tested it.
+- **Give `cms` its own port**, served by Caddy on something other than 443 and
+  left open in the firewall while 80 and 443 narrow to Cloudflare. Ugly URLs,
+  and a certificate over DNS-01 is unaffected.
+- **Leave 443 open to `Any`** and accept that the origin is closed for DNS
+  discovery only. That is the status quo, and it is the option that closes
+  nothing — it is listed so the choice is deliberate rather than the one that
+  happens by not deciding.
+
 **Both address families, or neither.** In pass two: Caddy listens on `0.0.0.0`
 and `::`, and Cloudflare reaches an origin over whichever family the DNS record
 offers. Allow only the IPv4 ranges while an `AAAA` record exists and Cloudflare

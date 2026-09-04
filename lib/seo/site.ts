@@ -66,3 +66,11 @@ export const SEARCH_PATH = '/search/'
 
 /** Path of the newsletter signup page. */
 export const NEWSLETTER_PATH = '/newsletter/'
+
+/**
+ * The id of the homepage's topics section, which is where "Topics" in the
+ * navigation goes. There is no `/topics` route; the archive of topics is a
+ * section of the homepage, and naming the anchor once keeps the link and the
+ * section from drifting apart.
+ */
+export const HOME_TOPICS_ID = 'topics'
