@@ -36,7 +36,7 @@ updates:
         update-types: ['version-update:semver-major']
       - dependency-name: 'typescript'
         update-types: ['version-update:semver-major']
-      # These two are held by something outside their own release notes, and
+      # These three are held by something outside their own release notes, and
       # each already has a test saying so — but nothing here was stopping
       # Dependabot from re-proposing them, so the same rejected pull request
       # came back the week after it was closed.
@@ -49,9 +49,18 @@ updates:
       # newest published — types ahead of the runtime compile calls that throw
       # in production. It moves when `.nvmrc` does. See
       # tests/scripts/node-types.test.ts.
+      #
+      # `zod`: 4 fails typecheck in lib/mcp/tools.ts, because
+      # `@payloadcms/plugin-mcp` types its `tools` field against its own zod 3
+      # and a zod 4 schema is not structurally a zod 3 `ZodType`. It unblocks
+      # when that plugin moves; `@payloadcms/*` above already gates the majors,
+      # and its `latest` is the pinned 3.88.0. Costs no API in the meantime —
+      # zod 3.25 ships zod 4 at `zod/v4`. See tests/scripts/zod-major.test.ts.
       - dependency-name: 'eslint'
         update-types: ['version-update:semver-major']
       - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'zod'
         update-types: ['version-update:semver-major']
 
   - package-ecosystem: github-actions
