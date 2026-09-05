@@ -68,12 +68,21 @@ export const LOCAL_IMAGE_PATTERN = {
  * The `pathname` is the half that was missing. A pattern naming only a hostname
  * matches every path on it, and Next resolves a remote `url` by *fetching it*
  * before it can decide the response is not an image — so
- * `/_next/image?url=https://<bucket-host>/<anything>&w=640&q=75` made the
+ * `/_next/image?url=https://<bucket-host>/<anything>&w=640&q=75` would make the
  * server issue a request to object storage for a key that need not exist. The
- * 400 the caller got back was the cheap half; the billed GET against R2 had
+ * 400 the caller gets back is the cheap half; the billed GET against R2 has
  * already happened, and a miss is not written to `.next/cache/images`, so the
- * same URL bought another one every time it was sent. One inbound request, one
+ * same URL buys another one every time it is sent. One inbound request, one
  * metered storage operation, repeatable for as long as somebody cared to.
+ *
+ * Conditional, and worth saying so rather than leaving it read as a live hole.
+ * `S3_PUBLIC_URL` is deliberately empty on this deployment — Payload streams
+ * media from `/api/media/file/<name>` and the bucket stays private, see
+ * `docs/DEPLOYMENT_STATUS.md` — so this function returns `[]` today and Next
+ * refuses every remote `url` outright. What the prefix closes is the step after
+ * the one the deployment notes describe as plausible: give the media bucket a
+ * custom domain, set this variable, and a hostname-only pattern would open the
+ * whole bucket to it. The bound belongs here, before that happens, not after.
  *
  * Scoping to the prefix `S3_PUBLIC_URL` actually carries does not make that
  * free — a real object still costs its fetch — but it bounds the reachable key
