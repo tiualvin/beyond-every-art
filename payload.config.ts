@@ -104,6 +104,30 @@ export default buildConfig({
     push: false,
   }),
   editor: lexicalEditor(),
+  // GraphQL is off because nothing asks for it, and an endpoint nothing asks
+  // for is surface with no reader to justify it.
+  //
+  // Checked rather than assumed, because "the admin panel probably needs it" is
+  // the reason it would otherwise stay: `@payloadcms/ui` contains no GraphQL
+  // reference at all, Live Preview refreshes over postMessage
+  // (`@payloadcms/live-preview-react`), and `plugin-mcp`, `richtext-lexical`,
+  // `db-postgres` and `storage-s3` never call the route. Neither does anything
+  // in this repository — the frontend renders through the Local API, and the
+  // one fetch a browser makes is to `/search/suggest`.
+  //
+  // What it removes is not a hole but the cheapest amplifier on the API: the
+  // `maxDepth` note below exists because `?depth=10` makes one request expensive,
+  // and a nested GraphQL query is that idea with no ceiling on shape. It is
+  // reachable on the CMS hostname by anything carrying an `Authorization` header
+  // of any value — the Caddyfile's gate is a presence check, as its own comment
+  // now says — so access control is the only thing behind it. That holds; the
+  // work in front of it is what this declines to offer.
+  //
+  // `graphql` stays a dependency either way: `withPayload` externalises it at
+  // build time to avoid a duplicate-instance error, so this changes what is
+  // served, not what is installed. Payload's POST handler reads this flag and
+  // answers 404.
+  graphQL: { disable: true },
   // Payload's default is 10, and `?depth=10` on a public collection endpoint is
   // a very cheap request that makes the server populate ten levels of
   // relationships before it can answer. Nothing in this repo reads deeper than
