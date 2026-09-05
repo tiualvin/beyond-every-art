@@ -111,6 +111,49 @@ describe('FixedWindowRateLimiter.peek', () => {
     limiter.check('a', 0)
     expect(limiter.peek('a', 1000).allowed).toBe(true)
   })
+
+  it('reads the overflow bucket once the ceiling is reached', () => {
+    // The case that made a peek-gated limiter stop gating. `check` diverts a
+    // key it has no room for into the shared bucket; `peek` used to look the
+    // raw key up, find nothing, and answer "allowed" — so past the ceiling
+    // every new key was waved through no matter how much the flood had spent.
+    const limiter = new FixedWindowRateLimiter(2, 1000, 1)
+
+    // One real bucket, taken. Everything after this shares the overflow one.
+    limiter.check('first', 0)
+    limiter.check('a', 0)
+    limiter.check('b', 0)
+
+    // 'c' has never been seen and there is no room for it, so it lands in the
+    // overflow bucket — which the two spends above have already exhausted.
+    expect(limiter.check('c', 0).allowed).toBe(false)
+    expect(limiter.peek('c', 0).allowed).toBe(false)
+  })
+
+  it('still answers for the key that holds its own window', () => {
+    // The other half: overflow must not swallow a key that got in early.
+    const limiter = new FixedWindowRateLimiter(2, 1000, 1)
+
+    limiter.check('first', 0)
+    limiter.check('flood', 0)
+    limiter.check('flood', 0)
+
+    // 'flood' exhausted the shared bucket; 'first' has its own and is untouched.
+    expect(limiter.peek('flood', 0).allowed).toBe(false)
+    expect(limiter.peek('first', 0)).toMatchObject({
+      allowed: true,
+      remaining: 1,
+    })
+  })
+
+  it('agrees with check() for a fresh key while there is still room', () => {
+    // Below the ceiling nothing changes: an unseen key is allowed and no
+    // window is opened for it by asking.
+    const limiter = new FixedWindowRateLimiter(2, 1000, 10)
+
+    expect(limiter.peek('unseen', 0).allowed).toBe(true)
+    expect(limiter.size).toBe(0)
+  })
 })
 
 describe('clientKey', () => {
