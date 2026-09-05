@@ -155,7 +155,17 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   // it has never passed through the staging Basic Auth gate, and routing it
   // through one now would put a credential prompt in front of every image on a
   // staging deploy.
-  if (request.nextUrl.pathname === '/_next/image') {
+  //
+  // Compared through `normalizePath` for the same reason the `/health` check
+  // below is, and it is load-bearing here rather than defensive. `trailingSlash`
+  // is on, which makes Next emit an internal redirect from `/:notfile` to
+  // `/:notfile/`, and `_next` is not exempt from it: a reader's image request
+  // arrives at `/_next/image`, is answered 308 by the redirect stage — which
+  // runs *before* middleware — and comes back at `/_next/image/`, which is the
+  // path the optimizer is actually served on. An exact match against the
+  // slashless literal therefore never sees a single real request, and every one
+  // of them reaches sharp and object storage uncounted.
+  if (normalizePath(request.nextUrl.pathname) === '/_next/image') {
     const allowance = imageLimiter.check(clientKey(request.headers))
     if (!allowance.allowed) {
       return NextResponse.json(
@@ -277,10 +287,14 @@ export const config = {
     '/api/users/:path*',
     '/api/preview/:path*',
     // The exception to the `_next/image` exclusion above, and the same shape:
-    // matched only to be rate limited, returned from immediately. Listed as the
-    // exact path because that is the only one the optimizer is served on — the
-    // width and quality arrive in the query string, which a matcher does not
-    // see.
+    // matched only to be rate limited, returned from immediately. The width and
+    // quality arrive in the query string, which a matcher does not see, so the
+    // path is the whole entry.
+    //
+    // One entry covers both spellings. Next compiles a matcher to a regex that
+    // ends `[\/#\?]?$`, so this matches `/_next/image/` as well — which matters,
+    // because with `trailingSlash` on that slashed form is the only one the
+    // optimizer is ever reached at. See the handler for why.
     '/_next/image',
   ],
 }
