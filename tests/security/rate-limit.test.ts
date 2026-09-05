@@ -182,7 +182,27 @@ describe('clientKey', () => {
     expect(key).toBe('ip:203.0.113.7')
   })
 
-  it('trusts CF-Connecting-IP once TRUST_CLOUDFLARE_IP is set', () => {
+  it('trusts CF-Connecting-IP when the peer is Cloudflare and the flag is set', () => {
+    const key = clientKey(
+      headers({
+        'cf-connecting-ip': '198.51.100.4',
+        // The peer Caddy accepted is a Cloudflare edge address, so the header
+        // in front of it was written by Cloudflare and names the real visitor.
+        'x-forwarded-for': '104.16.0.1',
+      }),
+      { TRUST_CLOUDFLARE_IP: '1' },
+    )
+
+    expect(key).toBe('ip:198.51.100.4')
+  })
+
+  it('ignores CF-Connecting-IP from a peer that is not Cloudflare', () => {
+    // The bypass. `TRUST_CLOUDFLARE_IP` is set — it is set in production — but
+    // this request did not come through Cloudflare: either straight to the
+    // origin address, which still answers while EDGE_PROTECTION.md step 6 is
+    // open, or to the `cms` hostname, which is never proxied at all. The header
+    // is then just a string the caller picked, and keying on it hands out a
+    // fresh allowance per request.
     const key = clientKey(
       headers({
         'cf-connecting-ip': '198.51.100.4',
@@ -191,7 +211,38 @@ describe('clientKey', () => {
       { TRUST_CLOUDFLARE_IP: '1' },
     )
 
-    expect(key).toBe('ip:198.51.100.4')
+    expect(key).toBe('ip:203.0.113.7')
+  })
+
+  it('gives a header-rotating caller one bucket, not one per request', () => {
+    // The property that matters, stated as the attack: same peer, a new
+    // CF-Connecting-IP every time. Every one of these must land in the same
+    // bucket, or the limiter is counting attackers instead of requests.
+    const keys = new Set(
+      ['10.0.0.1', '10.0.0.2', '10.0.0.3', '10.0.0.4'].map((forged) =>
+        clientKey(
+          headers({
+            'cf-connecting-ip': forged,
+            'x-forwarded-for': '203.0.113.7',
+          }),
+          { TRUST_CLOUDFLARE_IP: '1' },
+        ),
+      ),
+    )
+
+    expect(keys).toEqual(new Set(['ip:203.0.113.7']))
+  })
+
+  it('still ignores the header when the flag is off, whoever the peer is', () => {
+    const key = clientKey(
+      headers({
+        'cf-connecting-ip': '198.51.100.4',
+        'x-forwarded-for': '104.16.0.1',
+      }),
+      {},
+    )
+
+    expect(key).toBe('ip:104.16.0.1')
   })
 
   it('buckets a request with no forwarding header rather than waving it through', () => {
