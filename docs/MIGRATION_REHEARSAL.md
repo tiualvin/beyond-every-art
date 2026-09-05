@@ -181,11 +181,34 @@ discrepancy. Fix the root cause and re-run until it reports `"ok": true`.
       sitemaps 301 to `/sitemap.xml`, `/rss` 308s to `/rss/` and carries 20
       items against Ghost's 15. The feed's channel `<description>` was empty
       against Ghost's and now falls back to the site description.
-- [ ] **Payload admin** loads and editing works.
-- [ ] **Draft preview** works from the admin Preview button.
-- [ ] **Forms** (search, newsletter signup) submit successfully.
-- [ ] **Email** delivery works (trigger an admin password reset; confirm receipt).
-- [ ] **Health** endpoint (`/health`) returns `status: ok`.
+- [x] **Payload admin** loads and editing works. Covered by
+      `e2e/admin-editing.spec.ts`, which signs in, creates a post, lets autosave
+      write it, edits a second field, and reads both back from a fresh visit —
+      then deletes it through the UI, so a run leaves the database as it found
+      it. `admin.spec.ts` still covers the shallower half: that the login view
+      and dashboard render at all, which is the failure a status code misses.
+- [x] **Draft preview** works from the admin Preview button. Same spec: the
+      button is an icon-only anchor, so it is selected by its `href` and the
+      one carrying `live=1` — the Live Preview toggle — is deliberately not the
+      one clicked. It opens a tab, and the assertion is that the tab lands on
+      the draft's real path with the draft's own heading rendered, which is the
+      whole `/api/preview` chain rather than the fact that a tab opened. The
+      refusal is pinned too: no session, 401.
+- [x] **Forms** (search, newsletter signup) submit successfully. Already covered
+      before this pass — search in `mobile-nav.spec.ts`, newsletter in
+      `public-routes.spec.ts`, and the app waitlist in `apps.spec.ts`.
+- [ ] **Email** delivery works (trigger an admin password reset; confirm
+      receipt). The one item here no test can close: it needs a real inbox.
+- [x] **Health** endpoint (`/health`) returns `status: ok`. Covered by
+      `seo-and-health.spec.ts`, which asserts `{ status: 'ok', db: 'up' }`.
+
+> [!NOTE]
+> The ticks above mean the **mechanism** is covered by a test that runs on every
+> pull request, not that your migrated content has been through it. These run
+> against seeded fixtures on a disposable database. What they remove is the
+> class of failure where the CMS itself stops working and nobody notices until
+> an editor tries to use it — which is exactly what a checklist run once, by
+> hand, before a cutover is worst at catching.
 
 The redirect line above is the one item on this list that a spot-check cannot
 stand in for: a broken rule looks exactly like a URL nobody has asked for yet,
