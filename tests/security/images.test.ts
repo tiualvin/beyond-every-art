@@ -52,8 +52,56 @@ describe('buildImageConfig', () => {
   })
 
   it('names the object-storage host, over https only, when one is set', () => {
+    // Scoped to the prefix the public URL carries, not the whole host. A
+    // hostname-only pattern matched every key on the bucket, and Next fetches a
+    // remote url before it can decide the response is not an image — so each
+    // request was a billed storage operation for a key that need not exist,
+    // uncached and payable again on the next one.
     expect(
       imageRemotePatterns({ S3_PUBLIC_URL: 'https://media.example.com/files' }),
-    ).toEqual([{ hostname: 'media.example.com', protocol: 'https' }])
+    ).toEqual([
+      {
+        hostname: 'media.example.com',
+        protocol: 'https',
+        pathname: '/files/**',
+        search: '',
+      },
+    ])
+  })
+
+  it('scopes to the whole host when the public URL carries no prefix', () => {
+    expect(
+      imageRemotePatterns({ S3_PUBLIC_URL: 'https://media.example.com' }),
+    ).toEqual([
+      {
+        hostname: 'media.example.com',
+        protocol: 'https',
+        pathname: '/**',
+        search: '',
+      },
+    ])
+  })
+
+  it('ignores a trailing slash rather than producing a doubled prefix', () => {
+    // `https://host/files/` and `https://host/files` name the same prefix, and
+    // `/files//**` would match neither.
+    expect(
+      imageRemotePatterns({
+        S3_PUBLIC_URL: 'https://media.example.com/files/',
+      }),
+    ).toEqual([
+      {
+        hostname: 'media.example.com',
+        protocol: 'https',
+        pathname: '/files/**',
+        search: '',
+      },
+    ])
+  })
+
+  it('allows no remote host at all when the public URL is malformed', () => {
+    // This used to throw out of `new URL` and take the whole Next config with
+    // it, so a typo in one variable failed the build rather than the variable.
+    expect(imageRemotePatterns({ S3_PUBLIC_URL: 'not-a-url' })).toEqual([])
   })
 })

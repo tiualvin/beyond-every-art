@@ -6,15 +6,13 @@ import { redirect } from 'next/navigation'
 import type { SignupCampaign } from '@/blocks/schema'
 import { isCampaignLive } from '@/lib/content/signup-campaign'
 import { getPayloadClient } from '@/lib/payload'
+import { isSubmittableEmail } from '@/lib/security/email'
 import {
   clientKey,
   configuredLimit,
   FixedWindowRateLimiter,
 } from '@/lib/security/rate-limit'
 import { NEWSLETTER_PATH } from '@/lib/seo/site'
-
-/** Basic RFC 5322-ish check; Payload's `email` field re-validates on write. */
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export type SignupStatus = 'success' | 'invalid' | 'error'
 
@@ -48,7 +46,7 @@ function isDuplicate(error: unknown): boolean {
 }
 
 async function record(email: string, source: string): Promise<SignupStatus> {
-  if (!EMAIL_PATTERN.test(email)) return 'invalid'
+  if (!isSubmittableEmail(email)) return 'invalid'
 
   // Answered as a generic failure rather than its own status: a throttled
   // submitter is either a script, which is told nothing useful, or a person who

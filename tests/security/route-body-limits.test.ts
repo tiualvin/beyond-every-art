@@ -14,6 +14,7 @@ vi.mock('@/lib/payload', () => ({
 
 import { POST as cspReport } from '../../app/csp-report/route'
 import { POST as oauthAuthorize } from '../../app/oauth/authorize/route'
+import { POST as oauthRegister } from '../../app/oauth/register/route'
 import { POST as oauthRevoke } from '../../app/oauth/revoke/route'
 import { POST as oauthToken } from '../../app/oauth/token/route'
 import { POST as stripeWebhook } from '../../app/webhooks/stripe/route'
@@ -188,6 +189,48 @@ describe('the OAuth endpoints', () => {
 
     // 400 and not a thrown mock: the body is read, and refused, first.
     expect(response.status).toBe(400)
+  })
+
+  it('refuses an oversized registration before writing a client row', async () => {
+    // The endpoint this file was written to cover and did not: it read its body
+    // with `request.json()` while the three below used the ceiling. The mocked
+    // Payload client is the assertion — reaching 400 without it throwing proves
+    // the body was refused before a row could be created.
+    const response = await oauthRegister(
+      new Request('https://cms.beyondeveryart.com/oauth/register', {
+        method: 'POST',
+        headers: { ...headers(), 'content-type': 'application/json' },
+        body: JSON.stringify({
+          client_name: 'x'.repeat(20_000),
+          redirect_uris: ['https://example.com/callback'],
+        }),
+      }),
+    )
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'invalid_client_metadata',
+    })
+  })
+
+  it('still registers a client whose body is inside the limit', async () => {
+    // The ceiling must not be so tight that a real registration trips it. This
+    // one gets past the body read and is stopped by the mocked Payload client,
+    // which is what proves it was still being processed when it got there.
+    await expect(
+      oauthRegister(
+        new Request('https://cms.beyondeveryart.com/oauth/register', {
+          method: 'POST',
+          headers: { ...headers(), 'content-type': 'application/json' },
+          body: JSON.stringify({
+            client_name: 'Claude',
+            redirect_uris: ['https://claude.ai/api/mcp/auth_callback'],
+          }),
+        }),
+      ),
+    ).rejects.toThrow(
+      'the body limit must be enforced before Payload is touched',
+    )
   })
 
   it('answers an oversized revocation the same as every other one', async () => {

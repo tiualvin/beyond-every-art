@@ -196,10 +196,24 @@
 # not a rule. So the collection API is closed here too, for requests that carry
 # no credential at all.
 #
-# Credential-presence, not authentication: Payload still decides whether a
-# session or a key is valid, and answers 401 when it is not. What this removes
-# is the anonymous case — the unpaginated reads and the request volume that
-# reach Postgres before any of that is checked.
+# Credential-presence, not authentication — and weaker than it reads, which is
+# worth stating here rather than leaving for somebody to assume. Both matchers
+# test for a *header*, not for a valid one: `Authorization: anything` and a
+# `payload-token=` cookie of any value both satisfy them, and neither is hard
+# to send. So this stops a plain `curl` and an untargeted crawler, and it does
+# not stop anyone who reads this file.
+#
+# What still holds behind it is the part that matters: Payload's own access
+# control. `postsRead` in access/roles.ts answers an anonymous or unauthenticated
+# caller with published, public documents only, so a forged header buys the same
+# listing the website already renders — not drafts, not members-only bodies, not
+# members, billing, or users.
+#
+# What does *not* hold is the second thing this block was written for. The
+# unpaginated read and the request volume it describes reach Postgres before
+# access control is consulted, so a one-header change puts them back. Closing
+# that needs either a check of the credential itself at the edge, or the WAF in
+# docs/EDGE_PROTECTION.md; it is not something this matcher can do.
 #
 # Written inside `route` so these evaluate top to bottom as written. `handle`
 # blocks are otherwise sorted by matcher specificity, and the order is the whole

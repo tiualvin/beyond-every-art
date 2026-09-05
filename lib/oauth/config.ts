@@ -32,11 +32,16 @@ export const METADATA_CACHE_CONTROL = 'public, max-age=300'
 /**
  * The largest body any OAuth endpoint will read.
  *
- * All three are unauthenticated POSTs — that is what an authorization server
+ * All four are unauthenticated POSTs — that is what an authorization server
  * is — so without a ceiling the caller chooses how much memory one request
  * allocates before anything is validated. The bodies themselves are tiny: a
- * form-encoded grant request, a token, or the consent form's sealed blob and
- * its ticked boxes. Sixteen kilobytes is the same ceiling `/csp-report` uses,
- * and for the same reason.
+ * form-encoded grant request, a token, a registration's redirect URIs, or the
+ * consent form's sealed blob and its ticked boxes. Sixteen kilobytes is the
+ * same ceiling `/csp-report` uses, and for the same reason.
+ *
+ * It said "all three" until `/oauth/register` was found still reading its body
+ * with `request.json()` — the endpoint the count had quietly omitted was the
+ * one that had not been given the ceiling. Kept accurate here because this
+ * comment is where the next person checks whether their endpoint is covered.
  */
 export const MAX_OAUTH_BODY_BYTES = 16_000

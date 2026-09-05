@@ -14,6 +14,9 @@
 //   the endpoint, and nothing would look broken from in here.
 // - **Raw body.** The signature covers the exact bytes received, so the body is
 //   read with `request.text()` and only parsed after verification succeeds.
+// - **Rate limited on failures, never on successes.** See `failureLimiter`: a
+//   limiter counting every request would throttle Stripe's own retries, which
+//   is how an endpoint gets disabled.
 // - **Verify, persist, answer, then interpret.** Interpretation failures do not
 //   fail the response: the raw event is already stored, the record is marked
 //   `unresolved`, a JSON log line is emitted, and the daily reconciliation
@@ -47,6 +50,12 @@ import {
 import { verifyStripeSignature } from '@/lib/billing/stripe-signature'
 import { logWebhookProblem } from '@/lib/observability/webhook'
 import {
+  clientKey,
+  configuredLimit,
+  FixedWindowRateLimiter,
+  tooManyRequests,
+} from '@/lib/security/rate-limit'
+import {
   readBoundedText,
   RequestBodyTooLarge,
 } from '@/lib/security/request-body'
@@ -64,6 +73,38 @@ const PROVIDER = 'stripe'
 // unauthenticated caller choose how much memory one request allocates.
 const MAX_WEBHOOK_BODY_BYTES = 1_048_576
 
+/**
+ * Rejections one source may buy before this endpoint stops answering it.
+ *
+ * This was the last public endpoint with no limiter, and the reasoning that put
+ * one on every other is the same here: it is unauthenticated, and a request
+ * costs a megabyte-bounded stream read, an HMAC over it, and a log line before
+ * the signature can be found wanting. The log line is the part worth bounding.
+ * The container's log file is capped and rotated (`LOG_MAX_SIZE` ×
+ * `LOG_MAX_FILES` in docker-compose.yml), so a flood cannot fill the disk — but
+ * it can roll the window, and what it pushes out is the record of genuine
+ * webhook failures, which is the only evidence there is on the day billing
+ * quietly stops working.
+ *
+ * **Failures only**, which is the whole design and not a detail. Stripe retries
+ * from its own addresses, and a limiter counting every request would throttle
+ * Stripe itself during a legitimate burst — a delivery refused with a 429 is a
+ * delivery retried for three days and then disabled. A correctly signed event
+ * never touches this, however many arrive: the budget is spent by requests that
+ * were already being rejected. `peek` tests the allowance without spending it;
+ * `check` spends one on each rejection path.
+ *
+ * Sixty in fifteen minutes is deliberately loose, because the case that matters
+ * is the takeover in docs/SUBSCRIPTION_WEBHOOKS.md: a wrong
+ * `STRIPE_WEBHOOK_SECRET` makes every real delivery a failure, and the limit
+ * must not hide the sixty log lines that say so before it starts throttling.
+ * Configurable for the same reason the others are.
+ */
+const failureLimiter = new FixedWindowRateLimiter(
+  configuredLimit('RATE_LIMIT_STRIPE_FAILURES', 60),
+  15 * 60_000,
+)
+
 export async function POST(request: Request): Promise<Response> {
   const secret = process.env.STRIPE_WEBHOOK_SECRET
   if (!secret) {
@@ -78,6 +119,13 @@ export async function POST(request: Request): Promise<Response> {
     )
   }
 
+  // Tested, not spent: a request that turns out to be a real event must not
+  // have cost anything. Checked after the secret, which returns without reading
+  // a body, and before the read, which is the expensive part.
+  const source = clientKey(request.headers)
+  const allowance = failureLimiter.peek(source)
+  if (!allowance.allowed) return tooManyRequests(allowance.resetAt)
+
   // Raw bytes, before any parsing: re-serialised JSON does not match the
   // signature Stripe computed.
   let body: string
@@ -85,6 +133,7 @@ export async function POST(request: Request): Promise<Response> {
     body = await readBoundedText(request, MAX_WEBHOOK_BODY_BYTES)
   } catch (error) {
     if (!(error instanceof RequestBodyTooLarge)) throw error
+    failureLimiter.check(source)
     logWebhookProblem({
       event: 'webhook_rejected',
       provider: PROVIDER,
@@ -99,6 +148,7 @@ export async function POST(request: Request): Promise<Response> {
     secret,
   })
   if (!verification.verified) {
+    failureLimiter.check(source)
     logWebhookProblem({
       event: 'webhook_rejected',
       provider: PROVIDER,
@@ -116,6 +166,7 @@ export async function POST(request: Request): Promise<Response> {
   try {
     summary = summarizeStripeEvent(JSON.parse(body))
   } catch (error) {
+    failureLimiter.check(source)
     logWebhookProblem({
       event: 'webhook_rejected',
       provider: PROVIDER,

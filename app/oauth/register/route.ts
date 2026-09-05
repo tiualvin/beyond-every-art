@@ -2,7 +2,11 @@ import { NextResponse } from 'next/server'
 
 import { mintClientId } from '@/lib/oauth/tokens'
 import { validateRegistration } from '@/lib/oauth/clients'
-import { issuerOrigin, oauthEnabled } from '@/lib/oauth/config'
+import {
+  issuerOrigin,
+  MAX_OAUTH_BODY_BYTES,
+  oauthEnabled,
+} from '@/lib/oauth/config'
 import { getPayloadClient } from '@/lib/payload'
 import {
   clientKey,
@@ -10,6 +14,7 @@ import {
   FixedWindowRateLimiter,
   retryAfterSeconds,
 } from '@/lib/security/rate-limit'
+import { readBoundedText } from '@/lib/security/request-body'
 
 // RFC 7591 dynamic client registration.
 //
@@ -24,6 +29,15 @@ import {
 // What it does cost is a row. So it is rate limited by source address, and the
 // row it writes is small and bounded (`lib/oauth/clients.ts` caps the URI count
 // and the name length).
+//
+// The body is bounded too, and that half was missing while the other three
+// OAuth endpoints had it. The limiter caps how *often* this can be called; it
+// cannot cap what one call costs, because the body has already been buffered by
+// the time anything is counted. `request.json()` let the caller decide how much
+// memory one registration allocated — twenty an hour, each as large as it liked,
+// against a container with a 2 GB ceiling. `lib/oauth/clients.ts` bounds the URI
+// count and the name length but not the length of a single URI string, so the
+// ceiling here is what bounds that too.
 export const dynamic = 'force-dynamic'
 
 const REGISTRATIONS_PER_HOUR = 20
@@ -52,9 +66,11 @@ export async function POST(request: Request): Promise<NextResponse> {
     )
   }
 
+  // Read once, bounded, before Payload is touched — the ordering
+  // `tests/security/route-body-limits.test.ts` pins for the other endpoints.
   let body: unknown
   try {
-    body = await request.json()
+    body = JSON.parse(await readBoundedText(request, MAX_OAUTH_BODY_BYTES))
   } catch {
     return NextResponse.json(
       {

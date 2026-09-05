@@ -59,18 +59,68 @@ export const LOCAL_IMAGE_PATTERN = {
 } as const
 
 /**
- * Remote hosts the optimizer may fetch from.
+ * Remote hosts the optimizer may fetch from, and where on them.
  *
  * Only the object-storage origin, and only when one is configured. An empty
  * list is not a gap: with no `S3_PUBLIC_URL` every media URL is root-relative
  * and covered by the local pattern above.
+ *
+ * The `pathname` is the half that was missing. A pattern naming only a hostname
+ * matches every path on it, and Next resolves a remote `url` by *fetching it*
+ * before it can decide the response is not an image — so
+ * `/_next/image?url=https://<bucket-host>/<anything>&w=640&q=75` would make the
+ * server issue a request to object storage for a key that need not exist. The
+ * 400 the caller gets back is the cheap half; the billed GET against R2 has
+ * already happened, and a miss is not written to `.next/cache/images`, so the
+ * same URL buys another one every time it is sent. One inbound request, one
+ * metered storage operation, repeatable for as long as somebody cared to.
+ *
+ * Conditional, and worth saying so rather than leaving it read as a live hole.
+ * `S3_PUBLIC_URL` is deliberately empty on this deployment — Payload streams
+ * media from `/api/media/file/<name>` and the bucket stays private, see
+ * `docs/DEPLOYMENT_STATUS.md` — so this function returns `[]` today and Next
+ * refuses every remote `url` outright. What the prefix closes is the step after
+ * the one the deployment notes describe as plausible: give the media bucket a
+ * custom domain, set this variable, and a hostname-only pattern would open the
+ * whole bucket to it. The bound belongs here, before that happens, not after.
+ *
+ * Scoping to the prefix `S3_PUBLIC_URL` actually carries does not make that
+ * free — a real object still costs its fetch — but it bounds the reachable key
+ * space to the one media lives under. The volume half is `middleware.ts`,
+ * which now rate limits `/_next/image`; neither is sufficient alone.
+ *
+ * `search: ''` for the same reason `LOCAL_IMAGE_PATTERN` has it: Payload's
+ * storage URLs carry no query string, so anything appended to one is somebody
+ * else's idea.
  */
 export function imageRemotePatterns(
   env: Env = process.env,
 ): ImageConfig['remotePatterns'] {
   const publicUrl = env.S3_PUBLIC_URL
   if (!publicUrl) return []
-  return [{ hostname: new URL(publicUrl).hostname, protocol: 'https' }]
+
+  let parsed: URL
+  try {
+    parsed = new URL(publicUrl)
+  } catch {
+    // A malformed value used to throw here and take the whole config with it,
+    // which fails the build rather than the variable. An unusable public URL
+    // means no remote host is allowed — the same answer as not setting one.
+    return []
+  }
+
+  // `https://media.example.com` and `https://media.example.com/files` are both
+  // valid values, and the second is a prefix every media URL sits under.
+  const prefix = parsed.pathname.replace(/\/+$/, '')
+
+  return [
+    {
+      hostname: parsed.hostname,
+      protocol: 'https',
+      pathname: `${prefix}/**`,
+      search: '',
+    },
+  ]
 }
 
 /** The whole `images` block, as `next.config.ts` should hand it to Next.js. */
