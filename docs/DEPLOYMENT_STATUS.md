@@ -11,7 +11,77 @@ Related: [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md),
 
 ## Pick up here
 
-Last worked on **4 Sep 2026**. A cutover-readiness pass that compared the
+Last worked on **5 Sep 2026**. A security pass over the public request surface,
+and the last rehearsal checks that needed a browser turned into tests. Three
+pull requests merged — #146, #147, #148. **One finding is not fixed, and it is
+the most important line on this page.**
+
+### The rate limiters are currently bypassable with one header
+
+`clientKey()` in `lib/security/rate-limit.ts` keys on `CF-Connecting-IP`
+whenever `TRUST_CLOUDFLARE_IP` is set, and that variable has been set since
+29 Aug (item 0.1 below). The header is a fact only when Cloudflare wrote it, and
+two routes into this application do not go through Cloudflare:
+
+- **The origin address**, until step 6 closes it. The Hetzner rules for 80 and
+  443 are still sourced from `Any`, and the address has been public since July.
+- **`cms.beyondeveryart.com`**, which step 7 deliberately never proxies so the
+  MCP endpoint keeps answering non-browser clients. There the header is
+  forgeable **permanently** — closing the origin does not fix that hostname.
+
+Because the header becomes the rate-limit key, a caller who can write it gets a
+fresh allowance per request. Measured against a production build with the limit
+set to 3: rotating the header gave eight successes out of eight, where a single
+source is throttled after three. That is every in-process limiter switched off —
+login, password reset, preview, images, CSP reports, slug misses, Stripe
+failures, and MCP key guessing.
+
+It reads worst on `cms`, and that is not a coincidence: `@openApi` in the
+Caddyfile lets `/api/users/*` and `/api/mcp*` through with no credential, and
+that block's own comment says they are safe because they are "rate limited per
+key and per source in the application". That is the control being bypassed, on
+the one hostname where closing the origin cannot help. `forgot-password` sends a
+Resend email per call, so the cost there is money, quota and sending reputation.
+
+**Severity today is lower than it will be.** Production DNS has not cut over, so
+this is the public staging copy rather than the live site. After the flip, that
+password-reset endpoint mails real members.
+
+**A fix is drafted and deliberately not merged**, on branch
+`claude/review-open-prs-kp8lhx` (commit `c697ed6`, marked PROPOSAL). It requires
+the peer — the last `X-Forwarded-For` hop, which Caddy sets and a client cannot
+forge — to be one of Cloudflare's published addresses before the header is
+believed. Verified to block the rotation while leaving real visitors behind
+Cloudflare on their own buckets, which is the half that must not regress.
+
+**Do it in the same sitting as step 6.** Both need the same thing: Cloudflare's
+published IP ranges. Step 6 puts them in the Hetzner firewall rules; the
+proposal ships them in the application, in a module that commit adds under
+`lib/security/`. Verify the list once against
+[cloudflare.com/ips-v4](https://www.cloudflare.com/ips-v4) and use it for both.
+They belong together anyway — closing the origin is what makes "did this come
+from Cloudflare" a question worth asking.
+
+### Also from that pass
+
+- **`/_next/image` had a rate limiter that never fired** (#146). `trailingSlash`
+  makes Next redirect `/:notfile` to `/:notfile/` without exempting `_next`, and
+  redirects run _before_ middleware — so real image requests were answered 308
+  at the path the limiter checked and served at the one it did not. Fixed by
+  comparing through `normalizePath`, as the `/health` check already did.
+- **`peek()` stopped gating once the key map filled** (#147), which is how the
+  header rotation above becomes unbounded MCP key guessing rather than merely a
+  bypass. Fixed; GraphQL was also switched off, since nothing calls it.
+- **The rehearsal's browser-only checks are now tests** (#148) — see §4 of
+  [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md). Email delivery is the only
+  one left, because it needs a real inbox.
+- **A new advisory against `payload` itself** — GHSA-jg8r-5jh2-v2xj, moderate,
+  account-unlock access control, `<=3.88.0` — has **no patched version
+  published**. Nothing to override, and it does not fail the audit job, which
+  gates on `--prod --audit-level high`. Noted so it is not a surprise on a
+  scheduled run.
+
+Previously worked on **4 Sep 2026**. A cutover-readiness pass that compared the
 rendered output of all 113 posts on staging against the same posts on the live
 Ghost site, rather than querying Postgres or crawling staging alone. That choice
 is again the reason it found anything: every defect below is a difference
