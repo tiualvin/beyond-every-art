@@ -399,6 +399,21 @@ Three ways out, none of them free:
   nothing — it is listed so the choice is deliberate rather than the one that
   happens by not deciding.
 
+**Bring the rate limiters with you.** The range list this pass needs is the same
+one the fix drafted on branch `claude/review-open-prs-kp8lhx` needs — so verify
+it once and spend it twice.
+
+`clientKey()` trusts `CF-Connecting-IP` whenever `TRUST_CLOUDFLARE_IP` is set,
+which it has been since 29 Aug, and until this pass lands anything can reach the
+origin directly and write that header itself. Since the header becomes the
+rate-limit key, a new value per request is a new allowance per request: every
+in-process limiter is off, measured at eight successes out of eight against a
+limit of three. Pass two closes that for the site's address. It does **not**
+close it for `cms`, whichever of the three options above is chosen, because two
+of them leave that hostname reachable without Cloudflare in front — which is
+what the drafted fix is for, and why it wants deciding here rather than later.
+See `DEPLOYMENT_STATUS.md`, "Pick up here".
+
 **Both address families, or neither.** In pass two: Caddy listens on `0.0.0.0`
 and `::`, and Cloudflare reaches an origin over whichever family the DNS record
 offers. Allow only the IPv4 ranges while an `AAAA` record exists and Cloudflare
