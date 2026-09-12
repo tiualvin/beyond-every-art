@@ -63,8 +63,13 @@ const OVERRIDES: Record<string, { floor: string; reason: string }> = {
       'which serves /api/mcp.',
   },
   'js-yaml': {
-    floor: '4.3.1',
-    reason: 'Quadratic CPU consumption resolving !!omap, via payload.',
+    floor: '4.3.2',
+    reason:
+      'Quadratic CPU consumption resolving !!omap, plus a second high-' +
+      'severity advisory from September where maxTotalMergeKeys does not ' +
+      'count empty mappings, letting a small YAML document merge-explode ' +
+      'into seconds of CPU time. Via payload’s json-schema-to-typescript, ' +
+      'used by `payload generate:types` rather than a live request path.',
   },
   nanoid: {
     floor: '3.3.18',
