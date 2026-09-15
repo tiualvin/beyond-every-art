@@ -53,7 +53,10 @@ below.
   Until it is set, the rate limiters key on the last `X-Forwarded-For` hop,
   which is the peer Caddy actually accepted. `CF-Connecting-IP` is deliberately
   ignored while the proxy is off, because anyone can send that header when
-  Cloudflare is not the one setting it.
+  Cloudflare is not the one setting it — and, since 15 Sep, ignored whenever the
+  peer is not a Cloudflare address even with the variable set, because "the
+  proxy is on" and "this request came through it" are different claims and only
+  the second one is checkable. See `lib/security/cloudflare.ts`.
 
 Both are wired into `docker-compose.yml` now, along with `CADDY_ACME` and
 `CLOUDFLARE_API_TOKEN`, and all of it is inert until those variables are set —
@@ -371,10 +374,31 @@ warning about.
 **Pass two — after step 4, once the proxy is on.** Edit only the port 80 and
 443 rules and replace `Any` with Cloudflare's ranges, published as plain text
 at [cloudflare.com/ips-v4](https://www.cloudflare.com/ips-v4) and
-[cloudflare.com/ips-v6](https://www.cloudflare.com/ips-v6) — around twenty
-entries in total, comfortably inside Hetzner's per-rule limit. **Both lists go
-into both rules.** This is the pass that actually closes the origin; pass one
-only removes the ports nothing was serving.
+[cloudflare.com/ips-v6](https://www.cloudflare.com/ips-v6) — twenty-two entries
+in total, comfortably inside Hetzner's per-rule limit. **Both lists go into both
+rules.** This is the pass that actually closes the origin; pass one only removes
+the ports nothing was serving.
+
+The lists, as verified on 15 Sep 2026 against both published pages and against
+`api.cloudflare.com/client/v4/ips`, which returned etag
+`38f79d050aa027e3be3865e495dcc9bc` for exactly these:
+
+```
+173.245.48.0/20    103.21.244.0/22    103.22.200.0/22    103.31.4.0/22
+141.101.64.0/18    108.162.192.0/18   190.93.240.0/20    188.114.96.0/20
+197.234.240.0/22   198.41.128.0/17    162.158.0.0/15     104.16.0.0/13
+104.24.0.0/14      172.64.0.0/13      131.0.72.0/22
+
+2400:cb00::/32     2606:4700::/32     2803:f800::/32     2405:b500::/32
+2405:8100::/32     2a06:98c0::/29     2c0f:f248::/32
+```
+
+They are written out here rather than only linked because the same list is
+compiled into the application, in `lib/security/cloudflare.ts`, and two copies
+that are never compared are two copies that drift. `tests/docs/drift.test.ts`
+compares them on every run, so this block and that module fail together rather
+than separately. Re-check both against Cloudflare before running the pass —
+Cloudflare announces additions in advance, and the test cannot see the source.
 
 **Decide what happens to `cms.beyondeveryart.com` before you run pass two.**
 Step 7 keeps that hostname unproxied so the MCP endpoint answers non-browser
@@ -399,19 +423,24 @@ Three ways out, none of them free:
   nothing — it is listed so the choice is deliberate rather than the one that
   happens by not deciding.
 
-**Bring the rate limiters with you.** The range list this pass needs is the same
-one the fix drafted on branch `claude/review-open-prs-kp8lhx` needs — so verify
-it once and spend it twice.
+**The rate limiters no longer wait on this pass.** They used to: `clientKey()`
+trusted `CF-Connecting-IP` whenever `TRUST_CLOUDFLARE_IP` was set, which it has
+been since 29 Aug, so anything that reached the origin directly could write that
+header itself. Since the header becomes the rate-limit key, a new value per
+request was a new allowance per request: every in-process limiter off, measured
+at eight successes out of eight against a limit of three.
 
-`clientKey()` trusts `CF-Connecting-IP` whenever `TRUST_CLOUDFLARE_IP` is set,
-which it has been since 29 Aug, and until this pass lands anything can reach the
-origin directly and write that header itself. Since the header becomes the
-rate-limit key, a new value per request is a new allowance per request: every
-in-process limiter is off, measured at eight successes out of eight against a
-limit of three. Pass two closes that for the site's address. It does **not**
-close it for `cms`, whichever of the three options above is chosen, because two
-of them leave that hostname reachable without Cloudflare in front — which is
-what the drafted fix is for, and why it wants deciding here rather than later.
+That is fixed in the application as of 15 Sep — `clientKey()` now requires the
+peer to be inside the ranges above before it believes the header — and the fix
+is deliberately independent of which of the three `cms` options is chosen. It
+had to be: pass two closes the bypass for the site's address, but two of those
+three options leave `cms` reachable without Cloudflare in front, and on that
+hostname no firewall rule can close it. So the choice above is now only about
+Payload Admin and MCP reachability, not about rate limiting as well.
+
+What still belongs to this pass is the list itself. Verify it once against
+Cloudflare and spend it twice: into the firewall rules here, and into
+`lib/security/cloudflare.ts` if it has moved since the date recorded above.
 See `DEPLOYMENT_STATUS.md`, "Pick up here".
 
 **Both address families, or neither.** In pass two: Caddy listens on `0.0.0.0`

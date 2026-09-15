@@ -11,15 +11,14 @@ Related: [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md),
 
 ## Pick up here
 
-Last worked on **5 Sep 2026**. A security pass over the public request surface,
-and the last rehearsal checks that needed a browser turned into tests. Three
-pull requests merged — #146, #147, #148. **One finding is not fixed, and it is
-the most important line on this page.**
+Last worked on **15 Sep 2026**. The header bypass below — the item that had been
+the most important line on this page since 5 Sep — is closed in code. Nothing
+else changed.
 
-### The rate limiters are currently bypassable with one header
+### The rate-limiter bypass is fixed, and needs a deploy to take effect
 
-`clientKey()` in `lib/security/rate-limit.ts` keys on `CF-Connecting-IP`
-whenever `TRUST_CLOUDFLARE_IP` is set, and that variable has been set since
+`clientKey()` in `lib/security/rate-limit.ts` keyed on `CF-Connecting-IP`
+whenever `TRUST_CLOUDFLARE_IP` was set, and that variable has been set since
 29 Aug (item 0.1 below). The header is a fact only when Cloudflare wrote it, and
 two routes into this application do not go through Cloudflare:
 
@@ -29,40 +28,54 @@ two routes into this application do not go through Cloudflare:
   MCP endpoint keeps answering non-browser clients. There the header is
   forgeable **permanently** — closing the origin does not fix that hostname.
 
-Because the header becomes the rate-limit key, a caller who can write it gets a
+Because the header became the rate-limit key, a caller who could write it got a
 fresh allowance per request. Measured against a production build with the limit
 set to 3: rotating the header gave eight successes out of eight, where a single
-source is throttled after three. That is every in-process limiter switched off —
+source is throttled after three. That was every in-process limiter switched off —
 login, password reset, preview, images, CSP reports, slug misses, Stripe
 failures, and MCP key guessing.
 
-It reads worst on `cms`, and that is not a coincidence: `@openApi` in the
+It read worst on `cms`, and that was not a coincidence: `@openApi` in the
 Caddyfile lets `/api/users/*` and `/api/mcp*` through with no credential, and
 that block's own comment says they are safe because they are "rate limited per
-key and per source in the application". That is the control being bypassed, on
+key and per source in the application". That was the control being bypassed, on
 the one hostname where closing the origin cannot help. `forgot-password` sends a
 Resend email per call, so the cost there is money, quota and sending reputation.
 
-**Severity today is lower than it will be.** Production DNS has not cut over, so
-this is the public staging copy rather than the live site. After the flip, that
-password-reset endpoint mails real members.
+**What changed.** `clientKey()` now believes `CF-Connecting-IP` only when the
+peer — the last `X-Forwarded-For` hop, which Caddy appends and a client cannot
+forge — is inside Cloudflare's published ranges. Otherwise it keys on the peer,
+as it does with the variable unset. The ranges are compiled in at
+`lib/security/cloudflare.ts` rather than fetched, because a limiter that needs a
+network call to bucket a request fails open the first time the call does; a
+stale list fails the other way, treating an unrecognised peer as not-Cloudflare
+and keying tighter than intended.
 
-**A fix is drafted and deliberately not merged**, on branch
-`claude/review-open-prs-kp8lhx` (commit `c697ed6`, marked PROPOSAL). It requires
-the peer — the last `X-Forwarded-For` hop, which Caddy sets and a client cannot
-forge — to be one of Cloudflare's published addresses before the header is
-believed. Verified to block the rotation while leaving real visitors behind
-Cloudflare on their own buckets, which is the half that must not regress.
+This is the proposal that sat on `claude/review-open-prs-kp8lhx` (commit
+`c697ed6`), now landed. It was held on one thing — re-checking the ranges
+against Cloudflare — and that check is done: both published lists and
+`api.cloudflare.com/client/v4/ips` agreed on 15 Sep, etag
+`38f79d050aa027e3be3865e495dcc9bc`, 15 IPv4 and 7 IPv6 entries, matching the
+drafted list exactly. The other reason it was held — that the list is shared
+with step 6 — turned out to be an argument for landing it separately: step 6
+cannot close the bypass on `cms` under two of its three options, so the two are
+not actually one piece of work. `EDGE_PROTECTION.md` now carries the list next
+to the firewall rules, and `tests/docs/drift.test.ts` fails if the two copies
+diverge.
 
-**Do it in the same sitting as step 6.** Both need the same thing: Cloudflare's
-published IP ranges. Step 6 puts them in the Hetzner firewall rules; the
-proposal ships them in the application, in a module that commit adds under
-`lib/security/`. Verify the list once against
-[cloudflare.com/ips-v4](https://www.cloudflare.com/ips-v4) and use it for both.
-They belong together anyway — closing the origin is what makes "did this come
-from Cloudflare" a question worth asking.
+**Three things an operator still owns:**
 
-### Also from that pass
+1. **It is not deployed.** The bypass is open on the running host until the next
+   deploy. Severity is lower than it will be — DNS has not cut over, so this is
+   the public staging copy — but `forgot-password` mails real addresses today.
+2. **Re-verify the ranges at step 6**, and update both copies if Cloudflare has
+   published a change. The test compares the doc to the code; neither is checked
+   against Cloudflare, and nothing automated can be.
+3. **Watch for a limiter that suddenly bites.** The failure mode of a wrong or
+   stale list is real visitors behind Cloudflare sharing one bucket rather than
+   getting their own. `TRUST_CLOUDFLARE_IP` stays safe to leave set either way.
+
+### Also from the 5 Sep pass
 
 - **`/_next/image` had a rate limiter that never fired** (#146). `trailingSlash`
   makes Next redirect `/:notfile` to `/:notfile/` without exempting `_next`, and
