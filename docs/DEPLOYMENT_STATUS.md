@@ -17,7 +17,7 @@ the first time since 29 Aug. Four rehearsal items were worked at the same time.
 Two closed, one was decided rather than fixed, and one turned up a defect that
 blocks cutover.
 
-### Email has never been configured on this deployment
+### Email has never been configured — and now deliberately will not be
 
 Triggered an admin password reset on 18 Sep; nothing was delivered. Root
 cause confirmed the same day, on the box:
@@ -60,11 +60,27 @@ to enumerate addresses. A missing variable and a working send look the same
 from outside. The adapter is built once at module load, so the values must be
 present when the container starts, not merely written to `.env` afterwards.
 
-**To fix it:** create a Resend API key, verify a sending domain there (DNS
-records in the Cloudflare zone), then set `RESEND_API_KEY` and
-`EMAIL_FROM_ADDRESS` in `.env` and `docker compose up -d`. No rebuild is
-needed — neither is a `NEXT_PUBLIC_*` variable, so neither reaches the client
-bundle and neither is a Docker build argument, unlike
+**Resolved by decision on 18 Sep: no transactional provider, for now.** The
+cost is that an administrator who forgets their password needs SSH to get back
+in — `docker compose run --rm migrate pnpm bootstrap:admin` sets one from
+environment variables — and that is acceptable while the administrators are
+the people with SSH. The cutover runbook's "verify a password-reset email"
+line is struck for the same reason.
+
+[`EMAIL.md`](EMAIL.md) is now the source of truth for this, including what
+makes the decision expire: the account model's emailed sign-in link is the
+main one, and it turns a nuisance into a blocker.
+
+**Klaviyo is the ESP**, decided the same day, for the newsletter and anything
+else list-shaped. It replaces the Listmonk placeholder the handoff carried.
+Not for transactional mail, and `EMAIL.md` says why at length — the short
+version is that a reset token would have to travel as a marketing event
+property.
+
+**If it is ever turned on:** create the key, verify a sending domain (DNS in
+the Cloudflare zone), set `RESEND_API_KEY` and `EMAIL_FROM_ADDRESS`, then
+`docker compose up -d`. No rebuild — neither is a `NEXT_PUBLIC_*` variable, so
+neither reaches the client bundle nor is a Docker build argument, unlike
 `NEXT_PUBLIC_CHECKOUT_URL_MONTHLY`.
 
 Two things that will otherwise be found one at a time:

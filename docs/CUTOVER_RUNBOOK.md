@@ -98,7 +98,11 @@ on cutover day.
 - [ ] Confirm analytics is receiving traffic — GA4 **Reports → Realtime**,
       within seconds of loading the site. This is the first moment the tag can
       be verified at all, because the `noindex` gate keeps it off on staging.
-- [ ] Verify a password-reset email is delivered.
+- [x] ~~Verify a password-reset email is delivered.~~ **Not applicable.** No
+      transactional provider is configured, by decision — nothing member-facing
+      sends mail, and an administrator lockout is recovered with
+      `pnpm bootstrap:admin` over SSH. [`EMAIL.md`](EMAIL.md) records what makes
+      that decision expire.
 
 ## Post-launch monitoring (first weeks)
 
