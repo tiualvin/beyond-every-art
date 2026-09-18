@@ -23,7 +23,8 @@ on cutover day.
 - [ ] The `backup` service is running and has produced at least one backup.
 - [ ] DNS TTL for the domain reduced (e.g. to 300s) so the flip propagates fast.
 - [ ] Administrator account exists in production Payload.
-- [ ] **Search Console verification does not depend on Ghost** — check
+- [x] **Search Console verification does not depend on Ghost** — confirmed
+      18 Sep: the property is verified by DNS, which survives. Check
       Settings → Ownership verification. An HTML file or `<meta>` tag is served
       by Ghost and dies with it, and Google eventually unverifies the property;
       a DNS record survives. Data is never deleted, but an unverified property
@@ -53,7 +54,23 @@ on cutover day.
    pnpm migrate:ghost      --input ghost-export/ghost-content.json
    pnpm migrate:redirects  --input ghost-export/redirects.json
    pnpm migrate:members    --input ghost-export/ghost-members.csv
+   pnpm repair:content     --input ghost-export/ghost-content.json
    ```
+
+   **`repair:content` is part of the migration, not a tidy-up.** The importer
+   strips `__GHOST_URL__` placeholders (`stripGhostUrlPlaceholders` in
+   `lib/migration/plan.ts`) and nothing else. It does **not** undo the escaped
+   quotes on one post's `href`s — seven links that a browser resolves as
+   relative paths and 404s. That repair exists only in this script, so a
+   migration without it writes the seven dead links back into a database that
+   had already been repaired, and they ship.
+
+   This was found on 18 Sep by a crawl comparison reporting those seven URLs
+   as 404s on the live Ghost site while `repair:content --dry-run` reported
+   nothing to repair in Payload. Both were true: Payload was already clean, and
+   the export that would overwrite it was not. It also backfills 110 photo
+   credits the importer passes over, which is the other thing a fresh import
+   loses.
 
 6. **Validate** the production import:
 
@@ -63,11 +80,13 @@ on cutover day.
 
    Do not proceed unless it reports `"ok": true`.
 
-   **If any post is being retired, delete it in Ghost before step 2**, not just
+   **If any post is ever retired, delete it in Ghost before step 2**, not just
    in Payload. The validator builds what it expects from the export, so a post
    the export still lists and Payload no longer has is reported `missing` and
    fails this gate — correctly, by its own rules, for a deletion that was
-   deliberate. See `DEPLOYMENT_STATUS.md`, "Three posts are being deleted".
+   deliberate. Nothing is being retired for this cutover (see
+   `DEPLOYMENT_STATUS.md`, "The three posts are being kept"), so this is a note
+   for the next time rather than a step to take now.
 
 7. **Validate the redirects** against the production host. Not a spot-check:
    this is the one part of the migration whose failure is silent, because a

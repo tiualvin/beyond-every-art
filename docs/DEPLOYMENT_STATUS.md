@@ -11,11 +11,27 @@ Related: [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md),
 
 ## Pick up here
 
-Last worked on **18 Sep 2026**. The header bypass is closed **and deployed**
-(#156), so the limiters actually bound request volume on the running host for
-the first time since 29 Aug. Four rehearsal items were worked at the same time.
-Two closed, one was decided rather than fixed, and one turned up a defect that
-blocks cutover.
+Last worked on **18 Sep 2026**, and it was a long day: four merges (#156, #157,
+#158, #159) and the first crawl comparison since 4 Sep.
+
+The header bypass is closed **and deployed** (#156), so the limiters actually
+bound request volume on the running host for the first time since 29 Aug.
+
+Rehearsal §4 and §5 are both closed. Draft URLs 404, confirmed signed out. The
+restore drill ran against the real bucket and reproduced production exactly,
+including the one canonical defect production already has — which is stronger
+evidence than a clean report, because a lossy restore fails differently.
+Transactional email is decided rather than configured, and reaches
+administrators only.
+
+The crawl comparison found two things worth the work: structured data missing
+on three route kinds, now shipped in #158, and the escaped-quote trap below.
+Its 135 errors were mostly Cloudflare's email obfuscation, since switched off.
+
+Still open, in the order they will be met: rehearsal §6 re-run, media id 4,
+`/about/` losing an image, the members CSV, closing the origin, the analytics
+tag, and the search baseline. Search Console verification is done — it is by
+DNS, so it survives Ghost.
 
 ### Email has never been configured — and now deliberately will not be
 
@@ -102,49 +118,56 @@ nothing for it to be relative to. Those look set on this host, so this is a
 confirmation rather than an expectation — but it is the second way admin
 recovery fails, and it is invisible until someone clicks the link.
 
-### Three posts are being deleted — decided 18 Sep, and it needs redirects
+### The three posts are being kept — reversed 18 Sep, later the same day
 
-The repository owner decided to delete these rather than fix what each was
-flagged for:
+Three posts were briefly going to be deleted, and are not. Recorded because the
+reversal changes what is outstanding, and because the reasoning for each is
+still the reasoning:
 
 - `the-ultimate-guide-to-understanding-different-types-of-art-prints-giclee-lithographs-and-more`
-  — carried media id 4, the site's only broken image. Deleting the post
-  retires that item; the image needs no restoring.
-- `fine-art-home-guide` — the `__GHOST_URL__` canonical.
-- `limited-edition-vs-open-edition-prints-which-is-right-for-you` — the only
-  one of 117 posts carrying Ghost card markup.
+  carries media id 4, the site's only broken image. **That item is open again**
+  — see below. It needs the image re-uploaded through the admin under a
+  filename ending `.jpeg`, which fixes both the missing bytes and the
+  extensionless filename that `trailingSlash` makes unreachable.
+- `fine-art-home-guide` still declares a `__GHOST_URL__` canonical. The
+  importer strips the placeholder now, so the final migration repairs it — or
+  `docker compose run --rm migrate pnpm fix:ghost-links` does it sooner.
+- `limited-edition-vs-open-edition-prints-which-is-right-for-you` is the only
+  one of 117 posts carrying Ghost card markup. It served 200 on staging on
+  4 Sep with its table and its one `figcaption` intact; a look in a browser is
+  the outstanding half.
 
-**All three are published and indexed**, and were among the 127 Ghost URLs
-verified returning 200 on staging on 29 Aug. Deleting them without a
-redirect turns three indexed URLs into 404s at the flip — which is
-indistinguishable, in Search Console, from the migration having lost them.
-That is the one shape of post-cutover damage
-[`SEO_CUTOVER_RISK.md`](SEO_CUTOVER_RISK.md#reading-the-aftermath) says is a
-real problem rather than recrawl noise.
+**What the reversal buys:** no redirects to write, no indexed URL 404ing, and
+no interaction with the cutover gate. Deleting a post the export still lists
+makes `migrate:validate` report it `missing` and fail step 6, which is a red
+gate for a deliberate act — the trap is documented in the runbook now as a
+caution for next time rather than a step for this cutover.
 
-**Decide a destination for each before cutover** and add the rules to the
-`redirects` collection — the topic archive each sat under is usually the
-honest answer; a 410 is defensible if the content is genuinely retired and
-you would rather tell Google so directly. `pnpm validate:redirects` covers
-the table, so whatever is chosen gets checked with the rest.
+**What it leaves:** the three defects above, each small and each known.
 
-**Delete them in Ghost first, then take the final export.** This is the part
-that is easy to get backwards, and getting it backwards stops the cutover.
-`validateContent` in `lib/migration/validate.ts` iterates over what the export
-expects and raises a `missing` issue for anything absent from Payload, and
-`isClean` fails the report on any issue at all. So three posts deleted from
-Payload while the export still lists them is three `missing` issues and
-`"ok": false` — and step 6 of the [cutover runbook](CUTOVER_RUNBOOK.md) says
-not to proceed without `"ok": true`. Nothing would actually be wrong; the gate
-would be red anyway, at the worst possible moment to be debugging a gate.
+### The seven dead links come back unless `repair:content` runs
 
-Deleting them in Ghost first keeps the export, the database and the validator
-in agreement, and the redirects below still cover the indexed URLs. It also
-retires the `fine-art-home-guide` canonical defect at the same time, since the
-post carrying it leaves.
+New on 18 Sep, and the reason it was not obvious. The crawl comparison reported
+seven URLs 404ing — hrefs wrapped in escaped quotes, which a browser resolves
+as relative paths. They are dead on the **live Ghost site**. Payload's copies
+are already clean, and `repair:content --dry-run` confirms it by finding
+nothing to repair.
 
-Not yet done, at the time of writing: the deletions themselves, and the
-redirects for them.
+Both facts are true at once, and together they are the trap: the export still
+carries the malformed hrefs, and the importer does not touch them. It strips
+`__GHOST_URL__` placeholders and nothing else. So the final `migrate:ghost`
+overwrites a repaired database with the unrepaired export, and the seven dead
+links ship on the new site.
+
+The decision is to leave them in Ghost and fix them on the way in:
+`pnpm repair:content` is now step 5 of the [cutover runbook](CUTOVER_RUNBOOK.md),
+alongside the three migration commands rather than after them as a tidy-up. It
+also backfills the 110 photo credits the importer passes over, which is the
+other thing a fresh import loses.
+
+Until cutover, seven links in one published post 404 for readers on the live
+site. That is the accepted cost of not editing Ghost content this close to the
+move.
 
 ### Closed on 18 Sep
 
@@ -152,9 +175,10 @@ redirects for them.
   that it must be checked signed out: an admin session carries the preview
   cookie, and a draft served 200 through it looks exactly like one that
   leaked.
-- **Media id 4** — retired by the deletion decision above rather than fixed.
-  Recorded because the item appears in several places on this page and in
-  the rehearsal, and all of them are now answered by one decision.
+- **Media id 4 is not closed.** It was, briefly, by a deletion decision that
+  was reversed the same day. It needs an operator: re-upload the image
+  through the admin under a filename ending `.jpeg`. Noted here because the
+  item reads as closed in two earlier commits, and it is not.
 
 Previously worked on **15 Sep 2026**. The header bypass below — the item that
 had been the most important line on this page since 5 Sep — was closed in code.
@@ -960,9 +984,8 @@ content audit (see "The content audit" above) answered the question this used
 to pose:
 
 1. **Media id 4** (`photo-1689659721022-3aa475803e19`) has no bytes in R2.
-   **Retired on 18 Sep**: the post it belongs to is being deleted, so the image
-   needs no restoring — see "Three posts are being deleted" under Pick up here.
-   The rest of this entry is kept because it records what was established. It
+   Briefly retired on 18 Sep by a decision to delete the post carrying it; that
+   decision was reversed the same day, so this is open. It
    is an Unsplash URL that was linked rather than stored in Ghost, it **is**
    used — the feature image of a published post — and its source URL still
    returns 200 with the exact byte count the row expects, so it is

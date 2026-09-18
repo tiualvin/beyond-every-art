@@ -137,22 +137,24 @@ discrepancy. Fix the root cause and re-run until it reports `"ok": true`.
 - [ ] **Media** loads from R2 (not the old Ghost domain) with alt text intact.
       Loading is verified (30 Aug): 110 records, all `migrated`, R2 holding 327
       objects, and **no body anywhere references the Ghost domain** — see the
-      content audit in `DEPLOYMENT_STATUS.md`. One exception, now closed by a
-      decision rather than a fix: **media id 4 had no bytes in R2** — confirmed
+      content audit in `DEPLOYMENT_STATUS.md`. One exception, still open:
+      **media id 4 has no bytes in R2** and needs re-uploading — confirmed
       still missing on 4 Sep, in both the extensionless and `.jpeg` forms, and
-      the only broken image on the site, every other post's `og:image` having
-      been requested with all 108 returning 200. It belonged to
-      `the-ultimate-guide-to-understanding-different-types-of-art-prints-giclee-lithographs-and-more`.
-      On 18 Sep the repository owner decided to delete that post rather than
-      restore the image, which removes the last broken image with it. See
-      "Three posts are being deleted" in `DEPLOYMENT_STATUS.md` for what that
-      costs at cutover. "Alt text intact" is neither pass
-      nor fail as written, because **Ghost had none** — 118 `posts_meta` rows,
-      zero non-empty `feature_image_alt` — so nothing was lost. The importer
-      fills `alt` with the filename because the field is required, and
-      `toAltText` in `lib/content/media.ts` collapses that to an empty string
-      before it reaches a reader, which is correct: a filename read aloud is
-      worse than an image marked decorative. Confirmed in the rendered HTML.
+      it is the only broken image on the site: every other post's `og:image`
+      was requested and all 108 returned 200. The post it belongs to is
+      `the-ultimate-guide-to-understanding-different-types-of-art-prints-giclee-lithographs-and-more`,
+      which is published and is missing both its feature image and its sharing
+      card. It was briefly going to be deleted, which would have retired this;
+      that decision was reversed on 18 Sep, so the re-upload is needed after
+      all — through the admin, under a filename ending `.jpeg`, which fixes the
+      missing bytes and the extensionless filename together. "Alt text intact"
+      is neither pass nor fail as written, because **Ghost had none** — 118
+      `posts_meta` rows, zero non-empty `feature_image_alt` — so nothing was
+      lost. The importer fills `alt` with the filename because the field is
+      required, and `toAltText` in `lib/content/media.ts` collapses that to an
+      empty string before it reaches a reader, which is correct: a filename
+      read aloud is worse than an image marked decorative. Confirmed in the
+      rendered HTML.
 - [x] **URLs** preserve the original slugs and trailing-slash structure.
       Verified 29 Aug against real content: every URL in Ghost's four sitemaps —
       113 posts, 3 pages, 9 tags, 2 authors, **127 in total** — was requested on
