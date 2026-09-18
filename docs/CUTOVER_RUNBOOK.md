@@ -34,19 +34,19 @@ on cutover day.
       GA4 itself and setting both double-counts every page view irreversibly.
       Read at runtime, so no rebuild; gated on `!isNoindex()`, so it starts at
       the flip and never on staging. See [`ANALYTICS.md`](ANALYTICS.md).
-- [ ] **Microsoft Clarity, project `ut35gfe8hc`** — the second thing Ghost
-      injects, and the reason the line above used to understate this step.
-      Ghost loads it directly rather than through the container, and this
-      application has no support for it. `lib/security/csp.ts` allows Google
-      origins only, so `clarity.ms` is blocked either way until it is added —
-      and a CSP block is silent. Decide whether Clarity continues at all before
-      cutover; it does not survive by itself.
-- [ ] **Facebook domain verification `<meta>`,
-      `jbv5so0ptpuagh78xxvqgj07e77kex`** — the third. It dies with Ghost
-      exactly as an HTML-tag Search Console verification would. Re-verify with
-      Meta by **DNS TXT** in the Cloudflare zone instead, for the reason that
-      worked for Search Console: it survives the server, the migration, and any
-      later move.
+- [x] ~~**Microsoft Clarity, project `ut35gfe8hc`**~~ — **dropped, 18 Sep.**
+      Ghost injects it directly rather than through the container, this
+      application has no support for it, and `lib/security/csp.ts` allows Google
+      origins only, so `clarity.ms` would be blocked until added. Rather than
+      build support, Clarity stops at cutover. Nothing to do; recorded so its
+      disappearance from the data is expected rather than investigated.
+- [x] **Facebook domain verification** — **done, 18 Sep**, by DNS TXT in the
+      Cloudflare zone. Ghost carries a `<meta>` tag
+      (`jbv5so0ptpuagh78xxvqgj07e77kex`) that would have died with it, exactly
+      as an HTML-tag Search Console verification would. The DNS record survives
+      the server, the migration, and any later move. Confirm it reads as
+      verified in Meta Business Manager before Ghost is switched off, since
+      that is the last moment the old method still works.
 - [x] ~~**Search baseline captured from the Ghost site**~~ — **deliberately
       skipped, 18 Sep.** Search Console retains 16 months and GA4 its own
       window, both reachable in the platforms when a comparison is actually
@@ -65,7 +65,13 @@ on cutover day.
 
 1. **Freeze publishing** in Ghost (tell editors; avoid new posts mid-migration).
 2. Create a **final Ghost export** (content, redirects, members).
-3. Obtain the **latest members export**.
+3. Obtain the **latest members export**. **Do this even though the Payload
+   import is being skipped** (decided 18 Sep — Klaviyo is the ESP, so the list
+   belongs there rather than in `members`, which is a preservation copy). The
+   export is the only copy of the Ghost member list that survives the account
+   being cancelled, and it cannot be recovered afterwards. Take it, keep it
+   off-server, and load it into Klaviyo when the newsletter is built. See
+   [`EMAIL.md`](EMAIL.md).
 4. Download **media added since the rehearsal**.
 5. Run the **final migration** against production:
 

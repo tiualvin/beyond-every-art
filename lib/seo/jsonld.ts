@@ -131,9 +131,52 @@ export type WebPageJsonLdInput = {
 export function buildWebPageJsonLd(
   input: WebPageJsonLdInput,
 ): Record<string, unknown> {
+  return pageLikeJsonLd('WebPage', input)
+}
+
+export type CollectionPageJsonLdInput = {
+  url: string
+  name: string
+  description?: string
+  siteName: string
+  siteUrl: string
+}
+
+/**
+ * A tag archive's node — `CollectionPage`, where Ghost emitted `Series`.
+ *
+ * The same reasoning as `buildWebPageJsonLd`, applied to the fourth route kind.
+ * A `Series` is a work published in parts, in a deliberate order, by an author
+ * who meant it as a series. A tag archive is a list of everything filed under a
+ * word — no order, no intent, and a post can sit in several at once.
+ * `CollectionPage` is what schema.org offers for exactly that, so it is what
+ * this emits.
+ *
+ * Found on 18 Sep by the crawl comparison, which reported nine of these as
+ * `Series` against `(none)`. The pass that added the homepage, page and author
+ * nodes the same day covered three route kinds and missed this one.
+ */
+export function buildCollectionPageJsonLd(
+  input: CollectionPageJsonLdInput,
+): Record<string, unknown> {
+  return pageLikeJsonLd('CollectionPage', input)
+}
+
+/**
+ * The shape `WebPage` and `CollectionPage` share: a named page, owned by the
+ * site, optionally described and optionally dated.
+ *
+ * Factored rather than written twice because the two differ only in `@type`,
+ * and two near-identical builders is how one of them quietly stops matching
+ * the other.
+ */
+function pageLikeJsonLd(
+  type: 'WebPage' | 'CollectionPage',
+  input: WebPageJsonLdInput | CollectionPageJsonLdInput,
+): Record<string, unknown> {
   const jsonLd: Record<string, unknown> = {
     '@context': 'https://schema.org',
-    '@type': 'WebPage',
+    '@type': type,
     name: input.name,
     url: input.url,
     isPartOf: {
@@ -144,7 +187,8 @@ export function buildWebPageJsonLd(
   }
 
   if (input.description) jsonLd.description = input.description
-  if (input.dateModified) jsonLd.dateModified = input.dateModified
+  const dateModified = (input as WebPageJsonLdInput).dateModified
+  if (dateModified) jsonLd.dateModified = dateModified
 
   return jsonLd
 }

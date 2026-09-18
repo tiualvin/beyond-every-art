@@ -26,7 +26,7 @@ test('article metadata, canonical URL, and structured data agree', async ({
   expect(jsonLd.url).toMatch(new RegExp(`/${fixtures.publicPost.slug}/$`))
 })
 
-test('the homepage, a page and an author archive each describe themselves', async ({
+test('the homepage, a page, a tag and an author archive each describe themselves', async ({
   page,
 }) => {
   // Added 18 Sep, after the crawl comparison found Ghost emitting WebSite,
@@ -54,6 +54,13 @@ test('the homepage, a page and an author archive each describe themselves', asyn
   // future "fix" for the crawl diff argue with a test.
   expect(about['@type']).toBe('WebPage')
   expect(about.name).toBe(fixtures.page.title)
+
+  await page.goto(`/tag/${fixtures.tag.slug}/`)
+  const tag = await firstNode()
+  // CollectionPage rather than Ghost's Series — a tag archive is a list, not a
+  // work published in parts. Reasoning in lib/seo/jsonld.ts.
+  expect(tag['@type']).toBe('CollectionPage')
+  expect(tag.name).toBe(fixtures.tag.title)
 
   await page.goto(`/author/${fixtures.author.slug}/`)
   const author = await firstNode()
