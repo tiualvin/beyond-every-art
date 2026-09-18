@@ -19,6 +19,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
+import { CLOUDFLARE_IPV4, CLOUDFLARE_IPV6 } from '../../lib/security/cloudflare'
 import { RESERVED_ROOT_SLUGS } from '../../lib/seo/reserved-slugs'
 
 const root = resolve(import.meta.dirname, '../..')
@@ -270,5 +271,44 @@ describe('reserved root slugs', () => {
 
   it.each([...new Set(segments)])('reserves /%s', (segment) => {
     expect(RESERVED_ROOT_SLUGS as readonly string[]).toContain(segment)
+  })
+})
+
+describe('the Cloudflare ranges', () => {
+  // The same list lives in two places on purpose, and that is the risk. The
+  // firewall rules in EDGE_PROTECTION.md pass two and the peer check in
+  // lib/security/cloudflare.ts both need it, and they are edited by different
+  // people at different times — the first by an operator in a web console, the
+  // second in a commit. A range added to one and not the other fails in a way
+  // neither side can see: the firewall drops traffic the limiter would have
+  // trusted, or the limiter distrusts a peer the firewall let in and buckets
+  // every visitor behind it together.
+  //
+  // Neither copy is checked against Cloudflare here. A test that fetched the
+  // published list would fail on a network hiccup and pass on a stale cache,
+  // which is worse than useless for something this load-bearing. What this does
+  // is hold the two copies to each other; the date and etag recorded in the
+  // module are what say when they were last checked against the source.
+  const doc = docs.find((entry) => entry.name === 'docs/EDGE_PROTECTION.md')
+
+  it('are documented where pass two needs them', () => {
+    expect(doc).toBeDefined()
+  })
+
+  it('match the list compiled into the limiter', () => {
+    // Anchored on the sentence that introduces the block rather than on "the
+    // first fenced block with a slash in it", so that adding a code sample
+    // anywhere above it cannot quietly point this test at the wrong thing.
+    const fenced = doc!.text.match(/for exactly these:\n+```\n([\s\S]*?)```/)
+    expect(fenced, 'the range block in EDGE_PROTECTION.md').not.toBeNull()
+
+    const documented = new Set(
+      fenced![1].split(/\s+/).filter((entry) => entry.includes('/')),
+    )
+    const compiled = new Set<string>([...CLOUDFLARE_IPV4, ...CLOUDFLARE_IPV6])
+
+    // Reported as sorted arrays rather than sets, so a failure names the entry
+    // that differs instead of printing two collections to compare by eye.
+    expect([...documented].sort()).toEqual([...compiled].sort())
   })
 })

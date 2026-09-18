@@ -1,0 +1,17 @@
+# Git calls a file binary when it finds a NUL byte, and a binary file has no
+# diff — `git diff`, `git log -p` and the GitHub review view all print
+# "Binary files differ" and stop. Two source files here legitimately contain a
+# NUL: `lib/security/rate-limit.ts` uses one to prefix the overflow bucket key
+# so it cannot collide with a real key, and `tests/seo/indexing.test.ts` uses
+# one to check that a constant-time compare does not fold it to end-of-string.
+#
+# Both are now written as Unicode escapes rather than raw bytes, which keeps the
+# value identical and the file text. This is the belt to that braces: it makes
+# the classification explicit for these types, so a raw NUL reintroduced later
+# costs a readable diff on one line rather than silently hiding every change to
+# the file. That mattered — the rate limiter is the only bound on request volume
+# this deployment has, and its diffs were invisible in review for as long as the
+# byte was there.
+*.ts diff
+*.tsx diff
+*.mjs diff
