@@ -37,6 +37,12 @@ catalogue. None of it is built, and it must not displace migration or cutover
 work. Read it before adding any Lexical block, block registry, or content
 module.
 
+[`docs/EMAIL.md`](docs/EMAIL.md) records who sends mail and who does not.
+**Klaviyo is the ESP** for anything list-shaped; build the newsletter and member
+campaigns around it. No transactional provider is configured, deliberately, and
+that document says what makes the decision expire — read it before adding any
+send path, and do not reach for the ESP to send a token.
+
 [`docs/AUTONOMOUS_WORKSTREAMS.md`](docs/AUTONOMOUS_WORKSTREAMS.md) defines the
 sequencing, shared invariants, ownership boundaries, and verification gates for
 the repository's launch-readiness automation workstreams.

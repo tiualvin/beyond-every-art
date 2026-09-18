@@ -128,20 +128,25 @@ discrepancy. Fix the root cause and re-run until it reports `"ok": true`.
       (`limited-edition-vs-open-edition-prints-which-is-right-for-you`, the only
       one of 117 with Ghost card markup) serves 200 on staging with its table
       and its one `figcaption` intact (4 Sep).
-- [ ] **Drafts** are still drafts and are not publicly reachable. The count has
+- [x] **Drafts** are still drafts and are not publicly reachable. The count has
       survived two write passes at 4 (30 Aug), which is the half of this a query
-      can answer. Whether a draft URL actually 404s is still unverified.
+      can answer. The other half closed on 18 Sep: the draft URLs were requested
+      and returned 404. Check this signed out — an admin session carries the
+      preview cookie, and a draft served 200 through it reads exactly like a
+      draft that leaked.
 - [ ] **Media** loads from R2 (not the old Ghost domain) with alt text intact.
       Loading is verified (30 Aug): 110 records, all `migrated`, R2 holding 327
       objects, and **no body anywhere references the Ghost domain** — see the
-      content audit in `DEPLOYMENT_STATUS.md`. One exception: **media id 4 has
-      no bytes in R2** and needs re-uploading — confirmed still missing on
-      4 Sep, in both the extensionless and `.jpeg` forms, and it is the only
-      broken image on the site: every other post's `og:image` was requested and
-      all 108 returned 200. The post it belongs to is
-      `the-ultimate-guide-to-understanding-different-types-of-art-prints-giclee-lithographs-and-more`,
-      which is published and is missing both its feature image and its sharing
-      card. "Alt text intact" is neither pass
+      content audit in `DEPLOYMENT_STATUS.md`. One exception, now closed by a
+      decision rather than a fix: **media id 4 had no bytes in R2** — confirmed
+      still missing on 4 Sep, in both the extensionless and `.jpeg` forms, and
+      the only broken image on the site, every other post's `og:image` having
+      been requested with all 108 returning 200. It belonged to
+      `the-ultimate-guide-to-understanding-different-types-of-art-prints-giclee-lithographs-and-more`.
+      On 18 Sep the repository owner decided to delete that post rather than
+      restore the image, which removes the last broken image with it. See
+      "Three posts are being deleted" in `DEPLOYMENT_STATUS.md` for what that
+      costs at cutover. "Alt text intact" is neither pass
       nor fail as written, because **Ghost had none** — 118 `posts_meta` rows,
       zero non-empty `feature_image_alt` — so nothing was lost. The importer
       fills `alt` with the filename because the field is required, and
@@ -197,8 +202,18 @@ discrepancy. Fix the root cause and re-run until it reports `"ok": true`.
 - [x] **Forms** (search, newsletter signup) submit successfully. Already covered
       before this pass — search in `mobile-nav.spec.ts`, newsletter in
       `public-routes.spec.ts`, and the app waitlist in `apps.spec.ts`.
-- [ ] **Email** delivery works (trigger an admin password reset; confirm
-      receipt). The one item here no test can close: it needs a real inbox.
+- [x] **Email** delivery — **not applicable, by decision (18 Sep).** Tried on
+      18 Sep and nothing arrived; `RESEND_API_KEY` and `EMAIL_FROM_ADDRESS` are
+      both empty on the box, so `resendAdapter()` returned null and Payload fell
+      back to an adapter that logs instead of sending — which reports success to
+      the caller either way. Email has never worked on this deployment. Rather
+      than configure a provider, the decision is to send no transactional mail
+      for now: it reaches administrators only, since `Members` is not an
+      authentication collection, the account model is not built, and the public
+      forms record rows without sending. An administrator lockout is recovered
+      with `pnpm bootstrap:admin` over SSH. [`EMAIL.md`](EMAIL.md) carries the
+      reasoning and what makes the decision expire.
+
 - [x] **Health** endpoint (`/health`) returns `status: ok`. Covered by
       `seo-and-health.spec.ts`, which asserts `{ status: 'ok', db: 'up' }`.
 
@@ -245,8 +260,30 @@ pnpm restore:db --latest --dry-run   # verify it decompresses
 # Restore into a scratch DB and confirm counts (see BACKUP_AND_RESTORE.md).
 ```
 
-- [ ] A backup uploads to R2.
-- [ ] A restore into a scratch database reproduces the content.
+- [x] A backup uploads to R2. Proven 27 Aug (encrypted) and again 18 Sep, which
+      also exercised retention: the run pruned the 5 Sep archive under the
+      14-day policy.
+- [x] A restore into a scratch database reproduces the content. Done 18 Sep
+      against the real bucket — the thing CI's drill cannot prove, since only a
+      real run shows that _this_ bucket, holding _these_ objects, under the
+      passphrase currently in the production environment file, reads back. The
+      archive decrypted to 7,665,786 `sqlBytes` on the dry run and restored to
+      exactly the same on a scratch database; `posts`, `pages`, `tags`,
+      `authors` and `payload_migrations` matched row for row; and
+      `migrate:validate`, pointed at the restored copy, matched 117 of 117
+      posts against the Ghost export field by field.
+- [x] The `ok: false` that came with it is the result worth reading carefully
+      rather than at a glance. The single issue was the `fine-art-home-guide`
+      canonical — the defect production already has. The restore reproduced
+      production exactly, flaw included, which is stronger evidence than a
+      clean report: a lossy restore fails differently, with missing rows and
+      mismatched fields.
+- [ ] Two things the drill did **not** cover. `members` was 0 on both sides, so
+      that table proved nothing — re-run once the members CSV is imported,
+      since it is the table whose loss would actually hurt. And `posts` is 118
+      against the export's 117: one post exists in Payload that Ghost never
+      had. It does not fail the gate (`isClean` counts issues, not rows) but it
+      should be identified rather than carried into cutover.
 
 ## 6. Crawl comparison
 

@@ -825,13 +825,17 @@ Media should not rely solely on the VPS filesystem because application redeploym
 
 For transactional messages:
 
-- Resend or another low-cost transactional email provider
+- A low-cost transactional provider; a Resend adapter is written and tested.
+- **Not configured, deliberately** — see [`EMAIL.md`](EMAIL.md). Nothing
+  member-facing sends mail yet, and an administrator lockout is recovered with
+  `pnpm bootstrap:admin` over SSH. The decision expires when the account model
+  lands.
 
 For newsletters:
 
 - Do not rebuild Ghost newsletters during the first migration unless currently essential.
-- Listmonk may be added later.
-- An external SMTP provider will still be required for newsletter delivery.
+- **Klaviyo is the ESP** (decided 18 Sep 2026), replacing the Listmonk
+  placeholder this document used to carry. See [`EMAIL.md`](EMAIL.md).
 
 ## Backups
 
@@ -1771,9 +1775,8 @@ Migrate:
 
 Add:
 
-- Newsletter sending
-- Listmonk or another newsletter platform
-- Subscriber synchronization
+- Newsletter sending, through Klaviyo — see [`EMAIL.md`](EMAIL.md)
+- Subscriber synchronization, including which system owns subscription state
 - Email preferences
 - Unsubscribe handling
 

@@ -63,6 +63,12 @@ on cutover day.
 
    Do not proceed unless it reports `"ok": true`.
 
+   **If any post is being retired, delete it in Ghost before step 2**, not just
+   in Payload. The validator builds what it expects from the export, so a post
+   the export still lists and Payload no longer has is reported `missing` and
+   fails this gate — correctly, by its own rules, for a deletion that was
+   deliberate. See `DEPLOYMENT_STATUS.md`, "Three posts are being deleted".
+
 7. **Validate the redirects** against the production host. Not a spot-check:
    this is the one part of the migration whose failure is silent, because a
    broken rule looks exactly like a URL nobody has asked for yet.
@@ -98,7 +104,11 @@ on cutover day.
 - [ ] Confirm analytics is receiving traffic — GA4 **Reports → Realtime**,
       within seconds of loading the site. This is the first moment the tag can
       be verified at all, because the `noindex` gate keeps it off on staging.
-- [ ] Verify a password-reset email is delivered.
+- [x] ~~Verify a password-reset email is delivered.~~ **Not applicable.** No
+      transactional provider is configured, by decision — nothing member-facing
+      sends mail, and an administrator lockout is recovered with
+      `pnpm bootstrap:admin` over SSH. [`EMAIL.md`](EMAIL.md) records what makes
+      that decision expire.
 
 ## Post-launch monitoring (first weeks)
 
