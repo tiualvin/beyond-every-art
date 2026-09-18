@@ -4,7 +4,8 @@ A working snapshot of VPS setup and Ghost migration progress, so this can be
 picked up in a later session without re-deriving it. Update or delete this
 file once cutover is complete; it is a progress note, not a runbook.
 
-Related: [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md),
+Related: [`CUTOVER_DAY.md`](CUTOVER_DAY.md) — the ordered sheet for the morning
+of the flip — [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md),
 [`CUTOVER_RUNBOOK.md`](CUTOVER_RUNBOOK.md),
 [`ACCOUNT_MODEL.md`](ACCOUNT_MODEL.md),
 [`SUBSCRIPTION_WEBHOOKS.md`](SUBSCRIPTION_WEBHOOKS.md).
