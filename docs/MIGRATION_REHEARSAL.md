@@ -351,10 +351,40 @@ declining to claim a type it does not have; see `lib/seo/jsonld.ts`. The nine
 `Series` → `(none)` on tag archives are a real remaining gap — the 18 Sep pass
 covered the homepage, pages and author archives and missed tags.
 
-**`/about/ images_lost` appeared in the first two runs and not the third**,
-with nothing between them that would explain it. Unresolved rather than fixed:
-an intermittently missing image is worse than a consistently missing one, so
-it wants a look rather than an assumption.
+**`/about/ images_lost` appeared in the first two runs and not the third** —
+explained on 18 Sep, and the third run is the misleading one. The check is
+all-or-nothing: `source.images.length > 0 && target.images.length === 0` in
+`lib/migration-verification/compare.ts`. Nothing compares counts, so a page that
+keeps one image and loses nine reports nothing at all.
+
+#159 merged at 09:34 UTC on 18 Sep and put the wordmark in the masthead of every
+page (`app/(frontend)/components/site-header.tsx`). It is a `next/image` marked
+`priority`, so it is in the server-rendered HTML rather than lazy-loaded, and
+the crawler counts it. From that deploy onwards `target.images.length` is at
+least one on every page on this site, and `images_lost` can never fire again
+anywhere, whatever a page actually lost. The third run is after that merge, and
+its 14 errors are the 7 + 6 + 1 itemised above with no `images_lost` among them.
+
+So the warning was **masked, not fixed**, and the question it asked is still
+open: `/about/` may still be missing images the live Ghost page has. This gate
+can no longer answer it, and neither can a re-run. Ask the page directly —
+count the `<img>` tags that are not the masthead wordmark:
+
+```bash
+curl -s -u "$STAGING_CRAWL_BASIC_AUTH" https://staging.example.com/about/ \
+  | grep -o '<img[^>]*>' | grep -v 'logo'
+```
+
+Nothing printed means the images are genuinely gone and it is a real defect to
+fix before the flip. The page's figures printed means `/about/` was always
+intact, and the first two runs were reporting the absence of a masthead image
+rather than anything about `/about/`.
+
+**The gap outlives this page.** `images_lost` is now dead code against any
+target that renders a masthead image, which is every page of this site. If the
+comparison is to keep earning its place after cutover, it needs a count-based
+check — target images materially fewer than source — rather than a test for
+zero. Worth doing after the flip, not before it.
 
 ## 7. Record and sign off
 
