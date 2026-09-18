@@ -297,8 +297,8 @@ article from this outline"), and the plugin covers that too through
 
 ## How the plugin works
 
-Verified against the published `@payloadcms/plugin-mcp@3.88.0` package rather
-than the documentation, because the two disagree on the authorization header —
+Verified against the published `@payloadcms/plugin-mcp` package at 3.88.0
+rather than the documentation, because the two disagree on the authorization header —
 the docs describe Payload's generic `<collection> API-Key <key>` form, and the
 shipped endpoint reads a plain `Bearer` token.
 

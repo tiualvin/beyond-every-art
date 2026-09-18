@@ -380,11 +380,15 @@ fix before the flip. The page's figures printed means `/about/` was always
 intact, and the first two runs were reporting the absence of a masthead image
 rather than anything about `/about/`.
 
-**The gap outlives this page.** `images_lost` is now dead code against any
-target that renders a masthead image, which is every page of this site. If the
-comparison is to keep earning its place after cutover, it needs a count-based
-check — target images materially fewer than source — rather than a test for
-zero. Worth doing after the flip, not before it.
+**The gap outlived this page, and is closed.** `images_lost` was dead code
+against any target that renders a masthead image, which is every page of this
+site. The comparator now subtracts what is sitewide on each side before counting
+and warns as `images_reduced` when a page's remaining content images are fewer
+on the target — see
+[`MIGRATION_WEBSITE_COMPARATOR.md`](MIGRATION_WEBSITE_COMPARATOR.md). It is a
+warning, so it cannot fail the cutover gate, and `images_lost` is unchanged.
+The production comparison after the flip will therefore answer the `/about/`
+question even if nobody runs the curl above first.
 
 ## 7. Record and sign off
 
