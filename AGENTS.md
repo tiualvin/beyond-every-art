@@ -55,18 +55,22 @@ collection allowlist, adding an MCP tool, or changing any agent-facing write
 path into Payload — and keep the plugin allowlist and the custom tools in step,
 so the allowlist never understates the real surface.
 
-## Open risk: the origin has no edge protection
+## Edge protection — closed 18 Sep 2026
 
-Cloudflare is DNS-only, so nothing absorbs traffic in front of the VPS and the
-origin IP is public. [`docs/EDGE_PROTECTION.md`](docs/EDGE_PROTECTION.md) has the
-full procedure, the prepared Caddy image, and the reason the Cloudflare proxy
-must not simply be switched on (it breaks HTTP-01 certificate renewal). It needs
-a Cloudflare API token, so it cannot be finished without an operator.
+Cloudflare proxies every hostname, certificates issue over DNS-01, and the
+Hetzner firewall admits ports 80 and 443 only from Cloudflare's published
+ranges. Verified from outside the VPS: the origin IP times out on both ports
+while every hostname still serves.
+[`docs/EDGE_PROTECTION.md`](docs/EDGE_PROTECTION.md) records the procedure and
+why the proxy could not simply be switched on (it breaks HTTP-01 renewal).
 
-**Close this before the public cutover.** Until it is closed, the only bounds on
-request volume are the in-process limiters in `lib/security/rate-limit.ts`, which
-are per-container and are not a defence against a distributed attacker. Do not
-build anything that assumes otherwise.
+**What that does and does not buy.** Cloudflare's WAF is now in front of the
+application, so a distributed attacker meets something before it meets the box.
+The in-process limiters in `lib/security/rate-limit.ts` remain per-container and
+remain the only bound the application itself has — they are a second line now
+rather than the only one, but nothing should be built assuming the edge will
+catch what they miss. `clientKey()` believes `CF-Connecting-IP` only from a
+Cloudflare peer (`lib/security/cloudflare.ts`), so the two halves agree.
 
 ## Current priority
 
