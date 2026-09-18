@@ -5,6 +5,14 @@ clean [migration rehearsal](MIGRATION_REHEARSAL.md). Keep Ghost online and
 authoritative until the new site is verified in production; do not cancel Ghost
 on cutover day.
 
+> [!NOTE]
+> **On the morning itself, work from [`CUTOVER_DAY.md`](CUTOVER_DAY.md).** It is
+> this runbook narrowed to what this particular cutover does, in order, with the
+> commands filled in. Most importantly it runs **no migration**: Payload and the
+> export agree, so the importer would overwrite repairs the database already
+> carries. This file stays the reference for why each step exists; where the two
+> disagree, this one is right.
+
 ## Pre-cutover (day before)
 
 - [ ] Rehearsal completed cleanly; all recorded issues resolved.

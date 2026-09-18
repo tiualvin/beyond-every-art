@@ -4,7 +4,8 @@ A working snapshot of VPS setup and Ghost migration progress, so this can be
 picked up in a later session without re-deriving it. Update or delete this
 file once cutover is complete; it is a progress note, not a runbook.
 
-Related: [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md),
+Related: [`CUTOVER_DAY.md`](CUTOVER_DAY.md) — the ordered sheet for the morning
+of the flip — [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md),
 [`CUTOVER_RUNBOOK.md`](CUTOVER_RUNBOOK.md),
 [`ACCOUNT_MODEL.md`](ACCOUNT_MODEL.md),
 [`SUBSCRIPTION_WEBHOOKS.md`](SUBSCRIPTION_WEBHOOKS.md).
@@ -43,10 +44,69 @@ Analytics is set (`NEXT_PUBLIC_GTM_ID`), Search Console and Meta are both
 verified by DNS so both survive Ghost, and the search baseline is a recorded
 skip.
 
-Still open: media id 4, `/about/` losing an image on two crawls out of three,
-the Ghost members **export** (the Payload import is skipped, the export is
+Still open: the fresh Ghost export the cutover gate now needs (below), media
+id 4, the Ghost members **export** (the Payload import is skipped, the export is
 not — it is the only copy that survives cancelling the account), the flip
 itself, and the Stripe handover before Ghost is switched off.
+
+`/about/ images_lost` is no longer one of them, and not because it was fixed:
+#159 put a wordmark in every masthead, and `images_lost` only fires on a target
+page with _zero_ images, so the check has been dead sitewide since that deploy.
+See [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md) §6 for the mechanism and
+the one-line check that answers the original question.
+
+### The export on the VPS is older than the content — refresh it before the gate
+
+Four unwanted drafts were deleted on 18 Sep, in Payload **and** in Ghost. The
+export sitting on the VPS is still the 9 Aug one, so `migrate:validate` builds
+what it expects from a file that still lists them, finds them absent from
+Payload, and reports them `missing` with `ok: false`. The gate is red for a
+deliberate act — the trap the cutover runbook already documents at step 6.
+
+The fix is a fresh export rather than anything in the code. On the VPS, keeping
+the old file rather than overwriting it:
+
+```bash
+cd ~/beyond-every-art
+cp ghost-export/ghost-content.json \
+   ghost-export/ghost-content.2026-08-09.json    # preserve the 9 Aug export
+# copy the newly downloaded export into place as ghost-content.json
+```
+
+Then re-run the gate. **`ghost-export/` is in `.dockerignore` and the `migrate`
+service does not mount it**, so `--input` needs a bind mount or the container
+sees no file at all:
+
+```bash
+docker compose run --rm \
+  -v "$PWD/ghost-export:/app/ghost-export:ro" \
+  migrate pnpm migrate:validate -- --input ghost-export/ghost-content.json
+```
+
+**Read three numbers, not one.** The report is
+`{ ok, collections: { posts, pages, tags, authors } }`, and each collection
+carries `expected`, `actual`, `matched` and `issues`
+(`lib/migration/validate.ts`):
+
+- `expected: 113` — the fresh export lists 113 posts, i.e. the deletions reached
+  Ghost. Still 117 means the export is not the new one.
+- `matched: 113` with `ok: true` — every post the export lists is in Payload and
+  matches field for field. This is the actual gate: `isClean` counts `issues`.
+- `actual` — Payload rows carrying a `ghostID`. **`ok: true` does not prove this
+  number.** Issues are only ever raised for _expected_ records, so there is no
+  check for a row Payload has and the export does not; deleting the four drafts
+  in Ghost alone would still report `ok: true`.
+
+On `actual`, expect 113 **or 114**, and 114 is not a new problem: the §5 restore
+drill found `posts` at 118 against the export's 117 — one post in Payload that
+Ghost never had. Whether it lands in this count depends on whether it carries a
+`ghostID`; the validator only counts rows that do. Either number passes the
+gate. A third number does not, and 114 is still the unidentified post the
+rehearsal asked to have identified rather than carried into cutover.
+
+No migration runs on cutover day once this is green, and that is the point:
+`migrate:ghost` would overwrite the escaped-quote repair and the canonical fix
+with the unrepaired export.
 
 ### Email has never been configured — and now deliberately will not be
 

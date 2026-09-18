@@ -86,6 +86,44 @@ function indexPages(crawl: CrawlResult): Map<string, PageEvidence> {
   return new Map(crawl.pages.map((page) => [page.path, page]))
 }
 
+/** A site's chrome needs enough pages under it before "on every page" means anything. */
+const CHROME_MIN_PAGES = 5
+/** Present on at least this share of pages is chrome rather than content. */
+const CHROME_SHARE = 0.9
+
+/**
+ * The image sources that belong to the template rather than to any one page —
+ * a masthead wordmark, a footer mark, a default avatar.
+ *
+ * This exists because counting a page's images without it measures the theme.
+ * `images_lost` asks whether a page has *no* images, and on 18 Sep a masthead
+ * wordmark (#159) put one on every page of the target, which made the question
+ * unanswerable sitewide: the check could no longer fire however much a page had
+ * lost. Subtracting what appears everywhere leaves the images the page is
+ * actually about, and the comparison survives either side restyling its
+ * template.
+ */
+function sitewideImageSrcs(pages: Map<string, PageEvidence>): Set<string> {
+  const rendered = [...pages.values()].filter(
+    (page) => page.error === null && isSuccess(page.status),
+  )
+  // Below this, "on nearly every page" describes the crawl rather than the
+  // template, and subtracting it would hide real content.
+  if (rendered.length < CHROME_MIN_PAGES) return new Set()
+
+  const counts = new Map<string, number>()
+  for (const page of rendered) {
+    for (const src of new Set(page.images.map((image) => image.src))) {
+      counts.set(src, (counts.get(src) ?? 0) + 1)
+    }
+  }
+
+  const threshold = rendered.length * CHROME_SHARE
+  return new Set(
+    [...counts].filter(([, count]) => count >= threshold).map(([src]) => src),
+  )
+}
+
 function addIssue(
   issues: ComparisonIssue[],
   severity: IssueSeverity,
@@ -127,6 +165,7 @@ function comparePage(
   sourceOrigin: string,
   targetOrigin: string,
   targetPages: Map<string, PageEvidence>,
+  chrome: { source: Set<string>; target: Set<string> },
   issues: ComparisonIssue[],
   options: ComparisonOptions,
 ): void {
@@ -325,6 +364,30 @@ function comparePage(
       0,
       'Source page has images but target page has none',
     )
+  } else {
+    // The all-or-nothing check above cannot see a page that kept one image and
+    // lost nine, and cannot fire at all once either side puts an image in its
+    // template. Comparing what is left after the chrome is subtracted does see
+    // it. A warning rather than an error: the two sides are different themes,
+    // so a difference of one is ordinary and only an eye can judge the rest.
+    const sourceContent = source.images.filter(
+      (image) => !chrome.source.has(image.src),
+    ).length
+    const targetContent = target.images.filter(
+      (image) => !chrome.target.has(image.src),
+    ).length
+    if (sourceContent > 0 && targetContent < sourceContent) {
+      addIssue(
+        issues,
+        'warning',
+        'images_reduced',
+        path,
+        'images',
+        sourceContent,
+        targetContent,
+        'Target page has fewer content images than the source page',
+      )
+    }
   }
   // alt="" is valid for decorative images; only a missing attribute regresses
   // accessibility evidence.
@@ -412,6 +475,11 @@ export function compareCrawls(
   const sourcePages = indexPages(source)
   const targetPages = indexPages(target)
   const issues: ComparisonIssue[] = []
+  // Computed once per side: what is on nearly every page is the template.
+  const chrome = {
+    source: sitewideImageSrcs(sourcePages),
+    target: sitewideImageSrcs(targetPages),
+  }
 
   for (const path of [...sourcePages.keys()].sort()) {
     comparePage(
@@ -420,6 +488,7 @@ export function compareCrawls(
       source.origin,
       target.origin,
       targetPages,
+      chrome,
       issues,
       options,
     )
