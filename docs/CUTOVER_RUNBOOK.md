@@ -28,19 +28,38 @@ on cutover day.
       Settings → Ownership verification. An HTML file or `<meta>` tag is served
       by Ghost and dies with it, and Google eventually unverifies the property;
       a DNS record survives. Data is never deleted, but an unverified property
-      cannot be read, and that is a poor thing to discover mid-cutover.
-- [ ] **Analytics tag carried across** — whatever Ghost injects today,
-      reproduced in the production `.env`: `NEXT_PUBLIC_GTM_ID` for a Tag
-      Manager container, `NEXT_PUBLIC_GA_ID` for a direct GA4 tag. **One, never
-      both** — a container fires GA4 itself and the pair double-counts every
-      page view irreversibly. Read at runtime, so no rebuild; gated on
-      `!isNoindex()`, so it starts firing at the flip and never on staging. See
-      [`ANALYTICS.md`](ANALYTICS.md).
-- [ ] **Search baseline captured from the Ghost site** — Search Console queries
-      and pages (three months, sorted by impressions), the indexed page count,
-      and GA4 sessions and organic landing pages for the same window. The
-      post-launch list below compares against it. Procedure:
-      [`SEO_BASELINE_CAPTURE.md`](SEO_BASELINE_CAPTURE.md).
+- [ ] **Google Tag Manager: set `NEXT_PUBLIC_GTM_ID=GTM-P7FFKWG7`.** Read from
+      the live Ghost homepage on 18 Sep. Leave `NEXT_PUBLIC_GA_ID` **unset** —
+      there is no direct `gtag/js?id=G-` on the page, so the container fires
+      GA4 itself and setting both double-counts every page view irreversibly.
+      Read at runtime, so no rebuild; gated on `!isNoindex()`, so it starts at
+      the flip and never on staging. See [`ANALYTICS.md`](ANALYTICS.md).
+- [ ] **Microsoft Clarity, project `ut35gfe8hc`** — the second thing Ghost
+      injects, and the reason the line above used to understate this step.
+      Ghost loads it directly rather than through the container, and this
+      application has no support for it. `lib/security/csp.ts` allows Google
+      origins only, so `clarity.ms` is blocked either way until it is added —
+      and a CSP block is silent. Decide whether Clarity continues at all before
+      cutover; it does not survive by itself.
+- [ ] **Facebook domain verification `<meta>`,
+      `jbv5so0ptpuagh78xxvqgj07e77kex`** — the third. It dies with Ghost
+      exactly as an HTML-tag Search Console verification would. Re-verify with
+      Meta by **DNS TXT** in the Cloudflare zone instead, for the reason that
+      worked for Search Console: it survives the server, the migration, and any
+      later move.
+- [x] ~~**Search baseline captured from the Ghost site**~~ — **deliberately
+      skipped, 18 Sep.** Search Console retains 16 months and GA4 its own
+      window, both reachable in the platforms when a comparison is actually
+      wanted, so a written snapshot was judged not worth the step. The reading
+      guidance still applies:
+      [`SEO_CUTOVER_RISK.md`](SEO_CUTOVER_RISK.md#reading-the-aftermath) is
+      what separates recrawl noise from a real problem, and the distinction is
+      the pattern rather than the size. One part of this is genuinely lossy and
+      is not skippable for free: GA4 → Admin → Data settings → Data retention
+      defaults to two months for event-level data, and on that setting the
+      pre-migration detail ages out long before anyone thinks to compare — set
+      it to 14 months. Procedure, if a written baseline is ever wanted after
+      all: [`SEO_BASELINE_CAPTURE.md`](SEO_BASELINE_CAPTURE.md).
 
 ## Cutover
 

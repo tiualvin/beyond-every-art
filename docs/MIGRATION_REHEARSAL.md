@@ -308,6 +308,54 @@ pnpm restore:db --latest --dry-run   # verify it decompresses
   should be supplied as explicit `--seed` values.
 - Record any gap as a redirect to add before cutover.
 
+**Run on 18 Sep, and signed off.** 143 source pages, 146 target, 14 errors and
+19 warnings — every one explained below, none a migration defect. Reports
+retained at `rehearsal/site-comparison.{json,txt}` on the VPS.
+
+Two things had to be true before the run meant anything, and both cost a
+wasted crawl each to learn:
+
+- **Use `www`, not the apex.** The crawler discovers links only on the exact
+  origin supplied and records cross-origin redirects without following them.
+  The apex 301s to `www`, so seeding it yields one redirect and an empty
+  crawl — which reports clean, because there was nothing to find.
+- **Cloudflare's Email Address Obfuscation rewrites every `mailto:`** into
+  `/cdn-cgi/l/email-protection`, which the crawler then requests without the
+  fragment and Cloudflare errors on. That was 126 of the first run's 135
+  errors, on the proxied target only. Switched off zone-wide on 18 Sep; leave
+  it off, or the same noise returns in the production comparison.
+
+What the 14 errors are, so a later run can tell a new one from these:
+
+- **Seven 404-title differences** on `/%22https://…%22` URLs. Hrefs wrapped in
+  escaped quotes in one Ghost post, dead on the live site. Payload's copies are
+  already repaired; `repair:content` in the cutover runbook keeps them that way
+  through the final import.
+- **Six on `/page/2` and `/page/2/`.** Ghost paginates in the path and this
+  site redirects those to `/journal/` deliberately (`lib/seo/ghost-urls.ts`).
+  The comparator follows the redirect and compares the destination, so the
+  title and canonical differ by design.
+- **One canonical** on `fine-art-home-guide`, the known `__GHOST_URL__`
+  placeholder, repaired by the final migration.
+
+And the warnings worth not re-investigating: the homepage and
+`/ultramarine-science/` `h1_changed` are this site being _better_ (Ghost
+duplicates that h1); `robots_changed` is staging's `Disallow: /` and resolves
+at the flip, where production emits `sitemap`, `host`, and disallows `/admin`
+and `/api`; `legacy_origin_link` is same-domain absolute links, harmless once
+the domain is the same.
+
+The structured-data warnings are the deliberate half. `Article` → `WebPage` on
+pages and `Person` → `ProfilePage` on author archives are both this site
+declining to claim a type it does not have; see `lib/seo/jsonld.ts`. The nine
+`Series` → `(none)` on tag archives are a real remaining gap — the 18 Sep pass
+covered the homepage, pages and author archives and missed tags.
+
+**`/about/ images_lost` appeared in the first two runs and not the third**,
+with nothing between them that would explain it. Unresolved rather than fixed:
+an intermittently missing image is worse than a consistently missing one, so
+it wants a look rather than an assumption.
+
 ## 7. Record and sign off
 
 Log every problem found, its fix, and re-verification. The rehearsal is complete
