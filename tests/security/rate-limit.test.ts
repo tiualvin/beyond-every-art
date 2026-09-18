@@ -182,7 +182,27 @@ describe('clientKey', () => {
     expect(key).toBe('ip:203.0.113.7')
   })
 
-  it('trusts CF-Connecting-IP once TRUST_CLOUDFLARE_IP is set', () => {
+  it('trusts CF-Connecting-IP when the peer is Cloudflare and the flag is set', () => {
+    const key = clientKey(
+      headers({
+        'cf-connecting-ip': '198.51.100.4',
+        // The peer Caddy accepted is a Cloudflare edge address, so the header
+        // in front of it was written by Cloudflare and names the real visitor.
+        'x-forwarded-for': '104.16.0.1',
+      }),
+      { TRUST_CLOUDFLARE_IP: '1' },
+    )
+
+    expect(key).toBe('ip:198.51.100.4')
+  })
+
+  it('ignores CF-Connecting-IP from a peer that is not Cloudflare', () => {
+    // The bypass. `TRUST_CLOUDFLARE_IP` is set — it is set in production — but
+    // this request did not come through Cloudflare: either straight to the
+    // origin address, which still answers while EDGE_PROTECTION.md step 6 is
+    // open, or to the `cms` hostname, which is never proxied at all. The header
+    // is then just a string the caller picked, and keying on it hands out a
+    // fresh allowance per request.
     const key = clientKey(
       headers({
         'cf-connecting-ip': '198.51.100.4',
@@ -191,7 +211,93 @@ describe('clientKey', () => {
       { TRUST_CLOUDFLARE_IP: '1' },
     )
 
-    expect(key).toBe('ip:198.51.100.4')
+    expect(key).toBe('ip:203.0.113.7')
+  })
+
+  it('gives a header-rotating caller one bucket, not one per request', () => {
+    // The property that matters, stated as the attack: same peer, a new
+    // CF-Connecting-IP every time. Every one of these must land in the same
+    // bucket, or the limiter is counting attackers instead of requests.
+    const keys = new Set(
+      ['10.0.0.1', '10.0.0.2', '10.0.0.3', '10.0.0.4'].map((forged) =>
+        clientKey(
+          headers({
+            'cf-connecting-ip': forged,
+            'x-forwarded-for': '203.0.113.7',
+          }),
+          { TRUST_CLOUDFLARE_IP: '1' },
+        ),
+      ),
+    )
+
+    expect(keys).toEqual(new Set(['ip:203.0.113.7']))
+  })
+
+  it('keeps real visitors behind Cloudflare on their own buckets', () => {
+    // The half that must not regress. `TRUST_CLOUDFLARE_IP` was set so that
+    // visitors are counted individually rather than sharing Cloudflare's edge
+    // address, where a popular hour would throttle everyone at once. Same
+    // Cloudflare peer, different visitors, different keys.
+    const keys = ['198.51.100.4', '198.51.100.5', '198.51.100.6'].map(
+      (visitor) =>
+        clientKey(
+          headers({
+            'cf-connecting-ip': visitor,
+            'x-forwarded-for': '172.64.0.1',
+          }),
+          { TRUST_CLOUDFLARE_IP: '1' },
+        ),
+    )
+
+    expect(new Set(keys).size).toBe(3)
+  })
+
+  it('falls back to the Cloudflare peer when the header is missing', () => {
+    // A genuine Cloudflare peer that somehow sent no CF-Connecting-IP still
+    // gets bucketed, rather than dropping through to `ip:unknown` and sharing
+    // the bucket reserved for requests with no forwarding information at all.
+    const key = clientKey(headers({ 'x-forwarded-for': '104.16.0.1' }), {
+      TRUST_CLOUDFLARE_IP: '1',
+    })
+
+    expect(key).toBe('ip:104.16.0.1')
+  })
+
+  it('still ignores the header when the flag is off, whoever the peer is', () => {
+    const key = clientKey(
+      headers({
+        'cf-connecting-ip': '198.51.100.4',
+        'x-forwarded-for': '104.16.0.1',
+      }),
+      {},
+    )
+
+    expect(key).toBe('ip:104.16.0.1')
+  })
+
+  it('throttles a rotating caller at the limit, end to end', () => {
+    // The two halves above are properties of the key. This is the thing the
+    // key exists for, asserted the way it was measured against a running
+    // build: a limit of three, ten requests from one host, a fresh
+    // CF-Connecting-IP on every one of them. Before the peer check this was
+    // ten successes; it must now be three.
+    const limiter = new FixedWindowRateLimiter(3, 60_000)
+    const env = { TRUST_CLOUDFLARE_IP: '1' }
+
+    const allowed = Array.from({ length: 10 }, (_, attempt) =>
+      limiter.check(
+        clientKey(
+          headers({
+            'cf-connecting-ip': `10.0.0.${attempt + 1}`,
+            'x-forwarded-for': '203.0.113.7',
+          }),
+          env,
+        ),
+        attempt,
+      ),
+    ).filter((result) => result.allowed).length
+
+    expect(allowed).toBe(3)
   })
 
   it('buckets a request with no forwarding header rather than waving it through', () => {
