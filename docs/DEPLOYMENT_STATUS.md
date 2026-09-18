@@ -17,41 +17,74 @@ the first time since 29 Aug. Four rehearsal items were worked at the same time.
 Two closed, one was decided rather than fixed, and one turned up a defect that
 blocks cutover.
 
-### Password reset email does not arrive — new, and a blocker
+### Email has never been configured on this deployment
 
-Triggered from the admin on 18 Sep; nothing was delivered. This is the item
-§4 of the rehearsal always said no test could close, and it needed a real
-inbox to find. It blocks cutover because the same path sends **member**
-password resets: shipping it means members who cannot get back into their
-accounts, with nothing in the UI to say why.
+Triggered an admin password reset on 18 Sep; nothing was delivered. Root
+cause confirmed the same day, on the box:
 
-**The reason it fails silently is worth understanding before debugging it.**
-`resendAdapter()` in `lib/email/resend.ts` returns `null` when either
-`RESEND_API_KEY` or `EMAIL_FROM_ADDRESS` is unset, and `payload.config.ts`
-then omits the `email` key entirely (`...(email ? { email } : {})`). Payload
-falls back to its own adapter, which **logs the message instead of sending
-it** — and the forgot-password endpoint answers the caller the same way
-either way, deliberately, so it cannot be used to enumerate addresses. A
-missing variable and a working send are indistinguishable from the outside.
-The adapter is also built once at module load, so the variables have to be
-present when the container starts, not merely in `.env`.
+```
+docker compose exec app printenv | grep -E 'RESEND|EMAIL_FROM'
+EMAIL_FROM_ADDRESS=
+EMAIL_FROM_NAME=Beyond Every Art
+RESEND_API_KEY=
+```
 
-In order, cheapest first:
+Both are empty, and `docker compose logs app | grep -i resend` returns
+nothing — consistent, because the adapter was never built and so nothing ever
+called Resend. Compose is passing the variables through; only the values are
+missing. This is not a regression: email has never worked here.
 
-1. `docker compose exec app printenv | grep -E 'RESEND|EMAIL_FROM'` — if
-   either is empty or absent, that is the whole answer. Set them, then
-   `docker compose up -d`.
-2. If both are set, the adapter is live and the send threw. It logs the
-   Resend status and body: `docker compose logs app | grep -i resend`.
-3. A 403 there is almost always the sending domain not being verified in
-   Resend. Until a domain is verified, Resend only accepts mail to the
-   account's own address — which is a convincing "it works for me, not for
-   members". Verification is DNS records in the Cloudflare zone.
-4. A 401 is a bad or revoked key; a 422 is usually `EMAIL_FROM_ADDRESS` not
-   matching a verified domain.
+**Who is affected, stated carefully, because it is narrower than it first
+looks.** `Users` is the only collection with `auth`; `collections/Members.ts`
+says in its own description that it is a "Restricted preservation copy of
+Ghost member data. Not an authentication collection." The passwordless
+member sign-in described in [`ACCOUNT_MODEL.md`](ACCOUNT_MODEL.md) is design,
+not built — there is no accounts collection. The newsletter and app-waitlist
+actions record rows and send nothing. So the only mail this application sends
+today is Payload's **administrator** password reset and verification.
 
-Also confirm the admin user's own address is correct before concluding
-anything: a typo there produces exactly this symptom.
+The consequence is therefore operational rather than member-facing: an
+administrator who forgets their password cannot self-recover, and a
+production Payload with no working reset is a bad thing to discover on the
+day it is needed. It is on the cutover runbook's immediately-after list for
+that reason. It becomes member-facing the moment the account model is built,
+and it should be fixed well before then.
+
+**Why it failed silently.** `resendAdapter()` in `lib/email/resend.ts`
+returns `null` when either `RESEND_API_KEY` or `EMAIL_FROM_ADDRESS` is unset,
+and `payload.config.ts` then omits the `email` key entirely
+(`...(email ? { email } : {})`). Payload falls back to its own adapter, which
+**logs the message instead of sending it** — and the forgot-password endpoint
+answers the caller identically either way, deliberately, so it cannot be used
+to enumerate addresses. A missing variable and a working send look the same
+from outside. The adapter is built once at module load, so the values must be
+present when the container starts, not merely written to `.env` afterwards.
+
+**To fix it:** create a Resend API key, verify a sending domain there (DNS
+records in the Cloudflare zone), then set `RESEND_API_KEY` and
+`EMAIL_FROM_ADDRESS` in `.env` and `docker compose up -d`. No rebuild is
+needed — neither is a `NEXT_PUBLIC_*` variable, so neither reaches the client
+bundle and neither is a Docker build argument, unlike
+`NEXT_PUBLIC_CHECKOUT_URL_MONTHLY`.
+
+Two things that will otherwise be found one at a time:
+
+- **An unverified domain fails the convincing way.** Until the sending domain
+  is verified, Resend accepts mail only to the account's own address — which
+  reads as "it works for me". Verify before believing a successful test.
+- **Ghost is still sending from this domain.** A domain has one SPF record;
+  adding a second breaks both senders. Either merge Resend's include into the
+  existing record, or — better — send from a subdomain, which leaves Ghost's
+  DNS untouched and keeps the root domain's reputation separate.
+
+Once mail sends, check the link in it is absolute. `getRequestOrigin` builds
+reset links from the request `Host` and trusts it only against the list in
+`lib/security/origins.ts`, derived from `CMS_ADDRESS`,
+`PAYLOAD_PUBLIC_CMS_URL` and `NEXT_PUBLIC_SITE_URL`. With none of them set it
+emails a bare `/admin/reset/<token>`, relative, in an email, where there is
+nothing for it to be relative to. Those look set on this host, so this is a
+confirmation rather than an expectation — but it is the second way admin
+recovery fails, and it is invisible until someone clicks the link.
 
 ### Three posts are being deleted — decided 18 Sep, and it needs redirects
 

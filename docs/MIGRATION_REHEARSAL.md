@@ -204,12 +204,14 @@ discrepancy. Fix the root cause and re-run until it reports `"ok": true`.
       `public-routes.spec.ts`, and the app waitlist in `apps.spec.ts`.
 - [ ] **Email** delivery works (trigger an admin password reset; confirm
       receipt). The one item here no test can close: it needs a real inbox.
-      **Tried on 18 Sep and nothing arrived.** This is now a known defect rather
-      than an unchecked box, and it blocks cutover: the same path sends member
-      password resets. `DEPLOYMENT_STATUS.md`, "Pick up here", carries the
-      diagnosis — the leading candidate is that `resendAdapter()` returned null
-      and Payload fell back to an adapter that logs instead of sending, which
-      reports success to the caller either way.
+      **Tried on 18 Sep and nothing arrived**, and the cause is confirmed:
+      `RESEND_API_KEY` and `EMAIL_FROM_ADDRESS` are both empty on the box, so
+      `resendAdapter()` returned null and Payload fell back to an adapter that
+      logs instead of sending — which reports success to the caller either way.
+      Email has never worked on this deployment. It reaches administrators
+      only: `Members` is not an authentication collection and the account model
+      is not built, so no member-facing flow sends mail today. Fix and the two
+      ways it fails afterwards are in `DEPLOYMENT_STATUS.md`, "Pick up here".
 - [x] **Health** endpoint (`/health`) returns `status: ok`. Covered by
       `seo-and-health.spec.ts`, which asserts `{ status: 'ok', db: 'up' }`.
 
