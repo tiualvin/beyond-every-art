@@ -28,10 +28,25 @@ The crawl comparison found two things worth the work: structured data missing
 on three route kinds, now shipped in #158, and the escaped-quote trap below.
 Its 135 errors were mostly Cloudflare's email obfuscation, since switched off.
 
-Still open, in the order they will be met: rehearsal §6 re-run, media id 4,
-`/about/` losing an image, the members CSV, closing the origin, the analytics
-tag, and the search baseline. Search Console verification is done — it is by
-DNS, so it survives Ghost.
+**The origin is closed**, later the same day, which was the largest open risk
+in the deployment and the last piece of edge protection. `cms` is proxied too:
+the three-way choice that decision had been waiting on turned out to be
+testable in minutes rather than a bet, because the MCP endpoint is stateless
+`POST /api/mcp` with SSE disabled and nothing about a proxy troubles it. A curl
+with no browser headers reached the application and got a protocol-level answer
+from the MCP handler, which settled it. Then pass two narrowed 80 and 443 to
+Cloudflare's ranges, verified from outside the VPS: both ports time out on the
+origin IP while every hostname still serves and `/health` reports
+`{"status":"ok","db":"up"}`.
+
+Analytics is set (`NEXT_PUBLIC_GTM_ID`), Search Console and Meta are both
+verified by DNS so both survive Ghost, and the search baseline is a recorded
+skip.
+
+Still open: media id 4, `/about/` losing an image on two crawls out of three,
+the Ghost members **export** (the Payload import is skipped, the export is
+not — it is the only copy that survives cancelling the account), the flip
+itself, and the Stripe handover before Ghost is switched off.
 
 ### Email has never been configured — and now deliberately will not be
 
