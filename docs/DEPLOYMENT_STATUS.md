@@ -44,10 +44,17 @@ Analytics is set (`NEXT_PUBLIC_GTM_ID`), Search Console and Meta are both
 verified by DNS so both survive Ghost, and the search baseline is a recorded
 skip.
 
-Still open: the fresh Ghost export the cutover gate now needs (below), media
-id 4, the Ghost members **export** (the Payload import is skipped, the export is
-not — it is the only copy that survives cancelling the account), the flip
-itself, and the Stripe handover before Ghost is switched off.
+Still open: the fresh Ghost export the cutover gate now needs (below), the flip
+itself, and the Stripe handover before Ghost is switched off. **The export is
+the only thing standing between here and the flip.**
+
+Closed later on 18 Sep, all three by operator work on the box and in the
+admin: **media id 4** is re-uploaded as
+`photo-1689659721022-3aa475803e19.jpeg`, so the site has no broken image left;
+the **Ghost members export** is taken and held off-server, which is the copy
+that had to exist before the account is ever cancelled; and **publishing is
+frozen in Ghost**, ahead of the content export rather than after it, so
+tomorrow's export is a complete picture.
 
 `/about/ images_lost` is no longer one of them, and not because it was fixed:
 #159 put a wordmark in every masthead, and `images_lost` only fires on a target
@@ -200,10 +207,10 @@ reversal changes what is outstanding, and because the reasoning for each is
 still the reasoning:
 
 - `the-ultimate-guide-to-understanding-different-types-of-art-prints-giclee-lithographs-and-more`
-  carries media id 4, the site's only broken image. **That item is open again**
-  — see below. It needs the image re-uploaded through the admin under a
-  filename ending `.jpeg`, which fixes both the missing bytes and the
-  extensionless filename that `trailingSlash` makes unreachable.
+  carried media id 4, the site's only broken image. **Closed later on 18 Sep**
+  by re-uploading it through the admin as
+  `photo-1689659721022-3aa475803e19.jpeg`, which fixed both the missing bytes
+  and the extensionless filename that `trailingSlash` made unreachable.
 - `fine-art-home-guide` still declares a `__GHOST_URL__` canonical. The
   importer strips the placeholder now, so the final migration repairs it — or
   `docker compose run --rm migrate pnpm fix:ghost-links` does it sooner.
@@ -250,10 +257,20 @@ move.
   that it must be checked signed out: an admin session carries the preview
   cookie, and a draft served 200 through it looks exactly like one that
   leaked.
-- **Media id 4 is not closed.** It was, briefly, by a deletion decision that
-  was reversed the same day. It needs an operator: re-upload the image
-  through the admin under a filename ending `.jpeg`. Noted here because the
-  item reads as closed in two earlier commits, and it is not.
+- **Media id 4, closed for real this time.** It read as closed in two earlier
+  commits and was not — the first time by a deletion decision reversed the
+  same day. It is closed now because an operator re-uploaded the image through
+  the admin as `photo-1689659721022-3aa475803e19.jpeg`, which is the only
+  route that fixes the filename as well as the bytes: `pnpm restore:media`
+  preserves the existing name by design and would have left it unreachable.
+- **The Ghost members export is taken**, and held off-server. The Payload
+  import stays skipped (Klaviyo is the ESP), but this file is the only copy of
+  the member list that survives cancelling the Ghost account, and it could not
+  have been recovered afterwards. Load it into Klaviyo when the newsletter is
+  built.
+- **Publishing is frozen in Ghost.** Done before the final content export
+  rather than after, which is the order that leaves no gap for a post to be
+  published into and lost.
 
 Previously worked on **15 Sep 2026**. The header bypass below — the item that
 had been the most important line on this page since 5 Sep — was closed in code.

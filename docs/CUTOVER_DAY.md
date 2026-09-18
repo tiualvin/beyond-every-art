@@ -14,11 +14,10 @@ not run" at the end before doing anything that looks like an import.
 
 ## A. Clear these before the flip
 
-Four things, and only the first is a gate on starting. The members export is not
-a gate on the flip but is a gate on ever cancelling Ghost, and it is the one
-with no second chance.
+**A2, A3 and A4 were done on 18 Sep.** Only A1 is left, and it is the gate on
+starting.
 
-### A1. Get the cutover gate green — required
+### A1. Get the cutover gate green — required, not yet done
 
 The export on the VPS is still the 9 Aug one, so it lists four drafts that were
 deleted on 18 Sep in both Payload and Ghost. `migrate:validate` builds what it
@@ -46,29 +45,30 @@ Ghost never had, and whether it lands in this count depends on whether it
 carries a `ghostID`. Anything else, stop and read
 [`DEPLOYMENT_STATUS.md`](DEPLOYMENT_STATUS.md) before continuing.
 
-### A2. Re-upload media id 4
+### A2. Re-upload media id 4 — done 18 Sep
 
-The site's only broken image, on a published post. Re-upload it through the
-Payload admin as `photo-1689659721022-3aa475803e19.jpeg`, refetching the bytes
-from `https://images.unsplash.com/photo-1689659721022-3aa475803e19`.
+Re-uploaded through the Payload admin as
+`photo-1689659721022-3aa475803e19.jpeg`. The site's only broken image, and the
+filename mattered as much as the bytes: the old one had no extension, which
+`trailingSlash` made unreachable.
 
-The filename matters as much as the bytes: the current one has no extension,
-which `trailingSlash` makes unreachable. `pnpm restore:media` does **not** do
-this — it sets `overwriteExistingFiles: true` specifically to preserve the
-existing filename, so it would restore the bytes under the name that is already
-unreachable. This one needs the admin.
+Recorded because `pnpm restore:media` looks like the tool for this and is not —
+it sets `overwriteExistingFiles: true` specifically to preserve the existing
+filename, so it would have restored the bytes under the unreachable name. If
+this ever recurs, it is the admin again.
 
-### A3. Take the Ghost members export
+### A3. Take the Ghost members export — done 18 Sep
 
-Not needed for the flip, and the Payload import is skipped — Klaviyo is the ESP,
-see [`EMAIL.md`](EMAIL.md). Take it anyway and keep it off-server. It is the
-only copy of the member list that survives cancelling Ghost, and it cannot be
-recovered afterwards.
+Taken and held off-server. The Payload import stays skipped — Klaviyo is the
+ESP, see [`EMAIL.md`](EMAIL.md) — but this file is the only copy of the member
+list that survives cancelling Ghost, and it could not have been recovered
+afterwards. Load it into Klaviyo when the newsletter is built.
 
-### A4. Freeze publishing in Ghost
+### A4. Freeze publishing in Ghost — done 18 Sep
 
-Tell editors. Anything published after the export in A1 is not in Payload and is
-lost at the flip.
+Editors told. The freeze landing **before** the A1 export rather than after is
+the safe order: the export tomorrow is then a complete picture, with nothing
+published into the gap between the two.
 
 ---
 
