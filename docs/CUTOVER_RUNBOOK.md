@@ -63,6 +63,12 @@ on cutover day.
 
    Do not proceed unless it reports `"ok": true`.
 
+   **If any post is being retired, delete it in Ghost before step 2**, not just
+   in Payload. The validator builds what it expects from the export, so a post
+   the export still lists and Payload no longer has is reported `missing` and
+   fails this gate — correctly, by its own rules, for a deletion that was
+   deliberate. See `DEPLOYMENT_STATUS.md`, "Three posts are being deleted".
+
 7. **Validate the redirects** against the production host. Not a spot-check:
    this is the one part of the migration whose failure is silent, because a
    broken rule looks exactly like a URL nobody has asked for yet.

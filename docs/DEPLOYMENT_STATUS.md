@@ -128,6 +128,21 @@ honest answer; a 410 is defensible if the content is genuinely retired and
 you would rather tell Google so directly. `pnpm validate:redirects` covers
 the table, so whatever is chosen gets checked with the rest.
 
+**Delete them in Ghost first, then take the final export.** This is the part
+that is easy to get backwards, and getting it backwards stops the cutover.
+`validateContent` in `lib/migration/validate.ts` iterates over what the export
+expects and raises a `missing` issue for anything absent from Payload, and
+`isClean` fails the report on any issue at all. So three posts deleted from
+Payload while the export still lists them is three `missing` issues and
+`"ok": false` — and step 6 of the [cutover runbook](CUTOVER_RUNBOOK.md) says
+not to proceed without `"ok": true`. Nothing would actually be wrong; the gate
+would be red anyway, at the worst possible moment to be debugging a gate.
+
+Deleting them in Ghost first keeps the export, the database and the validator
+in agreement, and the redirects below still cover the indexed URLs. It also
+retires the `fine-art-home-guide` canonical defect at the same time, since the
+post carrying it leaves.
+
 Not yet done, at the time of writing: the deletions themselves, and the
 redirects for them.
 

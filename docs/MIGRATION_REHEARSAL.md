@@ -260,8 +260,30 @@ pnpm restore:db --latest --dry-run   # verify it decompresses
 # Restore into a scratch DB and confirm counts (see BACKUP_AND_RESTORE.md).
 ```
 
-- [ ] A backup uploads to R2.
-- [ ] A restore into a scratch database reproduces the content.
+- [x] A backup uploads to R2. Proven 27 Aug (encrypted) and again 18 Sep, which
+      also exercised retention: the run pruned the 5 Sep archive under the
+      14-day policy.
+- [x] A restore into a scratch database reproduces the content. Done 18 Sep
+      against the real bucket — the thing CI's drill cannot prove, since only a
+      real run shows that _this_ bucket, holding _these_ objects, under the
+      passphrase currently in the production environment file, reads back. The
+      archive decrypted to 7,665,786 `sqlBytes` on the dry run and restored to
+      exactly the same on a scratch database; `posts`, `pages`, `tags`,
+      `authors` and `payload_migrations` matched row for row; and
+      `migrate:validate`, pointed at the restored copy, matched 117 of 117
+      posts against the Ghost export field by field.
+- [x] The `ok: false` that came with it is the result worth reading carefully
+      rather than at a glance. The single issue was the `fine-art-home-guide`
+      canonical — the defect production already has. The restore reproduced
+      production exactly, flaw included, which is stronger evidence than a
+      clean report: a lossy restore fails differently, with missing rows and
+      mismatched fields.
+- [ ] Two things the drill did **not** cover. `members` was 0 on both sides, so
+      that table proved nothing — re-run once the members CSV is imported,
+      since it is the table whose loss would actually hurt. And `posts` is 118
+      against the export's 117: one post exists in Payload that Ghost never
+      had. It does not fail the gate (`isClean` counts issues, not rows) but it
+      should be identified rather than carried into cutover.
 
 ## 6. Crawl comparison
 
