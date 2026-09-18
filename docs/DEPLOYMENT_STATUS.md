@@ -11,11 +11,92 @@ Related: [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md),
 
 ## Pick up here
 
-Last worked on **15 Sep 2026**. The header bypass below — the item that had been
-the most important line on this page since 5 Sep — is closed in code. Nothing
-else changed.
+Last worked on **18 Sep 2026**. The header bypass is closed **and deployed**
+(#156), so the limiters actually bound request volume on the running host for
+the first time since 29 Aug. Four rehearsal items were worked at the same time.
+Two closed, one was decided rather than fixed, and one turned up a defect that
+blocks cutover.
 
-### The rate-limiter bypass is fixed, and needs a deploy to take effect
+### Password reset email does not arrive — new, and a blocker
+
+Triggered from the admin on 18 Sep; nothing was delivered. This is the item
+§4 of the rehearsal always said no test could close, and it needed a real
+inbox to find. It blocks cutover because the same path sends **member**
+password resets: shipping it means members who cannot get back into their
+accounts, with nothing in the UI to say why.
+
+**The reason it fails silently is worth understanding before debugging it.**
+`resendAdapter()` in `lib/email/resend.ts` returns `null` when either
+`RESEND_API_KEY` or `EMAIL_FROM_ADDRESS` is unset, and `payload.config.ts`
+then omits the `email` key entirely (`...(email ? { email } : {})`). Payload
+falls back to its own adapter, which **logs the message instead of sending
+it** — and the forgot-password endpoint answers the caller the same way
+either way, deliberately, so it cannot be used to enumerate addresses. A
+missing variable and a working send are indistinguishable from the outside.
+The adapter is also built once at module load, so the variables have to be
+present when the container starts, not merely in `.env`.
+
+In order, cheapest first:
+
+1. `docker compose exec app printenv | grep -E 'RESEND|EMAIL_FROM'` — if
+   either is empty or absent, that is the whole answer. Set them, then
+   `docker compose up -d`.
+2. If both are set, the adapter is live and the send threw. It logs the
+   Resend status and body: `docker compose logs app | grep -i resend`.
+3. A 403 there is almost always the sending domain not being verified in
+   Resend. Until a domain is verified, Resend only accepts mail to the
+   account's own address — which is a convincing "it works for me, not for
+   members". Verification is DNS records in the Cloudflare zone.
+4. A 401 is a bad or revoked key; a 422 is usually `EMAIL_FROM_ADDRESS` not
+   matching a verified domain.
+
+Also confirm the admin user's own address is correct before concluding
+anything: a typo there produces exactly this symptom.
+
+### Three posts are being deleted — decided 18 Sep, and it needs redirects
+
+The repository owner decided to delete these rather than fix what each was
+flagged for:
+
+- `the-ultimate-guide-to-understanding-different-types-of-art-prints-giclee-lithographs-and-more`
+  — carried media id 4, the site's only broken image. Deleting the post
+  retires that item; the image needs no restoring.
+- `fine-art-home-guide` — the `__GHOST_URL__` canonical.
+- `limited-edition-vs-open-edition-prints-which-is-right-for-you` — the only
+  one of 117 posts carrying Ghost card markup.
+
+**All three are published and indexed**, and were among the 127 Ghost URLs
+verified returning 200 on staging on 29 Aug. Deleting them without a
+redirect turns three indexed URLs into 404s at the flip — which is
+indistinguishable, in Search Console, from the migration having lost them.
+That is the one shape of post-cutover damage
+[`SEO_CUTOVER_RISK.md`](SEO_CUTOVER_RISK.md#reading-the-aftermath) says is a
+real problem rather than recrawl noise.
+
+**Decide a destination for each before cutover** and add the rules to the
+`redirects` collection — the topic archive each sat under is usually the
+honest answer; a 410 is defensible if the content is genuinely retired and
+you would rather tell Google so directly. `pnpm validate:redirects` covers
+the table, so whatever is chosen gets checked with the rest.
+
+Not yet done, at the time of writing: the deletions themselves, and the
+redirects for them.
+
+### Closed on 18 Sep
+
+- **Draft URLs 404.** Requested signed out and confirmed. Worth repeating
+  that it must be checked signed out: an admin session carries the preview
+  cookie, and a draft served 200 through it looks exactly like one that
+  leaked.
+- **Media id 4** — retired by the deletion decision above rather than fixed.
+  Recorded because the item appears in several places on this page and in
+  the rehearsal, and all of them are now answered by one decision.
+
+Previously worked on **15 Sep 2026**. The header bypass below — the item that
+had been the most important line on this page since 5 Sep — was closed in code.
+Nothing else changed.
+
+### The rate-limiter bypass is fixed, and was deployed on 18 Sep
 
 `clientKey()` in `lib/security/rate-limit.ts` keyed on `CF-Connecting-IP`
 whenever `TRUST_CLOUDFLARE_IP` was set, and that variable has been set since
@@ -63,17 +144,23 @@ not actually one piece of work. `EDGE_PROTECTION.md` now carries the list next
 to the firewall rules, and `tests/docs/drift.test.ts` fails if the two copies
 diverge.
 
-**Three things an operator still owns:**
+**Deployed 18 Sep**, by the `deploy` job on the merge of #156 — which runs on
+any push to `main` once all four build jobs pass, so no manual step was
+involved. The limiters bound request volume on the running host from that
+point.
 
-1. **It is not deployed.** The bypass is open on the running host until the next
-   deploy. Severity is lower than it will be — DNS has not cut over, so this is
-   the public staging copy — but `forgot-password` mails real addresses today.
-2. **Re-verify the ranges at step 6**, and update both copies if Cloudflare has
+**Two things an operator still owns:**
+
+1. **Re-verify the ranges at step 6**, and update both copies if Cloudflare has
    published a change. The test compares the doc to the code; neither is checked
    against Cloudflare, and nothing automated can be.
-3. **Watch for a limiter that suddenly bites.** The failure mode of a wrong or
+2. **Watch for a limiter that suddenly bites.** The failure mode of a wrong or
    stale list is real visitors behind Cloudflare sharing one bucket rather than
    getting their own. `TRUST_CLOUDFLARE_IP` stays safe to leave set either way.
+
+One consequence worth holding on to while the email defect above is open: the
+`forgot-password` limiter is now real, so repeated reset attempts while
+debugging will start returning 429. That is the fix working, not a new fault.
 
 ### Also from the 5 Sep pass
 
@@ -808,7 +895,10 @@ backups are all done — see "Backups are encrypted and a restore is proven" and
 content audit (see "The content audit" above) answered the question this used
 to pose:
 
-1. **Media id 4** (`photo-1689659721022-3aa475803e19`) has no bytes in R2. It
+1. **Media id 4** (`photo-1689659721022-3aa475803e19`) has no bytes in R2.
+   **Retired on 18 Sep**: the post it belongs to is being deleted, so the image
+   needs no restoring — see "Three posts are being deleted" under Pick up here.
+   The rest of this entry is kept because it records what was established. It
    is an Unsplash URL that was linked rather than stored in Ghost, it **is**
    used — the feature image of a published post — and its source URL still
    returns 200 with the exact byte count the row expects, so it is
