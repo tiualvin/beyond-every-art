@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   buildArticleJsonLd,
+  buildCollectionPageJsonLd,
   buildProfilePageJsonLd,
   buildWebPageJsonLd,
   buildWebSiteJsonLd,
@@ -204,6 +205,43 @@ describe('buildProfilePageJsonLd', () => {
   })
 })
 
+describe('buildCollectionPageJsonLd', () => {
+  const base = {
+    url: 'https://example.com/tag/palette/',
+    name: 'Palette',
+    siteName: 'Beyond Every Art',
+    siteUrl: 'https://example.com',
+  }
+
+  it('is a CollectionPage and never a Series', () => {
+    // Ghost emitted Series on tag archives. A Series is a work published in
+    // parts, in order, by someone who meant it as one. A tag archive is a list
+    // of everything filed under a word: no order, no intent, and a post can
+    // sit in several at once. Pinned against Series specifically so that a
+    // later pass closing the crawl diff has to argue with a failing test.
+    const node = buildCollectionPageJsonLd(base)
+
+    expect(node['@type']).toBe('CollectionPage')
+    expect(node['@type']).not.toBe('Series')
+    expect(node.name).toBe('Palette')
+    expect(node.isPartOf).toMatchObject({ '@type': 'WebSite' })
+  })
+
+  it('omits a description the topic has not been given', () => {
+    expect(buildCollectionPageJsonLd(base).description).toBeUndefined()
+    expect(
+      buildCollectionPageJsonLd({ ...base, description: 'Colour, mixed.' })
+        .description,
+    ).toBe('Colour, mixed.')
+  })
+
+  it('carries no dateModified, which WebPage may and this may not', () => {
+    // The two share a builder. This asserts the shared part did not leak a
+    // field a CollectionPage was never given.
+    expect(buildCollectionPageJsonLd(base).dateModified).toBeUndefined()
+  })
+})
+
 describe('every node survives serialization', () => {
   // The escaping in `serializeJsonLd` exists so a value cannot break out of
   // the <script> element. It is applied to these nodes too, so each has to
@@ -218,6 +256,15 @@ describe('every node survives serialization', () => {
       buildWebPageJsonLd({
         url: 'https://x.test/about/',
         name: 'A </script> B',
+        siteName: 'A & B',
+        siteUrl: 'https://x.test',
+      }),
+    ],
+    [
+      'CollectionPage',
+      buildCollectionPageJsonLd({
+        url: 'https://x.test/tag/a/',
+        name: 'A & B',
         siteName: 'A & B',
         siteUrl: 'https://x.test',
       }),

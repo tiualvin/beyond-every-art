@@ -3,13 +3,18 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { cache } from 'react'
 
-import { getPostsByTag, getTagsWithCounts } from '@/lib/content/queries'
+import {
+  getPostsByTag,
+  getSiteSettings,
+  getTagsWithCounts,
+} from '@/lib/content/queries'
 import { pigmentFor } from '@/lib/design/pigments'
 import { logMissingRoute } from '@/lib/observability/missing-route'
 import {
   recordSlugMiss,
   requireLookupableSlug,
 } from '@/lib/security/slug-requests'
+import { buildCollectionPageJsonLd, serializeJsonLd } from '@/lib/seo/jsonld'
 import { absoluteUrl, getSiteUrl, JOURNAL_PATH, tagPath } from '@/lib/seo/site'
 
 import { ArchiveGroups } from '../../components/archive-groups'
@@ -65,8 +70,26 @@ export default async function TagPage({ params }: { params: Promise<Params> }) {
 
   const pigment = pigmentFor(archive.slug)
 
+  // Ghost emitted `Series` on these; this emits `CollectionPage`, which is what
+  // a tag archive actually is. See `lib/seo/jsonld.ts`.
+  const settings = await getSiteSettings()
+  const siteUrl = getSiteUrl()
+  const jsonLd = serializeJsonLd(
+    buildCollectionPageJsonLd({
+      url: absoluteUrl(tagPath(archive.slug), siteUrl),
+      name: archive.name,
+      description: archive.description || undefined,
+      siteName: settings.title,
+      siteUrl,
+    }),
+  )
+
   return (
     <main>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLd }}
+      />
       {/* The topic's own pigment stains the head, so arriving on a topic feels
           like arriving somewhere rather than landing on a filtered list. */}
       <header
