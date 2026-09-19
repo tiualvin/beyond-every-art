@@ -52,9 +52,32 @@ describe('toMediaImage', () => {
       height: 1067,
       caption: 'Natural ultramarine, ground by hand.',
       credit: 'Photograph: studio archive',
+      creditURL: null,
       cardUrl: null,
       ogUrl: null,
     })
+  })
+
+  // The credit line links only when the record says where to. Most do not,
+  // and those render exactly as they did before the field existed.
+  it('carries a credit link through, vetted', () => {
+    expect(
+      toMediaImage({ ...record, creditURL: 'https://unsplash.com/@shhiscat' })
+        ?.creditURL,
+    ).toBe('https://unsplash.com/@shhiscat')
+  })
+
+  it('drops a credit link that must never reach an href', () => {
+    // Belt and braces with the collection's own validation: this is the check
+    // that holds for a row written before that validation, or by a script
+    // running with `overrideAccess`.
+    expect(
+      toMediaImage({ ...record, creditURL: 'javascript:alert(1)' })?.creditURL,
+    ).toBeNull()
+    expect(
+      toMediaImage({ ...record, creditURL: 'http://unsplash.com/@x' })
+        ?.creditURL,
+    ).toBeNull()
   })
 
   // Media uploaded before a size was added to the collection has no derivative

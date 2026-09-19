@@ -20,6 +20,12 @@
 // `media.credit`, which `FeaturedFigure` already renders. Reasoning in
 // `lib/migration/feature-image-credits.ts`.
 //
+// That pass has run, so rerunning it writes nothing — except that it now also
+// recovers the photographer's profile URL into `media.creditURL`, which the
+// first version dropped. Every row therefore has the right text and no link,
+// which is precisely the state `planCredits` has to be able to see; it
+// compares both fields for that reason.
+//
 // **Escaped quotes.** One post arrived with every `href` wrapped in
 // `\&quot;`, which a browser resolves as a relative path and 404s — seven
 // links, all dead. Reasoning in `lib/migration/link-rewrite.ts`.
@@ -75,7 +81,11 @@ function parseArgs(argv: string[]): Cli {
   }
 }
 
-type MediaDoc = { id: string | number; credit?: string | null }
+type MediaDoc = {
+  id: string | number
+  credit?: string | null
+  creditURL?: string | null
+}
 type BodyDoc = {
   id: string | number
   slug?: string | null
@@ -85,7 +95,7 @@ type BodyDoc = {
 
 const BODY_COLLECTIONS = ['posts', 'pages'] as const
 
-/** Media documents needing a credit they do not already carry. */
+/** Media documents needing a credit, or a credit link, they do not carry. */
 async function planCredits(
   payload: Payload,
   credits: RecoveredCredit[],
@@ -114,7 +124,14 @@ async function planCredits(
       unmatched.push(credit)
       continue
     }
-    if ((doc.credit ?? '').trim() === credit.credit) {
+    // Both halves, because this script has already run once against this
+    // database: every row carries the right `credit` and none carries a
+    // `creditURL`, so a check on the text alone would report 110 rows as
+    // already correct and write nothing.
+    const textMatches = (doc.credit ?? '').trim() === credit.credit
+    const linkMatches =
+      (doc.creditURL ?? '').trim() === (credit.creditURL ?? '')
+    if (textMatches && linkMatches) {
       alreadySet++
       continue
     }
@@ -122,7 +139,9 @@ async function planCredits(
       mediaId: doc.id,
       from: credit.slug,
       credit: credit.credit,
+      creditURL: credit.creditURL,
       existingCredit: doc.credit ?? null,
+      existingCreditURL: doc.creditURL ?? null,
     })
   }
 
@@ -209,7 +228,10 @@ async function main() {
             await payload.update({
               collection: 'media' as CollectionSlug,
               id: entry.mediaId as string | number,
-              data: { credit: entry.credit } as never,
+              data: {
+                credit: entry.credit,
+                creditURL: entry.creditURL ?? null,
+              } as never,
               overrideAccess: true,
             })
             written++

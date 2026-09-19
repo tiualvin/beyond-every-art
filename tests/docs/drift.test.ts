@@ -143,6 +143,11 @@ describe('documentation file references', () => {
     // is shared by the index and the detail page. The spec records the design,
     // and carries a note pointing at where it actually landed.
     'app/(frontend)/apps/[slug]/actions.ts',
+    // docs/STOCK_IMAGERY.md: the one module a stock-photo search would live
+    // in, named so the evaluation can say what does and does not import the
+    // vendor. Nothing is built; the decisions in that document's last section
+    // come first.
+    'lib/stock/unsplash.ts',
   ])
 
   // Backticked paths are how these docs point at code, and they are not links,

@@ -43,6 +43,18 @@ campaigns around it. No transactional provider is configured, deliberately, and
 that document says what makes the decision expire — read it before adding any
 send path, and do not reach for the ESP to send a token.
 
+[`docs/STOCK_IMAGERY.md`](docs/STOCK_IMAGERY.md) evaluates the Unsplash API as
+a replacement for the Ghost editor's image picker, which every feature image on
+this site came through and which the cutover removed. The API is not built and
+two of its findings are decisions rather than code: whether to store bytes or
+hotlink, and where a stock photograph is allowed on a publication that writes
+about specific works. The attribution its guidelines require *is* built —
+`media.creditURL`, rendered through
+[`lib/content/attribution.ts`](lib/content/attribution.ts), which is the only
+thing that may build a credit `href`: it refuses anything but https and adds
+referral parameters for Unsplash alone. Read that document before adding any
+image source, credit field, or agent-facing image search.
+
 [`docs/AUTONOMOUS_WORKSTREAMS.md`](docs/AUTONOMOUS_WORKSTREAMS.md) defines the
 sequencing, shared invariants, ownership boundaries, and verification gates for
 the repository's launch-readiness automation workstreams.
