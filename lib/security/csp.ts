@@ -17,7 +17,6 @@
 // `headers.ts`), which Next compiles on its own before the path aliases exist —
 // an aliased import here fails the build with a bare MODULE_NOT_FOUND. Anything
 // this file pulls in inherits the same constraint.
-import { analyticsConfigured } from '../analytics/tag'
 
 type Env = Record<string, string | undefined>
 
@@ -44,17 +43,39 @@ export const CSP_REPORT_PATH = '/csp-report/'
 export const CSP_REPORT_GROUP = 'csp-endpoint'
 
 /**
- * Google Tag Manager and GA4 origins.
+ * Google Tag Manager and GA4 origins, permitted unconditionally.
  *
- * Added when either `NEXT_PUBLIC_GTM_ID` or `NEXT_PUBLIC_GA_ID` is set, since
- * both tags load from `googletagmanager.com` and both report to the GA4
- * collectors. Keyed on configuration rather than on the noindex gate that
- * decides whether a tag actually renders: permitting an origin the page then
- * does not use costs nothing, while withholding one it does use breaks the tag.
- * `region1` is the regional collector GA4 falls back to.
+ * Both tags load from `googletagmanager.com` and both report to the GA4
+ * collectors; `region1` is the regional collector GA4 falls back to.
+ *
+ * **Unconditional since 19 Sep, and the condition it replaces is the reason.**
+ * These used to be added only when `NEXT_PUBLIC_GTM_ID` or `NEXT_PUBLIC_GA_ID`
+ * was set — which reads as careful and was not, because of *when* the question
+ * is asked. `buildSecurityHeaders()` is called from `next.config.ts`'s
+ * `headers()`, which Next evaluates during `pnpm build` and bakes into the
+ * routes manifest. Neither id is a Docker build argument (only the checkout
+ * URLs are), so at that moment both are empty, the test failed, and the policy
+ * shipped without the origins. `resolveAnalyticsTag()` meanwhile runs per
+ * request, reads the live value, and renders the tag. The policy was built at
+ * build time and the tag at request time, and they disagreed.
+ *
+ * Production caught it within minutes of the cutover: `script-src-elem`
+ * violations for `gtm.js` on every page, report-only, so nothing was blocked
+ * and analytics kept collecting. Under `CSP_MODE=enforce` it would have been
+ * blocked and collection would have stopped silently.
+ *
+ * Permitting them always is the direction this file already said was correct:
+ * an origin the page does not use costs nothing, while withholding one it does
+ * use breaks the tag under enforcement. It also costs nothing in practice,
+ * because `'unsafe-inline'` is still in `script-src` — an attacker who can
+ * inject markup can already run arbitrary inline script, so a host allowlist
+ * entry adds nothing to their reach. Phase 3's `'strict-dynamic'` makes host
+ * allowlists moot altogether.
  *
  * These cover Google's own requests only. Anything a Tag Manager container
- * fires beyond them needs `CSP_SCRIPT_SRC` and friends below.
+ * fires beyond them needs `CSP_SCRIPT_SRC` and friends below — which are read
+ * in this same build-time call, so they are not a runtime escape hatch either.
+ * See `docs/CONTENT_SECURITY_POLICY.md`.
  */
 const ANALYTICS_SCRIPT_ORIGINS = ['https://www.googletagmanager.com']
 const ANALYTICS_CONNECT_ORIGINS = [
@@ -170,7 +191,6 @@ export function buildCspPolicy(options: CspOptions = {}): string {
   const env = options.env ?? process.env
   const dev = options.isDevelopment ?? false
   const media = mediaOrigin(env)
-  const analytics = analyticsConfigured(env)
   const frames = frameOrigins(env)
 
   const scriptSrc = [
@@ -182,7 +202,7 @@ export function buildCspPolicy(options: CspOptions = {}): string {
     // gap is phase 3 in the rollout doc, and it needs nonces.
     "'unsafe-inline'",
     ...(dev ? ["'unsafe-eval'"] : []),
-    ...(analytics ? ANALYTICS_SCRIPT_ORIGINS : []),
+    ...ANALYTICS_SCRIPT_ORIGINS,
     ...extraScriptOrigins(env),
   ]
 
@@ -200,14 +220,14 @@ export function buildCspPolicy(options: CspOptions = {}): string {
     'data:',
     'blob:',
     ...(media ? [media] : []),
-    ...(analytics ? ANALYTICS_IMG_ORIGINS : []),
+    ...ANALYTICS_IMG_ORIGINS,
     ...extraImgOrigins(env),
   ]
 
   const connectSrc = [
     "'self'",
     ...(media ? [media] : []),
-    ...(analytics ? ANALYTICS_CONNECT_ORIGINS : []),
+    ...ANALYTICS_CONNECT_ORIGINS,
     ...extraConnectOrigins(env),
     // The dev server's HMR socket.
     ...(dev ? ['ws:'] : []),

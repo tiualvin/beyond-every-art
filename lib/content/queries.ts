@@ -425,6 +425,13 @@ export type PageDetail = {
   body: ArticleBody
   publishedAt: string | null
   updatedAt: string | null
+  /**
+   * The featured image, which pages carry exactly as posts do
+   * (`collections/Pages.ts`). Absent from this type until 19 Sep, which is why
+   * `/about/` served its whole life without the image Ghost had: the field
+   * migrated, validated and sat in the database with nothing able to read it.
+   */
+  image: MediaImage | null
   metaTitle: string | null
   metaDescription: string | null
   canonicalURL: string | null
@@ -654,6 +661,7 @@ async function readPageBySlug(
       body: toArticleBody(doc, { preview: Boolean(options.draft) }),
       publishedAt: doc.publishedAt ?? null,
       updatedAt: doc.updatedAt ?? null,
+      image: toMediaImage(doc.featuredImage),
       metaTitle: doc.metaTitle ?? null,
       metaDescription: doc.metaDescription ?? null,
       canonicalURL: doc.canonicalURL ?? null,

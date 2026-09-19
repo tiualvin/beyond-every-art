@@ -183,7 +183,14 @@ function AuthorCard({ author }: { author: AuthorSummary }) {
   )
 }
 
-function FeaturedFigure({ image }: { image: MediaImage }) {
+/**
+ * The featured image with its caption and credit.
+ *
+ * Exported because pages render it too — see `app/(frontend)/[slug]/page.tsx`.
+ * Keeping one implementation is what stops the two templates drifting on the
+ * `sizes` hint, which is the part a reader actually pays for.
+ */
+export function FeaturedFigure({ image }: { image: MediaImage }) {
   const meta = [image.caption, image.credit].filter(Boolean)
 
   return (
