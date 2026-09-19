@@ -27,6 +27,15 @@ export type SiteSettings = {
   homeTitle: string
   /** The homepage's meta description: the search snippet, not the standfirst. */
   metaDescription: string
+  /**
+   * The picture above the signup in the post rail, when an editor has set one.
+   *
+   * The only image on the site chosen outside a post, and the only reason this
+   * global is read at `depth: 1`. Null is the ordinary state rather than an
+   * error — every database that predates the field has it unset, and
+   * `ArticleRail` renders a card without a picture rather than a gap.
+   */
+  newsletterImage: MediaImage | null
 }
 
 export type AuthorSummary = {
@@ -78,6 +87,7 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
     'Reflect on what lies beyond art. Exploring the discipline, color theory, ' +
     'art history, and strategic frameworks that artists need to develop deeper ' +
     'practices and build cultural literacy.',
+  newsletterImage: null,
 }
 
 /**
@@ -165,21 +175,29 @@ function toPostCard(doc: RawPost): PostCard | null {
   }
 }
 
-/** Site-wide title/description, falling back to sensible defaults. */
+/**
+ * Site-wide title/description, falling back to sensible defaults.
+ *
+ * `depth: 1` rather than 0, which it was until this global gained an upload
+ * field: at depth 0 Payload returns the media row's id and `toMediaImage` has
+ * nothing to read, so the card would silently lose its picture. One join, on a
+ * global that is cached and purged on publish.
+ */
 async function readSiteSettings(): Promise<SiteSettings> {
   try {
     const payload = await getPayloadClient()
     const settings = (await payload.findGlobal({
       slug: 'site-settings',
       overrideAccess: true,
-      depth: 0,
-    })) as Partial<SiteSettings>
+      depth: 1,
+    })) as Partial<SiteSettings> & { newsletterImage?: unknown }
     return {
       title: settings.title || DEFAULT_SITE_SETTINGS.title,
       description: settings.description || DEFAULT_SITE_SETTINGS.description,
       homeTitle: settings.homeTitle || DEFAULT_SITE_SETTINGS.homeTitle,
       metaDescription:
         settings.metaDescription || DEFAULT_SITE_SETTINGS.metaDescription,
+      newsletterImage: toMediaImage(settings.newsletterImage),
     }
   } catch {
     return DEFAULT_SITE_SETTINGS

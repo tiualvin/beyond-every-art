@@ -5,6 +5,19 @@
   // imports to `React.createElement` calls against a `React` that no file in
   // this repository imports. The automatic runtime is what Next uses and what
   // `vitest.config.ts` sets for the same reason.
+  //
+  // `paths` is redeclared rather than extended: TypeScript replaces the key
+  // wholesale, so `@/*` has to come along, and both are relative to this file.
+  // `next/image` is stubbed because it is a client-boundary module whose
+  // default export is a descriptor object outside a Next build, which
+  // `renderToStaticMarkup` cannot render.
   "extends": "../tsconfig.json",
-  "compilerOptions": { "jsx": "react-jsx" }
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "paths": {
+      "@/*": ["../*"],
+      "@payload-config": ["../payload.config.ts"],
+      "next/image": ["./stubs/next-image.tsx"]
+    }
+  }
 }

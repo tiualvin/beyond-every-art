@@ -1,7 +1,11 @@
 # Post layout — before and after
 
-Evidence for the three-track post template described in
+Evidence for the post template described in
 [`../../POST_PAGE_LAYOUT.md`](../../POST_PAGE_LAYOUT.md).
+
+The sections are in the order the changes happened, and the earlier ones are a
+record of a state the page has since left rather than a picture of it today.
+The last section is the current rail.
 
 Every shot in the first two sections is the `Article` component rendered to
 static markup with the real `app/globals.css`, captured in Chromium at 1440×900
@@ -98,3 +102,37 @@ instead of prose leading; and the newsletter card has shed its line of copy,
 which is the first rung of the ladder in `../../POST_PAGE_LAYOUT.md` and the
 cheapest thing in the group. The card's frame goes at the next rung down, which
 is what carries three whole pieces to 683px of viewport.
+
+## 1440x800 and 1440x700 — the rail without "More on this"
+
+The end of the story the two sections above tell. The rail's related list had
+been the module that absorbed every shortfall, and the fix for that had been a
+ladder that made three pieces fit down to 683px of viewport. The module went
+instead: every piece it listed already closes the article in "Read next", which
+reaches every device where the rail reaches desktop only, so removing it costs
+a reader nothing and returns 245px.
+
+The card spends it. A picture an editor sets in Payload — `SiteSettings` →
+Newsletter card image — then the eyebrow, a heading, a line and the control.
+
+Taken with `pnpm measure:rail --shot`, which renders the real `ArticleRail`
+over the real `app/globals.css`, scrolled until the pair is pinned. The unit's
+box is empty because the harness is a local page with no AdSense fill; the
+picture is a gradient standing in for a photograph, for the same reason the
+shots at the top of this file use placeholder gradients.
+
+| 1440x800 — the whole card                                                                                                                                                                                                                                                        | 1440x700 — the first rung                                                                                                                                                                                       |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ![The rail at 800px of viewport: an "Advertisement" cap over the 250px unit, then the newsletter card — a 3:2 picture across its full width, then THE NEWSLETTER, "Stay close to the work", a line of copy and a full-width Join the list button.](rail-newsletter-1440x800.jpg) | ![The same rail at 700px: identical except that the picture is now a shallow 3:1 band rather than a 3:2 frame, which is what keeps the button clear of the bottom of the screen.](rail-newsletter-1440x700.jpg) |
+
+800px of viewport is a 1440x900 laptop with the browser chrome taken off, and
+the pair is 658px against a 700px cap — everything fits with room to spare. At
+700px the cap is 600 and the whole card would not, so the picture steps down to
+a band and the pair becomes 559. It steps away entirely below 663, and the line
+of copy goes below 564; the button never goes, which is the point of deciding
+the order rather than letting the group's scrollbar decide it.
+
+The picture costs a phone nothing despite the rail being `display: none` below 1280. `next/image` lazy-loads by default and an element with no box never
+intersects the viewport, so the request is never made — measured in Chromium at
+390px wide, where it is requested zero times, against 1440px scrolled into
+view, where it is requested once.

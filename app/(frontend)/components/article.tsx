@@ -3,7 +3,7 @@ import Link from 'next/link'
 
 import { attributionHref } from '@/lib/content/attribution'
 import { thumbnailSrc, type MediaImage } from '@/lib/content/media'
-import type { AuthorSummary, PostCard, PostDetail } from '@/lib/content/queries'
+import type { AuthorSummary, PostDetail } from '@/lib/content/queries'
 import { extractHeadings } from '@/lib/content/toc'
 import { formatDate } from '@/lib/format'
 import { authorPath, tagPath } from '@/lib/seo/site'
@@ -43,12 +43,12 @@ const FIGURE_SIZES =
  */
 export function Article({
   post,
-  related = [],
+  newsletterImage = null,
   preview = false,
 }: {
   post: PostDetail
-  /** Related pieces for the rail; "Read next" is given its own share. */
-  related?: PostCard[]
+  /** The rail's signup picture, from `SiteSettings`. */
+  newsletterImage?: MediaImage | null
   preview?: boolean
 }) {
   const primaryTag = post.tags[0]
@@ -145,7 +145,7 @@ export function Article({
 
           <ArticleRail
             headings={headings}
-            related={related}
+            newsletterImage={newsletterImage}
             restricted={post.restricted}
           />
         </div>

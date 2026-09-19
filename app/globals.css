@@ -3361,56 +3361,6 @@ ol.feature-list__items .feature-list__title::before {
   text-decoration: none;
 }
 
-.rail__list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 0.85rem;
-}
-
-.rail__item {
-  display: block;
-}
-
-/* Clamped to two lines, which is the change that makes the list's height
-   knowable at all. A rail title is whatever an editor wrote: "Why Burnt Sienna
-   Behaves Differently in Oil Than in Watercolour" sets two lines at this
-   measure and a longer one sets three, so an item was 60px or 80px depending
-   on the post — and the three-item list the ladder below is budgeted for was
-   180px or 240px, which is the difference between three pieces showing and
-   one and a half showing with the second cut through the middle of a word.
-   That is what the screenshot of this rail actually looked like.
-
-   Two lines and an ellipsis, not one: one line loses the subject of most of
-   these titles. */
-.rail__item h3 {
-  font-family: var(--font-serif);
-  font-size: 1rem;
-  font-weight: 600;
-  line-height: 1.25;
-  margin: 0 0 0.25rem;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.rail__item:hover h3 {
-  color: var(--color-burgundy);
-}
-
-/* `line-height: 1.35`, not the body's 1.65. This is an 11.5px caption, and
-   prose leading on it bought 3.4px of air per item that the third piece in the
-   list needed more. */
-.rail__meta {
-  margin: 0;
-  font-size: 0.72rem;
-  line-height: 1.35;
-  color: var(--color-muted);
-  font-variant-numeric: tabular-nums;
-}
-
 /* The square unit above "More on this" — `rail-1` in docs/ADVERTISING.md §8.
    It is filled now: `AdUnit` renders the 300x250 `<ins>` into it whenever ads
    are on for the deployment and the post is not a restricted teaser.
@@ -3514,35 +3464,9 @@ ol.feature-list__items .feature-list__title::before {
   margin-bottom: 1.5rem;
 }
 
-/* And the labels inside it run tighter than the contents list above, for the
-   same reason: 4px each, twice, and the list is budgeted in 60px items. */
-.rail__sticky .rail__label {
-  margin-bottom: 0.6rem;
-}
-
 /* Everything in the group holds its height... */
 .rail__sticky > * {
   flex: none;
-}
-
-/* ...except the related list, which is what absorbs a short window. `flex:
-   0 1 auto` rather than `1 1 auto`: it may shrink, but it must not grow into
-   the space left over on a tall one, or the newsletter card would be pushed
-   to the bottom of the box with a gap above it. `min-height: 0` twice because
-   a flex item's automatic minimum is its content, and without it neither the
-   module nor the list inside it can go below its natural height. */
-.rail__sticky > .rail__related {
-  flex: 0 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.rail__related .rail__list {
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
 }
 
 /* The last module in the group carries no bottom margin of its own, so the
@@ -3551,15 +3475,58 @@ ol.feature-list__items .feature-list__title::before {
   margin-bottom: 0;
 }
 
+/* The signup card: the rail's own content now, rather than a footnote under a
+   list of links.
+
+   It got bigger because the rail got shorter. "More on this" is gone — three
+   related pieces, a square unit and a signup came to 712px in a box capped at
+   the viewport less 100, so an ordinary laptop was always cutting something,
+   and what it cut was the one module that duplicated "Read next" below the
+   article. That is 245px the card can spend on being worth looking at.
+
+   The picture bleeds to the card's edges, which is what `overflow: hidden`
+   buys: the figure takes the card's own corners instead of sitting inside a
+   padded box with a second radius of its own. */
 .rail__signup {
   background: var(--color-surface);
   border: 1px solid var(--color-line);
   border-radius: var(--radius);
+  overflow: hidden;
+}
+
+/* `aspect-ratio` rather than a height, because it is the one property the
+   ladder below steps: the picture goes from a frame to a band to nothing, and
+   every step is one number. `position: relative` is what `next/image`'s `fill`
+   needs; the ground underneath shows through a transparent upload and is what
+   the box looks like for the moment before the picture decodes. */
+.rail__signup-figure {
+  position: relative;
+  aspect-ratio: 3 / 2;
+  background: var(--color-rule);
+}
+
+.rail__signup-body {
   padding: 0.9rem;
 }
 
+/* No rule under this one, unlike every other label in the rail. Those sit over
+   a list and separate it from what came before; this one sits directly above a
+   heading, and a burgundy rule between an eyebrow and its own title reads as a
+   divider between two things rather than as one block. */
+.rail__signup .rail__label {
+  border-bottom: 0;
+  padding-bottom: 0;
+  margin-bottom: 0.3rem;
+}
+
+.rail__signup-title {
+  font-size: 1.15rem;
+  line-height: 1.15;
+  margin: 0 0 0.4rem;
+}
+
 .rail__signup p {
-  margin: 0 0 0.6rem;
+  margin: 0 0 0.7rem;
   font-size: 0.85rem;
   line-height: 1.5;
   color: var(--color-muted);
@@ -3571,108 +3538,71 @@ ol.feature-list__items .feature-list__title::before {
 }
 
 /* --- The ladder ----------------------------------------------------------
-   Three related pieces is the module, not a maximum: `RAIL_COUNT` in
-   `lib/content/related.ts` asks for three and the rail had room for one and a
-   half of them. The three rungs below are what buys the other one and a half,
-   and they are measured in Chromium rather than reasoned about — every number
-   in this block and in docs/POST_PAGE_LAYOUT.md comes off the same harness.
+   The sticky pair is the 300x250 unit and this card, and the unit cannot
+   shrink — a 300x250 is a 300x250. So on a window too short for both, the card
+   is the only thing that can give, and what it gives is decided here rather
+   than left to the group's scrollbar, which would take the button first.
 
-   What the group costs, whole: the labelled unit and its gap (265.7 + 13.6),
-   the related label (27.4 + 9.6), a three-item list (60 x 3 + 13.6 x 2), the
-   gap under it (24), and the newsletter card (166.1) — which Chromium measures
-   at 712, against a cap of the viewport less 100. So the whole group needs
-   812px of viewport, and a 1440x900 laptop has about 800.
+   What the pair costs, whole: the labelled unit and its gap (265.7 + 13.6),
+   and the card at 379.1 — of which the picture is 198.7. Chromium measures the
+   group at 658, against a cap of the viewport less 100, so the whole thing
+   needs 758px of viewport. A 1920x1080 screen has about 937 and a 1440x900
+   laptop about 800, so both keep the picture at full size; below that the
+   ladder starts.
 
-   Rather than let the list absorb that on its own — which is what put one and
-   a half pieces in a module built for three — the group sheds the cheapest
-   thing it has, in order, and the list keeps its height until there is nothing
-   cheaper left:
+   The picture is what gives, in two steps, because it is the only thing here
+   that is worth less at a smaller size rather than worthless: a 3:2 frame
+   becomes a 5:2 band, and then goes. The words go after it and the button
+   never does.
 
-     >= 820   everything                         group 712   3 pieces
-     770-819  the card's line of copy goes       group 662   3 pieces
-     683-769  the card's frame and label go too  group 583   3 pieces
-     610-682  nothing left to shed; list scrolls group 510   2 pieces
-     538-609  the same, one item further in      group 438   1 piece
-     <= 537   the list itself goes               group 324   the unit, a button
+     >= 761   everything                    group 658   3:2 picture
+     663-760  the picture becomes a band    group 559   3:1 band
+     564-662  the band goes                 group 460   no picture
+     508-563  the line of copy goes too     group 408   eyebrow, title, button
+     <= 507   nothing left; the group scrolls
 
-   Three whole pieces from 683px of viewport up, where it used to take 826.
-   Below 683 the list shrinks and scrolls as it always did, because by then the
-   rungs are spent and it is the only elastic module left.
+   The boundaries carry about 3px of slack over what the measurements demand,
+   deliberately. Every one of them landed on exactly zero when first computed —
+   a group of 658 against a cap of 658 — and a boundary with no margin is one
+   font-rendering difference away from being wrong on somebody's machine.
 
-   The rung boundaries are measured, not rounded, and rounding them is exactly
-   how this goes wrong: 769 rather than 759 because at 760 the rung-2 group is
-   662 against a cap of 660, so the third piece falls off across a two-pixel
-   band that would have shipped invisibly. `pnpm measure:rail` prints this
-   table; tests/design/article-layout.test.ts fails if a rung starts lower than
-   its own group fits. */
+   `pnpm measure:rail` prints that table from the real `ArticleRail` in
+   Chromium; tests/design/article-layout.test.ts fails if a rung starts lower
+   than its own group fits, which is the fault that ships invisibly.
 
-/* Rung 2. One line of copy is the cheapest thing in the group: the card keeps
-   its frame, its label and its button, and "One piece a week on colour,
-   material, and practice." is framing rather than the offer. 50px.
+   Every rung is scoped to `--ad`, which the component sets only when it is
+   rendering a unit. Without one there is no pair — just the card, 379px, which
+   fits any window a desktop browser opens in, so there is nothing to shed — and a members-only
+   teaser, which carries no unit by docs/ADVERTISING.md §4, would otherwise
+   lose its picture for no reason at all. Scoping also keeps the cascade
+   honest: a descendant selector beats `.rail__signup`'s own declarations on
+   specificity rather than on source order, which an earlier version of this
+   block got wrong. */
 
-   Scoped to `--ad`, which the component sets only when it is rendering a unit.
-   Without one the group is 433px and fits any window a desktop browser opens
-   in, so there is nothing to shed — and a members-only teaser, which carries
-   no unit by §4, would otherwise lose its card's copy on an 800px window for
-   no reason at all. It is also what keeps the cascade honest: a descendant
-   selector beats `.rail__signup`'s own declarations on specificity rather than
-   on source order, which this rule got wrong once. */
-@media (max-height: 819px) {
-  .rail__sticky--ad .rail__signup .rail__copy {
+/* Rung 2. The frame becomes a band. */
+@media (max-height: 760px) {
+  .rail__sticky--ad .rail__signup-figure {
+    aspect-ratio: 3 / 1;
+  }
+}
+
+/* Rung 3. The band goes. */
+@media (max-height: 662px) {
+  .rail__sticky--ad .rail__signup-figure {
     display: none;
   }
 }
 
-/* Rung 3. The card gives up being a card and becomes its button. 79px, which
-   is the rung that reaches a 1366x768 laptop — roughly 670px of viewport once
-   the OS and browser chrome are off it, where nothing above this rung fits
-   three pieces at all.
-
-   The label goes with the frame deliberately, and it was measured rather than
-   assumed: keeping "The newsletter" and dropping only the frame leaves the
-   group at 623 instead of 583, which puts the cutoff at 723px of viewport —
-   above the laptop this rung exists for, so the rung would not do its job.
-   "Join the list" on a burgundy button is legible without the label, and the
-   newsletter reaches this reader through the band below the article as well. */
-@media (max-height: 769px) {
-  .rail__sticky--ad .rail__signup {
-    background: none;
-    border: 0;
-    padding: 0;
-  }
-
-  .rail__sticky--ad .rail__signup .rail__label {
+/* Rung 4. The line of copy goes, and the group's modules close up. The card is
+   then its eyebrow, its heading and the control — which is the least this can
+   be and still be an offer rather than a button on its own. */
+@media (max-height: 563px) {
+  .rail__sticky--ad .rail__copy {
     display: none;
   }
 
   .rail__sticky--ad > .rail__mod {
     margin-bottom: 1rem;
-  }
-}
-
-/* Rung 4. Past a point shrinking stops being graceful: the fixed parts of the
-   group at rung 3 come to 377px against a cap of the viewport less 100, so
-   under 538px the list has nothing whole left to show and becomes a sliver
-   under a heading, which reads as broken rather than tight. It is dropped
-   there instead — the related pieces close the article on every device, so
-   nothing here is only here.
-
-   537 and not 649. The threshold is recomputed, not nudged: it has only ever
-   been "the window that genuinely cannot hold one whole item", and the rungs
-   above moved that window down by 112px. It shipped at 700 once, which was
-   above a large share of real windows, and the test below can only ever let it
-   fall further.
-
-   This is a `max-height`, not the `min-height` guard it replaced upstream. That
-   one turned the sticky group off entirely on most windows; this one drops one
-   supplementary module on the windows that provably cannot hold it.
-
-   Unscoped, unlike the rungs above: without a unit the list could survive to
-   387px of viewport rather than 537, and a desktop window under 537px tall is
-   not a case worth a second threshold. */
-@media (max-height: 537px) {
-  .rail__sticky > .rail__related {
-    display: none;
   }
 }
 

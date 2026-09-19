@@ -37,31 +37,47 @@ import { chromium } from '@playwright/test'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 import { ArticleRail } from '@/app/(frontend)/components/article-rail'
-import type { PostCard } from '@/lib/content/queries'
+import type { MediaImage } from '@/lib/content/media'
 
-/** Titles long enough to reach the two-line clamp, which is the budgeted case. */
-const RELATED: PostCard[] = [
-  'Why Burnt Sienna Behaves Differently in Oil Than in Watercolour',
-  'Why Titanium White Behaves Differently Than Lead White',
-  'The Quiet Argument for Leaving a Great Deal of Space Empty in a Composition',
-].map((title, index) => ({
-  id: String(index + 1),
-  slug: `measured-post-${index + 1}`,
-  title,
-  excerpt: '',
-  readingTime: 14 - index,
-  tags: [{ name: 'materials-science', slug: 'materials-science' }],
-})) as unknown as PostCard[]
+/**
+ * A picture for the signup card.
+ *
+ * A data URI rather than a path, for two independent reasons. The measurement
+ * does not care — the figure's height comes from its `aspect-ratio` in the
+ * stylesheet and the `<img>` inside it is absolutely positioned, so a source
+ * that never resolves measures exactly like one that does — but `--shot`
+ * writes the screenshots in `docs/assets/post-layout`, and a broken image icon
+ * in those is worse than useless. And it keeps the harness self-contained:
+ * no media server, no file beside the script to go missing.
+ *
+ * A 90x60 gradient, scaled up by `object-fit: cover`. It stands for a
+ * photograph without pretending to be one, which is what these shots are for.
+ */
+const NEWSLETTER_IMAGE = {
+  url: 'data:image/jpeg;base64,/9j/2wBDAAoHBwgHBgoICAgLCgoLDhgQDg0NDh0VFhEYIx8lJCIfIiEmKzcvJik0KSEiMEExNDk7Pj4+JS5ESUM8SDc9Pjv/2wBDAQoLCw4NDhwQEBw7KCIoOzs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozv/wAARCAA8AFoDASIAAhEBAxEB/8QAGAABAQEBAQAAAAAAAAAAAAAAAgMEAQb/xAAbEAEBAQEBAQEBAAAAAAAAAAACAAEDERMSYf/EABkBAAMBAQEAAAAAAAAAAAAAAAACAwEEBf/EABgRAQEBAQEAAAAAAAAAAAAAAAEAAhEx/9oADAMBAAIRAxEAPwDyuGeGWGeG5lvfjhqYZYZ4aa2xwzwywzJkWLmGeGWGeGmtscNTDLDMmRYjhn+ag5+1flLHbzmGeGWGeG6lsjhqYbpNTDIsRwzwyw1MNNbY4Z4ZE1Rz9k7ECPa45VByrjlaErqmOVb5fysOVX5TBSdXj8M8MsM8My144amGWGZMixHDUI9mOftoHKX2xaY5VxyqDlaBymCm6pjlaByqDlXHKcKTqA5VflWHKr8pwpOrwWGeG7mVBmbc63fcI9rjlIHLQDkBKsBytA5SBy0A5UCk6iOVoHKQOVwcnCk6iOVoHKQOWgHJwouojlV+VQHK35ycKbq//9k=',
+  alt: '',
+  width: 90,
+  height: 60,
+  caption: null,
+  credit: null,
+  creditURL: null,
+  cardUrl: null,
+  ogUrl: null,
+} satisfies MediaImage
 
 const HEIGHTS = [
-  1080, 937, 900, 860, 820, 819, 800, 770, 769, 740, 700, 683, 682, 640, 600,
-  560, 538, 537,
+  1200, 1080, 937, 900, 860, 800, 758, 757, 700, 659, 658, 600, 560, 559, 520,
+  508, 507,
 ]
 
 function page(): string {
   const css = readFileSync(resolve(process.cwd(), 'app/globals.css'), 'utf8')
   const rail = renderToStaticMarkup(
-    ArticleRail({ headings: [], related: RELATED, restricted: false }),
+    ArticleRail({
+      headings: [],
+      newsletterImage: NEWSLETTER_IMAGE,
+      restricted: false,
+    }),
   )
 
   return `<!doctype html>
@@ -101,7 +117,7 @@ async function main() {
   const html = page()
 
   console.log(
-    ['viewport', 'cap', 'group', 'list', 'whole', 'card', 'listed'].join('\t'),
+    ['viewport', 'cap', 'group', 'card', 'figure', 'copy', 'fits'].join('\t'),
   )
 
   for (const height of heights.length ? heights : HEIGHTS) {
@@ -116,28 +132,26 @@ async function main() {
     // and the evaluate then fails with a ReferenceError inside the browser.
     const measured = await context.evaluate(() => {
       const sticky = document.querySelector('.rail__sticky')!
-      const related = document.querySelector('.rail__related')
-      const list = document.querySelector('.rail__related .rail__list')
-      const port = list?.getBoundingClientRect()
-      const whole = port
-        ? [...document.querySelectorAll('.rail__list > li')].filter(
-            (item) =>
-              item.getBoundingClientRect().top >= port.top - 0.5 &&
-              item.getBoundingClientRect().bottom <= port.bottom + 0.5,
-          ).length
-        : 0
+      const figure = document.querySelector('.rail__signup-figure')
+      const copy = document.querySelector('.rail__copy')
+      const cap = parseFloat(getComputedStyle(sticky).maxHeight)
 
       return {
-        cap: parseFloat(getComputedStyle(sticky).maxHeight),
+        cap,
         group: sticky.scrollHeight,
-        list: list ? Math.round(list.scrollHeight * 10) / 10 : 0,
-        whole,
         card:
           Math.round(
             (document.querySelector('.rail__signup')?.getBoundingClientRect()
               .height ?? 0) * 10,
           ) / 10,
-        listed: related ? getComputedStyle(related).display !== 'none' : false,
+        figure:
+          figure && getComputedStyle(figure).display !== 'none'
+            ? Math.round(figure.getBoundingClientRect().height * 10) / 10
+            : 0,
+        copy: copy ? getComputedStyle(copy).display !== 'none' : false,
+        // The whole point of the ladder: a group taller than its cap scrolls,
+        // and the control is what goes below the fold when it does.
+        fits: sticky.scrollHeight <= cap + 0.5,
       }
     })
 
@@ -146,10 +160,10 @@ async function main() {
         height,
         measured.cap,
         measured.group,
-        measured.list,
-        measured.listed ? measured.whole : '—',
         measured.card,
-        measured.listed,
+        measured.figure || '—',
+        measured.copy,
+        measured.fits,
       ].join('\t'),
     )
 

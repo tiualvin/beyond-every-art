@@ -472,7 +472,7 @@ that slot's request is deferred to idle.
 
 | ID                 | Track / template     | Position                                          | Desktop | Mobile  | Reserved    |
 | ------------------ | -------------------- | ------------------------------------------------- | ------- | ------- | ----------- |
-| `rail-1` **built** | Rail, `/[slug]`      | Above the related pieces, inside the sticky group | 300×250 | —       | 250px       |
+| `rail-1` **built** | Rail, `/[slug]`      | Above the newsletter card, inside the sticky pair | 300×250 | —       | 250px       |
 | `article-inline-1` | Text, `/[slug]`      | After the 5th body block                          | 336×280 | 300×250 | 280 / 250px |
 | `article-end`      | Block, `/[slug]`     | Below the author card, above Read Next            | 970×250 | 300×250 | 250px       |
 | `archive-inline`   | journal, tag, author | After every 6th entry row                         | 970×250 | 300×250 | 250px       |
@@ -482,21 +482,25 @@ Five identified placements, of which **four should be live at launch**: all but
 `home-mid`. `rail-1` is the one that is, and the reservation held: turning it on
 was a fill rather than a re-layout.
 
-What it was _not_ was free of consequences for the rail around it. 265.7px of a
-712px sticky group is the unit and its cap, and the group is capped at the
-viewport less 100 — so on a 1440×900 laptop the related list absorbed the
-shortfall and "More on this" showed one piece and part of a second where three
-were meant to be. That is fixed in the rail rather than in the unit, by
-clamping a rail title to two lines and by having the newsletter card shed its
-copy and then its frame before the list gives anything, and it is measured
-rather than reasoned about: `pnpm measure:rail`, and the table in
+What it was _not_ was free of consequences for the rail around it, and the
+outcome is worth recording because it cost an editorial module. 279.3px of the
+sticky group is the unit, its cap and its gap, the group is capped at the
+viewport less 100, and on a 1440×900 laptop that left "More on this" showing
+one piece and part of a second where three were meant to be. A ladder fixed it
+down to 683px of viewport; then the module was removed outright, because every
+piece it listed already closes the article in "Read next" on every device
+while the rail reached desktop only. The rail is now the unit and a newsletter
+card with a picture, and the card is what gives on a short window —
+`pnpm measure:rail`, and the table in
 [`POST_PAGE_LAYOUT.md`](POST_PAGE_LAYOUT.md).
 
-The general lesson is worth keeping for the four units still to come. A unit's
-reserved height is not only a promise about layout shift; it is a claim on
-whatever module is elastic next to it, and the module that gives has to be
-chosen deliberately or the unit quietly eats the editorial content it was
-placed beside.
+**The general lesson is worth keeping for the four units still to come.** A
+unit's reserved height is not only a promise about layout shift; it is a claim
+on whatever is elastic next to it. Decide what gives before placing the unit,
+or the unit quietly eats the editorial content it was placed beside — which is
+exactly what happened here, and it took two passes to notice that the right
+answer was not a better ladder but a module that should not have been
+competing with an ad for the same 250px.
 
 **The rail carries one unit, not three.** An earlier version of this table had a
 ladder of three, spaced a viewport apart down a rail that scrolled with the
