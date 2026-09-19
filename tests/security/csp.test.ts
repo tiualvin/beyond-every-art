@@ -143,6 +143,46 @@ describe('buildCspPolicy', () => {
     )
   })
 
+  it('admits the ad origins with nothing configured at all', () => {
+    // Same reasoning as the analytics origins, and the same trap: the policy is
+    // built during `pnpm build`, where no NEXT_PUBLIC_* value exists, while the
+    // tag is rendered per request from the live one.
+    const policy = buildCspPolicy({ env: {} })
+
+    expect(directive(policy, 'script-src')).toContain(
+      'https://pagead2.googlesyndication.com',
+    )
+    expect(directive(policy, 'frame-src')).toContain(
+      'https://googleads.g.doubleclick.net',
+    )
+    expect(directive(policy, 'connect-src')).toContain(
+      'https://ep1.adtrafficquality.google',
+    )
+    expect(directive(policy, 'img-src')).toContain(
+      'https://pagead2.googlesyndication.com',
+    )
+  })
+
+  it('does not vary on the AdSense publisher id', () => {
+    // The guard on the bug rather than its symptom, exactly as for the
+    // analytics ids. `NEXT_PUBLIC_ADSENSE_CLIENT` is not a Docker build
+    // argument either, so any future reading of it here would be read at the
+    // one moment it is guaranteed to be empty.
+    const atBuildTime = buildCspPolicy({ env: {} })
+
+    expect(
+      buildCspPolicy({
+        env: { NEXT_PUBLIC_ADSENSE_CLIENT: 'ca-pub-1234567890123456' },
+      }),
+    ).toBe(atBuildTime)
+    expect(buildCspPolicy({ env: { NEXT_PUBLIC_ADSENSE_CLIENT: 'off' } })).toBe(
+      atBuildTime,
+    )
+    expect(buildCspPolicy({ env: { NEXT_PUBLIC_NOINDEX: '1' } })).toBe(
+      atBuildTime,
+    )
+  })
+
   it('admits operator-supplied origins for what a container fires', () => {
     // A container's tags load from origins chosen in a web interface long
     // after this policy was written, so the policy has to be extensible or
@@ -193,11 +233,15 @@ describe('buildCspPolicy', () => {
   })
 
   it('carries configured embed origins into frame-src', () => {
+    // Compared against the unset baseline rather than a hardcoded directive,
+    // so this keeps testing what it is named for — that the operator's origin
+    // is carried — when the built-in list either side of it changes.
+    const baseline = directive(buildCspPolicy({ env: {} }), 'frame-src')
     const policy = buildCspPolicy({
       env: { CSP_FRAME_SRC: 'https://www.youtube-nocookie.com' },
     })
     expect(directive(policy, 'frame-src')).toBe(
-      "frame-src 'self' https://www.youtube-nocookie.com",
+      `${baseline} https://www.youtube-nocookie.com`,
     )
   })
 

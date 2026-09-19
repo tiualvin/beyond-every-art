@@ -2,8 +2,13 @@
 
 An evaluation of putting ad units on the site: what is in the way, what the
 architecture should be so that AdSense is not a one-way door, where the units
-go, and in what order the work should happen. None of it is built, and §1 is a
-cutover item rather than a change already made.
+go, and in what order the work should happen.
+
+Two pieces of it are now built: `/ads.txt` (§1) and the AdSense loader itself,
+which `app/(frontend)/layout.tsx` renders whenever the deployment is indexable.
+Everything else below — consent, the slot layer, the placements — is still a
+plan. The loader alone earns nothing: it is what makes an approved account able
+to fill a unit, and there are no units yet.
 
 Related: [`CONTENT_SECURITY_POLICY.md`](CONTENT_SECURITY_POLICY.md),
 [`DEPLOYMENT_STATUS.md`](DEPLOYMENT_STATUS.md),
@@ -167,12 +172,28 @@ reason nonce-based policies and ad stacks are hard to run together. In practice
 publishers who run ads keep `'unsafe-inline'`, or maintain a policy that
 periodically breaks a creative.
 
-The good news is that the existing code already has the right shape for this.
-`ANALYTICS_SCRIPT_ORIGINS`, `ANALYTICS_CONNECT_ORIGINS` and
-`ANALYTICS_IMG_ORIGINS` are gated on `NEXT_PUBLIC_GA_ID` being set — origins
-appear in the policy only when the thing that needs them is switched on. Ad
-origins should follow that pattern exactly, gated on the ad provider being
-configured, so a deployment with ads off has no ad origins in its policy.
+**Corrected on 19 Sep.** This section used to end by recommending that ad
+origins be gated on the ad provider being configured, mirroring what
+`ANALYTICS_SCRIPT_ORIGINS` and friends then did. Do not do that. Those origins
+are no longer gated either, because the gate was a live bug: the policy is built
+by `next.config.ts` during `pnpm build`, where no `NEXT_PUBLIC_*` value exists,
+while the tag is rendered per request from the live value. Production reported
+`script-src-elem` violations for `gtm.js` on every page within minutes of the
+cutover, and `CSP_MODE=enforce` would have ended analytics collection silently.
+
+So `AD_SCRIPT_ORIGINS`, `AD_FRAME_ORIGINS`, `AD_IMG_ORIGINS` and
+`AD_CONNECT_ORIGINS` in `lib/security/csp.ts` are permitted unconditionally, and
+a test pins that the policy does not vary on `NEXT_PUBLIC_ADSENSE_CLIENT`. The
+principle the gate violated is the one this file already argued: an origin the
+page does not use costs nothing, while one withheld that it does use breaks the
+tag. It costs nothing in practice for a second reason too — `'unsafe-inline'` is
+still in `script-src`, so a host allowlist entry adds nothing to the reach of
+anyone who can already inject markup.
+
+The list that ships is a starting set, not a complete one. Google does not
+publish these origins as a stable contract and creatives reach further than the
+loader does, which is exactly why §7 turns ads on while the policy is still
+report-only: the reports name the origin of every request the list gets wrong.
 
 The report-only phase is also, conveniently, the right place to do this. Turn
 the ad tag on with the policy still in report-only and the violation reports
@@ -340,9 +361,13 @@ AdSense in the meantime.
 4. **Let traffic establish, then apply to AdSense.** Applying against a site
    with no organic traffic history and a fresh domain configuration invites a
    decline that is slow to appeal.
-5. **Build `lib/ads/`, off by default.** Ship it configured off, exactly as
-   analytics is when `NEXT_PUBLIC_GA_ID` is unset. Merged and dormant is a
-   safer state than a branch that rots.
+5. **Build `lib/ads/`.** Started: `lib/ads/adsense.ts` resolves the publisher
+   and `app/(frontend)/components/adsense.tsx` renders Google's loader, gated
+   on the deployment being indexable so staging never serves ad code. It ships
+   _on_ rather than off — the publisher defaults to the id committed in
+   `ads.txt`, since a loader nobody switched on is indistinguishable from the
+   problem it was meant to fix — with `NEXT_PUBLIC_ADSENSE_CLIENT=off` as the
+   switch for pulling it without a deploy. The slot layer below is still to do.
 6. **Turn it on with the CSP still in report-only**, and read the violation
    reports to build the real origin list before enforcement.
 7. **Two or three units, measured.** Watch CLS and LCP against the current

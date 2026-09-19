@@ -88,6 +88,53 @@ const ANALYTICS_IMG_ORIGINS = [
   'https://www.googletagmanager.com',
 ]
 
+/**
+ * Google AdSense origins, permitted unconditionally for the same reason the
+ * analytics origins above are.
+ *
+ * `docs/ADVERTISING.md` §3 asks for these to be gated on the ad provider being
+ * configured, mirroring what the analytics origins used to do. That advice is
+ * stale and must not be followed: it is the shape that broke Tag Manager on
+ * cutover day. This policy is built by `next.config.ts` during `pnpm build`,
+ * where no `NEXT_PUBLIC_*` value exists, while `resolveAdsenseClient()` runs
+ * per request and reads the live one — so a gate here is read at the one moment
+ * it is guaranteed to be wrong, and `CSP_MODE=enforce` would then block the tag
+ * silently. See the commit that removed the analytics gate.
+ *
+ * Two warnings about the list itself. It is a *starting* set, not a complete
+ * one — Google does not publish the origins an ad stack touches as a stable
+ * contract, and creatives reach further than the loader does. And it is why the
+ * rollout order in §7 puts "turn ads on" before "enforce": report-only names the
+ * exact origin of every request this list gets wrong, which is a far cheaper way
+ * to find them than a blank ad slot under enforcement. Fill the gaps from the
+ * reports and from `CSP_SCRIPT_SRC` and friends, not from guesswork.
+ */
+const AD_SCRIPT_ORIGINS = [
+  'https://pagead2.googlesyndication.com',
+  'https://tpc.googlesyndication.com',
+  'https://partner.googleadservices.com',
+  'https://www.googletagservices.com',
+  'https://adservice.google.com',
+]
+const AD_FRAME_ORIGINS = [
+  'https://googleads.g.doubleclick.net',
+  'https://tpc.googlesyndication.com',
+  'https://www.google.com',
+]
+const AD_IMG_ORIGINS = [
+  'https://pagead2.googlesyndication.com',
+  'https://tpc.googlesyndication.com',
+  'https://googleads.g.doubleclick.net',
+  'https://www.gstatic.com',
+]
+const AD_CONNECT_ORIGINS = [
+  'https://pagead2.googlesyndication.com',
+  'https://googleads.g.doubleclick.net',
+  // Google's ad traffic quality endpoints, which the tag calls on its own.
+  'https://ep1.adtrafficquality.google',
+  'https://ep2.adtrafficquality.google',
+]
+
 export function cspMode(env: Env = process.env): CspMode {
   const value = (env.CSP_MODE ?? '').trim().toLowerCase()
   if (value === 'enforce') return 'enforce'
@@ -203,6 +250,7 @@ export function buildCspPolicy(options: CspOptions = {}): string {
     "'unsafe-inline'",
     ...(dev ? ["'unsafe-eval'"] : []),
     ...ANALYTICS_SCRIPT_ORIGINS,
+    ...AD_SCRIPT_ORIGINS,
     ...extraScriptOrigins(env),
   ]
 
@@ -221,6 +269,7 @@ export function buildCspPolicy(options: CspOptions = {}): string {
     'blob:',
     ...(media ? [media] : []),
     ...ANALYTICS_IMG_ORIGINS,
+    ...AD_IMG_ORIGINS,
     ...extraImgOrigins(env),
   ]
 
@@ -228,6 +277,7 @@ export function buildCspPolicy(options: CspOptions = {}): string {
     "'self'",
     ...(media ? [media] : []),
     ...ANALYTICS_CONNECT_ORIGINS,
+    ...AD_CONNECT_ORIGINS,
     ...extraConnectOrigins(env),
     // The dev server's HMR socket.
     ...(dev ? ['ws:'] : []),
@@ -253,7 +303,7 @@ export function buildCspPolicy(options: CspOptions = {}): string {
     // Live Preview renders the public site inside an admin iframe on the same
     // origin, so this must be 'self' rather than 'none'.
     ['frame-ancestors', ["'self'"]],
-    ['frame-src', ["'self'", ...frames]],
+    ['frame-src', ["'self'", ...AD_FRAME_ORIGINS, ...frames]],
     ['worker-src', ["'self'", 'blob:']],
     ['manifest-src', ["'self'"]],
     // Only outside development, where the site is served over plain http.
