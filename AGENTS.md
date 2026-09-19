@@ -43,6 +43,14 @@ campaigns around it. No transactional provider is configured, deliberately, and
 that document says what makes the decision expire — read it before adding any
 send path, and do not reach for the ESP to send a token.
 
+[`docs/STOCK_IMAGERY.md`](docs/STOCK_IMAGERY.md) evaluates the Unsplash API as
+a replacement for the Ghost editor's image picker, which every feature image on
+this site came through and which the cutover removed. Nothing is built, and two
+of its findings are decisions rather than code: whether to store bytes or
+hotlink, and where a stock photograph is allowed on a publication that writes
+about specific works. Read it before adding any image source, credit field, or
+agent-facing image search.
+
 [`docs/AUTONOMOUS_WORKSTREAMS.md`](docs/AUTONOMOUS_WORKSTREAMS.md) defines the
 sequencing, shared invariants, ownership boundaries, and verification gates for
 the repository's launch-readiness automation workstreams.
