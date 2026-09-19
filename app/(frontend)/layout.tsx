@@ -6,8 +6,10 @@ import { getPreviewMode } from '@/lib/preview/mode'
 import { isNoindex } from '@/lib/seo/indexing'
 import { getSiteUrl } from '@/lib/seo/site'
 
+import { resolveAdsenseClient } from '@/lib/ads/adsense'
 import { resolveAnalyticsTag } from '@/lib/analytics/tag'
 
+import { AdSense } from './components/adsense'
 import { Analytics } from './components/analytics'
 import { LivePreviewListener } from './components/live-preview-listener'
 import { NewsletterBand } from './components/newsletter-band'
@@ -60,6 +62,7 @@ export default async function FrontendLayout({
   ])
 
   const analyticsTag = resolveAnalyticsTag()
+  const adsenseClient = resolveAdsenseClient()
 
   return (
     <html lang="en" className={`${playfair.variable} ${inter.variable}`}>
@@ -76,6 +79,7 @@ export default async function FrontendLayout({
           links={footer.links}
           copyright={footer.copyright}
         />
+        {adsenseClient && <AdSense client={adsenseClient} />}
         {analyticsTag && <Analytics tag={analyticsTag} />}
         {preview.live && <LivePreviewListener serverURL={getSiteUrl()} />}
       </body>
