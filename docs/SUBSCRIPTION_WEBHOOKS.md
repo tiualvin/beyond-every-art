@@ -154,6 +154,26 @@ should follow the same approach; revisit only if we start writing to Stripe
 
 ## Stripe (website)
 
+**Configure the endpoint URL with a trailing slash**, and treat this as the
+first thing to get right rather than a detail:
+
+```
+POST /webhooks/stripe   -> 308, location: /webhooks/stripe/
+POST /webhooks/stripe/  -> the route
+```
+
+`next.config.ts` sets `trailingSlash: true`, so the unslashed form redirects.
+Stripe requires a 2xx and does **not** follow redirects on a delivery, so an
+endpoint registered without the slash fails every event, retries for about
+three days, and is then disabled — while nothing reaches the route, so there is
+no log line, no `billing-events` row, and nothing on this side to notice it by.
+The first symptom is a subscription state that quietly stopped tracking
+reality, which is the exact failure this whole document exists to prevent.
+
+Measured against production on 19 Sep. The runbook said `/webhooks/stripe`
+until the same day; if an endpoint was created from that instruction, fix the
+URL rather than assuming it has been working.
+
 **Verify the signature against the raw request body.** Stripe signs each request
 with the endpoint's secret; the check fails if the body has already been parsed
 into JSON, so the route needs the raw bytes. The signature includes a timestamp
@@ -206,6 +226,13 @@ handling too. Select the events from the table above, not from Ghost's endpoint.
 > (`https://www.beyondeveryart.com/members/webhooks/stripe/`, pinned to API
 > version `2020-08-27`), and it must be replaced by ours — see the event-name
 > trap below.
+>
+> **Since the cutover on 19 Sep that URL points here, not at Ghost.** The
+> hostname moved with DNS, this application serves no `/members/*` route, and
+> the path now answers 404 — confirmed the same day. Harmless only for as long
+> as the account stays empty: nothing is firing, so nothing is failing. It
+> stops being harmless at the first subscription, so delete it as part of the
+> handover rather than leaving it pointed at a site that cannot serve it.
 
 Ghost owns this integration today. Before Ghost is cancelled:
 

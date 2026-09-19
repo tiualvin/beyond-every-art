@@ -213,8 +213,15 @@ explained without a manual Stripe audit.
       without the second, events are stored but their current state is read only
       by the reconciliation sweep.
 - [ ] Webhook endpoint created in **our** Stripe account, pointing at
-      `https://<domain>/webhooks/stripe`, subscribed to the events listed in
+      `https://<domain>/webhooks/stripe/` — **with the trailing slash** — and
+      subscribed to the events listed in
       [`SUBSCRIPTION_WEBHOOKS.md`](SUBSCRIPTION_WEBHOOKS.md#stripe-website).
+      Without it the endpoint answers 308, and that is a silent billing
+      failure: see the note in that document.
+- [ ] Ghost's own endpoint deleted from the Stripe account — **last**, once
+      ours is verified. Since the flip its URL
+      (`https://www.beyondeveryart.com/members/webhooks/stripe/`) resolves to
+      this site rather than to Ghost, and answers 404. Confirmed 19 Sep.
 - [ ] Endpoint subscribed to `invoice.paid` — **not** `invoice.payment_succeeded`,
       which is what Ghost's endpoint uses. They are different event types and the
       wrong one fails silently: renewals get stored and marked `ignored`
