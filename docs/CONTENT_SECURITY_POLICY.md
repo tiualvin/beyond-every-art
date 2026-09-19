@@ -266,10 +266,59 @@ existing configuration — the policy derives the media origin the same way
 origins only when a tag is actually configured.
 
 The analytics allowance keys on **configuration**, not on the `noindex` gate
-that decides whether a tag renders. The policy is built in middleware and must
-permit whatever the page may load: permitting an origin the page then does not
-use costs nothing, while withholding one it does use breaks the tag under
-enforcement.
+that decides whether a tag renders. The policy must permit whatever the page may
+load: permitting an origin the page then does not use costs nothing, while
+withholding one it does use breaks the tag under enforcement.
+
+### That goal is not currently met — found live on 19 Sep 2026
+
+Within minutes of the cutover the report endpoint logged, on the homepage and on
+a post:
+
+```json
+{
+  "event": "csp_violation",
+  "directive": "script-src-elem",
+  "blockedURI": "https://www.googletagmanager.com/gtm.js",
+  "disposition": "report"
+}
+```
+
+`disposition: report` means nothing was blocked and analytics works. The policy
+being wrong is the finding.
+
+**The tag is resolved at runtime and the policy is built at build time, so they
+disagree.** `buildSecurityHeaders()` is called from `next.config.ts`'s
+`async headers()`, which Next evaluates during `next build` and bakes into the
+routes manifest. `analyticsConfigured()` reads `NEXT_PUBLIC_GTM_ID`, and that is
+**not** a Docker build argument — only `NEXT_PUBLIC_CHECKOUT_URL_MONTHLY` and
+`NEXT_PUBLIC_CHECKOUT_URL_YEARLY` are. So at image build time it is empty,
+`analytics` is false, and `https://www.googletagmanager.com` never reaches
+`script-src`. Meanwhile `resolveAnalyticsTag()` runs per request in a server
+component, reads the live value, and renders the tag.
+
+**Setting `CSP_MODE=enforce` today would block Tag Manager and silently end
+analytics collection.** Treat that as a blocker on phase 2, not a detail.
+
+The same boundary defeats the escape hatch below: `CSP_SCRIPT_SRC`,
+`CSP_CONNECT_SRC`, `CSP_IMG_SRC` and `CSP_FRAME_SRC` are read in the same
+build-time call, so they cannot be used to admit a container's third-party tags
+on a running host either. A value set in `.env` after the image was built has no
+effect on the policy, which is the opposite of what an incident escape hatch
+needs to be.
+
+Two ways out, and the choice is a real one rather than an oversight to correct
+in passing:
+
+1. **Make the variables build arguments**, as the checkout URLs already are.
+   Smallest change, keeps the static header and its whole-route coverage, but
+   every analytics or CSP change then needs a rebuild rather than a restart —
+   and `ANALYTICS.md` currently promises the opposite for the tag ids.
+2. **Move the policy to `middleware.ts`**, where it is computed per request. Wins
+   the runtime behaviour and the per-request nonce that phase 3 needs, at the
+   cost documented under "Why the policy is in `next.config.ts`": the middleware
+   matcher excludes `/admin`, `/api`, `/webhooks` and anything containing a dot,
+   so admin coverage has to be solved rather than assumed.
 
 ### The three script/connect/img variables exist for Tag Manager
 
