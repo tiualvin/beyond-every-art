@@ -1,6 +1,7 @@
 import type { CollectionConfig } from 'payload'
 
 import { editorsAndAdmins, publicRead } from '../access/roles'
+import { toCreditURL } from '../lib/content/attribution'
 import { ghostUrlField, migrationStatusField } from '../fields/ghost'
 import { CONTENT_TAGS } from '../lib/cache/content'
 import { purgeOnChange, purgeOnDelete } from '../lib/cache/purge'
@@ -86,6 +87,28 @@ export const Media: CollectionConfig = {
     { name: 'alt', type: 'text', required: true },
     { name: 'caption', type: 'textarea' },
     { name: 'credit', type: 'text' },
+    {
+      name: 'creditURL',
+      label: 'Credit URL',
+      type: 'text',
+      admin: {
+        description:
+          'Where the credit points — the photographer’s profile, or the ' +
+          'page the image came from. The credit line renders as a link when ' +
+          'this is set and as plain text when it is not. Store the address ' +
+          'itself: referral parameters are added when the link is built, so ' +
+          'they do not have to be right in every row.',
+      },
+      // Checked here and again in `lib/content/attribution.ts`, which is what
+      // the page actually renders through. This stops a bad value being
+      // stored; that stops one already stored from reaching an `href`.
+      validate: (value: string | null | undefined) => {
+        const raw = (value ?? '').trim()
+        if (!raw) return true
+        if (toCreditURL(raw)) return true
+        return 'Credit links must be a full https:// address.'
+      },
+    },
     {
       name: 'aiGenerated',
       type: 'checkbox',

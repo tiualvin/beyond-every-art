@@ -1008,8 +1008,9 @@ errors`, and `/swapfile` is `-rw-------`. Its one warning — "non-bind mount
   `SITE_ADDRESS`/`NEXT_PUBLIC_SITE_URL`/`NEXT_PUBLIC_SERVER_URL`/
   `PAYLOAD_PUBLIC_SERVER_URL` set to the staging domain, `CMS_ADDRESS` set,
   and `NEXT_PUBLIC_NOINDEX=1` / `STAGING_BASIC_AUTH` set so the rehearsal
-  site is neither indexed nor public. `MCP_ENABLED` and an MCP API key are
-  still not set up — see item 0.5 below, still open.
+  site is neither indexed nor public. `MCP_ENABLED` and an MCP API key were
+  not set up at that point; `MCP_ENABLED=1` has since been set — see item 0.5
+  below for what is left.
 - **DNS + TLS, for staging.** `staging.beyondeveryart.com` and
   `cms.beyondeveryart.com` both point at the VPS (Cloudflare, DNS-only —
   proxying either would break Let's Encrypt's HTTP-01 challenge) and Caddy
@@ -1142,11 +1143,31 @@ And `docker compose run` never rebuilds an image, so it is always one deploy
 behind until the deploy rebuilds it. A script added in a merge is not available
 until that merge has deployed; `docker compose build migrate` forces it sooner.
 
-0.5. **MCP from mobile — subdomain is live, endpoint is not enabled yet
-(operator action).** `cms.beyondeveryart.com` now has a real certificate (see
-above) and Payload Admin loads there. Still needed: set `MCP_ENABLED=1`,
-create an editor-bound key in Payload Admin under MCP → API Keys, and add it
-to the Claude connector. See [`MCP_SERVER.md`](MCP_SERVER.md).
+0.5. **MCP — the endpoint is live; the key and OAuth are not (operator
+action).** This item said "not enabled yet" and was stale by the time anyone
+read it. `MCP_ENABLED=1` is set on the VPS: `GET https://cms.beyondeveryart.com/api/mcp/`
+answers `405`, which is the refusal `overrideAuth` throws for a `GET` and
+therefore says the endpoint is mounted, while a sibling path that does not
+exist answers `404`. Checked from outside the VPS, so it needs no SSH session
+to re-check.
+
+Two things are still operator work, and neither can be done from a repository:
+
+- **A key.** Payload Admin → **MCP → API Keys**, bound to an **editor** user
+  in the **User** field, capabilities ticked, copied once. Then set it as
+  `PAYLOAD_MCP_KEY` wherever the client runs — [`.mcp.json`](../.mcp.json) is
+  committed and reads it from the environment, so for a Claude Code session
+  in the browser that is an environment variable on the web environment, not
+  a shell export.
+- **OAuth, if a phone or the claude.ai connector dialog is wanted.**
+  `MCP_OAUTH_ENABLED` is unset — `/.well-known/oauth-protected-resource`
+  answers `404`, which is what that route returns when the flag is missing —
+  so the endpoint takes bearer API keys only today. Claude Code and Codex
+  need nothing more; the connector dialogs cannot send a fixed header and
+  need the flag. See [`MCP_OAUTH.md`](MCP_OAUTH.md) before setting it: it
+  mounts publicly reachable, unauthenticated registration.
+
+See [`MCP_SERVER.md`](MCP_SERVER.md).
 
 1. **Members CSV.** Not included in the site archive already checked. Export
    separately from Ghost Admin (Members → Settings → Export all members)

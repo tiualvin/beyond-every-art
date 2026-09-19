@@ -1,6 +1,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 
+import { attributionHref } from '@/lib/content/attribution'
 import { thumbnailSrc, type MediaImage } from '@/lib/content/media'
 import type { AuthorSummary, PostCard, PostDetail } from '@/lib/content/queries'
 import { extractHeadings } from '@/lib/content/toc'
@@ -192,6 +193,9 @@ function AuthorCard({ author }: { author: AuthorSummary }) {
  */
 export function FeaturedFigure({ image }: { image: MediaImage }) {
   const meta = [image.caption, image.credit].filter(Boolean)
+  // Null whenever the record has no link, or has one this site will not put in
+  // an href. Either way the credit still renders, as text.
+  const creditHref = attributionHref(image.creditURL)
 
   return (
     <figure className="article__figure">
@@ -219,7 +223,19 @@ export function FeaturedFigure({ image }: { image: MediaImage }) {
         <figcaption>
           {image.caption}
           {image.credit && (
-            <span className="article__figure-credit">{image.credit}</span>
+            <span className="article__figure-credit">
+              {creditHref ? (
+                // `noreferrer` is why the referral parameters exist rather
+                // than a `Referer` header doing the work: the source is named
+                // in the URL, so stripping the header costs the photographer
+                // nothing. See `lib/content/attribution.ts`.
+                <a href={creditHref} target="_blank" rel="noopener noreferrer">
+                  {image.credit}
+                </a>
+              ) : (
+                image.credit
+              )}
+            </span>
           )}
         </figcaption>
       )}
