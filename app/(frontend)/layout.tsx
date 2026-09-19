@@ -7,9 +7,11 @@ import { isNoindex } from '@/lib/seo/indexing'
 import { getSiteUrl } from '@/lib/seo/site'
 
 import { resolveAdsenseClient } from '@/lib/ads/adsense'
+import { consentBootstrap } from '@/lib/analytics/consent'
 import { resolveAnalyticsTag } from '@/lib/analytics/tag'
 
 import { AdSense } from './components/adsense'
+import { ConsentMode } from './components/consent-mode'
 import { Analytics } from './components/analytics'
 import { LivePreviewListener } from './components/live-preview-listener'
 import { NewsletterBand } from './components/newsletter-band'
@@ -63,9 +65,19 @@ export default async function FrontendLayout({
 
   const analyticsTag = resolveAnalyticsTag()
   const adsenseClient = resolveAdsenseClient()
+  // Only where a Google tag will actually load. A consent default with nothing
+  // to read it is a script tag for its own sake.
+  const googleTags = Boolean(analyticsTag || adsenseClient)
 
   return (
     <html lang="en" className={`${playfair.variable} ${inter.variable}`}>
+      {/* An explicit `<head>` for one reason: it is the only placement that
+          actually puts the consent default in the head. React still hoists the
+          two async loaders above it, which is in time — `consent-mode.tsx` has
+          the measurements. */}
+      <head>
+        {googleTags && <ConsentMode bootstrap={consentBootstrap()} />}
+      </head>
       <body>
         <SiteHeader
           siteTitle={settings.title}

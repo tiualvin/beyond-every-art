@@ -125,9 +125,11 @@ describe('documentation file references', () => {
   /**
    * Paths the docs name that are not files, and each one's reason.
    *
-   * Two kinds live here. A design document laying out the file it argues for is
-   * doing its job, and so is a record of a decision that was later taken
-   * differently — neither is drift. Anything not on this list is.
+   * Three kinds live here. A design document laying out the file it argues for
+   * is doing its job, and so is a record of a decision that was later taken
+   * differently. The third is a path whose *absence* is the point being made —
+   * a file the framework treats specially that this application does not have.
+   * None of those is drift. Anything not on this list is.
    *
    * Keeping the reasons here rather than suppressing the check makes the list
    * useful in its own right: it is the inventory of what the docs promise and
@@ -148,6 +150,14 @@ describe('documentation file references', () => {
     // vendor. Nothing is built; the decisions in that document's last section
     // come first.
     'lib/stock/unsplash.ts',
+    // docs/ANALYTICS.md names this precisely because it does not exist. Next
+    // reserves `next/script`'s `beforeInteractive` for the literal root
+    // `app/layout.tsx`, and this application's roots are the two route-group
+    // layouts — which is why the consent bootstrap could not be hoisted that
+    // way and is a plain inline script in an explicit `<head>` instead. If
+    // this file ever appears, that paragraph needs rereading rather than
+    // deleting.
+    'app/layout.tsx',
   ])
 
   // Backticked paths are how these docs point at code, and they are not links,

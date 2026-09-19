@@ -4,11 +4,24 @@ An evaluation of putting ad units on the site: what is in the way, what the
 architecture should be so that AdSense is not a one-way door, where the units
 go, and in what order the work should happen.
 
-Two pieces of it are now built: `/ads.txt` (§1) and the AdSense loader itself,
-which `app/(frontend)/layout.tsx` renders whenever the deployment is indexable.
-Everything else below — consent, the slot layer, the placements — is still a
-plan. The loader alone earns nothing: it is what makes an approved account able
-to fill a unit, and there are no units yet.
+Four pieces of it are now built: `/ads.txt` (§1), the AdSense loader itself
+(`app/(frontend)/layout.tsx`, whenever the deployment is indexable), the first
+two modules of the slot layer (`lib/ads/placements.ts` and
+`lib/ads/eligibility.ts`, per §5), and the first unit — `rail-1`, the 300×250
+in the post rail, rendered by `app/(frontend)/components/ad-unit.tsx`.
+
+**Consent is no longer the blocker.** Google's Privacy & messaging — the
+certified CMP §9 recommends — is configured in the AdSense console, reported by
+the repository owner on 19 Sep. It needs no code here: the AdSense tag loads the
+European regulations message itself, which is exactly why it was recommended.
+
+The other half of §2 is closed too, and that half was code.
+`lib/analytics/consent.ts` declares the Consent Mode v2 defaults before either
+Google tag acts on them: granted where no banner is shown, denied across the
+EEA, the UK and Switzerland where one is. Both tags honour it, so one banner
+now governs both — which is what §2 asked for and what §9's seam argument is
+built on. [`ANALYTICS.md`](ANALYTICS.md) has the placement, which took
+measuring.
 
 Related: [`CONTENT_SECURITY_POLICY.md`](CONTENT_SECURITY_POLICY.md),
 [`DEPLOYMENT_STATUS.md`](DEPLOYMENT_STATUS.md),
@@ -25,16 +38,19 @@ ship yet, for reasons that have nothing to do with the code:
 1. The site has not cut over. It is `noindex` and behind Basic Auth, so Google
    cannot review it, and an AdSense application reviewed in that state is an
    application that gets declined.
-2. There is no consent management platform. For EEA/UK traffic that is not a
-   nice-to-have, it is the thing Google requires before it will serve ads at
-   all.
+2. There is a consent management platform now. Google's Privacy & messaging is
+   configured in the AdSense console (19 Sep, owner-reported), which is what
+   Google requires before it will serve ads to EEA/UK traffic at all. What is
+   still missing is the application's half: GA4 runs ungated, and nothing here
+   reads a Consent Mode signal. §2.
 3. `/ads.txt` is now served by Caddy from the repository-root file (§1).
    Closed on 29 Aug, with one operator action left: delete the dead redirect
    row in Payload, which can never run and which `validate:redirects` reports.
 
-The order that follows from this is: build consent, cut over, apply, then wire
-the ad layer behind a flag. `ads.txt` is no longer part of that sequence. §7 lays it out, §8 plans
-the placements, and §9 evaluates the consent platforms.
+Only the first is still a blocker. The order that follows is: cut over, apply,
+then wire the units already built. `ads.txt` and the CMP are no longer part of
+that sequence. §7 lays it out, §8 plans the placements, and §9 evaluates the
+consent platforms and records which one was chosen.
 
 The more important point is in §6: **the ceiling on RPM is traffic, not
 architecture.** Futureproofing the code is cheap and worth doing, but it is not
@@ -125,28 +141,47 @@ build or app-level test would catch.
 Verify after cutover by fetching `https://<domain>/ads.txt` and reading the
 body, not the status code.
 
-## 2. Consent is the real blocker
+## 2. Consent was the real blocker — it is closed
 
-There is no cookie consent system in this repository. Grepping for one finds
-the OAuth consent screen and the newsletter signup's consent line, and nothing
-else.
+**Settled 19 Sep, in a console rather than in this repository.** Google's
+Privacy & messaging is configured on the AdSense account, per the owner. That
+is the certified CMP §9 recommends, it is certified by construction because
+Google both requires and supplies it, and the AdSense tag serves the European
+regulations message on its own — which is why "zero integration work" was the
+argument for it and why nothing in this repository changed when it was turned
+on.
 
-Google has required a certified consent management platform for AdSense,
-Ad Manager and AdMob traffic from the EEA, UK and Switzerland since January
-2024, and the framework version has since moved — TCF v2.3 became mandatory on
-1 March 2026. Without a CMP certified at the current version, ads to those users
-are not served, and this is enforced by Google rather than merely advised. §9
-evaluates the options, including why the open-source ones cannot be used here.
+That closes the requirement below. Google has required a certified consent
+management platform for AdSense, Ad Manager and AdMob traffic from the EEA, UK
+and Switzerland since January 2024, and the framework version has since moved —
+TCF v2.3 became mandatory on 1 March 2026. Without a CMP certified at the
+current version, ads to those users are not served, and this is enforced by
+Google rather than merely advised. §9 evaluates the options, including why the
+open-source ones cannot be used here.
 
-Two things follow that are easy to get wrong:
+**What the console did not close, and what did.** There is still no cookie
+consent _banner_ in this repository — grepping finds the OAuth consent screen
+and the newsletter signup's consent line, and nothing else. That is correct:
+the ad tag brings its own. What was missing was the other side of it.
 
-**GA4 already has this problem.** `app/(frontend)/components/analytics.tsx`
-loads the GA4 tag unconditionally whenever `NEXT_PUBLIC_GA_ID` is set and the
-deployment is indexable. There is no consent gate in front of it. That is an
-existing gap rather than something ads introduce, but ads make it sharper:
-advertising cookies are unambiguously non-essential, and a site running a
-consent banner that only governs half its tags is in a worse position than one
-running no banner at all, because it has now made a claim.
+**GA4 had this problem, and the CMP made it sharper rather than softer.**
+`app/(frontend)/components/analytics.tsx` loads the GA4 tag whenever
+`NEXT_PUBLIC_GA_ID` is set and the deployment is indexable, and for a while
+there was nothing in front of it. That was a small gap while there was no
+banner at all; the moment one went live it became a claim the analytics tag was
+not honouring, on every EEA and UK visit — and a site whose banner governs half
+its tags is in a worse position than one running none, because it has made a
+promise.
+
+**Closed the way §9's last paragraph asks**, by declaring Consent Mode v2
+defaults rather than by gating the script. That distinction is the part worth
+keeping: a Google tag with no declared default treats consent as _granted_, so
+the fix is not "do not load GA4" — it is to say what it may store before it
+asks. Denied across the EEA, the UK and Switzerland; granted elsewhere, because
+Google's CMP shows no banner there and a global denial would never be updated
+for anybody else. `lib/analytics/consent.ts`, and
+[`ANALYTICS.md`](ANALYTICS.md) for where the script has to sit and why that
+took measuring rather than reading.
 
 **Consent has to be an input to the ad layer, not a wrapper around it.** The
 tempting shape is a banner component that conditionally renders the ad script.
@@ -263,15 +298,22 @@ slot _is_, never for what fills it. `article-mid` maps to an AdSense slot ID
 today and to some other partner's unit later, and no component that renders an
 ad ever knows which. That mapping is the only thing a provider swap touches.
 
-`eligibility` earns its own module because it is where four unrelated
-conditions meet, and each of them is a bug if it is checked in only some of the
-places a unit appears:
+`eligibility` earns its own module because it is where unrelated conditions
+meet, and each of them is a bug if it is checked in only some of the places a
+unit appears:
 
 - the deployment is indexable (`isNoindex()` — no ads on staging, same reason
   analytics does not run there);
-- the reader has consented, where consent is required;
 - the post is not a restricted teaser;
 - later, the reader is not a paying member.
+
+**Consent is deliberately not on that list**, which is a correction to an
+earlier version of this section. With Google's CMP (§9) the tag enforces
+consent itself, and a reader who refuses gets limited ads rather than none — so
+withholding the `<ins>` here would not be honouring a consent decision, it
+would be throwing away the inventory Google is still willing to serve. The
+consent work that is outstanding is GA4's (§2), and it belongs in front of the
+analytics tag rather than in this predicate.
 
 The last one is why this exists now rather than later. [`ACCOUNT_MODEL.md`](ACCOUNT_MODEL.md)
 ships no reader accounts in Phase 1, so there is no member to check — but the
@@ -350,10 +392,12 @@ AdSense in the meantime.
 
 1. **Settle `/ads.txt`,** at cutover and not before — the Ghost redirect serves
    it until then. §1 has the two options and the trap in each.
-2. **Consent management.** A prerequisite for ads rather than a part of them.
-   §9 recommends Google's Privacy & messaging to start; the work in this
-   repository is reading Consent Mode v2 signals and retrofitting GA4 behind
-   them, not building a banner.
+2. **Consent management.** Done in the console on 19 Sep: Google's Privacy &
+   messaging, per §9's recommendation, serving the European regulations message
+   through the AdSense tag. The banner half needed no code and got none. The
+   remaining half is this repository's — reading Consent Mode v2 signals and
+   retrofitting GA4 behind them — and it is still outstanding, which §2 says
+   plainly rather than leaving this step looking finished.
 3. **Cut over.** [`DEPLOYMENT_STATUS.md`](DEPLOYMENT_STATUS.md)'s "Flip" —
    unset `NEXT_PUBLIC_NOINDEX` and `STAGING_BASIC_AUTH`. Nothing about
    advertising can be evaluated before this, including the AdSense
@@ -361,13 +405,19 @@ AdSense in the meantime.
 4. **Let traffic establish, then apply to AdSense.** Applying against a site
    with no organic traffic history and a fresh domain configuration invites a
    decline that is slow to appeal.
-5. **Build `lib/ads/`.** Started: `lib/ads/adsense.ts` resolves the publisher
-   and `app/(frontend)/components/adsense.tsx` renders Google's loader, gated
-   on the deployment being indexable so staging never serves ad code. It ships
-   _on_ rather than off — the publisher defaults to the id committed in
-   `ads.txt`, since a loader nobody switched on is indistinguishable from the
-   problem it was meant to fix — with `NEXT_PUBLIC_ADSENSE_CLIENT=off` as the
-   switch for pulling it without a deploy. The slot layer below is still to do.
+5. **Build `lib/ads/`.** Three of §5's four modules exist. `lib/ads/adsense.ts`
+   resolves the publisher and `app/(frontend)/components/adsense.tsx` renders
+   Google's loader, gated on the deployment being indexable so staging never
+   serves ad code. It ships _on_ rather than off — the publisher defaults to the
+   id committed in `ads.txt`, since a loader nobody switched on is
+   indistinguishable from the problem it was meant to fix — with
+   `NEXT_PUBLIC_ADSENSE_CLIENT=off` as the switch for pulling it without a
+   deploy. `lib/ads/placements.ts` holds the placement names and the sizes they
+   reserve; `lib/ads/eligibility.ts` is the one predicate, and it already
+   answers for the restricted teaser as well as the deployment. `providers` is
+   not built: there is one provider, and an interface with one implementation
+   is a guess about the second. The seam that matters — that no component knows
+   which network fills a slot — is held by the placement names on their own.
 6. **Turn it on with the CSP still in report-only**, and read the violation
    reports to build the real origin list before enforcement.
 7. **Two or three units, measured.** Watch CLS and LCP against the current
@@ -426,17 +476,35 @@ that slot's request is deferred to idle.
 
 | ID                 | Track / template     | Position                                          | Desktop | Mobile  | Reserved    |
 | ------------------ | -------------------- | ------------------------------------------------- | ------- | ------- | ----------- |
-| `rail-1`           | Rail, `/[slug]`      | Above the related pieces, inside the sticky group | 300×250 | —       | 250px       |
+| `rail-1` **built** | Rail, `/[slug]`      | Above the newsletter card, inside the sticky pair | 300×250 | —       | 250px       |
 | `article-inline-1` | Text, `/[slug]`      | After the 5th body block                          | 336×280 | 300×250 | 280 / 250px |
 | `article-end`      | Block, `/[slug]`     | Below the author card, above Read Next            | 970×250 | 300×250 | 250px       |
 | `archive-inline`   | journal, tag, author | After every 6th entry row                         | 970×250 | 300×250 | 250px       |
 | `home-mid`         | `/`                  | Between Featured and Topics                       | 970×250 | 300×250 | 250px       |
 
 Five identified placements, of which **four should be live at launch**: all but
-`home-mid`. `.rail__slot` in `app/globals.css` already reserves `rail-1`'s
-250px, so turning it on is a fill rather than a re-layout — and the reservation
-holds at every window height, because the sticky group shrinks its related list
-rather than the unit or the newsletter card (`docs/POST_PAGE_LAYOUT.md`).
+`home-mid`. `rail-1` is the one that is, and the reservation held: turning it on
+was a fill rather than a re-layout.
+
+What it was _not_ was free of consequences for the rail around it, and the
+outcome is worth recording because it cost an editorial module. 279.3px of the
+sticky group is the unit, its cap and its gap, the group is capped at the
+viewport less 100, and on a 1440×900 laptop that left "More on this" showing
+one piece and part of a second where three were meant to be. A ladder fixed it
+down to 683px of viewport; then the module was removed outright, because every
+piece it listed already closes the article in "Read next" on every device
+while the rail reached desktop only. The rail is now the unit and a newsletter
+card with a picture, and the card is what gives on a short window —
+`pnpm measure:rail`, and the table in
+[`POST_PAGE_LAYOUT.md`](POST_PAGE_LAYOUT.md).
+
+**The general lesson is worth keeping for the four units still to come.** A
+unit's reserved height is not only a promise about layout shift; it is a claim
+on whatever is elastic next to it. Decide what gives before placing the unit,
+or the unit quietly eats the editorial content it was placed beside — which is
+exactly what happened here, and it took two passes to notice that the right
+answer was not a better ladder but a module that should not have been
+competing with an ad for the same 250px.
 
 **The rail carries one unit, not three.** An earlier version of this table had a
 ladder of three, spaced a viewport apart down a rail that scrolled with the
@@ -557,6 +625,13 @@ having to track certification, and requires no third-party script — which is
 worth something specific here, since §3 already establishes that every
 additional ad-adjacent origin is a line in the CSP and a phase-3 problem.
 
+**Taken, on 19 Sep.** It is configured in the AdSense console. Nothing in this
+repository records that, and nothing can: the whole point of this option is
+that the tag carries the banner, so there is no import, no origin and no
+setting here that would fail if it were switched off again. The one thing that
+would notice is EEA and UK fill rate, which is where to look if ads stop
+serving to those readers.
+
 Two honest costs. It ties consent to the ad network, so moving to a managed
 partner later means changing CMP as well — mitigated by the fact that
 Mediavine and Raptive supply their own CMP anyway, so that migration is coming
@@ -571,9 +646,18 @@ depends on the signal and not on the vendor, and swapping CMP becomes a console
 change instead of a code change. That is the same seam argument as §5, applied
 one layer down: the thing worth abstracting is the signal, not the provider.
 
-It also settles the GA4 gap in §2. Once `Analytics` reads the same signals, one
-banner governs both tags and there is no second source of truth — which was the
-actual requirement, and is the part no CMP gives you for free.
+It also settles the GA4 gap in §2, and that is built rather than planned now —
+`lib/analytics/consent.ts`. One banner governs both tags and there is no second
+source of truth, which was the actual requirement and is the part no CMP gives
+you for free.
+
+One correction to the paragraph above, learned in the building. "Read consent
+through the signals" is the wrong shape for a Google tag: there is nothing to
+read, because the tag reads them itself. What the application owes is the
+_declaration_ — the default state, before the tag looks. A reader is still the
+right seam for anything non-Google, and there is nothing non-Google yet, so
+there is no reader. The signal is the contract either way, which is the part
+that mattered.
 
 ### What the banner can be made to look like
 

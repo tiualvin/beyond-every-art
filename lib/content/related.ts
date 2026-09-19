@@ -1,33 +1,15 @@
-// How one list of related posts is shared between the two places that show it.
+// How many related posts a post page asks for, and who shows them.
 //
-// The rail is a desktop module: it is hidden below 1280 and it is supplementary
-// by construction. "Read next" closes the article on every device. So the most
-// relevant pieces go to "Read next" and the rail takes what follows, which also
-// means a thin tag — one where the query had to top up with recent posts to
-// fill three — spends its best matches where everyone sees them and simply
-// leaves the rail empty.
+// One surface now, where there were two. "Read next" closes the article on
+// every device; the rail used to take a second helping of the same query and
+// show it to desktop readers only, above the fold of a sticky group that could
+// not hold it.
 //
-// Splitting rather than querying twice keeps one cache entry and one ordering.
-// `getRelatedPosts` already takes a limit and `cachedRead` keys on arguments,
-// so asking for six costs the same round trip as asking for three.
+// That split is gone with the rail's "More on this" module (see
+// `ArticleRail`), and with it `splitRelated`, `RAIL_COUNT`, and a query that
+// asked for six posts to show three. Every piece the rail listed already
+// closed the article below it, so nothing a reader can reach has changed —
+// what changed is that the page reads three rows instead of six.
 
-import type { PostCard } from './queries'
-
-/** What each surface shows when there are enough posts to fill both. */
+/** What "Read next" shows, and therefore what the page asks the database for. */
 export const READ_NEXT_COUNT = 3
-export const RAIL_COUNT = 3
-
-/** How many to ask `getRelatedPosts` for, so a split can fill both. */
-export const RELATED_QUERY_LIMIT = READ_NEXT_COUNT + RAIL_COUNT
-
-export type RelatedSplit = {
-  readNext: PostCard[]
-  rail: PostCard[]
-}
-
-export function splitRelated(posts: PostCard[]): RelatedSplit {
-  return {
-    readNext: posts.slice(0, READ_NEXT_COUNT),
-    rail: posts.slice(READ_NEXT_COUNT, RELATED_QUERY_LIMIT),
-  }
-}
