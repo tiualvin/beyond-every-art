@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "payload": {
+      "type": "http",
+      "url": "${PAYLOAD_MCP_URL:-https://cms.beyondeveryart.com/api/mcp/}",
+      "headers": {
+        "Authorization": "Bearer ${PAYLOAD_MCP_KEY}"
+      }
+    }
+  }
+}

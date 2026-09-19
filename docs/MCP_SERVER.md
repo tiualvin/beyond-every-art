@@ -6,6 +6,15 @@
   `POST /api/mcp`; without it the endpoint does not exist. The sections below
   are the evaluation it was built from, kept because the reasoning still governs
   what may be added next.
+- **Live on `cms.beyondeveryart.com`**, which is newer than the "not enabled
+  yet" this and `DEPLOYMENT_STATUS.md` both used to say. Checked from outside
+  the VPS on 19 Sep 2026 rather than inferred: `GET /api/mcp/` answers `405`,
+  which is [Finding 9](#finding-9-get-apimcp-spent-the-guessing-budget--fixed)'s
+  refusal and therefore proof the endpoint is mounted, while a neighbouring path
+  that does not exist answers `404`. When `MCP_ENABLED=1` was set is not
+  recorded anywhere; that it is set is re-checkable in one request, which is the
+  more useful fact. What is still an operator action is the key — see
+  [Turning it on](#turning-it-on) step 3.
 - **What it does:** drafts and revises articles from Claude Code, Codex, or the
   Claude mobile app, writing bodies in Markdown, through the same role-based
   access control the admin panel uses. It never publishes unless the key belongs
@@ -13,10 +22,14 @@
 - **What it deliberately cannot reach:** `members`, `billing-events`,
   `newsletter-signups`, `users`, and every global. Deleting articles is off.
 - **How to turn it on:** [What is built](#what-is-built).
-- **OAuth is built.** The connector dialogs that cannot send a bearer header now
-  have an authorization server to talk to — see
+- **OAuth is built, and is off in production.** The connector dialogs that
+  cannot send a bearer header now have an authorization server to talk to — see
   [`MCP_OAUTH.md`](MCP_OAUTH.md). It is off by default and separate from
-  `MCP_ENABLED`.
+  `MCP_ENABLED`, and the same check as above says it is unset on the VPS:
+  `/.well-known/oauth-protected-resource` answers `404`, which is what
+  `oauthEnabled()` returns when the flag is missing. So the endpoint currently
+  takes bearer API keys only — enough for Claude Code and Codex, not enough for
+  the claude.ai or ChatGPT connector dialogs.
 - **Still open:** no key carries an expiry or a last-used stamp —
   [Finding 10](#finding-10-key-lifecycle--open). Note that an _OAuth_ grant does
   expire, after ninety days — see [`MCP_OAUTH.md`](MCP_OAUTH.md); this is about
@@ -740,23 +753,58 @@ today.
 
 ### Claude Code
 
-`.mcp.json`, with the key read from the environment, never inline:
+[`.mcp.json`](../.mcp.json) is committed, and holds no credential:
 
 ```json
 {
   "mcpServers": {
     "payload": {
       "type": "http",
-      "url": "http://127.0.0.1:3000/api/mcp",
+      "url": "${PAYLOAD_MCP_URL:-https://cms.beyondeveryart.com/api/mcp/}",
       "headers": { "Authorization": "Bearer ${PAYLOAD_MCP_KEY}" }
     }
   }
 }
 ```
 
-`.mcp.json` is not in [`.gitignore`](../.gitignore). If a committed config is
-wanted it must reference the key by environment variable only; the safer default
-is to leave client config out of the repository entirely.
+Set `PAYLOAD_MCP_KEY` in the environment — a key from **MCP → API Keys**, bound
+to an editor. For a Claude Code session in the browser, that means an
+environment variable on the
+[web environment](https://code.claude.com/docs/en/claude-code-on-the-web), not a
+shell export: the container is built fresh from this repository each session and
+holds nothing a previous one had. Locally, export it from a password manager or
+a file outside the repository. `PAYLOAD_MCP_URL` overrides the endpoint —
+`http://127.0.0.1:3000/api/mcp/` for a development server — and is otherwise not
+needed.
+
+**Three details, each of which produces a confusing failure rather than a clear
+one.**
+
+`trailingSlash: true` in [`next.config.ts`](../next.config.ts) applies to `/api`
+as much as to a permalink, so `/api/mcp` answers `308` to `/api/mcp/` and the
+configured URL carries the slash for that reason. Most clients follow a 308 with
+the method and body intact and the only cost is a wasted round trip per call,
+but an MCP client that treats a redirect as a transport error fails at
+`initialize` with nothing that names the slash.
+
+**An unset `PAYLOAD_MCP_KEY` is worse than a missing config.** The header
+expands to a bare `Bearer`, which is a failed authentication, and those are
+bounded at ten per fifteen minutes _per source address_ — an address shared by
+every MCP caller behind the same vendor cloud
+([Finding 4](#finding-4-the-endpoint-is-not-behind-the-staging-gate)). A client
+reconnecting on a loop with no key can therefore spend the budget for a
+correctly configured one. Set the variable or remove the server from the config;
+do not leave it half-configured.
+
+**A committed config is a decision, and it reverses what this section used to
+say.** It previously recommended leaving client config out of the repository
+entirely. That advice assumed a workstation, where the file persists and can
+stay untracked. It does not survive the browser sessions this endpoint was made
+reachable for: an uncommitted `.mcp.json` is a file that does not exist there, so
+the server would have to be re-added by hand every session. What made the old
+advice safe — that no credential is in the repository — is unchanged, because
+the key is still only ever an environment variable. `.mcp.json` is not in
+[`.gitignore`](../.gitignore), and should stay out of it.
 
 ### Codex
 
