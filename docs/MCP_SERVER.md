@@ -787,14 +787,15 @@ the method and body intact and the only cost is a wasted round trip per call,
 but an MCP client that treats a redirect as a transport error fails at
 `initialize` with nothing that names the slash.
 
-**An unset `PAYLOAD_MCP_KEY` is worse than a missing config.** The header
-expands to a bare `Bearer`, which is a failed authentication, and those are
-bounded at ten per fifteen minutes _per source address_ — an address shared by
-every MCP caller behind the same vendor cloud
+**Do not leave `PAYLOAD_MCP_KEY` unset.** Whether the client then skips the
+server or sends a bare `Bearer` is the client's business and is not documented
+either way — but if it sends one, that is a failed authentication, and failed
+authentications are bounded at ten per fifteen minutes _per source address_, on
+an address shared by every MCP caller behind the same vendor cloud
 ([Finding 4](#finding-4-the-endpoint-is-not-behind-the-staging-gate)). A client
-reconnecting on a loop with no key can therefore spend the budget for a
-correctly configured one. Set the variable or remove the server from the config;
-do not leave it half-configured.
+reconnecting on a loop with no key would spend that budget for a correctly
+configured one. Set the variable or remove the server from the config; the
+half-configured state is the one with a cost attached.
 
 **A committed config is a decision, and it reverses what this section used to
 say.** It previously recommended leaving client config out of the repository
