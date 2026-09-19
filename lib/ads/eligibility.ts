@@ -4,8 +4,15 @@
 // about why: the conditions are unrelated to each other, and each of them is a
 // bug if it is checked in only some of the places a unit appears. Today there
 // are two — the deployment must be one that serves ad code at all, and the
-// post must not be a restricted teaser — and the third and fourth (consent,
-// and a paying member) land here rather than at a call site when they exist.
+// post must not be a restricted teaser — and ad-free membership lands here
+// rather than at a call site when it exists.
+//
+// Consent is not one of them, and that is a decision rather than an omission.
+// Google's CMP serves the banner through the AdSense tag and enforces the
+// answer itself; a reader who refuses gets limited ads rather than none, so
+// withholding the unit here would discard inventory Google is still willing to
+// fill. The consent work this repository still owes is GA4's, in front of the
+// analytics tag — §2.
 //
 // Every call site takes its answer from this function from the first commit,
 // so that opening ad-free membership is a change in one function rather than a

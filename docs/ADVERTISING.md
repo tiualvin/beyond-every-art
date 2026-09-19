@@ -10,10 +10,16 @@ two modules of the slot layer (`lib/ads/placements.ts` and
 `lib/ads/eligibility.ts`, per §5), and the first unit — `rail-1`, the 300×250
 in the post rail, rendered by `app/(frontend)/components/ad-unit.tsx`.
 
-**Consent is still not built, and that is the thing standing between this and
-revenue in the EEA and UK** (§2). A unit without a certified CMP serves limited
-ads to those readers, silently. The rollout order in §7 has not changed; what
-has changed is that the units it sequences now exist to be switched on.
+**Consent is no longer the blocker.** Google's Privacy & messaging — the
+certified CMP §9 recommends — is configured in the AdSense console, reported by
+the repository owner on 19 Sep. It needs no code here: the AdSense tag loads the
+European regulations message itself, which is exactly why it was recommended.
+
+Half of §2 survives that, and it is the half this repository owns. GA4 still
+loads unconditionally with no consent gate, and the application still reads no
+Consent Mode signal — so there is a certified banner governing the ad tag and
+nothing governing the analytics tag. §2 says why that is a worse position than
+no banner at all, and §9 says what closes it.
 
 Related: [`CONTENT_SECURITY_POLICY.md`](CONTENT_SECURITY_POLICY.md),
 [`DEPLOYMENT_STATUS.md`](DEPLOYMENT_STATUS.md),
@@ -30,16 +36,19 @@ ship yet, for reasons that have nothing to do with the code:
 1. The site has not cut over. It is `noindex` and behind Basic Auth, so Google
    cannot review it, and an AdSense application reviewed in that state is an
    application that gets declined.
-2. There is no consent management platform. For EEA/UK traffic that is not a
-   nice-to-have, it is the thing Google requires before it will serve ads at
-   all.
+2. There is a consent management platform now. Google's Privacy & messaging is
+   configured in the AdSense console (19 Sep, owner-reported), which is what
+   Google requires before it will serve ads to EEA/UK traffic at all. What is
+   still missing is the application's half: GA4 runs ungated, and nothing here
+   reads a Consent Mode signal. §2.
 3. `/ads.txt` is now served by Caddy from the repository-root file (§1).
    Closed on 29 Aug, with one operator action left: delete the dead redirect
    row in Payload, which can never run and which `validate:redirects` reports.
 
-The order that follows from this is: build consent, cut over, apply, then wire
-the ad layer behind a flag. `ads.txt` is no longer part of that sequence. §7 lays it out, §8 plans
-the placements, and §9 evaluates the consent platforms.
+Only the first is still a blocker. The order that follows is: cut over, apply,
+then wire the units already built. `ads.txt` and the CMP are no longer part of
+that sequence. §7 lays it out, §8 plans the placements, and §9 evaluates the
+consent platforms and records which one was chosen.
 
 The more important point is in §6: **the ceiling on RPM is traffic, not
 architecture.** Futureproofing the code is cheap and worth doing, but it is not
@@ -130,28 +139,45 @@ build or app-level test would catch.
 Verify after cutover by fetching `https://<domain>/ads.txt` and reading the
 body, not the status code.
 
-## 2. Consent is the real blocker
+## 2. Consent was the real blocker — half of it is closed
 
-There is no cookie consent system in this repository. Grepping for one finds
-the OAuth consent screen and the newsletter signup's consent line, and nothing
-else.
+**Settled 19 Sep, in a console rather than in this repository.** Google's
+Privacy & messaging is configured on the AdSense account, per the owner. That
+is the certified CMP §9 recommends, it is certified by construction because
+Google both requires and supplies it, and the AdSense tag serves the European
+regulations message on its own — which is why "zero integration work" was the
+argument for it and why nothing in this repository changed when it was turned
+on.
 
-Google has required a certified consent management platform for AdSense,
-Ad Manager and AdMob traffic from the EEA, UK and Switzerland since January
-2024, and the framework version has since moved — TCF v2.3 became mandatory on
-1 March 2026. Without a CMP certified at the current version, ads to those users
-are not served, and this is enforced by Google rather than merely advised. §9
-evaluates the options, including why the open-source ones cannot be used here.
+That closes the requirement below. Google has required a certified consent
+management platform for AdSense, Ad Manager and AdMob traffic from the EEA, UK
+and Switzerland since January 2024, and the framework version has since moved —
+TCF v2.3 became mandatory on 1 March 2026. Without a CMP certified at the
+current version, ads to those users are not served, and this is enforced by
+Google rather than merely advised. §9 evaluates the options, including why the
+open-source ones cannot be used here.
 
-Two things follow that are easy to get wrong:
+**Two things it does not close**, and the second is the one with teeth.
 
-**GA4 already has this problem.** `app/(frontend)/components/analytics.tsx`
+There is still no cookie consent system in _this repository_. Grepping for one
+finds the OAuth consent screen and the newsletter signup's consent line, and
+nothing else. That is fine for the ad tag, which brings its own, and it is not
+fine for anything else on the page that sets a non-essential cookie.
+
+**GA4 still has this problem, and the CMP made it sharper rather than
+softer.** `app/(frontend)/components/analytics.tsx`
 loads the GA4 tag unconditionally whenever `NEXT_PUBLIC_GA_ID` is set and the
-deployment is indexable. There is no consent gate in front of it. That is an
-existing gap rather than something ads introduce, but ads make it sharper:
-advertising cookies are unambiguously non-essential, and a site running a
-consent banner that only governs half its tags is in a worse position than one
-running no banner at all, because it has now made a claim.
+deployment is indexable. There is no consent gate in front of it. That was an
+existing gap while there was no banner at all; now there is one, and a site
+running a consent banner that governs only half its tags is in a worse position
+than one running none, because it has made a claim. The banner is live. The
+claim is being made today, on every EEA and UK visit, and the analytics tag is
+not honouring it.
+
+Closing it is the work in §9's last paragraph — read the Consent Mode v2
+signals off `dataLayer` rather than any one CMP's API — and it is the only
+consent work left in this repository. It is not built here, and it is not part
+of this change.
 
 **Consent has to be an input to the ad layer, not a wrapper around it.** The
 tempting shape is a banner component that conditionally renders the ad script.
@@ -268,15 +294,22 @@ slot _is_, never for what fills it. `article-mid` maps to an AdSense slot ID
 today and to some other partner's unit later, and no component that renders an
 ad ever knows which. That mapping is the only thing a provider swap touches.
 
-`eligibility` earns its own module because it is where four unrelated
-conditions meet, and each of them is a bug if it is checked in only some of the
-places a unit appears:
+`eligibility` earns its own module because it is where unrelated conditions
+meet, and each of them is a bug if it is checked in only some of the places a
+unit appears:
 
 - the deployment is indexable (`isNoindex()` — no ads on staging, same reason
   analytics does not run there);
-- the reader has consented, where consent is required;
 - the post is not a restricted teaser;
 - later, the reader is not a paying member.
+
+**Consent is deliberately not on that list**, which is a correction to an
+earlier version of this section. With Google's CMP (§9) the tag enforces
+consent itself, and a reader who refuses gets limited ads rather than none — so
+withholding the `<ins>` here would not be honouring a consent decision, it
+would be throwing away the inventory Google is still willing to serve. The
+consent work that is outstanding is GA4's (§2), and it belongs in front of the
+analytics tag rather than in this predicate.
 
 The last one is why this exists now rather than later. [`ACCOUNT_MODEL.md`](ACCOUNT_MODEL.md)
 ships no reader accounts in Phase 1, so there is no member to check — but the
@@ -355,10 +388,12 @@ AdSense in the meantime.
 
 1. **Settle `/ads.txt`,** at cutover and not before — the Ghost redirect serves
    it until then. §1 has the two options and the trap in each.
-2. **Consent management.** A prerequisite for ads rather than a part of them.
-   §9 recommends Google's Privacy & messaging to start; the work in this
-   repository is reading Consent Mode v2 signals and retrofitting GA4 behind
-   them, not building a banner.
+2. **Consent management.** Done in the console on 19 Sep: Google's Privacy &
+   messaging, per §9's recommendation, serving the European regulations message
+   through the AdSense tag. The banner half needed no code and got none. The
+   remaining half is this repository's — reading Consent Mode v2 signals and
+   retrofitting GA4 behind them — and it is still outstanding, which §2 says
+   plainly rather than leaving this step looking finished.
 3. **Cut over.** [`DEPLOYMENT_STATUS.md`](DEPLOYMENT_STATUS.md)'s "Flip" —
    unset `NEXT_PUBLIC_NOINDEX` and `STAGING_BASIC_AUTH`. Nothing about
    advertising can be evaluated before this, including the AdSense
@@ -581,6 +616,13 @@ AdSense-only publisher it is free with no volume cap, certified without you
 having to track certification, and requires no third-party script — which is
 worth something specific here, since §3 already establishes that every
 additional ad-adjacent origin is a line in the CSP and a phase-3 problem.
+
+**Taken, on 19 Sep.** It is configured in the AdSense console. Nothing in this
+repository records that, and nothing can: the whole point of this option is
+that the tag carries the banner, so there is no import, no origin and no
+setting here that would fail if it were switched off again. The one thing that
+would notice is EEA and UK fill rate, which is where to look if ads stop
+serving to those readers.
 
 Two honest costs. It ties consent to the ad network, so moving to a managed
 partner later means changing CMP as well — mitigated by the fact that
