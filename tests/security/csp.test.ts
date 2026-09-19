@@ -86,16 +86,33 @@ describe('buildCspPolicy', () => {
     )
   })
 
-  it('admits the analytics origins only when the tag is configured', () => {
-    const without = buildCspPolicy({ env: {} })
-    expect(without).not.toContain('googletagmanager.com')
+  it('admits the analytics origins with nothing configured at all', () => {
+    // The empty env is not a hypothetical: it is what `next.config.ts` sees
+    // during `pnpm build`, because no analytics id is a Docker build argument.
+    // Gating the origins on configuration therefore shipped a policy that
+    // forbade the tag the running container renders — found in production
+    // within minutes of the 19 Sep cutover.
+    const policy = buildCspPolicy({ env: {} })
 
-    const with_ = buildCspPolicy({ env: { NEXT_PUBLIC_GA_ID: 'G-123' } })
-    expect(directive(with_, 'script-src')).toContain(
+    expect(directive(policy, 'script-src')).toContain(
       'https://www.googletagmanager.com',
     )
-    expect(directive(with_, 'connect-src')).toContain(
+    expect(directive(policy, 'connect-src')).toContain(
       'https://www.google-analytics.com',
+    )
+  })
+
+  it('does not vary on the analytics ids', () => {
+    // The guard on the bug itself rather than its symptom. Any future reading
+    // of an id that is absent at build time and present at runtime reopens it,
+    // whatever the directive.
+    const atBuildTime = buildCspPolicy({ env: {} })
+
+    expect(buildCspPolicy({ env: { NEXT_PUBLIC_GTM_ID: 'GTM-ABC1234' } })).toBe(
+      atBuildTime,
+    )
+    expect(buildCspPolicy({ env: { NEXT_PUBLIC_GA_ID: 'G-ABC1234XYZ' } })).toBe(
+      atBuildTime,
     )
   })
 
@@ -158,9 +175,12 @@ describe('buildCspPolicy', () => {
   })
 
   it('adds nothing when the operator origin lists are unset or blank', () => {
-    const policy = buildCspPolicy({ env: { CSP_SCRIPT_SRC: '  ' } })
-    expect(directive(policy, 'script-src')).toBe(
-      "script-src 'self' 'unsafe-inline'",
+    // Compared against the unset policy rather than a literal, so this keeps
+    // testing what it is named for when the baseline directive changes.
+    const blank = buildCspPolicy({ env: { CSP_SCRIPT_SRC: '  ' } })
+
+    expect(directive(blank, 'script-src')).toBe(
+      directive(buildCspPolicy({ env: {} }), 'script-src'),
     )
   })
 

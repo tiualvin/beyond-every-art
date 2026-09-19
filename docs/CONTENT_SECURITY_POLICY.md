@@ -260,17 +260,17 @@ implements) and `report-to` with a matching `Reporting-Endpoints` header.
 | `CSP_IMG_SRC`     | empty         | Same format; additional `img-src` origins.                                   |
 | `CSP_REPORT_URI`  | `/csp-report` | External collector, if not the built-in endpoint.                            |
 
-`S3_PUBLIC_URL`, `NEXT_PUBLIC_GTM_ID` and `NEXT_PUBLIC_GA_ID` are read from the
-existing configuration — the policy derives the media origin the same way
-`next.config.ts` derives `images.remotePatterns`, and admits the analytics
-origins only when a tag is actually configured.
+`S3_PUBLIC_URL` is read from the existing configuration — the policy derives
+the media origin the same way `next.config.ts` derives `images.remotePatterns`.
 
-The analytics allowance keys on **configuration**, not on the `noindex` gate
-that decides whether a tag renders. The policy must permit whatever the page may
-load: permitting an origin the page then does not use costs nothing, while
-withholding one it does use breaks the tag under enforcement.
+**The analytics origins are permitted unconditionally**, and are not read from
+`NEXT_PUBLIC_GTM_ID` or `NEXT_PUBLIC_GA_ID` at all. The policy must permit
+whatever the page may load: permitting an origin the page then does not use
+costs nothing, while withholding one it does use breaks the tag under
+enforcement. Conditioning on the ids looked like the careful version of that
+principle and was the opposite of it — see below.
 
-### That goal is not currently met — found live on 19 Sep 2026
+### Why they are unconditional — found live on 19 Sep 2026
 
 Within minutes of the cutover the report endpoint logged, on the homepage and on
 a post:
@@ -284,41 +284,47 @@ a post:
 }
 ```
 
-`disposition: report` means nothing was blocked and analytics works. The policy
-being wrong is the finding.
+`disposition: report` means nothing was blocked and analytics kept collecting.
+The policy being wrong was the finding.
 
-**The tag is resolved at runtime and the policy is built at build time, so they
-disagree.** `buildSecurityHeaders()` is called from `next.config.ts`'s
-`async headers()`, which Next evaluates during `next build` and bakes into the
-routes manifest. `analyticsConfigured()` reads `NEXT_PUBLIC_GTM_ID`, and that is
-**not** a Docker build argument — only `NEXT_PUBLIC_CHECKOUT_URL_MONTHLY` and
-`NEXT_PUBLIC_CHECKOUT_URL_YEARLY` are. So at image build time it is empty,
-`analytics` is false, and `https://www.googletagmanager.com` never reaches
-`script-src`. Meanwhile `resolveAnalyticsTag()` runs per request in a server
-component, reads the live value, and renders the tag.
+**The tag was resolved at runtime and the policy built at build time, so they
+disagreed.** `buildSecurityHeaders()` is called from `next.config.ts`'s
+`async headers()`, which Next evaluates during `pnpm build` and bakes into the
+routes manifest. The gate read `NEXT_PUBLIC_GTM_ID`, and that is **not** a
+Docker build argument — only `NEXT_PUBLIC_CHECKOUT_URL_MONTHLY` and
+`NEXT_PUBLIC_CHECKOUT_URL_YEARLY` are. So at image build time it was empty, the
+condition was false, and `https://www.googletagmanager.com` never reached
+`script-src`. Meanwhile `resolveAnalyticsTag()` ran per request, read the live
+value, and rendered the tag.
 
-**Setting `CSP_MODE=enforce` today would block Tag Manager and silently end
-analytics collection.** Treat that as a blocker on phase 2, not a detail.
+Under `CSP_MODE=enforce` that would have blocked Tag Manager and ended
+analytics collection with nothing in the logs to say why.
 
-The same boundary defeats the escape hatch below: `CSP_SCRIPT_SRC`,
-`CSP_CONNECT_SRC`, `CSP_IMG_SRC` and `CSP_FRAME_SRC` are read in the same
-build-time call, so they cannot be used to admit a container's third-party tags
-on a running host either. A value set in `.env` after the image was built has no
-effect on the policy, which is the opposite of what an incident escape hatch
-needs to be.
+**Fixed by removing the condition rather than by feeding it.** The origins are
+now always present. Two tests hold it there: one asserts they appear with an
+empty environment — which is not hypothetical, it is exactly what the build
+sees — and one asserts the whole policy does not vary on either id, which is
+the guard on the bug rather than on its symptom.
 
-Two ways out, and the choice is a real one rather than an oversight to correct
-in passing:
+The alternative was making the ids build arguments. It was rejected: it buys
+nothing the unconditional list does not, costs a rebuild for every analytics
+change, and contradicts what [`ANALYTICS.md`](ANALYTICS.md) promises about
+those variables being runtime-only.
 
-1. **Make the variables build arguments**, as the checkout URLs already are.
-   Smallest change, keeps the static header and its whole-route coverage, but
-   every analytics or CSP change then needs a rebuild rather than a restart —
-   and `ANALYTICS.md` currently promises the opposite for the tag ids.
-2. **Move the policy to `middleware.ts`**, where it is computed per request. Wins
-   the runtime behaviour and the per-request nonce that phase 3 needs, at the
-   cost documented under "Why the policy is in `next.config.ts`": the middleware
-   matcher excludes `/admin`, `/api`, `/webhooks` and anything containing a dot,
-   so admin coverage has to be solved rather than assumed.
+Permitting the origins always costs nothing in practice, and it is worth being
+precise about why rather than resting on the principle. `'unsafe-inline'` is
+still in `script-src`, so an attacker who can inject markup can already run
+arbitrary inline script — a host allowlist entry adds nothing to their reach.
+And phase 3's `'strict-dynamic'` makes host allowlists moot altogether, since
+browsers that honour it ignore them.
+
+**What this does not fix.** `CSP_SCRIPT_SRC`, `CSP_CONNECT_SRC`, `CSP_IMG_SRC`
+and `CSP_FRAME_SRC` are read in the same build-time call, so a value set in
+`.env` after the image was built still has no effect on the policy. They are
+not a runtime escape hatch, which is the opposite of what an incident escape
+hatch needs to be. Closing that means moving the policy into `middleware.ts` —
+the same move phase 3 needs for per-request nonces, and best done once, for
+both reasons, rather than twice.
 
 ### The three script/connect/img variables exist for Tag Manager
 
