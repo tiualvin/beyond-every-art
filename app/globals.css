@@ -3310,11 +3310,12 @@ ol.feature-list__items .feature-list__title::before {
 }
 
 /* --- The rail -------------------------------------------------------------
-   Editorial only. Every module here has to hold up on its own: the rail is
-   what a reader sees for the whole scroll, and docs/ADVERTISING.md puts a slot
-   in it later that will be absent for members, for anyone running a blocker,
-   and on every staging deployment. A rail that is an ad with decoration around
-   it is a hole on those visits.
+   Editorial first. Every module here has to hold up on its own: the rail is
+   what a reader sees for the whole scroll, and the ad slot in it is absent for
+   anyone running a blocker, on every staging deployment, on a restricted
+   teaser, and later for members. A rail that is an ad with decoration around
+   it is a hole on those visits, so the reading aids are what it is built
+   around and the unit is one module among them.
 
    Nothing in it carries a thumbnail. The rail is hidden below 1280 rather than
    reflowed — every module it holds already reaches a phone another way, the
@@ -3391,10 +3392,16 @@ ol.feature-list__items .feature-list__title::before {
   font-variant-numeric: tabular-nums;
 }
 
-/* Space kept for a square unit above "More on this", per docs/ADVERTISING.md
-   §8. It renders empty until there is an ad layer to fill it — the reservation
-   is the point, so that turning ads on is a fill rather than a re-layout, and
-   so the rail is designed around the height it will actually have.
+/* The square unit above "More on this" — `rail-1` in docs/ADVERTISING.md §8.
+   It is filled now: `AdUnit` renders the 300x250 `<ins>` into it whenever ads
+   are on for the deployment and the post is not a restricted teaser.
+
+   `min-height` is no longer a reservation for an empty box; it is the defence
+   against a *mid-view* collapse. Google marks an unsold impression
+   `data-adsbygoogle-status="unfilled"` and hides the `<ins>`, and a slot that
+   vanished under the reader's cursor would drag the whole sticky group up by
+   the 250px it was holding. §8 is explicit that an unfilled slot may collapse
+   only on a subsequent navigation, never mid-view, and this is what holds it.
 
    The reservation is the unit and a gap, not the unit and a second band: at
    the module rhythm of 2.5rem it read as 290px of nothing above the related
@@ -3402,6 +3409,30 @@ ol.feature-list__items .feature-list__title::before {
 .rail__slot {
   min-height: 250px;
   margin-bottom: 1rem;
+}
+
+/* Google's snippet styles the unit `display: inline-block`, which puts it on a
+   text baseline and reserves 8px of descender space beneath it that nothing
+   ever fills. Aligning it to the top takes that back. It is 8px the related
+   list gets, and it is also 8px the reservation was out by — the slot was
+   taller than the unit it is reserving for. */
+.rail__slot .adsbygoogle {
+  vertical-align: top;
+}
+
+/* "Advertisement", above the unit. docs/ADVERTISING.md calls this an
+   editorial-integrity requirement before a policy one: PRODUCT.md describes a
+   publication whose credibility is the product, and an unlabelled display unit
+   inside a materials-science essay reads as an endorsement. */
+.ad-slot__label {
+  font-family: var(--font-sans);
+  font-size: 0.58rem;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--color-muted);
+  margin: 0 0 0.4rem;
 }
 
 /* The ad slot, the related pieces and the newsletter travel together and stay

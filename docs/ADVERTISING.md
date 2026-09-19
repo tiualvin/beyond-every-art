@@ -4,11 +4,16 @@ An evaluation of putting ad units on the site: what is in the way, what the
 architecture should be so that AdSense is not a one-way door, where the units
 go, and in what order the work should happen.
 
-Two pieces of it are now built: `/ads.txt` (§1) and the AdSense loader itself,
-which `app/(frontend)/layout.tsx` renders whenever the deployment is indexable.
-Everything else below — consent, the slot layer, the placements — is still a
-plan. The loader alone earns nothing: it is what makes an approved account able
-to fill a unit, and there are no units yet.
+Four pieces of it are now built: `/ads.txt` (§1), the AdSense loader itself
+(`app/(frontend)/layout.tsx`, whenever the deployment is indexable), the first
+two modules of the slot layer (`lib/ads/placements.ts` and
+`lib/ads/eligibility.ts`, per §5), and the first unit — `rail-1`, the 300×250
+in the post rail, rendered by `app/(frontend)/components/ad-unit.tsx`.
+
+**Consent is still not built, and that is the thing standing between this and
+revenue in the EEA and UK** (§2). A unit without a certified CMP serves limited
+ads to those readers, silently. The rollout order in §7 has not changed; what
+has changed is that the units it sequences now exist to be switched on.
 
 Related: [`CONTENT_SECURITY_POLICY.md`](CONTENT_SECURITY_POLICY.md),
 [`DEPLOYMENT_STATUS.md`](DEPLOYMENT_STATUS.md),
@@ -361,13 +366,19 @@ AdSense in the meantime.
 4. **Let traffic establish, then apply to AdSense.** Applying against a site
    with no organic traffic history and a fresh domain configuration invites a
    decline that is slow to appeal.
-5. **Build `lib/ads/`.** Started: `lib/ads/adsense.ts` resolves the publisher
-   and `app/(frontend)/components/adsense.tsx` renders Google's loader, gated
-   on the deployment being indexable so staging never serves ad code. It ships
-   _on_ rather than off — the publisher defaults to the id committed in
-   `ads.txt`, since a loader nobody switched on is indistinguishable from the
-   problem it was meant to fix — with `NEXT_PUBLIC_ADSENSE_CLIENT=off` as the
-   switch for pulling it without a deploy. The slot layer below is still to do.
+5. **Build `lib/ads/`.** Three of §5's four modules exist. `lib/ads/adsense.ts`
+   resolves the publisher and `app/(frontend)/components/adsense.tsx` renders
+   Google's loader, gated on the deployment being indexable so staging never
+   serves ad code. It ships _on_ rather than off — the publisher defaults to the
+   id committed in `ads.txt`, since a loader nobody switched on is
+   indistinguishable from the problem it was meant to fix — with
+   `NEXT_PUBLIC_ADSENSE_CLIENT=off` as the switch for pulling it without a
+   deploy. `lib/ads/placements.ts` holds the placement names and the sizes they
+   reserve; `lib/ads/eligibility.ts` is the one predicate, and it already
+   answers for the restricted teaser as well as the deployment. `providers` is
+   not built: there is one provider, and an interface with one implementation
+   is a guess about the second. The seam that matters — that no component knows
+   which network fills a slot — is held by the placement names on their own.
 6. **Turn it on with the CSP still in report-only**, and read the violation
    reports to build the real origin list before enforcement.
 7. **Two or three units, measured.** Watch CLS and LCP against the current
@@ -426,17 +437,15 @@ that slot's request is deferred to idle.
 
 | ID                 | Track / template     | Position                                          | Desktop | Mobile  | Reserved    |
 | ------------------ | -------------------- | ------------------------------------------------- | ------- | ------- | ----------- |
-| `rail-1`           | Rail, `/[slug]`      | Above the related pieces, inside the sticky group | 300×250 | —       | 250px       |
+| `rail-1` **built** | Rail, `/[slug]`      | Above the related pieces, inside the sticky group | 300×250 | —       | 250px       |
 | `article-inline-1` | Text, `/[slug]`      | After the 5th body block                          | 336×280 | 300×250 | 280 / 250px |
 | `article-end`      | Block, `/[slug]`     | Below the author card, above Read Next            | 970×250 | 300×250 | 250px       |
 | `archive-inline`   | journal, tag, author | After every 6th entry row                         | 970×250 | 300×250 | 250px       |
 | `home-mid`         | `/`                  | Between Featured and Topics                       | 970×250 | 300×250 | 250px       |
 
 Five identified placements, of which **four should be live at launch**: all but
-`home-mid`. `.rail__slot` in `app/globals.css` already reserves `rail-1`'s
-250px, so turning it on is a fill rather than a re-layout — and the reservation
-holds at every window height, because the sticky group shrinks its related list
-rather than the unit or the newsletter card (`docs/POST_PAGE_LAYOUT.md`).
+`home-mid`. `rail-1` is the one that is, and the reservation held: turning it on
+was a fill rather than a re-layout.
 
 **The rail carries one unit, not three.** An earlier version of this table had a
 ladder of three, spaced a viewport apart down a rail that scrolled with the

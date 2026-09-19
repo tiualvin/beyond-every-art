@@ -143,7 +143,11 @@ export function Article({
             )}
           </div>
 
-          <ArticleRail headings={headings} related={related} />
+          <ArticleRail
+            headings={headings}
+            related={related}
+            restricted={post.restricted}
+          />
         </div>
       </article>
     </main>
