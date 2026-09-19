@@ -12,7 +12,46 @@ of the flip — [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md),
 
 ## Pick up here
 
-Last worked on **18 Sep 2026**, and it was a long day: four merges (#156, #157,
+**The cutover happened on 19 Sep 2026. The site is live on Payload.** Ghost is
+still running and is still the rollback; do not cancel it yet.
+
+Verified on the day: `migrate:validate` green on a fresh export; both
+certificates issued over DNS-01 _before_ DNS moved, which is what made the
+ordering work; apex and `www` now `A 178.104.16.54` proxied through Cloudflare,
+`cf-ray` and `server: cloudflare` confirmed from outside; the apex 301s to `www`
+from Caddy; `robots.txt` serves `Allow: /` with `Sitemap:` and `Host:`, so
+`NEXT_PUBLIC_NOINDEX` is genuinely off; `validate:redirects` clean apart from
+the two expected `/ads.txt` errors; `ads.txt` serving its AdSense record; and an
+encrypted 2.3 MB backup uploaded to R2 with `errors: []`.
+
+[`CUTOVER_DAY.md`](CUTOVER_DAY.md) is now the corrected record of what was run.
+Three commands and one ordering in its first version were wrong and are fixed
+there: `/health` needs its trailing slash, the backup runs in the `backup` image
+with `--entrypoint tsx` rather than `pnpm backup:db` in `migrate`, and the
+redirect validation has to come **after** the DNS move because its `--target` is
+resolved normally and there is no host override among its flags.
+
+**The rollback, while it is still needed:** apex `A 178.128.137.126` and
+`www CNAME beyond-every-art.ghost.io`, both **grey**. Ghost Pro will not work
+behind Cloudflare's proxy, so restoring them orange is still a broken site. A
+Cloudflare zone export does not capture proxy status, which is why those two
+lines are written out here.
+
+**Newly open, from the day itself:** the CSP permits no Tag Manager origin,
+because the policy is built at image-build time from `next.config.ts` while the
+tag is resolved per request. Nothing is blocked today — the policy is
+report-only — but `CSP_MODE=enforce` would silently end analytics collection.
+Recorded with both candidate fixes in
+[`CONTENT_SECURITY_POLICY.md`](CONTENT_SECURITY_POLICY.md).
+
+Still to do after the flip: submit the sitemap in Search Console, confirm GA4
+Realtime, run the production crawl comparison (which will now answer the
+`/about/` image question), the Stripe handover **before** cancelling Ghost, PRs
+#150 and #154, and the box reboot.
+
+---
+
+Previously, last worked on **18 Sep 2026**, and it was a long day: four merges (#156, #157,
 #158, #159) and the first crawl comparison since 4 Sep.
 
 The header bypass is closed **and deployed** (#156), so the limiters actually

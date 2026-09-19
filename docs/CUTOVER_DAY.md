@@ -10,6 +10,12 @@ is right and this file is stale.
 the runbook's Cutover section and it is deliberate — see "What is deliberately
 not run" at the end before doing anything that looks like an import.
 
+> [!NOTE]
+> **Done on 19 Sep 2026.** The site is live on Payload; Ghost is still running
+> as the rollback. What follows is now the record of what was run, corrected
+> where the first version of it was wrong — three commands and one ordering.
+> Read the corrections before trusting any earlier copy of this file.
+
 ---
 
 ## A. Clear these before the flip
@@ -127,16 +133,99 @@ While still on the old DNS, the origin can answer for itself:
 
 ```bash
 curl -sS --resolve www.beyondeveryart.com:443:127.0.0.1 \
-  https://www.beyondeveryart.com/health
+  https://www.beyondeveryart.com/health/
 ```
 
 Expect `{"status":"ok","db":"up"}`. From the VPS itself, since ports 80 and 443
 admit only Cloudflare from outside.
 
-### 3. Validate the redirects against production
+**The trailing slash is required.** `next.config.ts` sets `trailingSlash: true`,
+so `/health` answers 308 with the body `/health/` — which reads like a failure
+and is not.
+
+### 3. Move DNS — Cloudflare
+
+**This comes before the redirect validation, not after.** The first version of
+this sheet copied the runbook's order and had them the other way round, which
+cannot work: `validate:redirects` takes `--target https://www.beyondeveryart.com`
+and resolves it normally, with no host or DNS override among its flags. Run
+before the DNS edit and it tests Ghost, which passes its own redirects happily
+and tells you nothing about this site.
+
+**Write the current records down first.** Rollback is a DNS change back to
+Ghost, and the edit overwrites the only copy of what Ghost's records were. A
+Cloudflare zone export is worth taking too, but it is not sufficient on its own:
+the BIND format has no way to express proxy status, and proxy status is exactly
+what decides whether a reverted site works.
+
+```
+ROLLBACK — Ghost Pro, as recorded 19 Sep 2026
+  beyondeveryart.com   A      178.128.137.126             DNS only (grey)
+  www                  CNAME  beyond-every-art.ghost.io   DNS only (grey)
+```
+
+Both **grey**. Ghost Pro terminates its own TLS at Fastly and will not work
+behind Cloudflare's proxy, so a rollback that restores these orange is still a
+broken site. Ghost itself is untouched by any of this — it keeps serving at
+`beyond-every-art.ghost.io` whatever DNS says, so rollback is purely recreating
+these two rows.
+
+Two zone settings to confirm **before** editing anything:
+
+- **SSL/TLS → Overview must be `Full (strict)`.** Zone-wide, and already correct
+  from the staging work on 29 Aug. On `Flexible` Cloudflare sends plain HTTP to
+  the origin, Caddy 301s it back to HTTPS, and the live site becomes an infinite
+  redirect loop the moment these records go orange.
+- **Scrape Shield → Email Address Obfuscation must be off.** Switched off
+  zone-wide on 18 Sep. Back on, it rewrites every `mailto:` into
+  `/cdn-cgi/l/email-protection` and poisons the next crawl comparison — that was
+  126 of the first comparison run's 135 errors.
+
+Then the edits. TTLs are already 300s.
+
+1. **apex** `beyondeveryart.com` → `A 178.104.16.54`, **Proxied**
+2. **`www`** → `A 178.104.16.54`, **Proxied**
+3. **Delete** the `staging` record
+4. **Leave `cms` alone**
+
+`www` was a `CNAME` to Ghost, so it is a delete-then-create rather than an edit:
+Cloudflare will not hold a CNAME and an A record on the same name.
+
+Proxied, not grey: the origin admits only Cloudflare on 80 and 443, so an
+unproxied record is a site that times out.
+
+Afterwards, **Caching → Configuration → Purge Everything**. One click, and it
+removes the whole class of "why am I still seeing the old site" before it can
+cost twenty minutes.
+
+**Verify from a laptop, never from the VPS.** The box caches the pre-proxy
+address in its own resolver and keeps answering itself directly long after the
+toggle took effect, which reads exactly like a toggle that did not work.
+
+```bash
+NS=$(dig +short NS beyondeveryart.com | head -1)
+dig +short www.beyondeveryart.com @"$NS"      # authoritative, bypasses caches
+curl -sSI https://www.beyondeveryart.com/ | grep -iE '^HTTP|cf-ray|^server'
+curl -sSI https://beyondeveryart.com/ | grep -iE '^HTTP|^location'
+curl -sS  https://www.beyondeveryart.com/robots.txt
+```
+
+A proxied record returns Cloudflare's edge IPs (`104.x`, `172.67.x`) and
+**never** `178.104.16.54` — hiding the origin is the point of the orange cloud,
+so do not go looking for the VPS address and conclude it failed. Want `cf-ray`
+with `server: cloudflare`, the apex 301ing to `www`, and a `robots.txt` that
+emits `Sitemap:` and `Host:` and disallows `/admin` and `/api`.
+
+That `robots.txt` is also the cleanest proof you are on the new site: Ghost
+disallows `/ghost/` and `/p/` and never emits a `Host:` line.
+
+### 4. Validate the redirects
 
 Not a spot-check. This is the one part of the migration whose failure is silent:
 a broken rule looks exactly like a URL nobody has asked for yet.
+
+Give the VPS five minutes from the DNS edit first — its resolver cached the
+Ghost address, and that exact trap already cost a wasted crawl on this box once.
 
 ```bash
 docker compose run --rm \
@@ -149,20 +238,29 @@ docker compose run --rm \
 ```
 
 `--tag` and `--author` must be real values, or the built-in pagination rules are
-checked against URLs that do not exist. It exits non-zero on the first failing
-rule and reports rules the middleware matcher can never run. Do not move DNS
-while it reports errors.
+checked against URLs that do not exist.
 
-### 4. Move DNS
+**Two errors on `/ads.txt` are expected and are not a failure.** Both were seen
+on 19 Sep and both are the validator correctly reporting a deliberate design
+change it does not know about (29 Aug, `docs/ADVERTISING.md` §1):
 
-Three edits in the Cloudflare zone. TTLs are already 300s.
+- _"the middleware matcher skips this path, so the rule can never run"_ —
+  correct. `middleware.ts` excludes any path containing a dot, so an `/ads.txt`
+  row imports cleanly, looks configured, and never runs. `migrate:redirects`
+  reports the same thing as non-fatal.
+- _"answered 200, expected 301"_ — the 200 **is** the fix. Caddy serves
+  `/ads.txt` from the repository-root file bind-mounted at `/srv/ads.txt`,
+  replacing Ghost's redirect.
 
-1. `beyondeveryart.com` (apex) → `A 178.104.16.54`, **proxied**
-2. `www` → `A 178.104.16.54`, **proxied**
-3. Delete the `staging` record
+So the script exits non-zero on a run that passed. Check the file is really
+being served rather than trusting the exit code either way:
 
-Proxied, not grey-cloud: the origin admits only Cloudflare on 80 and 443, so an
-unproxied record is a site that does not answer.
+```bash
+curl -sS https://www.beyondeveryart.com/ads.txt
+```
+
+Any error naming a path other than `/ads.txt` is real: fix and redeploy, or
+revert DNS if it is bad enough.
 
 ### 5. Watch
 
@@ -178,7 +276,7 @@ docker compose logs app | grep '"event":"request_error"'
 ```
 
 Spot-check by eye while this runs: the homepage, several recent posts, media,
-`/sitemap.xml`, `/rss`, `/robots.txt`, `/health`. `robots.txt` should now emit
+`/sitemap.xml`, `/rss`, `/robots.txt`, `/health/`. `robots.txt` should now emit
 `sitemap` and `host` and disallow `/admin` and `/api` — if it still says
 `Disallow: /`, `NEXT_PUBLIC_NOINDEX` is still set somewhere.
 
@@ -186,7 +284,7 @@ Spot-check by eye while this runs: the homepage, several recent posts, media,
 
 ## C. Immediately after
 
-- [ ] `pnpm backup:db` — a fresh backup of the state the site launched on.
+- [ ] A fresh backup of the state the site launched on — see below.
 - [ ] Confirm HTTPS is valid in a browser, on both the apex and `www`.
 - [ ] Submit the sitemap in Google Search Console.
 - [ ] GA4 → **Reports → Realtime**, within seconds of loading the site. This is
@@ -195,6 +293,26 @@ Spot-check by eye while this runs: the homepage, several recent posts, media,
 - [ ] Check the CSP report endpoint for violations the container trips.
 - [ ] **Leave Ghost running.** Rollback is a DNS change back to Ghost, and that
       only works while Ghost is still there.
+
+---
+
+### The backup command, which is not the obvious one
+
+**Not `pnpm backup:db` in `migrate`.** `pg_dump` lives in the `backup` image
+(`postgresql16-client`) and not in `migrate`, so that fails with
+`spawn pg_dump ENOENT`. The backup image's entrypoint is a cron scheduler that
+ignores anything after the image name, so `--entrypoint tsx` is required rather
+than decoration — without it this silently starts the nightly scheduler in the
+foreground and backs nothing up.
+
+```bash
+docker compose run --rm --entrypoint tsx backup scripts/backup-database.ts
+```
+
+Want `"uploaded": true`, `"encrypted": true`, `"errors": []`. It ran clean on
+19 Sep at 2.3 MB, which is the first proof that this bucket, these credentials
+and the passphrase in the production `.env` work together — something the CI
+restore drill deliberately cannot establish.
 
 ---
 
