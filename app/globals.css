@@ -1822,6 +1822,30 @@ img {
   letter-spacing: 0.02em;
 }
 
+/* The one link on an article a reader has no other reason to try.
+ *
+ * Links on this site carry no resting underline — `a` above sets
+ * `text-decoration: none` and hover adds it back — which works everywhere a
+ * link sits in prose or in navigation, where its purpose is legible from
+ * where it is. A photo credit is not that: it reads as a caption, so nothing
+ * suggests the photographer's name is clickable, and the attribution Unsplash
+ * asks for is one nobody finds. Hence a resting underline here and nowhere
+ * else, faint enough not to turn a credit line into a call to action.
+ *
+ * `currentColor` rather than a token, so this follows the muted colour the
+ * figcaption sets instead of needing to be kept in step with it. */
+.article__figure-credit a {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.25em;
+  text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
+}
+
+.article__figure-credit a:hover,
+.article__figure-credit a:focus-visible {
+  text-decoration-color: currentColor;
+}
+
 /* Rendered body (preserved legacy HTML). */
 .prose {
   font-size: 1.1rem;
