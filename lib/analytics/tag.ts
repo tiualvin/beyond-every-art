@@ -71,18 +71,3 @@ export function resolveAnalyticsTag(
 
   return null
 }
-
-/**
- * True when a tag *could* render, ignoring the noindex gate.
- *
- * The CSP is built in middleware and must permit whatever the page may load,
- * so it keys on configuration rather than on the gate: permitting an origin a
- * page then does not use costs nothing, while withholding one it does use
- * breaks the tag under enforcement.
- */
-export function analyticsConfigured(env: Env = process.env): boolean {
-  return Boolean(
-    (env.NEXT_PUBLIC_GTM_ID ?? '').trim() ||
-    (env.NEXT_PUBLIC_GA_ID ?? '').trim(),
-  )
-}

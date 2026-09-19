@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { analyticsConfigured, resolveAnalyticsTag } from '@/lib/analytics/tag'
+import { resolveAnalyticsTag } from '@/lib/analytics/tag'
 
 describe('resolveAnalyticsTag', () => {
   it('renders nothing when neither id is set', () => {
@@ -105,27 +105,5 @@ describe('resolveAnalyticsTag', () => {
         NEXT_PUBLIC_GA_ID: 'G-ABC1234XYZ',
       }),
     ).toBeNull()
-  })
-})
-
-describe('analyticsConfigured', () => {
-  // The CSP is built in middleware and must permit what the page may load, so
-  // it keys on configuration rather than on the noindex gate.
-  it('is true while noindex hides the tag', () => {
-    expect(
-      analyticsConfigured({
-        NEXT_PUBLIC_NOINDEX: '1',
-        NEXT_PUBLIC_GTM_ID: 'GTM-ABC1234',
-      }),
-    ).toBe(true)
-  })
-
-  it.each([
-    [{ NEXT_PUBLIC_GA_ID: 'G-ABC1234XYZ' }, true],
-    [{ NEXT_PUBLIC_GTM_ID: 'GTM-ABC1234' }, true],
-    [{}, false],
-    [{ NEXT_PUBLIC_GA_ID: '   ' }, false],
-  ])('reads %o as %s', (env, expected) => {
-    expect(analyticsConfigured(env)).toBe(expected)
   })
 })
