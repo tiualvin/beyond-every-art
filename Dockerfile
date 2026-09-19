@@ -1,5 +1,12 @@
 FROM node:20-alpine AS base
 RUN corepack enable
+# Corepack asks before downloading a package manager, and only when it is
+# attached to a terminal. That is why this never surfaced in CI or in a deploy
+# — both run without one — and why running `docker compose run migrate ...` by
+# hand stopped dead on `Do you want to continue? [Y/n]`, which is indis-
+# tinguishable from a hang if the session is then closed. Nothing here should
+# ever wait for an answer nobody is there to give.
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 WORKDIR /app
 
 FROM base AS dependencies
@@ -41,6 +48,17 @@ COPY --from=dependencies /app/node_modules ./node_modules
 ARG SOURCE_COMMIT=""
 RUN echo "$SOURCE_COMMIT" > /etc/source-commit
 COPY . .
+# Bakes pnpm into the image, which is the half of the corepack problem the
+# variable above only hides. `corepack enable` installs shims, not a package
+# manager: the version in `packageManager` is fetched on first use. The
+# `dependencies` stage pays that cost during its own build, but this stage
+# copies `node_modules` from it and not corepack's cache — so every `pnpm`
+# invocation at *runtime* was reaching registry.npmjs.org before it could do
+# anything. That is a network dependency on the path of `pnpm migrate:db`,
+# which the deploy runs before it replaces containers, so an npm outage could
+# fail a deploy that has nothing to do with npm. Resolved at build time now,
+# where a failure is a failed build.
+RUN corepack install
 # The Ghost importer writes uploads here, so this stage needs the directory to
 # exist with the runtime image's ownership: whichever service touches the media
 # volume first is the one Docker initialises it from, and a root-owned volume
