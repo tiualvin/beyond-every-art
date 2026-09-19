@@ -1,18 +1,22 @@
 # Edge Protection
 
-> [!WARNING]
+> [!NOTE]
 >
-> **The origin is unprotected, and this is the largest open risk in the
-> deployment.** Cloudflare holds the DNS for `beyondeveryart.com` but every
-> record is set to **DNS only** — the grey cloud, not the orange one. Nothing
-> filters, caches, or absorbs traffic in front of the VPS: every request lands
-> on a €5 box, and the origin's IP address is published in DNS for anyone who
-> looks.
+> **Closed on 18 Sep 2026.** This document opened with a warning that the
+> origin was the largest open risk in the deployment; it is not open any more.
+> Every step below is done, including pass two of the firewall.
 >
-> This must be closed before the public cutover. The repository now carries
-> everything it can: the image is built and in use, and the challenge switch is
-> a single variable. What remains is operator work in the production `.env` and
-> the Cloudflare and Hetzner dashboards — steps 1 and 3 through 6 below.
+> Verified from outside the VPS, which is the only vantage point that proves
+> anything: `http://<origin-ip>` and `https://<origin-ip>` both time out —
+> curl exit 28, the port genuinely shut, rather than exit 35, which would mean
+> open-but-unable-to-choose-a-certificate. `staging` answers 200, `cms/admin`
+> answers 200 through its trailing-slash redirect, and `/health` reports
+> `{"status":"ok","db":"up"}`. That last one matters because both ports failing
+> closed is otherwise silent: the Compose healthcheck runs inside the
+> container, where no firewall applies.
+>
+> `cms.beyondeveryart.com` is proxied too, which this document had treated as
+> an open question. See "Closing the origin" for how it was settled.
 
 ## Do not simply turn the proxy on
 

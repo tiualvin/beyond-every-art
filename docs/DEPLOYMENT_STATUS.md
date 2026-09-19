@@ -4,18 +4,262 @@ A working snapshot of VPS setup and Ghost migration progress, so this can be
 picked up in a later session without re-deriving it. Update or delete this
 file once cutover is complete; it is a progress note, not a runbook.
 
-Related: [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md),
+Related: [`CUTOVER_DAY.md`](CUTOVER_DAY.md) — the ordered sheet for the morning
+of the flip — [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md),
 [`CUTOVER_RUNBOOK.md`](CUTOVER_RUNBOOK.md),
 [`ACCOUNT_MODEL.md`](ACCOUNT_MODEL.md),
 [`SUBSCRIPTION_WEBHOOKS.md`](SUBSCRIPTION_WEBHOOKS.md).
 
 ## Pick up here
 
-Last worked on **15 Sep 2026**. The header bypass below — the item that had been
-the most important line on this page since 5 Sep — is closed in code. Nothing
-else changed.
+Last worked on **18 Sep 2026**, and it was a long day: four merges (#156, #157,
+#158, #159) and the first crawl comparison since 4 Sep.
 
-### The rate-limiter bypass is fixed, and needs a deploy to take effect
+The header bypass is closed **and deployed** (#156), so the limiters actually
+bound request volume on the running host for the first time since 29 Aug.
+
+Rehearsal §4 and §5 are both closed. Draft URLs 404, confirmed signed out. The
+restore drill ran against the real bucket and reproduced production exactly,
+including the one canonical defect production already has — which is stronger
+evidence than a clean report, because a lossy restore fails differently.
+Transactional email is decided rather than configured, and reaches
+administrators only.
+
+The crawl comparison found two things worth the work: structured data missing
+on three route kinds, now shipped in #158, and the escaped-quote trap below.
+Its 135 errors were mostly Cloudflare's email obfuscation, since switched off.
+
+**The origin is closed**, later the same day, which was the largest open risk
+in the deployment and the last piece of edge protection. `cms` is proxied too:
+the three-way choice that decision had been waiting on turned out to be
+testable in minutes rather than a bet, because the MCP endpoint is stateless
+`POST /api/mcp` with SSE disabled and nothing about a proxy troubles it. A curl
+with no browser headers reached the application and got a protocol-level answer
+from the MCP handler, which settled it. Then pass two narrowed 80 and 443 to
+Cloudflare's ranges, verified from outside the VPS: both ports time out on the
+origin IP while every hostname still serves and `/health` reports
+`{"status":"ok","db":"up"}`.
+
+Analytics is set (`NEXT_PUBLIC_GTM_ID`), Search Console and Meta are both
+verified by DNS so both survive Ghost, and the search baseline is a recorded
+skip.
+
+Still open: the fresh Ghost export the cutover gate now needs (below), media
+id 4, the Ghost members **export** (the Payload import is skipped, the export is
+not — it is the only copy that survives cancelling the account), the flip
+itself, and the Stripe handover before Ghost is switched off.
+
+`/about/ images_lost` is no longer one of them, and not because it was fixed:
+#159 put a wordmark in every masthead, and `images_lost` only fires on a target
+page with _zero_ images, so the check has been dead sitewide since that deploy.
+See [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md) §6 for the mechanism and
+the one-line check that answers the original question.
+
+### The export on the VPS is older than the content — refresh it before the gate
+
+Four unwanted drafts were deleted on 18 Sep, in Payload **and** in Ghost. The
+export sitting on the VPS is still the 9 Aug one, so `migrate:validate` builds
+what it expects from a file that still lists them, finds them absent from
+Payload, and reports them `missing` with `ok: false`. The gate is red for a
+deliberate act — the trap the cutover runbook already documents at step 6.
+
+The fix is a fresh export rather than anything in the code. On the VPS, keeping
+the old file rather than overwriting it:
+
+```bash
+cd ~/beyond-every-art
+cp ghost-export/ghost-content.json \
+   ghost-export/ghost-content.2026-08-09.json    # preserve the 9 Aug export
+# copy the newly downloaded export into place as ghost-content.json
+```
+
+Then re-run the gate. **`ghost-export/` is in `.dockerignore` and the `migrate`
+service does not mount it**, so `--input` needs a bind mount or the container
+sees no file at all:
+
+```bash
+docker compose run --rm \
+  -v "$PWD/ghost-export:/app/ghost-export:ro" \
+  migrate pnpm migrate:validate -- --input ghost-export/ghost-content.json
+```
+
+**Read three numbers, not one.** The report is
+`{ ok, collections: { posts, pages, tags, authors } }`, and each collection
+carries `expected`, `actual`, `matched` and `issues`
+(`lib/migration/validate.ts`):
+
+- `expected: 113` — the fresh export lists 113 posts, i.e. the deletions reached
+  Ghost. Still 117 means the export is not the new one.
+- `matched: 113` with `ok: true` — every post the export lists is in Payload and
+  matches field for field. This is the actual gate: `isClean` counts `issues`.
+- `actual` — Payload rows carrying a `ghostID`. **`ok: true` does not prove this
+  number.** Issues are only ever raised for _expected_ records, so there is no
+  check for a row Payload has and the export does not; deleting the four drafts
+  in Ghost alone would still report `ok: true`.
+
+On `actual`, expect 113 **or 114**, and 114 is not a new problem: the §5 restore
+drill found `posts` at 118 against the export's 117 — one post in Payload that
+Ghost never had. Whether it lands in this count depends on whether it carries a
+`ghostID`; the validator only counts rows that do. Either number passes the
+gate. A third number does not, and 114 is still the unidentified post the
+rehearsal asked to have identified rather than carried into cutover.
+
+No migration runs on cutover day once this is green, and that is the point:
+`migrate:ghost` would overwrite the escaped-quote repair and the canonical fix
+with the unrepaired export.
+
+### Email has never been configured — and now deliberately will not be
+
+Triggered an admin password reset on 18 Sep; nothing was delivered. Root
+cause confirmed the same day, on the box:
+
+```
+docker compose exec app printenv | grep -E 'RESEND|EMAIL_FROM'
+EMAIL_FROM_ADDRESS=
+EMAIL_FROM_NAME=Beyond Every Art
+RESEND_API_KEY=
+```
+
+Both are empty, and `docker compose logs app | grep -i resend` returns
+nothing — consistent, because the adapter was never built and so nothing ever
+called Resend. Compose is passing the variables through; only the values are
+missing. This is not a regression: email has never worked here.
+
+**Who is affected, stated carefully, because it is narrower than it first
+looks.** `Users` is the only collection with `auth`; `collections/Members.ts`
+says in its own description that it is a "Restricted preservation copy of
+Ghost member data. Not an authentication collection." The passwordless
+member sign-in described in [`ACCOUNT_MODEL.md`](ACCOUNT_MODEL.md) is design,
+not built — there is no accounts collection. The newsletter and app-waitlist
+actions record rows and send nothing. So the only mail this application sends
+today is Payload's **administrator** password reset and verification.
+
+The consequence is therefore operational rather than member-facing: an
+administrator who forgets their password cannot self-recover, and a
+production Payload with no working reset is a bad thing to discover on the
+day it is needed. It is on the cutover runbook's immediately-after list for
+that reason. It becomes member-facing the moment the account model is built,
+and it should be fixed well before then.
+
+**Why it failed silently.** `resendAdapter()` in `lib/email/resend.ts`
+returns `null` when either `RESEND_API_KEY` or `EMAIL_FROM_ADDRESS` is unset,
+and `payload.config.ts` then omits the `email` key entirely
+(`...(email ? { email } : {})`). Payload falls back to its own adapter, which
+**logs the message instead of sending it** — and the forgot-password endpoint
+answers the caller identically either way, deliberately, so it cannot be used
+to enumerate addresses. A missing variable and a working send look the same
+from outside. The adapter is built once at module load, so the values must be
+present when the container starts, not merely written to `.env` afterwards.
+
+**Resolved by decision on 18 Sep: no transactional provider, for now.** The
+cost is that an administrator who forgets their password needs SSH to get back
+in — `docker compose run --rm migrate pnpm bootstrap:admin` sets one from
+environment variables — and that is acceptable while the administrators are
+the people with SSH. The cutover runbook's "verify a password-reset email"
+line is struck for the same reason.
+
+[`EMAIL.md`](EMAIL.md) is now the source of truth for this, including what
+makes the decision expire: the account model's emailed sign-in link is the
+main one, and it turns a nuisance into a blocker.
+
+**Klaviyo is the ESP**, decided the same day, for the newsletter and anything
+else list-shaped. It replaces the Listmonk placeholder the handoff carried.
+Not for transactional mail, and `EMAIL.md` says why at length — the short
+version is that a reset token would have to travel as a marketing event
+property.
+
+**If it is ever turned on:** create the key, verify a sending domain (DNS in
+the Cloudflare zone), set `RESEND_API_KEY` and `EMAIL_FROM_ADDRESS`, then
+`docker compose up -d`. No rebuild — neither is a `NEXT_PUBLIC_*` variable, so
+neither reaches the client bundle nor is a Docker build argument, unlike
+`NEXT_PUBLIC_CHECKOUT_URL_MONTHLY`.
+
+Two things that will otherwise be found one at a time:
+
+- **An unverified domain fails the convincing way.** Until the sending domain
+  is verified, Resend accepts mail only to the account's own address — which
+  reads as "it works for me". Verify before believing a successful test.
+- **Ghost is still sending from this domain.** A domain has one SPF record;
+  adding a second breaks both senders. Either merge Resend's include into the
+  existing record, or — better — send from a subdomain, which leaves Ghost's
+  DNS untouched and keeps the root domain's reputation separate.
+
+Once mail sends, check the link in it is absolute. `getRequestOrigin` builds
+reset links from the request `Host` and trusts it only against the list in
+`lib/security/origins.ts`, derived from `CMS_ADDRESS`,
+`PAYLOAD_PUBLIC_CMS_URL` and `NEXT_PUBLIC_SITE_URL`. With none of them set it
+emails a bare `/admin/reset/<token>`, relative, in an email, where there is
+nothing for it to be relative to. Those look set on this host, so this is a
+confirmation rather than an expectation — but it is the second way admin
+recovery fails, and it is invisible until someone clicks the link.
+
+### The three posts are being kept — reversed 18 Sep, later the same day
+
+Three posts were briefly going to be deleted, and are not. Recorded because the
+reversal changes what is outstanding, and because the reasoning for each is
+still the reasoning:
+
+- `the-ultimate-guide-to-understanding-different-types-of-art-prints-giclee-lithographs-and-more`
+  carries media id 4, the site's only broken image. **That item is open again**
+  — see below. It needs the image re-uploaded through the admin under a
+  filename ending `.jpeg`, which fixes both the missing bytes and the
+  extensionless filename that `trailingSlash` makes unreachable.
+- `fine-art-home-guide` still declares a `__GHOST_URL__` canonical. The
+  importer strips the placeholder now, so the final migration repairs it — or
+  `docker compose run --rm migrate pnpm fix:ghost-links` does it sooner.
+- `limited-edition-vs-open-edition-prints-which-is-right-for-you` is the only
+  one of 117 posts carrying Ghost card markup. It served 200 on staging on
+  4 Sep with its table and its one `figcaption` intact; a look in a browser is
+  the outstanding half.
+
+**What the reversal buys:** no redirects to write, no indexed URL 404ing, and
+no interaction with the cutover gate. Deleting a post the export still lists
+makes `migrate:validate` report it `missing` and fail step 6, which is a red
+gate for a deliberate act — the trap is documented in the runbook now as a
+caution for next time rather than a step for this cutover.
+
+**What it leaves:** the three defects above, each small and each known.
+
+### The seven dead links come back unless `repair:content` runs
+
+New on 18 Sep, and the reason it was not obvious. The crawl comparison reported
+seven URLs 404ing — hrefs wrapped in escaped quotes, which a browser resolves
+as relative paths. They are dead on the **live Ghost site**. Payload's copies
+are already clean, and `repair:content --dry-run` confirms it by finding
+nothing to repair.
+
+Both facts are true at once, and together they are the trap: the export still
+carries the malformed hrefs, and the importer does not touch them. It strips
+`__GHOST_URL__` placeholders and nothing else. So the final `migrate:ghost`
+overwrites a repaired database with the unrepaired export, and the seven dead
+links ship on the new site.
+
+The decision is to leave them in Ghost and fix them on the way in:
+`pnpm repair:content` is now step 5 of the [cutover runbook](CUTOVER_RUNBOOK.md),
+alongside the three migration commands rather than after them as a tidy-up. It
+also backfills the 110 photo credits the importer passes over, which is the
+other thing a fresh import loses.
+
+Until cutover, seven links in one published post 404 for readers on the live
+site. That is the accepted cost of not editing Ghost content this close to the
+move.
+
+### Closed on 18 Sep
+
+- **Draft URLs 404.** Requested signed out and confirmed. Worth repeating
+  that it must be checked signed out: an admin session carries the preview
+  cookie, and a draft served 200 through it looks exactly like one that
+  leaked.
+- **Media id 4 is not closed.** It was, briefly, by a deletion decision that
+  was reversed the same day. It needs an operator: re-upload the image
+  through the admin under a filename ending `.jpeg`. Noted here because the
+  item reads as closed in two earlier commits, and it is not.
+
+Previously worked on **15 Sep 2026**. The header bypass below — the item that
+had been the most important line on this page since 5 Sep — was closed in code.
+Nothing else changed.
+
+### The rate-limiter bypass is fixed, and was deployed on 18 Sep
 
 `clientKey()` in `lib/security/rate-limit.ts` keyed on `CF-Connecting-IP`
 whenever `TRUST_CLOUDFLARE_IP` was set, and that variable has been set since
@@ -63,17 +307,23 @@ not actually one piece of work. `EDGE_PROTECTION.md` now carries the list next
 to the firewall rules, and `tests/docs/drift.test.ts` fails if the two copies
 diverge.
 
-**Three things an operator still owns:**
+**Deployed 18 Sep**, by the `deploy` job on the merge of #156 — which runs on
+any push to `main` once all four build jobs pass, so no manual step was
+involved. The limiters bound request volume on the running host from that
+point.
 
-1. **It is not deployed.** The bypass is open on the running host until the next
-   deploy. Severity is lower than it will be — DNS has not cut over, so this is
-   the public staging copy — but `forgot-password` mails real addresses today.
-2. **Re-verify the ranges at step 6**, and update both copies if Cloudflare has
+**Two things an operator still owns:**
+
+1. **Re-verify the ranges at step 6**, and update both copies if Cloudflare has
    published a change. The test compares the doc to the code; neither is checked
    against Cloudflare, and nothing automated can be.
-3. **Watch for a limiter that suddenly bites.** The failure mode of a wrong or
+2. **Watch for a limiter that suddenly bites.** The failure mode of a wrong or
    stale list is real visitors behind Cloudflare sharing one bucket rather than
    getting their own. `TRUST_CLOUDFLARE_IP` stays safe to leave set either way.
+
+One consequence worth holding on to while the email defect above is open: the
+`forgot-password` limiter is now real, so repeated reset attempts while
+debugging will start returning 429. That is the fix working, not a new fault.
 
 ### Also from the 5 Sep pass
 
@@ -808,7 +1058,9 @@ backups are all done — see "Backups are encrypted and a restore is proven" and
 content audit (see "The content audit" above) answered the question this used
 to pose:
 
-1. **Media id 4** (`photo-1689659721022-3aa475803e19`) has no bytes in R2. It
+1. **Media id 4** (`photo-1689659721022-3aa475803e19`) has no bytes in R2.
+   Briefly retired on 18 Sep by a decision to delete the post carrying it; that
+   decision was reversed the same day, so this is open. It
    is an Unsplash URL that was linked rather than stored in Ghost, it **is**
    used — the feature image of a published post — and its source URL still
    returns 200 with the exact byte count the row expects, so it is

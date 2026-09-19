@@ -2,12 +2,13 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { cache } from 'react'
 
-import { getPostsByAuthor } from '@/lib/content/queries'
+import { getPostsByAuthor, getSiteSettings } from '@/lib/content/queries'
 import { logMissingRoute } from '@/lib/observability/missing-route'
 import {
   recordSlugMiss,
   requireLookupableSlug,
 } from '@/lib/security/slug-requests'
+import { buildProfilePageJsonLd, serializeJsonLd } from '@/lib/seo/jsonld'
 import { absoluteUrl, authorPath, getSiteUrl } from '@/lib/seo/site'
 
 import { FadeIn } from '../../components/motion/fade-in'
@@ -59,8 +60,26 @@ export default async function AuthorPage({
     notFound()
   }
 
+  // Ghost emitted a bare Person here; this wraps it as the mainEntity of a
+  // ProfilePage, which is what the page actually is. See `lib/seo/jsonld.ts`.
+  const settings = await getSiteSettings()
+  const siteUrl = getSiteUrl()
+  const jsonLd = serializeJsonLd(
+    buildProfilePageJsonLd({
+      url: absoluteUrl(authorPath(archive.slug), siteUrl),
+      name: archive.name,
+      description: archive.description || undefined,
+      siteName: settings.title,
+      siteUrl,
+    }),
+  )
+
   return (
     <main>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLd }}
+      />
       <section className="section">
         <div className="container">
           <FadeIn>

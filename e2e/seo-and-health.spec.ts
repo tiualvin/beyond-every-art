@@ -26,6 +26,51 @@ test('article metadata, canonical URL, and structured data agree', async ({
   expect(jsonLd.url).toMatch(new RegExp(`/${fixtures.publicPost.slug}/$`))
 })
 
+test('the homepage, a page, a tag and an author archive each describe themselves', async ({
+  page,
+}) => {
+  // Added 18 Sep, after the crawl comparison found Ghost emitting WebSite,
+  // Article and Person on these three routes while this site emitted nothing
+  // on any of them. The builders are unit tested; what this covers is the
+  // wiring, which is the half that was actually missing — `buildArticleJsonLd`
+  // was correct all along and simply never called outside the post branch.
+  const firstNode = async () =>
+    JSON.parse(
+      (await page
+        .locator('script[type="application/ld+json"]')
+        .first()
+        .textContent()) || '{}',
+    ) as Record<string, unknown>
+
+  await page.goto('/')
+  const home = await firstNode()
+  expect(home['@type']).toBe('WebSite')
+  expect(home.url).toBeTruthy()
+
+  await page.goto(`/${fixtures.page.slug}/`)
+  const about = await firstNode()
+  // WebPage rather than Article, deliberately — a page is not editorial. The
+  // reasoning is in lib/seo/jsonld.ts, and this is the assertion that makes a
+  // future "fix" for the crawl diff argue with a test.
+  expect(about['@type']).toBe('WebPage')
+  expect(about.name).toBe(fixtures.page.title)
+
+  await page.goto(`/tag/${fixtures.tag.slug}/`)
+  const tag = await firstNode()
+  // CollectionPage rather than Ghost's Series — a tag archive is a list, not a
+  // work published in parts. Reasoning in lib/seo/jsonld.ts.
+  expect(tag['@type']).toBe('CollectionPage')
+  expect(tag.name).toBe(fixtures.tag.title)
+
+  await page.goto(`/author/${fixtures.author.slug}/`)
+  const author = await firstNode()
+  expect(author['@type']).toBe('ProfilePage')
+  expect(author.mainEntity).toMatchObject({
+    '@type': 'Person',
+    name: fixtures.author.title,
+  })
+})
+
 test('the URL a page advertises is the URL it serves', async ({ request }) => {
   // The migration's central promise: a Ghost permalink keeps working as-is.
   // Ghost served every URL with a trailing slash, so that shape must answer

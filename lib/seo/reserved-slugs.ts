@@ -19,6 +19,11 @@ export const RESERVED_ROOT_SLUGS = [
   'author',
   'csp-report',
   'health',
+  // `app/icon.png` is a metadata file, not a page, but Next still answers
+  // `/icon.png` from it — the same way `robots.txt` and `sitemap.xml` below
+  // are answered from `app/robots.ts` and `app/sitemap.ts`. A file-based
+  // root route is still a root route, so it reserves its segment here.
+  'icon.png',
   'journal',
   'newsletter',
   'oauth',
