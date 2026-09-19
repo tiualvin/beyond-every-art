@@ -22,6 +22,8 @@
 
 import type { CollectionAfterChangeHook } from 'payload'
 
+import { recordMcpConnectorPublish } from '../observability/alert'
+
 /** Cap on any logged free-text field, so one request cannot flood the log. */
 const MAX_FIELD = 120
 
@@ -261,16 +263,35 @@ export const recordMcpWrite: CollectionAfterChangeHook = ({
 }) => {
   if (req.payloadAPI !== 'MCP') return doc
 
+  const role = (req.user as { role?: string } | null | undefined)?.role
+  const status = (doc as { _status?: unknown })?._status
+  const documentId = (doc as { id?: unknown })?.id
+
   logMcpEvent(
     mcpWriteLogEntry({
       collection: collection.slug,
-      documentId: (doc as { id?: unknown })?.id,
+      documentId,
       operation,
-      role: (req.user as { role?: string } | null | undefined)?.role,
-      status: (doc as { _status?: unknown })?._status,
+      role,
+      status,
       userId: req.user?.id,
     }),
   )
+
+  // A log line is evidence; this is a notification. The line above is written
+  // whatever happened and read by whoever goes looking, which is the right
+  // shape for a draft save and the wrong shape for the one write that is
+  // immediately visible to every reader of the site.
+  const viaOAuth =
+    (req.context as { mcpViaOAuth?: unknown } | undefined)?.mcpViaOAuth === true
+  if (viaOAuth && status === 'published') {
+    recordMcpConnectorPublish({
+      collection: collection.slug,
+      documentId,
+      role,
+      userId: req.user?.id,
+    })
+  }
 
   return doc
 }

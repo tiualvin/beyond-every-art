@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   ThresholdAlarm,
   alertsEnabled,
+  recordMcpConnectorPublish,
   sendAlert,
 } from '../../lib/observability/alert'
 
@@ -122,6 +123,63 @@ describe('sendAlert', () => {
       } as unknown as NodeJS.ProcessEnv),
     ).resolves.toBeUndefined()
 
+    fetchSpy.mockRestore()
+  })
+})
+
+describe('recordMcpConnectorPublish', () => {
+  const publish = {
+    collection: 'posts',
+    documentId: 42,
+    role: 'admin',
+    userId: 7,
+  }
+
+  it('says nothing when no destination is configured', () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    vi.stubEnv('ALERT_WEBHOOK_URL', '')
+
+    recordMcpConnectorPublish(publish)
+
+    expect(fetchSpy).not.toHaveBeenCalled()
+    vi.unstubAllEnvs()
+    fetchSpy.mockRestore()
+  })
+
+  // No threshold and no cooldown, unlike the auth alarm. A connector
+  // publishing is interesting the first time and every time: if these start
+  // arriving when nobody is publishing, that is the signal, and a cooldown
+  // would hide the second one.
+  it('fires on every publish, with no cooldown', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(null, { status: 204 }))
+    vi.stubEnv('ALERT_WEBHOOK_URL', 'https://hooks.example/x')
+
+    recordMcpConnectorPublish(publish)
+    recordMcpConnectorPublish(publish)
+    await Promise.resolve()
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    vi.unstubAllEnvs()
+    fetchSpy.mockRestore()
+  })
+
+  it('names the document and says how to revoke, and carries no client name', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(null, { status: 204 }))
+    vi.stubEnv('ALERT_WEBHOOK_URL', 'https://hooks.example/x')
+
+    recordMcpConnectorPublish(publish)
+    await Promise.resolve()
+
+    const [, init] = fetchSpy.mock.calls[0]!
+    const sent = JSON.parse(String((init as RequestInit).body))
+    expect(sent.event).toBe('mcp_connector_publish')
+    expect(sent.message).toContain('posts/42')
+    expect(sent.message).toContain('revoke')
+    vi.unstubAllEnvs()
     fetchSpy.mockRestore()
   })
 })
