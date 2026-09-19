@@ -28,7 +28,7 @@ import {
 } from '@/lib/seo/jsonld'
 import { absoluteUrl, getSiteUrl, pagePath, postPath } from '@/lib/seo/site'
 
-import { Article } from '../components/article'
+import { Article, FeaturedFigure } from '../components/article'
 import { ArticleBody } from '../components/body'
 import { ReadNext } from '../components/read-next'
 
@@ -195,6 +195,13 @@ export default async function SlugPage({
             <header className="article__header">
               <h1>{page.title}</h1>
             </header>
+            {/* Same wrapper class as the post template, for the same reason:
+                the grid sizes this box, not the figure inside it. */}
+            {page.image && (
+              <div className="article__figure-frame">
+                <FeaturedFigure image={page.image} />
+              </div>
+            )}
             <ArticleBody
               body={page.body}
               preview={draft}
