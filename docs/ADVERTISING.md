@@ -15,11 +15,13 @@ certified CMP §9 recommends — is configured in the AdSense console, reported 
 the repository owner on 19 Sep. It needs no code here: the AdSense tag loads the
 European regulations message itself, which is exactly why it was recommended.
 
-Half of §2 survives that, and it is the half this repository owns. GA4 still
-loads unconditionally with no consent gate, and the application still reads no
-Consent Mode signal — so there is a certified banner governing the ad tag and
-nothing governing the analytics tag. §2 says why that is a worse position than
-no banner at all, and §9 says what closes it.
+The other half of §2 is closed too, and that half was code.
+`lib/analytics/consent.ts` declares the Consent Mode v2 defaults before either
+Google tag acts on them: granted where no banner is shown, denied across the
+EEA, the UK and Switzerland where one is. Both tags honour it, so one banner
+now governs both — which is what §2 asked for and what §9's seam argument is
+built on. [`ANALYTICS.md`](ANALYTICS.md) has the placement, which took
+measuring.
 
 Related: [`CONTENT_SECURITY_POLICY.md`](CONTENT_SECURITY_POLICY.md),
 [`DEPLOYMENT_STATUS.md`](DEPLOYMENT_STATUS.md),
@@ -139,7 +141,7 @@ build or app-level test would catch.
 Verify after cutover by fetching `https://<domain>/ads.txt` and reading the
 body, not the status code.
 
-## 2. Consent was the real blocker — half of it is closed
+## 2. Consent was the real blocker — it is closed
 
 **Settled 19 Sep, in a console rather than in this repository.** Google's
 Privacy & messaging is configured on the AdSense account, per the owner. That
@@ -157,27 +159,29 @@ current version, ads to those users are not served, and this is enforced by
 Google rather than merely advised. §9 evaluates the options, including why the
 open-source ones cannot be used here.
 
-**Two things it does not close**, and the second is the one with teeth.
+**What the console did not close, and what did.** There is still no cookie
+consent _banner_ in this repository — grepping finds the OAuth consent screen
+and the newsletter signup's consent line, and nothing else. That is correct:
+the ad tag brings its own. What was missing was the other side of it.
 
-There is still no cookie consent system in _this repository_. Grepping for one
-finds the OAuth consent screen and the newsletter signup's consent line, and
-nothing else. That is fine for the ad tag, which brings its own, and it is not
-fine for anything else on the page that sets a non-essential cookie.
+**GA4 had this problem, and the CMP made it sharper rather than softer.**
+`app/(frontend)/components/analytics.tsx` loads the GA4 tag whenever
+`NEXT_PUBLIC_GA_ID` is set and the deployment is indexable, and for a while
+there was nothing in front of it. That was a small gap while there was no
+banner at all; the moment one went live it became a claim the analytics tag was
+not honouring, on every EEA and UK visit — and a site whose banner governs half
+its tags is in a worse position than one running none, because it has made a
+promise.
 
-**GA4 still has this problem, and the CMP made it sharper rather than
-softer.** `app/(frontend)/components/analytics.tsx`
-loads the GA4 tag unconditionally whenever `NEXT_PUBLIC_GA_ID` is set and the
-deployment is indexable. There is no consent gate in front of it. That was an
-existing gap while there was no banner at all; now there is one, and a site
-running a consent banner that governs only half its tags is in a worse position
-than one running none, because it has made a claim. The banner is live. The
-claim is being made today, on every EEA and UK visit, and the analytics tag is
-not honouring it.
-
-Closing it is the work in §9's last paragraph — read the Consent Mode v2
-signals off `dataLayer` rather than any one CMP's API — and it is the only
-consent work left in this repository. It is not built here, and it is not part
-of this change.
+**Closed the way §9's last paragraph asks**, by declaring Consent Mode v2
+defaults rather than by gating the script. That distinction is the part worth
+keeping: a Google tag with no declared default treats consent as _granted_, so
+the fix is not "do not load GA4" — it is to say what it may store before it
+asks. Denied across the EEA, the UK and Switzerland; granted elsewhere, because
+Google's CMP shows no banner there and a global denial would never be updated
+for anybody else. `lib/analytics/consent.ts`, and
+[`ANALYTICS.md`](ANALYTICS.md) for where the script has to sit and why that
+took measuring rather than reading.
 
 **Consent has to be an input to the ad layer, not a wrapper around it.** The
 tempting shape is a banner component that conditionally renders the ad script.
@@ -642,9 +646,18 @@ depends on the signal and not on the vendor, and swapping CMP becomes a console
 change instead of a code change. That is the same seam argument as §5, applied
 one layer down: the thing worth abstracting is the signal, not the provider.
 
-It also settles the GA4 gap in §2. Once `Analytics` reads the same signals, one
-banner governs both tags and there is no second source of truth — which was the
-actual requirement, and is the part no CMP gives you for free.
+It also settles the GA4 gap in §2, and that is built rather than planned now —
+`lib/analytics/consent.ts`. One banner governs both tags and there is no second
+source of truth, which was the actual requirement and is the part no CMP gives
+you for free.
+
+One correction to the paragraph above, learned in the building. "Read consent
+through the signals" is the wrong shape for a Google tag: there is nothing to
+read, because the tag reads them itself. What the application owes is the
+_declaration_ — the default state, before the tag looks. A reader is still the
+right seam for anything non-Google, and there is nothing non-Google yet, so
+there is no reader. The signal is the contract either way, which is the part
+that mattered.
 
 ### What the banner can be made to look like
 

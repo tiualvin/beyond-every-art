@@ -54,6 +54,88 @@ Do not lift `noindex` on staging to test a tag. It is the only thing keeping a
 complete duplicate of the site out of the index, and a crawler does not need
 long.
 
+## Consent, and what governs the tag
+
+The site runs Google's Privacy & messaging CMP, configured in the AdSense
+console. The AdSense tag serves the banner itself, which is why it needed no
+code here — and why, for a while, it governed the ad tag and nothing else. A
+Google tag with **no declared consent default treats consent as granted**, so
+GA4 set cookies on every EEA and UK visit from page load until the banner's
+answer arrived, if it arrived at all. A banner that governs half the tags on a
+page is worse than no banner, because it has made a claim.
+
+`lib/analytics/consent.ts` declares the default. Two commands:
+
+```js
+gtag('consent', 'default', { …: 'granted' })
+gtag('consent', 'default', { …: 'denied', region: [/* EEA, GB, CH */], wait_for_update: 500 })
+```
+
+Granted where no banner is shown, denied where one is. Order does not decide
+which applies — Google resolves the overlap by specificity, so the regional
+command governs the countries it names and the unscoped one governs the rest.
+
+**Denying everywhere would be denying forever.** Google's CMP shows nothing
+outside those countries, so nothing would ever update the signal for anybody
+else and analytics would go cookieless worldwide while looking configured.
+`NEXT_PUBLIC_CONSENT_SCOPE=all` does it anyway for the day a banner runs
+worldwide; anything unrecognised falls back to the regional pair, because a
+typo must not turn analytics off for the whole world.
+
+`wait_for_update: 500` is on the denied command only. It is a real cost on
+every restricted-region page view, and the alternative is a tag firing — and
+writing a cookie — in the gap between the page loading and the banner being
+answered, which is the gap the whole thing exists to close.
+
+### Where the script goes, and why that took measuring
+
+The default has to be on `dataLayer` before a tag acts on it, and two plausible
+placements do not do what their names suggest. Both were tried against a built
+server rather than reasoned about:
+
+| Placement                                    | What actually happened                     |
+| -------------------------------------------- | ------------------------------------------ |
+| `next/script` `strategy="beforeInteractive"` | Rendered into `<body>`, after both loaders |
+| An explicit `<head>` in the layout           | Lands in `<head>` — this is what ships     |
+
+`beforeInteractive` is reserved for the literal `app/layout.tsx`, and this
+application's root layout is `app/(frontend)/layout.tsx` — a root layout for
+its route group, which is not the same thing.
+
+Even in `<head>` it is third, not first: React 19 hoists the AdSense loader and
+the analytics loader above it, because both are `<script async src>`. That is
+in time for two independent reasons. Both loaders are `async`, so neither
+executes during parsing while this one does. And neither reads consent when it
+loads — GA4 acts on `gtag('config', …)` and AdSense on `adsbygoogle.push({})`,
+both strictly later.
+
+Measured in Chromium against a production build, `dataLayer` comes out as:
+
+```
+set ads_data_redaction → consent default → consent default → js → config
+```
+
+The defaults ahead of the command that sends the first hit.
+[`../e2e/analytics-consent.spec.ts`](../e2e/analytics-consent.spec.ts) pins
+that order, because the second reason is a fact about today's tags rather than
+a guarantee: **a Tag Manager container fires on load**, so configuring
+`NEXT_PUBLIC_GTM_ID` is exactly the change that would make the ordering matter
+for real.
+
+### What is still not gated
+
+Nothing reads the signals back. Both Google tags honour them on their own, and
+nothing else on the page sets a non-essential cookie, so there is no consumer
+to write. A reader belongs in `lib/analytics/consent.ts` when something
+non-Google needs one — not before, or it is an abstraction with one imaginary
+caller.
+
+The script is inline, so `'unsafe-inline'` in `script-src` is what lets it run.
+[`CONTENT_SECURITY_POLICY.md`](CONTENT_SECURITY_POLICY.md) phase 3 replaces
+that with nonces, and this is one of the scripts to check when it happens: a
+consent default that silently fails to run looks exactly like never having had
+one.
+
 ## Neither is a build argument
 
 Both are read at **runtime**. Set one in `.env`, restart, done — no rebuild.
