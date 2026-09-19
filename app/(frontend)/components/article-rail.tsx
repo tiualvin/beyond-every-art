@@ -3,9 +3,10 @@ import Link from 'next/link'
 import { adClientFor } from '@/lib/ads/eligibility'
 import type { PostCard } from '@/lib/content/queries'
 import type { TocEntry } from '@/lib/content/toc'
-import { NEWSLETTER_PATH, postPath } from '@/lib/seo/site'
+import { postPath } from '@/lib/seo/site'
 
 import { AdUnit } from './ad-unit'
+import { SubscribeLink } from './subscribe-link'
 
 /**
  * A contents list of two is a heading with extra steps, and of one is a lie
@@ -124,9 +125,9 @@ export function ArticleRail({
             <p className="rail__copy">
               One piece a week on colour, material, and practice.
             </p>
-            <Link href={NEWSLETTER_PATH} className="button button--primary">
+            <SubscribeLink className="button button--primary">
               Join the list
-            </Link>
+            </SubscribeLink>
           </div>
         </div>
       </div>
