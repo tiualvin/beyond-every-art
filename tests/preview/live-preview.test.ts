@@ -7,8 +7,6 @@ import {
   previewTargetPath,
 } from '../../lib/preview/live-preview'
 
-const siteUrl = 'https://beyondeveryart.test'
-
 describe('isPreviewCollection', () => {
   it('accepts the collections rendered on the public site', () => {
     expect(isPreviewCollection('posts')).toBe(true)
@@ -56,9 +54,9 @@ describe('previewTargetPath', () => {
 
 describe('buildPreviewUrl', () => {
   it('builds the preview entry point for a saved document', () => {
-    expect(
-      buildPreviewUrl({ collection: 'posts', slug: 'lead-white', siteUrl }),
-    ).toBe(`${siteUrl}/api/preview?collection=posts&slug=lead-white`)
+    expect(buildPreviewUrl({ collection: 'posts', slug: 'lead-white' })).toBe(
+      `/api/preview?collection=posts&slug=lead-white`,
+    )
   })
 
   it('marks the live-preview variant so the frontend can drop the banner', () => {
@@ -67,16 +65,35 @@ describe('buildPreviewUrl', () => {
         collection: 'pages',
         slug: 'about',
         live: true,
-        siteUrl,
       }),
-    ).toBe(`${siteUrl}/api/preview?collection=pages&slug=about&live=1`)
+    ).toBe(`/api/preview?collection=pages&slug=about&live=1`)
+  })
+
+  // The regression this file exists to prevent. An absolute URL built from
+  // `NEXT_PUBLIC_SITE_URL` sent an editor from the host holding their session
+  // (`CMS_ADDRESS`, the only one serving the admin) to the public site, which
+  // had never seen that cookie — so Preview and Live Preview both arrived
+  // anonymous and were refused. A relative URL resolves against whichever host
+  // the admin is served from, whatever the hostnames are called.
+  it('is relative, so it stays on the host serving the admin', () => {
+    for (const live of [false, true]) {
+      const url = buildPreviewUrl({
+        collection: 'posts',
+        slug: 'lead-white',
+        live,
+      })
+
+      expect(url).toMatch(/^\/api\/preview\?/)
+      // Not `toContain('://')`: a protocol-relative `//host/...` carries no
+      // scheme and would still leave the origin.
+      expect(url?.startsWith('//')).toBe(false)
+    }
   })
 
   it('never puts the shared secret in a URL', () => {
     const url = buildPreviewUrl({
       collection: 'posts',
       slug: 'lead-white',
-      siteUrl,
     })
     expect(url).not.toContain('secret')
   })
@@ -99,9 +116,8 @@ describe('buildPreviewUrl', () => {
     const url = buildPreviewUrl({
       collection: 'posts',
       slug: 'a&b=c',
-      siteUrl,
     })
-    expect(url).toBe(`${siteUrl}/api/preview?collection=posts&slug=a%26b%3Dc`)
+    expect(url).toBe(`/api/preview?collection=posts&slug=a%26b%3Dc`)
   })
 })
 
@@ -112,8 +128,8 @@ describe('apps preview', () => {
 
   it('targets the app route rather than a root slug', () => {
     expect(previewTargetPath('apps', 'dapple')).toBe('/apps/dapple/')
-    expect(
-      buildPreviewUrl({ collection: 'apps', slug: 'dapple', siteUrl }),
-    ).toBe(`${siteUrl}/api/preview?collection=apps&slug=dapple`)
+    expect(buildPreviewUrl({ collection: 'apps', slug: 'dapple' })).toBe(
+      `/api/preview?collection=apps&slug=dapple`,
+    )
   })
 })
