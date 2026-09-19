@@ -58,9 +58,15 @@ No third-party social sign-in for v1. Beyond keeping the flow simple, offering
 social login on iOS obliges you to offer Sign in with Apple, whose private relay
 addresses hide the real email and break matching against the Ghost archive.
 
-Practical consequence: sign-in sends a transactional email per attempt. Resend's
-free tier is limited (3,000/month at the time of writing) and a launch
-announcement to the migrated member list can exceed it in a day.
+Practical consequence: sign-in sends a transactional email per attempt, and
+building this is what makes a transactional provider required rather than
+optional — none is configured today. See [`EMAIL.md`](EMAIL.md), which also
+explains why Klaviyo, the ESP for the list, is the wrong place to send a
+sign-in token.
+
+Size it against the sign-in volume alone. The launch announcement is a separate
+problem on a separate system: that goes to the migrated member list through
+Klaviyo, and does not draw on the transactional allowance at all.
 
 ### 3. One subscription state, on the account
 

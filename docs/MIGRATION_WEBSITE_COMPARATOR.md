@@ -113,6 +113,20 @@ An explicit empty alt attribute (`alt=""`) is valid evidence for a decorative
 image. The comparator reports an alt regression only when the target has more
 images with the attribute entirely missing than the source.
 
+Images are counted **beneath the chrome**. `images_lost` is an error and asks
+whether a page has no images at all, which stops being a useful question the
+moment a template puts one on every page — as a masthead wordmark did here on
+18 Sep, making the check unable to fire sitewide however much a page had lost.
+So the comparator first works out what is sitewide on each side (an image source
+on at least 90% of that side's successfully crawled pages, and only where there
+are at least five to judge from), subtracts it, and warns as `images_reduced`
+when a page's remaining content images are fewer on the target than the source.
+
+It is a warning, not an error, and deliberately: the two sides are different
+themes, so a difference of one is ordinary and only an eye can judge the rest.
+Read it as a list of pages to look at, not as a gate. A crawl too small to tell
+a template from a coincidence subtracts nothing rather than guessing.
+
 This comparator complements rather than replaces manual rendering checks,
 Payload admin/draft checks, sitemap/RSS validation, backup restoration, or
 post-cutover monitoring described in `docs/MIGRATION_REHEARSAL.md`.

@@ -21,7 +21,11 @@ import {
 } from '@/lib/security/slug-requests'
 import { collectBlockJsonLd } from '@/lib/seo/block-jsonld'
 import { robotsDirective } from '@/lib/seo/indexing'
-import { buildArticleJsonLd, serializeJsonLd } from '@/lib/seo/jsonld'
+import {
+  buildArticleJsonLd,
+  buildWebPageJsonLd,
+  serializeJsonLd,
+} from '@/lib/seo/jsonld'
 import { absoluteUrl, getSiteUrl, pagePath, postPath } from '@/lib/seo/site'
 
 import { Article } from '../components/article'
@@ -155,13 +159,33 @@ export default async function SlugPage({
 
   if (resolved.kind === 'page') {
     const { page } = resolved
-    // A page has no Article node — it is not an article — but its blocks still
-    // describe themselves. A landing page whose FAQ answers the question a
-    // visitor searched is worth saying out loud even when the page around it
-    // is not editorial.
+    // A page has no Article node — it is not an article — but it is a WebPage,
+    // and its blocks still describe themselves. A landing page whose FAQ
+    // answers the question a visitor searched is worth saying out loud even
+    // when the page around it is not editorial.
+    //
+    // Ghost emitted `Article` here. Departing from that is deliberate and the
+    // reasoning is in `lib/seo/jsonld.ts`: the crawl comparison reads this as a
+    // difference, and it is the right difference to keep.
+    const pageSettings = await getSiteSettings()
+    const pageSiteUrl = getSiteUrl()
+    const pageJsonLd = serializeJsonLd(
+      buildWebPageJsonLd({
+        url: page.canonicalURL || absoluteUrl(pagePath(page.slug), pageSiteUrl),
+        name: page.title,
+        description: page.metaDescription || undefined,
+        dateModified: page.updatedAt,
+        siteName: pageSettings.title,
+        siteUrl: pageSiteUrl,
+      }),
+    )
     const pageBlockJsonLd = collectBlockJsonLd(page.body)
     return (
       <main>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: pageJsonLd }}
+        />
         {pageBlockJsonLd.map((node, index) => (
           <BlockJsonLd key={index} node={node} />
         ))}

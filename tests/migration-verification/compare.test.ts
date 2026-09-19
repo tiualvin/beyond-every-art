@@ -298,3 +298,114 @@ describe('compareCrawls', () => {
     expect(crawlSite).toBeTypeOf('function')
   })
 })
+
+describe('content images beneath the chrome', () => {
+  const WORDMARK = 'https://target.example/_next/image?url=%2Flogo.png'
+  const paths = ['/', '/a/', '/b/', '/c/', '/about/', '/d/']
+
+  function sourceSite(aboutImages: number): CrawlResult {
+    return crawl(
+      'https://source.example',
+      paths.map((path) =>
+        page(path, {
+          images: Array.from(
+            { length: path === '/about/' ? aboutImages : 2 },
+            (_, index) => ({
+              src: `https://source.example/content/images/${path}${index}.jpg`,
+              internal: true,
+              alt: 'A picture',
+            }),
+          ),
+        }),
+      ),
+    )
+  }
+
+  function targetSite(aboutContentImages: number): CrawlResult {
+    return crawl(
+      'https://target.example',
+      paths.map((path) => {
+        const url = `https://target.example${path}`
+        const content = path === '/about/' ? aboutContentImages : 2
+        return page(path, {
+          requestedUrl: url,
+          finalUrl: url,
+          canonical: url,
+          images: [
+            // #159 put this on every page, which is what broke `images_lost`.
+            { src: WORDMARK, internal: true, alt: 'Beyond Every Art' },
+            ...Array.from({ length: content }, (_, index) => ({
+              src: `https://target.example/media/${path}${index}.jpg`,
+              internal: true,
+              alt: 'A picture',
+            })),
+          ],
+        })
+      }),
+    )
+  }
+
+  it('sees a page stripped of its content images behind a sitewide wordmark', () => {
+    const report = compareCrawls(sourceSite(3), targetSite(0))
+
+    // The masthead image means the target page is never empty, so the
+    // all-or-nothing check stays silent — the exact blind spot found on 18 Sep.
+    expect(report.issues.map((issue) => issue.code)).not.toContain(
+      'images_lost',
+    )
+    expect(report.issues).toContainEqual(
+      expect.objectContaining({
+        code: 'images_reduced',
+        path: '/about/',
+        expected: 3,
+        actual: 0,
+      }),
+    )
+  })
+
+  it('reports a partial loss the zero-check cannot express', () => {
+    const report = compareCrawls(sourceSite(10), targetSite(1))
+
+    expect(report.issues).toContainEqual(
+      expect.objectContaining({
+        code: 'images_reduced',
+        path: '/about/',
+        expected: 10,
+        actual: 1,
+      }),
+    )
+  })
+
+  it('does not fail the gate on its own', () => {
+    // A warning: the two sides are different themes, and a comparison that
+    // blocked a cutover over one image would be turned off rather than read.
+    const report = compareCrawls(sourceSite(3), targetSite(0))
+
+    expect(report.ok).toBe(true)
+    expect(
+      report.issues.find((issue) => issue.code === 'images_reduced')?.severity,
+    ).toBe('warning')
+  })
+
+  it('stays quiet when only the chrome differs', () => {
+    const report = compareCrawls(sourceSite(2), targetSite(2))
+
+    expect(report.issues.map((issue) => issue.code)).not.toContain(
+      'images_reduced',
+    )
+  })
+
+  it('subtracts nothing from a crawl too small to show what is sitewide', () => {
+    // Two pages cannot distinguish a template from a coincidence, so the
+    // wordmark counts as content and the target is ahead rather than behind.
+    const small = (site: CrawlResult): CrawlResult => ({
+      ...site,
+      pages: site.pages.slice(0, 2),
+    })
+    const report = compareCrawls(small(sourceSite(2)), small(targetSite(2)))
+
+    expect(report.issues.map((issue) => issue.code)).not.toContain(
+      'images_reduced',
+    )
+  })
+})

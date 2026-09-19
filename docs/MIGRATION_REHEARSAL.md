@@ -128,26 +128,33 @@ discrepancy. Fix the root cause and re-run until it reports `"ok": true`.
       (`limited-edition-vs-open-edition-prints-which-is-right-for-you`, the only
       one of 117 with Ghost card markup) serves 200 on staging with its table
       and its one `figcaption` intact (4 Sep).
-- [ ] **Drafts** are still drafts and are not publicly reachable. The count has
+- [x] **Drafts** are still drafts and are not publicly reachable. The count has
       survived two write passes at 4 (30 Aug), which is the half of this a query
-      can answer. Whether a draft URL actually 404s is still unverified.
+      can answer. The other half closed on 18 Sep: the draft URLs were requested
+      and returned 404. Check this signed out — an admin session carries the
+      preview cookie, and a draft served 200 through it reads exactly like a
+      draft that leaked.
 - [ ] **Media** loads from R2 (not the old Ghost domain) with alt text intact.
       Loading is verified (30 Aug): 110 records, all `migrated`, R2 holding 327
       objects, and **no body anywhere references the Ghost domain** — see the
-      content audit in `DEPLOYMENT_STATUS.md`. One exception: **media id 4 has
-      no bytes in R2** and needs re-uploading — confirmed still missing on
-      4 Sep, in both the extensionless and `.jpeg` forms, and it is the only
-      broken image on the site: every other post's `og:image` was requested and
-      all 108 returned 200. The post it belongs to is
+      content audit in `DEPLOYMENT_STATUS.md`. One exception, still open:
+      **media id 4 has no bytes in R2** and needs re-uploading — confirmed
+      still missing on 4 Sep, in both the extensionless and `.jpeg` forms, and
+      it is the only broken image on the site: every other post's `og:image`
+      was requested and all 108 returned 200. The post it belongs to is
       `the-ultimate-guide-to-understanding-different-types-of-art-prints-giclee-lithographs-and-more`,
       which is published and is missing both its feature image and its sharing
-      card. "Alt text intact" is neither pass
-      nor fail as written, because **Ghost had none** — 118 `posts_meta` rows,
-      zero non-empty `feature_image_alt` — so nothing was lost. The importer
-      fills `alt` with the filename because the field is required, and
-      `toAltText` in `lib/content/media.ts` collapses that to an empty string
-      before it reaches a reader, which is correct: a filename read aloud is
-      worse than an image marked decorative. Confirmed in the rendered HTML.
+      card. It was briefly going to be deleted, which would have retired this;
+      that decision was reversed on 18 Sep, so the re-upload is needed after
+      all — through the admin, under a filename ending `.jpeg`, which fixes the
+      missing bytes and the extensionless filename together. "Alt text intact"
+      is neither pass nor fail as written, because **Ghost had none** — 118
+      `posts_meta` rows, zero non-empty `feature_image_alt` — so nothing was
+      lost. The importer fills `alt` with the filename because the field is
+      required, and `toAltText` in `lib/content/media.ts` collapses that to an
+      empty string before it reaches a reader, which is correct: a filename
+      read aloud is worse than an image marked decorative. Confirmed in the
+      rendered HTML.
 - [x] **URLs** preserve the original slugs and trailing-slash structure.
       Verified 29 Aug against real content: every URL in Ghost's four sitemaps —
       113 posts, 3 pages, 9 tags, 2 authors, **127 in total** — was requested on
@@ -197,8 +204,18 @@ discrepancy. Fix the root cause and re-run until it reports `"ok": true`.
 - [x] **Forms** (search, newsletter signup) submit successfully. Already covered
       before this pass — search in `mobile-nav.spec.ts`, newsletter in
       `public-routes.spec.ts`, and the app waitlist in `apps.spec.ts`.
-- [ ] **Email** delivery works (trigger an admin password reset; confirm
-      receipt). The one item here no test can close: it needs a real inbox.
+- [x] **Email** delivery — **not applicable, by decision (18 Sep).** Tried on
+      18 Sep and nothing arrived; `RESEND_API_KEY` and `EMAIL_FROM_ADDRESS` are
+      both empty on the box, so `resendAdapter()` returned null and Payload fell
+      back to an adapter that logs instead of sending — which reports success to
+      the caller either way. Email has never worked on this deployment. Rather
+      than configure a provider, the decision is to send no transactional mail
+      for now: it reaches administrators only, since `Members` is not an
+      authentication collection, the account model is not built, and the public
+      forms record rows without sending. An administrator lockout is recovered
+      with `pnpm bootstrap:admin` over SSH. [`EMAIL.md`](EMAIL.md) carries the
+      reasoning and what makes the decision expire.
+
 - [x] **Health** endpoint (`/health`) returns `status: ok`. Covered by
       `seo-and-health.spec.ts`, which asserts `{ status: 'ok', db: 'up' }`.
 
@@ -245,8 +262,30 @@ pnpm restore:db --latest --dry-run   # verify it decompresses
 # Restore into a scratch DB and confirm counts (see BACKUP_AND_RESTORE.md).
 ```
 
-- [ ] A backup uploads to R2.
-- [ ] A restore into a scratch database reproduces the content.
+- [x] A backup uploads to R2. Proven 27 Aug (encrypted) and again 18 Sep, which
+      also exercised retention: the run pruned the 5 Sep archive under the
+      14-day policy.
+- [x] A restore into a scratch database reproduces the content. Done 18 Sep
+      against the real bucket — the thing CI's drill cannot prove, since only a
+      real run shows that _this_ bucket, holding _these_ objects, under the
+      passphrase currently in the production environment file, reads back. The
+      archive decrypted to 7,665,786 `sqlBytes` on the dry run and restored to
+      exactly the same on a scratch database; `posts`, `pages`, `tags`,
+      `authors` and `payload_migrations` matched row for row; and
+      `migrate:validate`, pointed at the restored copy, matched 117 of 117
+      posts against the Ghost export field by field.
+- [x] The `ok: false` that came with it is the result worth reading carefully
+      rather than at a glance. The single issue was the `fine-art-home-guide`
+      canonical — the defect production already has. The restore reproduced
+      production exactly, flaw included, which is stronger evidence than a
+      clean report: a lossy restore fails differently, with missing rows and
+      mismatched fields.
+- [ ] Two things the drill did **not** cover. `members` was 0 on both sides, so
+      that table proved nothing — re-run once the members CSV is imported,
+      since it is the table whose loss would actually hurt. And `posts` is 118
+      against the export's 117: one post exists in Payload that Ghost never
+      had. It does not fail the gate (`isClean` counts issues, not rows) but it
+      should be identified rather than carried into cutover.
 
 ## 6. Crawl comparison
 
@@ -268,6 +307,88 @@ pnpm restore:db --latest --dry-run   # verify it decompresses
   export when available; important URLs not linked from the source homepage
   should be supplied as explicit `--seed` values.
 - Record any gap as a redirect to add before cutover.
+
+**Run on 18 Sep, and signed off.** 143 source pages, 146 target, 14 errors and
+19 warnings — every one explained below, none a migration defect. Reports
+retained at `rehearsal/site-comparison.{json,txt}` on the VPS.
+
+Two things had to be true before the run meant anything, and both cost a
+wasted crawl each to learn:
+
+- **Use `www`, not the apex.** The crawler discovers links only on the exact
+  origin supplied and records cross-origin redirects without following them.
+  The apex 301s to `www`, so seeding it yields one redirect and an empty
+  crawl — which reports clean, because there was nothing to find.
+- **Cloudflare's Email Address Obfuscation rewrites every `mailto:`** into
+  `/cdn-cgi/l/email-protection`, which the crawler then requests without the
+  fragment and Cloudflare errors on. That was 126 of the first run's 135
+  errors, on the proxied target only. Switched off zone-wide on 18 Sep; leave
+  it off, or the same noise returns in the production comparison.
+
+What the 14 errors are, so a later run can tell a new one from these:
+
+- **Seven 404-title differences** on `/%22https://…%22` URLs. Hrefs wrapped in
+  escaped quotes in one Ghost post, dead on the live site. Payload's copies are
+  already repaired; `repair:content` in the cutover runbook keeps them that way
+  through the final import.
+- **Six on `/page/2` and `/page/2/`.** Ghost paginates in the path and this
+  site redirects those to `/journal/` deliberately (`lib/seo/ghost-urls.ts`).
+  The comparator follows the redirect and compares the destination, so the
+  title and canonical differ by design.
+- **One canonical** on `fine-art-home-guide`, the known `__GHOST_URL__`
+  placeholder, repaired by the final migration.
+
+And the warnings worth not re-investigating: the homepage and
+`/ultramarine-science/` `h1_changed` are this site being _better_ (Ghost
+duplicates that h1); `robots_changed` is staging's `Disallow: /` and resolves
+at the flip, where production emits `sitemap`, `host`, and disallows `/admin`
+and `/api`; `legacy_origin_link` is same-domain absolute links, harmless once
+the domain is the same.
+
+The structured-data warnings are the deliberate half. `Article` → `WebPage` on
+pages and `Person` → `ProfilePage` on author archives are both this site
+declining to claim a type it does not have; see `lib/seo/jsonld.ts`. The nine
+`Series` → `(none)` on tag archives are a real remaining gap — the 18 Sep pass
+covered the homepage, pages and author archives and missed tags.
+
+**`/about/ images_lost` appeared in the first two runs and not the third** —
+explained on 18 Sep, and the third run is the misleading one. The check is
+all-or-nothing: `source.images.length > 0 && target.images.length === 0` in
+`lib/migration-verification/compare.ts`. Nothing compares counts, so a page that
+keeps one image and loses nine reports nothing at all.
+
+#159 merged at 09:34 UTC on 18 Sep and put the wordmark in the masthead of every
+page (`app/(frontend)/components/site-header.tsx`). It is a `next/image` marked
+`priority`, so it is in the server-rendered HTML rather than lazy-loaded, and
+the crawler counts it. From that deploy onwards `target.images.length` is at
+least one on every page on this site, and `images_lost` can never fire again
+anywhere, whatever a page actually lost. The third run is after that merge, and
+its 14 errors are the 7 + 6 + 1 itemised above with no `images_lost` among them.
+
+So the warning was **masked, not fixed**, and the question it asked is still
+open: `/about/` may still be missing images the live Ghost page has. This gate
+can no longer answer it, and neither can a re-run. Ask the page directly —
+count the `<img>` tags that are not the masthead wordmark:
+
+```bash
+curl -s -u "$STAGING_CRAWL_BASIC_AUTH" https://staging.example.com/about/ \
+  | grep -o '<img[^>]*>' | grep -v 'logo'
+```
+
+Nothing printed means the images are genuinely gone and it is a real defect to
+fix before the flip. The page's figures printed means `/about/` was always
+intact, and the first two runs were reporting the absence of a masthead image
+rather than anything about `/about/`.
+
+**The gap outlived this page, and is closed.** `images_lost` was dead code
+against any target that renders a masthead image, which is every page of this
+site. The comparator now subtracts what is sitewide on each side before counting
+and warns as `images_reduced` when a page's remaining content images are fewer
+on the target — see
+[`MIGRATION_WEBSITE_COMPARATOR.md`](MIGRATION_WEBSITE_COMPARATOR.md). It is a
+warning, so it cannot fail the cutover gate, and `images_lost` is unchanged.
+The production comparison after the flip will therefore answer the `/about/`
+question even if nobody runs the curl above first.
 
 ## 7. Record and sign off
 

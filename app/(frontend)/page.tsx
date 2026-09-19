@@ -8,11 +8,14 @@ import {
   type PostCard,
 } from '@/lib/content/queries'
 import { formatDate } from '@/lib/format'
+import { buildWebSiteJsonLd, serializeJsonLd } from '@/lib/seo/jsonld'
 import {
+  getSiteUrl,
   HOME_TOPICS_ID,
   JOURNAL_PATH,
   NEWSLETTER_PATH,
   postPath,
+  SEARCH_PATH,
 } from '@/lib/seo/site'
 
 import { CoverField } from './components/cover-field'
@@ -38,8 +41,25 @@ export default async function HomePage() {
   const [latest, ...rest] = posts
   const featured = rest.length > 0 ? rest : posts
 
+  // Ghost served a WebSite node here and this page served none, which the
+  // 18 Sep crawl comparison caught. The description is the standfirst rather
+  // than `metaDescription`: schema.org asks what the site is, which is the
+  // editorial answer, not the search snippet.
+  const jsonLd = serializeJsonLd(
+    buildWebSiteJsonLd({
+      siteName: settings.title,
+      siteUrl: getSiteUrl(),
+      description: settings.description || undefined,
+      searchPath: SEARCH_PATH,
+    }),
+  )
+
   return (
     <main>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLd }}
+      />
       {/* ── Cover ── */}
       <section className="cover">
         <CoverField />

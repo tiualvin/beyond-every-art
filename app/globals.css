@@ -292,11 +292,37 @@ img {
 }
 
 .brand {
+  /* The wordmark is an image, so this type only ever renders as its alt text —
+     on the page that loads before the file arrives, or does not get it at all.
+     Keeping it means that page still shows the masthead it always did. */
   font-family: var(--font-serif);
   font-size: 1.15rem;
   font-weight: 600;
   letter-spacing: 0.02em;
   text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  /* The bar is `space-between` with the actions `flex-shrink: 0`, so the brand
+     is the side that has to give. `min-width: 0` is what lets it: without it a
+     flex item will not shrink below its content, and the wordmark would push
+     search and the menu toggle off the right edge of a small phone instead. */
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+/* Capped in both directions with the dimensions left `auto`, which is how a
+   replaced element is asked to fit a box without being told its aspect ratio:
+   the browser scales 520x72 down until it satisfies whichever cap binds first
+   and keeps the proportions either way. Height is the one that binds in a bar
+   wide enough for it; `max-width` takes over below roughly 200px of brand, so
+   the wordmark shrinks rather than overflows. Neither number is a second copy
+   of the aspect ratio, so the image can be re-cut without touching this. */
+.brand__logo {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 1.75rem;
 }
 
 .site-nav {
@@ -504,6 +530,15 @@ img {
 
   .brand {
     font-size: 1rem;
+  }
+
+  /* The bar gives up most of its padding here and the 2rem icon buttons are
+     what set its height. Coming down to 1.375rem keeps the wordmark inside
+     that box, so the masthead stays the 3.25rem this breakpoint just promised
+     `--masthead-h` it would be — a promise the search drawer and the mobile
+     menu both position themselves against. */
+  .brand__logo {
+    max-height: 1.375rem;
   }
 }
 
