@@ -2,11 +2,14 @@
 
 ## Summary
 
-- **Status:** evaluated, nothing built. No dependency added, no key issued, no
-  schema change. This records what adopting the Unsplash API would cost and
-  what it would oblige, because two of the obligations are not obvious and one
-  of them is a decision for the repository owner rather than for whoever writes
-  the code.
+- **Status:** evaluated. No Unsplash dependency added and no key issued — the
+  API itself is not built and the decisions below gate it. What _is_ built is
+  the attribution the guidelines require, because it repays the credits already
+  on the site regardless: see
+  [Finding 2](#finding-2-attribution-is-required-by-the-api-and-mediacredit-could-not-carry-it--built).
+  The rest records what adopting the API would cost and what it would oblige,
+  because two of the obligations are not obvious and one of them is a decision
+  for the repository owner rather than for whoever writes the code.
 - **The question is narrower than it looks.** This publication already runs on
   Unsplash photographs — every feature image it has, 110 credits and 102
   distinct photographers, all of the form `Photo by <name> / Unsplash`. They
@@ -16,7 +19,7 @@
   is not "no stock photography" but "an editor with a browser tab open".
 - **Recommendation:** yes, but bind it to a narrow job, and settle
   [Finding 1](#finding-1-the-hotlinking-guideline-runs-against-the-media-pipeline)
-  and [Finding 2](#finding-2-attribution-is-required-by-the-api-and-mediacredit-cannot-carry-it)
+  and [Finding 2](#finding-2-attribution-is-required-by-the-api-and-mediacredit-could-not-carry-it--built)
   before writing any of it. Finding 2 is a schema change and therefore a
   migration; Finding 1 is not a technical question at all.
 - **The sharpest constraint is editorial, not technical** —
@@ -126,7 +129,7 @@ are as close to that as makes no difference. The options, stated plainly:
 Option 3 is the recommendation. It is not the letter of the guideline, and it
 should be adopted as a deliberate position rather than as an oversight.
 
-### Finding 2: attribution is required by the API, and `media.credit` cannot carry it
+### Finding 2: attribution is required by the API, and `media.credit` could not carry it — built
 
 Worth separating two documents that are easy to conflate:
 
@@ -147,18 +150,40 @@ inside a span. It cannot hold a link. That is not an oversight either; the
 migration chose plain text deliberately, because the alternative was shipping
 escaped markup to readers.
 
-So adopting the API implies a schema change: a `creditURL` alongside `credit`,
-rendered as an anchor, with the UTM parameters appended where the link is built
-rather than stored in the field. Per [`AGENTS.md`](../AGENTS.md) and
-[`docs/DATABASE_MIGRATIONS.md`](DATABASE_MIGRATIONS.md) that means a generated
-migration committed with it, and CI fails if one is missing.
+**This is built, ahead of any decision about the API**, because it repays the
+110 credits already on the site whether or not the API is ever adopted.
+`media.creditURL` sits alongside `credit`; `FeaturedFigure` renders the credit
+as a link when it is set and as plain text when it is not, so nothing changes
+for a record that has only a name.
 
-Two things make this worth doing on its own merits. It would let the 110
-existing credits become links again — the profile URLs are still in the Ghost
-export, and [`lib/migration/feature-image-credits.ts`](../lib/migration/feature-image-credits.ts)
-already parses the captions they came from. And it is the prerequisite for
-production rate limits ([Finding 4](#finding-4-rate-limits-are-not-the-constraint)),
-which Unsplash grants on review of exactly this.
+[`lib/content/attribution.ts`](../lib/content/attribution.ts) is the whole of
+the policy, and it does two things in one function on purpose. It refuses
+anything that is not a plain https address — React hands an `href` to the DOM
+verbatim, `javascript:` included, with a development-only warning and nothing
+in production — and it appends `utm_source` and `utm_medium=referral` for
+Unsplash and for nowhere else, because on a museum's collection page those
+parameters are noise somebody did not ask for. Folding the two together means
+`attributionHref` returns null rather than a best-effort string, so there is no
+argument a component can pass that yields a usable `href` and skips the check.
+The parameters are added at render rather than stored, so the field holds the
+photographer's actual profile URL and one place decides what this site calls
+itself.
+
+The links themselves came back out of the Ghost export, where they had been all
+along: [`lib/migration/feature-image-credits.ts`](../lib/migration/feature-image-credits.ts)
+kept the photographer's name and dropped the href, on the grounds that its
+`utm_source=ghost` parameters named a site this publication no longer is. That
+was right about the parameters and wrong about the link — the profile URL is
+the one part of an attribution that cannot be reconstructed from anything else.
+`captionToCreditURL` now recovers it, strips only the `utm_*` keys, and
+`pnpm repair:content` writes it. Note the ordering that matters there: the href
+is read out of the markup before entities are decoded, because Ghost writes the
+separators as `&amp;` and a URL with a literal `&amp;` between its parameters
+is a different URL.
+
+This is also the prerequisite for production rate limits
+([Finding 4](#finding-4-rate-limits-are-not-the-constraint)), which Unsplash
+grants on review of exactly this.
 
 ### Finding 3: the download trigger is cheap, and easy to forget
 
@@ -277,10 +302,11 @@ here because the immediate question is the smaller one.
 
 ## Recommended shape, if it is built
 
-1. **`creditURL` on `Media`, and a linked credit in `FeaturedFigure`.** One
-   field, one migration, one component change. Backfill the 110 existing
-   credits from the Ghost export in the same pass. Do this first: it is useful
-   with or without the API, and everything else depends on it.
+1. ~~**`creditURL` on `Media`, and a linked credit in `FeaturedFigure`.**~~
+   Built — see [Finding 2](#finding-2-attribution-is-required-by-the-api-and-mediacredit-could-not-carry-it--built).
+   Run `pnpm repair:content --input <ghost-content.json>` to write the recovered
+   links; it compares both the credit text and the link, so a database where the
+   first backfill already ran is not reported as needing nothing.
 2. **One module** — `lib/stock/unsplash.ts` — holding the search call, the
    download trigger, and the attribution builder that appends the UTM
    parameters. Nothing else imports the vendor.
@@ -307,9 +333,9 @@ the API outside the editorial drafting path.
 1. **Store or hotlink** — [Finding 1](#finding-1-the-hotlinking-guideline-runs-against-the-media-pipeline).
    The recommendation is store, trigger the download endpoint, and attribute
    with a working link, adopted as a stated position.
-2. **Whether the attribution change is worth making on its own** —
-   [Finding 2](#finding-2-attribution-is-required-by-the-api-and-mediacredit-cannot-carry-it).
-   It repays 110 existing credits regardless of whether the API is adopted.
+2. ~~**Whether the attribution change is worth making on its own.**~~ Taken: it
+   is built, because it repays 110 existing credits regardless of whether the
+   API is adopted. What remains is running the backfill against production.
 3. **Where stock imagery is allowed at all** —
    [Finding 5](#finding-5-the-editorial-risk-is-the-one-that-matters). This one
    is editorial policy, and no amount of code substitutes for it.

@@ -8,6 +8,7 @@ import * as migration_20260820_122559_add_upload_media_from_url_capability from 
 import * as migration_20260821_160357_relax_ghost_id_add_trash_and_og_size from './20260821_160357_relax_ghost_id_add_trash_and_og_size';
 import * as migration_20260823_154928_add_noindex_to_posts_and_pages from './20260823_154928_add_noindex_to_posts_and_pages';
 import * as migration_20260824_043611_add_signup_campaigns from './20260824_043611_add_signup_campaigns';
+import * as migration_20260919_050651_add_media_credit_url from './20260919_050651_add_media_credit_url';
 
 export const migrations = [
   {
@@ -58,6 +59,11 @@ export const migrations = [
   {
     up: migration_20260824_043611_add_signup_campaigns.up,
     down: migration_20260824_043611_add_signup_campaigns.down,
-    name: '20260824_043611_add_signup_campaigns'
+    name: '20260824_043611_add_signup_campaigns',
+  },
+  {
+    up: migration_20260919_050651_add_media_credit_url.up,
+    down: migration_20260919_050651_add_media_credit_url.down,
+    name: '20260919_050651_add_media_credit_url'
   },
 ];

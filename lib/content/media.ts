@@ -1,3 +1,5 @@
+import { toCreditURL } from './attribution'
+
 /**
  * A featured image resolved from a Payload media record, in the shape the
  * frontend renders. Kept free of Payload types so it can be unit tested.
@@ -11,6 +13,14 @@ export type MediaImage = {
   height: number | null
   caption: string | null
   credit: string | null
+  /**
+   * Where the credit points, when it points anywhere.
+   *
+   * Vetted to an https URL by `toCreditURL`, so a component can put it
+   * straight in an `href`. Null for every record that has only a name — which
+   * is most of them, and renders exactly as it did before this existed.
+   */
+  creditURL: string | null
   /**
    * Pre-generated derivatives, when the record has them.
    *
@@ -72,6 +82,7 @@ type RawMedia = {
   filename?: unknown
   caption?: unknown
   credit?: unknown
+  creditURL?: unknown
   width?: unknown
   height?: unknown
   sizes?: unknown
@@ -108,6 +119,7 @@ export function toMediaImage(value: unknown): MediaImage | null {
     height: toDimension(raw.height),
     caption: toOptionalText(raw.caption),
     credit: toOptionalText(raw.credit),
+    creditURL: toCreditURL(raw.creditURL),
     cardUrl: sizeUrl(raw.sizes, 'card'),
     ogUrl: sizeUrl(raw.sizes, 'og'),
   }

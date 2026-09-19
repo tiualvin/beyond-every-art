@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  captionToCreditURL,
   captionToPlainText,
   collectFeatureImageCredits,
 } from '../../lib/migration/feature-image-credits'
@@ -55,6 +56,51 @@ describe('captionToPlainText', () => {
   })
 })
 
+describe('captionToCreditURL', () => {
+  it('recovers the photographer profile the plain text drops', () => {
+    expect(captionToCreditURL(REAL_CAPTION)).toBe(
+      'https://unsplash.com/@shhiscat',
+    )
+  })
+
+  it("strips Ghost's tracking parameters and keeps everything else", () => {
+    // `utm_*` named another site; an object id is the address itself.
+    expect(
+      captionToCreditURL(
+        '<a href="https://www.themet.org/art/1?objectId=42&amp;utm_source=ghost">X</a>',
+      ),
+    ).toBe('https://www.themet.org/art/1?objectId=42')
+  })
+
+  it('decodes entities in the href rather than in the whole caption', () => {
+    // `&amp;` between parameters is a separator, not a literal — decoding it
+    // late would store a URL whose second parameter is named `amp;utm_medium`.
+    expect(captionToCreditURL(REAL_CAPTION)).not.toContain('amp;')
+    expect(captionToCreditURL(REAL_CAPTION)).not.toContain('utm_')
+  })
+
+  it('refuses an href that is not a plain https address', () => {
+    expect(captionToCreditURL('<a href="javascript:alert(1)">X</a>')).toBeNull()
+    expect(
+      captionToCreditURL('<a href="http://unsplash.com/@x">X</a>'),
+    ).toBeNull()
+    expect(captionToCreditURL('<a href="/relative">X</a>')).toBeNull()
+    expect(captionToCreditURL('<a href="">X</a>')).toBeNull()
+  })
+
+  it('returns null for a caption that links nowhere', () => {
+    expect(captionToCreditURL('<span>Photo by X</span>')).toBeNull()
+    expect(captionToCreditURL(null)).toBeNull()
+    expect(captionToCreditURL('')).toBeNull()
+  })
+
+  it('does not mistake a word starting with href for the attribute', () => {
+    expect(
+      captionToCreditURL('<a data-xhref="https://evil.test/" >X</a>'),
+    ).toBeNull()
+  })
+})
+
 describe('collectFeatureImageCredits', () => {
   it('joins posts_meta to posts and keys the result by image URL', () => {
     const result = collectFeatureImageCredits(
@@ -67,6 +113,7 @@ describe('collectFeatureImageCredits', () => {
       {
         ghostURL: 'https://img/one.jpg',
         credit: 'Photo by Carolina / Unsplash',
+        creditURL: 'https://unsplash.com/@shhiscat',
         slug: 'a-post',
         kind: 'post',
       },
