@@ -12,7 +12,7 @@
 // called the registration endpoint, which is anybody: it is the one string on
 // this page an attacker controls, and it sits next to the word "Approve".
 
-import type { CapabilityRow } from './capabilities'
+import { PUBLISH_CAPABILITY, type CapabilityRow } from './capabilities'
 
 /** Escapes for use in an HTML text node or a double-quoted attribute. */
 export function escapeHtml(value: string): string {
@@ -93,6 +93,17 @@ export function renderConsentPage(view: ConsentView): string {
     )
     .join('')
 
+  // Never pre-ticked, whatever `defaults` says. Every other row on this form
+  // may arrive checked because the plugin's own defaults do that for custom
+  // tools; this one is the difference between a connector that drafts and one
+  // that writes to the public site, so it is a decision the approver makes
+  // rather than one they have to notice and undo.
+  const publishRow = checkbox(
+    PUBLISH_CAPABILITY,
+    'Publish to the live site',
+    false,
+  )
+
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -109,8 +120,11 @@ verified. Approve it only if you started this connection.</p>
 <input type="hidden" name="request" value="${escapeHtml(view.sealed)}">
 ${collectionRows}
 <fieldset><legend>tools</legend>${toolRows}</fieldset>
-<p>Publishing is never granted here. A connector may draft and revise; a person
-publishes from the admin panel.</p>
+<fieldset><legend>publishing</legend>${publishRow}</fieldset>
+<p class="warn">Publishing puts a document on the public site. Grant it only to
+a connector you control, and only if you intend to publish from it &mdash; a
+drafting connector never needs it. It is off unless you tick it, and it does
+nothing unless this account is an administrator.</p>
 <div class="actions">
 <button type="submit" name="decision" value="approve" class="primary">Approve</button>
 <button type="submit" name="decision" value="deny">Deny</button>

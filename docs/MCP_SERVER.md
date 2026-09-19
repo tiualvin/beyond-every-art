@@ -22,6 +22,11 @@
 - **What it deliberately cannot reach:** `members`, `billing-events`,
   `newsletter-signups`, `users`, and every global. Deleting articles is off.
 - **How to turn it on:** [What is built](#what-is-built).
+- **A connector may now publish**, where its consent screen granted that and
+  its user is an administrator — see
+  [`MCP_OAUTH.md`](MCP_OAUTH.md#publishing--reversed-narrowly). That reverses
+  the flat refusal this document's Decision 2 assumed for grants; Decision 2
+  itself still governs API keys and is unchanged.
 - **OAuth is built, and is off in production.** The connector dialogs that
   cannot send a bearer header now have an authorization server to talk to — see
   [`MCP_OAUTH.md`](MCP_OAUTH.md). It is off by default and separate from

@@ -39,9 +39,54 @@ describe('mayPublish', () => {
   // An OAuth connector never publishes, whatever role it acts as. It is the
   // least supervised client this project has — a vendor's cloud, a schedule
   // nobody watches, content that includes migrated articles an attacker could
-  // have influenced — and approving one on a phone is not a decision to let it
-  // write to the live site.
-  it('refuses an OAuth grant acting as an administrator', () => {
+  // have influenced. It is no longer refused outright, because publishing from
+  // a phone is what the OAuth layer was asked for; it is held to two
+  // independent conditions instead, and the tests below are what stop either
+  // of them quietly becoming one.
+  it('lets an approved administrator connector publish', () => {
+    expect(
+      mayPublish({
+        nextStatus: 'published',
+        payloadAPI: 'MCP',
+        role: 'admin',
+        viaOAuth: true,
+        grantMayPublish: true,
+      }),
+    ).toBe(true)
+  })
+
+  it('refuses an administrator connector nobody granted publishing to', () => {
+    // The box on the consent screen is never pre-ticked, so this is what an
+    // administrator who approved a connector without reading it produces.
+    expect(
+      mayPublish({
+        nextStatus: 'published',
+        payloadAPI: 'MCP',
+        role: 'admin',
+        viaOAuth: true,
+        grantMayPublish: false,
+      }),
+    ).toBe(false)
+  })
+
+  it('refuses a connector granted publishing whose user is not an admin', () => {
+    // The capability is not a way around the role. Ticking the box on an
+    // editor's consent screen grants nothing.
+    expect(
+      mayPublish({
+        nextStatus: 'published',
+        payloadAPI: 'MCP',
+        role: 'editor',
+        viaOAuth: true,
+        grantMayPublish: true,
+      }),
+    ).toBe(false)
+  })
+
+  it('refuses a connector approved before the capability existed', () => {
+    // Every grant issued before this shipped has no value in the column, and
+    // the column defaults to false. An absent capability must read as refused
+    // rather than as unset-therefore-fine.
     expect(
       mayPublish({
         nextStatus: 'published',
@@ -52,13 +97,14 @@ describe('mayPublish', () => {
     ).toBe(false)
   })
 
-  it('refuses an OAuth grant acting as an editor', () => {
+  it('does not let a truthy-but-not-true capability through', () => {
     expect(
       mayPublish({
         nextStatus: 'published',
         payloadAPI: 'MCP',
-        role: 'editor',
+        role: 'admin',
         viaOAuth: true,
+        grantMayPublish: 'yes' as unknown as boolean,
       }),
     ).toBe(false)
   })

@@ -2,6 +2,8 @@ import { createHash, randomBytes } from 'node:crypto'
 
 import { expect, test, type APIRequestContext } from '@playwright/test'
 
+import { PUBLISH_CAPABILITY } from '../lib/oauth/capabilities'
+
 import { fixtures } from './fixtures'
 
 // The OAuth authorization server, driven the way a connector drives it.
@@ -341,19 +343,27 @@ test.describe('OAuth authorization server', () => {
     expect(names).not.toContain('uploadMedia')
   })
 
-  test('refuses to publish, whatever the grant may otherwise do', async () => {
+  /**
+   * Tries to publish through a grant, and expects to be told no.
+   *
+   * `posts.update` is granted on purpose in both callers. Without it the tool
+   * would simply be absent and the test would pass for the wrong reason —
+   * proving the capability grid works, not the publish guard. With it,
+   * `updatePosts` is available to the grant and the refusal has to come from
+   * the guard itself.
+   */
+  const attemptPublish = async (capabilities: string[]) => {
     const request = session
 
     const clientId = await registerClient(request)
     const { challenge, verifier } = pkce()
-    // `posts.update` is granted on purpose. Without it the tool would simply be
-    // absent and this test would pass for the wrong reason — proving the
-    // capability grid works, not the publish guard. With it, `updatePosts` is
-    // available to the grant and the refusal has to come from the guard.
-    const code = await authorize(request, clientId, challenge, token, [
-      'posts.update',
-      'posts.find',
-    ])
+    const code = await authorize(
+      request,
+      clientId,
+      challenge,
+      token,
+      capabilities,
+    )
     const { body } = await exchange(request, code, verifier)
 
     const attempt = await request.post('/api/mcp', {
@@ -374,10 +384,35 @@ test.describe('OAuth authorization server', () => {
       },
     })
 
-    const text = await attempt.text()
-    expect(text).toContain(
-      'Publishing through an OAuth connector is not permitted',
-    )
+    return attempt.text()
+  }
+
+  test('refuses to publish for a grant nobody granted publishing to', async () => {
+    const text = await attemptPublish(['posts.update', 'posts.find'])
+
+    expect(text).toContain('This connector may not publish')
+    expect(text).toContain('Updated: 0 documents')
+  })
+
+  // The security property, not the happy path: the capability is a second
+  // condition, never a way around the first. This session signs in as an
+  // editor, so ticking the publish box on its consent screen must buy nothing
+  // at all — if it ever does, the capability has become a privilege
+  // escalation reachable by anyone who can reach `/oauth/register`.
+  //
+  // The admin-with-capability direction, which is the one that now succeeds,
+  // is covered by `tests/mcp/publish-guard.test.ts` rather than here: this
+  // file holds one signed-in session on purpose (see the note above
+  // `beforeAll`), and a second login as the admin fixture is not worth
+  // destabilising it for.
+  test('refuses to publish for an editor grant that was granted publishing', async () => {
+    const text = await attemptPublish([
+      'posts.update',
+      'posts.find',
+      PUBLISH_CAPABILITY,
+    ])
+
+    expect(text).toContain('This connector may not publish')
     expect(text).toContain('Updated: 0 documents')
   })
 

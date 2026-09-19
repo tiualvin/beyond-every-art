@@ -151,6 +151,42 @@ export async function sendAlert(
  */
 export const mcpAuthAlarm = new ThresholdAlarm(10, 5 * 60_000)
 
+/**
+ * Says so, every time, when a phone connector publishes to the live site.
+ *
+ * No threshold and no cooldown, unlike the alarm above, because the two things
+ * are not alike. A failed authentication is only interesting as a *run* — one
+ * is a typo. A connector publishing is interesting the first time: it is rare,
+ * it is visible to every reader the moment it happens, and it is the outcome
+ * an injected instruction would be steering toward. If it starts arriving when
+ * nobody is publishing, that is the signal, and a cooldown would hide the
+ * second one.
+ *
+ * Deliberately not carrying the connector's name. Registration is open to
+ * anyone (RFC 7591), so that string is chosen by whoever registered and this
+ * body ends up in a chat room — the same reasoning that keeps credentials out
+ * of it. The `mcp_auth` log line records the client per request, which is
+ * where an investigation that needs the name should get it.
+ */
+export function recordMcpConnectorPublish(input: {
+  collection: string
+  documentId: unknown
+  role: string | undefined
+  userId: unknown
+}): void {
+  if (!alertsEnabled()) return
+
+  void sendAlert({
+    event: 'mcp_connector_publish',
+    message:
+      `An OAuth connector published ${input.collection}/${String(input.documentId)} ` +
+      `as ${input.role ?? 'unknown role'} (user ${String(input.userId)}). ` +
+      'If this was not you, revoke the grant in Payload Admin under MCP → API Keys.',
+    source: 'mcp',
+    time: new Date().toISOString(),
+  })
+}
+
 /** Records one failed MCP authentication, alerting if a run is under way. */
 export function recordMcpAuthFailure(headers: Headers): void {
   if (!alertsEnabled()) return

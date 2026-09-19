@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { PUBLISH_CAPABILITY } from '../../lib/oauth/capabilities'
 import {
   escapeHtml,
   renderConsentPage,
@@ -59,8 +60,31 @@ describe('renderConsentPage', () => {
     expect(html).not.toContain('name="client_id"')
   })
 
-  it('tells the approver that publishing is never granted', () => {
-    expect(renderConsentPage(view('Claude'))).toContain('Publishing is never')
+  // Publishing used to be refused outright and the page said so. It is now
+  // grantable, which makes how it is *offered* the thing worth holding: one
+  // row, never pre-ticked, with the consequence stated next to it.
+  it('offers publishing as a row the approver has to tick', () => {
+    const html = renderConsentPage(view('Claude'))
+    expect(html).toContain(`value="${PUBLISH_CAPABILITY}"`)
+  })
+
+  it('never pre-ticks publishing, whatever the defaults say', () => {
+    // `defaults` arrives from the plugin, whose custom-tool checkboxes default
+    // to ticked. If this row ever followed that, an approval made by reflex
+    // would hand a connector the live site.
+    const html = renderConsentPage({
+      ...view('Claude'),
+      defaults: new Set([PUBLISH_CAPABILITY]),
+    })
+
+    const row = html.slice(html.indexOf(`value="${PUBLISH_CAPABILITY}"`))
+    expect(row.slice(0, row.indexOf('>'))).not.toContain('checked')
+  })
+
+  it('says what publishing means, next to where it is granted', () => {
+    expect(renderConsentPage(view('Claude'))).toContain(
+      'Publishing puts a document on the public site',
+    )
   })
 
   it('says the name is unverified, because it is', () => {

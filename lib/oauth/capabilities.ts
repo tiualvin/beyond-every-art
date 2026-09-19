@@ -8,6 +8,7 @@
 // `mcpPluginConfig` and `mcpTools`, and adding a collection there adds a row
 // here with no second edit.
 
+import { PUBLISH_FIELD, PUBLISH_OPERATION } from '../mcp/api-keys'
 import { mcpPluginConfig } from '../mcp/plugin'
 import { mcpTools } from '../mcp/tools'
 
@@ -46,6 +47,18 @@ export function collectionCapabilities(
   })
 }
 
+/**
+ * The publishing capability, which is not derived from anything.
+ *
+ * Every other row here is read off the plugin config precisely so it cannot
+ * understate what a connector reaches. This one has no config to read: it is
+ * not a collection operation (`posts.update` covers a draft edit and a publish
+ * alike — that is why `refuseMcpPublish` exists at all) and it is not a tool.
+ * So it is named once, here, and both the consent screen and the guard take it
+ * from this module.
+ */
+export const PUBLISH_CAPABILITY = `${PUBLISH_FIELD}.${PUBLISH_OPERATION}`
+
 /** Custom tool names, which are individually grantable. */
 export function toolCapabilities(tools = mcpTools): string[] {
   return tools.map((tool) => tool.name)
@@ -78,6 +91,14 @@ export function capabilityDocument(
   document[TOOL_GROUP] = Object.fromEntries(
     toolCapabilities(tools).map((name) => [name, granted.has(`tool.${name}`)]),
   )
+
+  // Written explicitly, false included, for the same reason as everything
+  // above: the record should say what was refused. This one matters most,
+  // because a missing value read as falsey and a value recorded as `false`
+  // look identical in code and completely different in an audit.
+  document[PUBLISH_FIELD] = {
+    [PUBLISH_OPERATION]: granted.has(PUBLISH_CAPABILITY),
+  }
 
   return document
 }

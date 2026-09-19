@@ -23,8 +23,12 @@
 // The plugin's own comments point at this hook as the intended remedy ("Grant
 // these via `overrideApiKeyCollection` to let trusted administrators issue keys
 // on behalf of other users"), so this takes it up rather than working around
-// it. Only access functions change; no field is added, moved, or removed, so
-// the database schema is untouched and no migration follows from this file.
+// it.
+//
+// **This file adds one field**, which it did not when it was written — see
+// `PUBLISH_FIELD` below. The access changes above still add, move and remove
+// nothing, but the field does mean a schema change and therefore a migration;
+// `docs/DATABASE_MIGRATIONS.md` has the workflow.
 
 import type { Access, CollectionConfig, FieldAccess } from 'payload'
 
@@ -67,6 +71,49 @@ const adminMayBind: FieldAccess = ({ req }) => isAdmin(req.user)
  */
 const never: FieldAccess = () => false
 
+/**
+ * Whether this credential may publish to the live site.
+ *
+ * A capability rather than a consequence of the bound user's role, because the
+ * two questions are genuinely different: "is this person allowed to publish"
+ * is answered by `access/roles.ts`, and "did anybody decide *this connector*
+ * should be able to" is not answered anywhere else. `/oauth/register` is
+ * unauthenticated by design (RFC 7591), so a connector this deployment has
+ * never heard of can present itself for approval; defaulting this off means
+ * the worst an inattentive approval can produce is a connector that drafts.
+ *
+ * Off by default and deliberately not defaulted from the role. An
+ * administrator who connects a phone has not thereby decided the phone may
+ * publish — they decide that by ticking this box, on the consent screen, for
+ * one connector at a time.
+ *
+ * Shaped as a group with one checkbox because that is the shape every other
+ * capability on this document already has, so `capabilityDocument` needs no
+ * special case and the consent screen renders it as one more row.
+ */
+export const PUBLISH_FIELD = 'publish'
+/** The single operation inside that group. */
+export const PUBLISH_OPERATION = 'live'
+
+const publishCapability = {
+  name: PUBLISH_FIELD,
+  type: 'group' as const,
+  label: 'Publishing',
+  admin: {
+    description:
+      'Whether this credential may take a document from draft to published. ' +
+      'Leave off for anything that only drafts.',
+  },
+  fields: [
+    {
+      name: PUBLISH_OPERATION,
+      type: 'checkbox' as const,
+      label: 'Publish to the live site',
+      defaultValue: false,
+    },
+  ],
+}
+
 export function adminIssuableApiKeys(
   collection: CollectionConfig,
 ): CollectionConfig {
@@ -82,7 +129,7 @@ export function adminIssuableApiKeys(
     // Narrowed on `type` as well as `name`, because `UIField` also carries a
     // `name` and carries no `access` at all — the compiler is right that the
     // name alone does not identify the relationship field.
-    fields: collection.fields.map((field) =>
+    fields: [...collection.fields, publishCapability].map((field) =>
       field.type === 'relationship' && field.name === 'user'
         ? {
             ...field,
