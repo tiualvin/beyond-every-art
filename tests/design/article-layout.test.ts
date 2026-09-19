@@ -294,7 +294,7 @@ describe('the rail', () => {
     expect(list![1]).toMatch(/overflow-y: auto/)
   })
 
-  // Under 650px of viewport the list has nothing whole left to show and becomes
+  // Under 538px of viewport the list has nothing whole left to show and becomes
   // a sliver under a heading, which reads as broken rather than tight. Note
   // this is a `max-height`: it drops one supplementary module on the windows
   // that cannot hold it, where the `min-height` guard above turned the whole
@@ -308,9 +308,10 @@ describe('the rail', () => {
   // The threshold is the thing that goes wrong quietly. It shipped at 700px,
   // which is above a large share of real windows — a laptop with a bookmarks
   // bar sits just under it — so the module vanished for them and looked like a
-  // bug rather than a decision. Measured in Chromium against the current
-  // spacing, one whole related item survives to 650. A threshold above that is
-  // hiding the module from windows that could have held it.
+  // bug rather than a decision. It has only ever meant one thing: the window
+  // that cannot hold one whole item. Measured in Chromium against the current
+  // spacing and the rungs below, that is 537. A threshold above it hides the
+  // module from windows that could have held it, so this can only ever fall.
   it('hides the list only where the geometry says it cannot fit', () => {
     const guard =
       /@media \(max-height: (\d+)px\) \{\s*\.rail__sticky > \.rail__related/.exec(
@@ -320,7 +321,7 @@ describe('the rail', () => {
       guard,
       'the short-window guard is missing from globals.css',
     ).toBeTruthy()
-    expect(Number(guard![1])).toBeLessThanOrEqual(650)
+    expect(Number(guard![1])).toBeLessThanOrEqual(537)
   })
 
   // The elastic module is the related one, and the stylesheet can only know
@@ -336,6 +337,205 @@ describe('the rail', () => {
     expect(rail).toMatch(/className="rail__mod rail__related"/)
     // One module carries it, and it is not the newsletter card.
     expect(rail.match(/className="[^"]*rail__related[^"]*"/g)!.length).toBe(1)
+  })
+})
+
+describe('the related list', () => {
+  /** A declaration block by selector, from the top level of the stylesheet. */
+  function rule(selector: string): string {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const match = new RegExp(`\\n${escaped} \\{([^}]*)\\}`).exec(css)
+    expect(match, `${selector} is missing from globals.css`).toBeTruthy()
+    return match![1]
+  }
+
+  function decl(selector: string, property: string): string {
+    const match = new RegExp(`${property}:\\s*([^;]+);`).exec(rule(selector))
+    expect(match, `${selector} has no ${property}`).toBeTruthy()
+    return match![1].trim()
+  }
+
+  /**
+   * The height of the list, recomputed from the stylesheet.
+   *
+   * Every term is a fixed length in `globals.css`, which is only true because
+   * the title is clamped: an unclamped title is two lines or three depending
+   * on what an editor wrote, and the list is then 206px or 246px depending on
+   * the post. This agrees with Chromium to within a tenth of a pixel, which is
+   * the point — the ladder is budgeted against this number, so it has to be
+   * one the stylesheet actually produces.
+   */
+  function listHeight(items: number): number {
+    const lines = Number(decl('.rail__item h3', '-webkit-line-clamp'))
+    const title =
+      px(decl('.rail__item h3', 'font-size')) *
+      Number(decl('.rail__item h3', 'line-height')) *
+      lines
+    const under = px(/margin: 0 0 ([\d.]+rem)/.exec(rule('.rail__item h3'))![1])
+    const meta =
+      px(decl('.rail__meta', 'font-size')) *
+      Number(decl('.rail__meta', 'line-height'))
+    const gap = px(decl('.rail__list', 'gap'))
+
+    return items * (title + under + meta) + (items - 1) * gap
+  }
+
+  // The defect this whole block exists for. `RAIL_COUNT` asks for three and
+  // the rail showed one and a half, with the second cut through the middle of
+  // a word — because an item's height was whatever an editor's title wrapped
+  // to, so the module was 206px on one post and 246px on the next and the
+  // group was budgeted for neither.
+  it('bounds a title at two lines, so an item has a knowable height', () => {
+    const h3 = rule('.rail__item h3')
+    expect(h3).toMatch(/-webkit-line-clamp: 2/)
+    expect(h3).toMatch(/-webkit-box-orient: vertical/)
+    expect(h3).toMatch(/overflow: hidden/)
+    // The clamp needs the box display to do anything at all, and losing it is
+    // silent: the title simply wraps again and the ladder is 40px short.
+    expect(h3).toMatch(/display: -webkit-box/)
+  })
+
+  // 206px is the number the rungs below are measured against. If an item grows
+  // — a larger title, looser leading on the meta line, a wider gap — the group
+  // grows with it and the rung that was buying the third piece stops buying
+  // it, silently, on exactly the windows nobody tests at.
+  it('fits three pieces in the 206px the ladder is budgeted for', () => {
+    expect(listHeight(3)).toBeGreaterThan(200)
+    expect(listHeight(3)).toBeLessThanOrEqual(206)
+  })
+
+  it('costs about 60px a piece, gap included', () => {
+    expect(listHeight(2) - listHeight(1)).toBeLessThanOrEqual(74)
+  })
+})
+
+describe('the ladder', () => {
+  /** Every `max-height` rung in the stylesheet, tallest first, with its body. */
+  const rungs = [
+    ...css.matchAll(/@media \(max-height: (\d+)px\) \{([\s\S]*?)\n\}/g),
+  ]
+    .map((match) => ({ at: Number(match[1]), body: match[2] }))
+    .sort((a, b) => b.at - a.at)
+
+  /**
+   * How tall the sticky group is on each rung, in CSS pixels.
+   *
+   * Measured in Chromium rather than computed, and the only numbers in this
+   * file that are: the newsletter card's height turns on an inline-block
+   * button sitting on a text baseline, which arithmetic gets wrong by 3px and
+   * a browser gets right — the same trap the ad unit fell into, where an
+   * inline-block `<ins>` reserved 8px of descender space that the replica this
+   * ladder was first measured on did not have. `pnpm measure:rail` prints
+   * these; re-run it after touching anything in the group and bring the output
+   * back here, to `app/globals.css`, and to `docs/POST_PAGE_LAYOUT.md`.
+   */
+  const GROUP = { whole: 712, withoutCopy: 662, buttonOnly: 583 }
+
+  /**
+   * What the viewport loses before the group gets any of it, recomputed from
+   * the cap rather than written down: the masthead it sticks below, and the
+   * room left under it so the group's bottom is never off the screen.
+   */
+  const reserved = (() => {
+    const cap =
+      /max-height: calc\(100dvh - var\(--masthead-h\) - ([\d.]+rem)\)/.exec(css)
+    const masthead = /--masthead-h: ([\d.]+rem);/.exec(css)
+    expect(
+      cap,
+      'the sticky cap is no longer a calc on --masthead-h',
+    ).toBeTruthy()
+    expect(masthead, '--masthead-h is missing from globals.css').toBeTruthy()
+    return px(masthead![1]) + px(cap![1])
+  })()
+
+  it('has the three rungs the group gives in order', () => {
+    expect(rungs.map((rung) => rung.at)).toEqual([819, 769, 537])
+  })
+
+  // Cheapest first. A line of framing copy goes before the card's frame, and
+  // both go before a related piece — which inverts what the group did before,
+  // where the list absorbed everything and the card never gave anything.
+  it('sheds the card copy first, then the card frame, then the list', () => {
+    expect(rungs[0].body).toMatch(
+      /\.rail__signup \.rail__copy \{\s*display: none;/,
+    )
+
+    expect(rungs[1].body).toMatch(/\.rail__signup \{[^}]*border: 0;/)
+    expect(rungs[1].body).toMatch(/\.rail__signup \{[^}]*padding: 0;/)
+    expect(rungs[1].body).toMatch(
+      /\.rail__signup \.rail__label \{\s*display: none;/,
+    )
+
+    expect(rungs[2].body).toMatch(
+      /\.rail__sticky > \.rail__related \{\s*display: none;/,
+    )
+  })
+
+  // The whole point of the rungs, and the one thing about them that goes wrong
+  // silently. A rung has to start high enough that its own group already fits
+  // the shortest window it covers — otherwise there is a band of viewport
+  // heights where the rung above has stopped applying, the rung below has not
+  // started, and the third related piece falls off for windows nobody thought
+  // to look at.
+  //
+  // Rung 2 was written at 759 first, and at a viewport of 760 the group is
+  // 661.8px against a cap of 660. Two pixels, two viewport heights, and no
+  // round number would have found it. 769 closes it.
+  it('starts each rung high enough that its own group fits', () => {
+    // Rung 1 is everything above the first threshold; the shortest window it
+    // covers is one pixel above it.
+    expect(GROUP.whole).toBeLessThanOrEqual(rungs[0].at + 1 - reserved)
+    expect(GROUP.withoutCopy).toBeLessThanOrEqual(rungs[1].at + 1 - reserved)
+  })
+
+  // What the ladder buys, stated as the number a reader would notice: the
+  // window at which all three related pieces stop being whole. It was 826px of
+  // viewport, which is above a 1440x900 laptop.
+  it('holds three whole pieces down to 683px of viewport', () => {
+    expect(GROUP.buttonOnly + reserved).toBeLessThanOrEqual(683)
+    expect(GROUP.buttonOnly + reserved).toBeGreaterThan(rungs[2].at)
+  })
+
+  // The stylesheet is a cascade: a rung written above a taller one would be
+  // overridden by it on every window the taller one also matches.
+  it('is written tallest first, so each rung overrides the one above', () => {
+    const order = [...css.matchAll(/@media \(max-height: (\d+)px\)/g)].map(
+      (match) => Number(match[1]),
+    )
+    expect(order).toEqual([...order].sort((a, b) => b - a))
+  })
+
+  // The rungs exist because 265.7px of the group is a unit that cannot shrink.
+  // A rail without one is 433px and fits any window a desktop browser opens in,
+  // so it must shed nothing — otherwise a members-only teaser, which carries no
+  // unit at all, loses its card's copy on an 800px window for no reason.
+  //
+  // Scoping also settles the cascade. `.rail__signup`'s own declarations come
+  // later in the stylesheet than these rules, so a bare `.rail__signup` inside
+  // the media query lost the padding and border to them on a specificity tie —
+  // which is exactly what happened, and it took a browser to notice.
+  it('applies only where there is a unit making the group too tall', () => {
+    for (const rung of rungs.slice(0, 2)) {
+      for (const selector of rung.body.matchAll(/\n {2}([^{\n]+)\{/g)) {
+        expect(selector[1]).toContain('.rail__sticky--ad')
+      }
+    }
+  })
+
+  // The stylesheet can only hide the card's line of copy, or know whether
+  // there is a unit at all, if the component tells it — the same way the
+  // elastic module is marked.
+  it('is given the hooks it needs by the component', () => {
+    const rail = readFileSync(
+      resolve(
+        import.meta.dirname,
+        '../../app/(frontend)/components/article-rail.tsx',
+      ),
+      'utf8',
+    )
+    expect(rail.match(/className="rail__copy"/g)!.length).toBe(1)
+    // The modifier is conditional on the unit, not unconditional markup.
+    expect(rail).toMatch(/adClient \? ' rail__sticky--ad' : ''/)
   })
 })
 

@@ -447,6 +447,22 @@ Five identified placements, of which **four should be live at launch**: all but
 `home-mid`. `rail-1` is the one that is, and the reservation held: turning it on
 was a fill rather than a re-layout.
 
+What it was _not_ was free of consequences for the rail around it. 265.7px of a
+712px sticky group is the unit and its cap, and the group is capped at the
+viewport less 100 — so on a 1440×900 laptop the related list absorbed the
+shortfall and "More on this" showed one piece and part of a second where three
+were meant to be. That is fixed in the rail rather than in the unit, by
+clamping a rail title to two lines and by having the newsletter card shed its
+copy and then its frame before the list gives anything, and it is measured
+rather than reasoned about: `pnpm measure:rail`, and the table in
+[`POST_PAGE_LAYOUT.md`](POST_PAGE_LAYOUT.md).
+
+The general lesson is worth keeping for the four units still to come. A unit's
+reserved height is not only a promise about layout shift; it is a claim on
+whatever module is elastic next to it, and the module that gives has to be
+chosen deliberately or the unit quietly eats the editorial content it was
+placed beside.
+
 **The rail carries one unit, not three.** An earlier version of this table had a
 ladder of three, spaced a viewport apart down a rail that scrolled with the
 page. The rail's modules are now a single sticky group — the slot, the related

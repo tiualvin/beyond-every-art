@@ -78,42 +78,61 @@ gives the browser a language to hyphenate against; without it the property is
 inert, which is the one way this can silently stop working.
 
 **Rail — 300px, from 1280.** A contents list in flow at the top, then a sticky
-group of three: space reserved for a square ad, the related pieces, and the
-newsletter card. The group travels with the reader for the rest of the scroll;
-the contents list does not, because a reader below the sections it names is
-done with it.
+group of three: the square ad unit, the related pieces, and the newsletter
+card. The group travels with the reader for the rest of the scroll; the
+contents list does not, because a reader below the sections it names is done
+with it.
 
 The group is capped at the height of the space it pins into, which is what
 keeps a sticky box from hanging its bottom off the screen where nothing can
-reach it. The group is 686px and the cap is the viewport less 100px, so it
-binds under about 790px of viewport — which is most windows, and means
-something in the group has to give.
+reach it. Whole, the group is 712px and the cap is the viewport less 100px, so
+it binds under 812px of viewport — which is most windows, a 1440×900 laptop
+included, and means something in the group has to give.
 
-**Which module gives is decided, not left to the scrollbar.** The unit keeps
-its 250px and the newsletter card keeps its height; the related list is the
-only module allowed to shrink and scroll inside itself. Capping the group and
-scrolling it whole had made the card — the last thing in the group, and the
-only thing in it a reader is meant to act on — the first thing off the bottom.
+**Which module gives is decided, not left to the scrollbar, and it is not the
+related list first.** That was the previous answer and it was wrong for a
+module built to hold three pieces: the list absorbed the whole shortfall, so
+"More on this" showed one piece and part of a second, cut through the middle of
+a word, on the most ordinary desktop window there is.
 
-| Viewport | Cap  | Group | Related list | What the reader sees     |
-| -------- | ---- | ----- | ------------ | ------------------------ |
-| ≥790     | ≥690 | 686   | 184          | all three pieces         |
-| 760      | 660  | 660   | 158          | two, and part of a third |
-| 680      | 580  | 580   | 78           | one                      |
-| ≤649     | —    | 421   | —            | the unit and the card    |
+Two things fixed it. A rail title is now clamped to two lines, which is what
+makes an item's height knowable at all — unclamped it was 60px or 80px
+depending on what an editor wrote, so the list was 206px on one post and 246px
+on the next and the group was budgeted for neither. And the group now sheds the
+cheapest thing it has, in order, before the list gives anything:
 
-Under 650px the list has nothing whole left to show, so it is dropped instead —
-the related pieces close the article on every device, so nothing in the rail is
-only in the rail.
+| Viewport | Cap | Group | What the group has shed         | The reader sees    |
+| -------- | --- | ----- | ------------------------------- | ------------------ |
+| ≥820     | 720 | 712   | nothing                         | all three pieces   |
+| 770–819  | 670 | 662   | the card's line of copy         | all three pieces   |
+| 683–769  | 583 | 583   | the card's frame and label too  | all three pieces   |
+| 610–682  | 510 | 510   | nothing left — the list scrolls | two pieces         |
+| 538–609  | 438 | 438   | —                               | one piece          |
+| ≤537     | 437 | 324   | the list entirely               | the unit, a button |
 
-**That threshold shipped wrong once, at 700px.** A laptop with a bookmarks bar
-sits just under 700, so for a large share of real windows the module simply
-vanished, which reads as a bug rather than a decision. The fix was not to move
-the number on its own but to buy the space back: the gap under the unit, the
-rhythm between the group's modules, the card's padding and the sticky box's own
-breathing room were tightened, 37px in total, which moved the point where a
-whole item still fits from 695 to 650. 649 is now a window that genuinely
-cannot hold the module.
+The cap and group columns are taken at the bottom of each band, which is where
+the band binds; above it the cap is larger and the group unchanged.
+
+**Three whole pieces down to 683px of viewport, where it used to take 826.**
+That is the difference between a 1440×900 laptop showing the module it was
+built for and showing half of it. Below 683 the list shrinks and scrolls as it
+always did, because by then the rungs are spent and it is the only elastic
+module left.
+
+The rung boundaries are measured, not rounded, and the rounding is where the
+defect hides. Rung 3 was written at 759 first: at a viewport of 760 the rung-2
+group is 662px against a cap of 660, so the third piece fell off across a
+two-pixel band that no round number would have found. `pnpm measure:rail`
+prints the table above from the real component in Chromium, and
+`tests/design/article-layout.test.ts` fails if a rung starts lower than its own
+group fits.
+
+**The drop threshold shipped wrong once, at 700px.** A laptop with a bookmarks
+bar sits just under 700, so for a large share of real windows the module simply
+vanished, which reads as a bug rather than a decision. It has only ever meant
+one thing — the window that cannot hold one whole item — and it is recomputed
+rather than nudged each time the geometry moves: 700, then 649, and now 537,
+because the rungs above moved that window down by 112px.
 
 Note it is a `max-height` guard, and not the `@media (min-height: 820px)` one it
 replaced upstream: that turned the sticky group off entirely, on a group about
@@ -122,9 +141,12 @@ screens there was no sticky at all and it looked like the feature had never been
 built. This one drops one supplementary module on the windows that cannot hold
 it, and the test asserts the threshold can only go down.
 
-The space above "More on this" is the unit and a gap — 250px and 1rem — not the
-unit and a second band. At the 2.5rem module rhythm it read as 290px of nothing,
-and those pixels were also pixels the card did not have.
+The space above "More on this" is the unit, its "Advertisement" cap and a gap —
+265.7px and 0.85rem — not the unit and a second band. At the 2.5rem module
+rhythm it read as 290px of nothing, and those pixels were also pixels the card
+did not have. The unit is aligned to the top of its line box, too: Google's
+snippet styles it `display: inline-block`, which parks it on a text baseline
+and reserves 8px of descender space underneath that nothing ever fills.
 
 ## Decisions worth not relitigating
 
@@ -192,12 +214,40 @@ only thing that absorbs it. The options, if it ever matters:
   it and the text would not, which is what the notes margin should have been.
   It reintroduces an empty column on articles with no media.
 
+## The unit in the rail
+
+`rail-1` from [`ADVERTISING.md`](ADVERTISING.md) §8 is built: a 300×250 unit
+above "More on this", inside the sticky group, with an "Advertisement" cap
+above it. `ArticleRail` renders it through `AdUnit`, and `lib/ads/eligibility.ts`
+decides whether it renders at all — not on a non-indexable deployment, not with
+`NEXT_PUBLIC_ADSENSE_CLIENT=off`, and not on a restricted teaser (§4: a
+truncated article with ads on it is thin content, and it is the worst possible
+moment to be asking someone to subscribe).
+
+Two things about it that the rest of this document depends on:
+
+**It is the whole reason the ladder exists.** 265.7px of a 712px group is the
+unit and its cap, and it cannot shrink — a 300×250 is a 300×250. Everything the
+group gives on a short window, it gives because of this.
+
+**`min-height: 250px` is no longer a reservation for an empty box.** It is the
+defence against a collapse under the reader: Google marks an unsold impression
+`data-adsbygoogle-status="unfilled"` and hides the `<ins>`, which would drag the
+group up by 266px mid-scroll. §8 allows an unfilled slot to collapse only on a
+subsequent navigation, and this is what holds it to that.
+
+The slot renders nothing where there is no publisher to render it for — staging,
+a teaser, ads switched off — rather than reserving 266px of blank paper above
+"More on this". Nothing shifts either way, because the reservation exists to
+stop a unit collapsing mid-view rather than to stand in for one.
+
 ## Not built, deliberately
 
-- **Ads.** No slot renders. `.rail__slot` reserves 250px above the related
-  pieces so that turning ads on is a fill rather than a re-layout, and §7 of
-  [`ADVERTISING.md`](ADVERTISING.md) still puts consent and the cutover ahead
-  of any ad code.
+- **The other four placements.** [`ADVERTISING.md`](ADVERTISING.md) §8 has five
+  and only `rail-1` is rendered. `article-inline-1` needs the server-side body
+  split in §4 before it can exist on migrated Ghost posts at all, and
+  `lib/ads/placements.ts` deliberately does not name a placement that nothing
+  renders.
 - **A contents list on every article.** `extractHeadings` stops at the first
   block node. Anchors come from a stateful allocator the renderer shares
   between the body's headings and any block that emits one, so past a block
@@ -215,8 +265,18 @@ content before believing a change here:
 1. A migrated Ghost post with figures, a wide card and a gallery, at 1280 and
    1440 — the archive is most of the site, and it is the content this grid has
    to hold rather than the seeded examples.
-2. A short viewport. 1280×800 and 1366×768 are where the height cap binds. The
-   newsletter card should be whole at every height, the reserved 250px should
-   still be 250px, and the related list should be the only thing that gives.
-   Check "More on this" is there at all: it is the one module a change here can
-   remove from the page entirely, and it does so silently.
+2. A short viewport. `pnpm measure:rail` sweeps them in Chromium against the
+   real `ArticleRail` and prints the table above; run it before and after and
+   compare, rather than eyeballing one window. The numbers it prints belong in
+   three places, and a change that updates only some of them is the drift this
+   document exists to prevent: the rung boundaries in `app/globals.css`, the
+   `GROUP` constants in `tests/design/article-layout.test.ts`, and the table
+   above.
+
+   Then look at the two heights either side of each rung — 819/820, 769/770 —
+   because a rung that starts too low costs the third piece across a band a few
+   pixels wide, which is invisible unless you are looking at exactly it.
+
+3. Check "More on this" is there at all, and holding three. It is the one
+   module a change here can remove from the page entirely, and it does so
+   silently.

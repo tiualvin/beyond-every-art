@@ -1,0 +1,10 @@
+{
+  // `tsconfig.json` sets `jsx: preserve` because Next does its own transform.
+  // `scripts/measure-rail-ladder.ts` renders a component outside Next, where
+  // nothing does that transform — so tsx compiles the JSX in the component it
+  // imports to `React.createElement` calls against a `React` that no file in
+  // this repository imports. The automatic runtime is what Next uses and what
+  // `vitest.config.ts` sets for the same reason.
+  "extends": "../tsconfig.json",
+  "compilerOptions": { "jsx": "react-jsx" }
+}

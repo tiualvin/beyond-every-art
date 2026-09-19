@@ -27,19 +27,17 @@ const MIN_TOC_ENTRIES = 3
  * once. The contents list stays in flow above it: it belongs to the top of the
  * piece, and a reader below the sections it names is done with it.
  *
- * The group is taller than a laptop's viewport, so one module in it has to
- * give. It is the related list — the unit cannot shrink and the newsletter
- * card is the one thing here a reader is meant to act on. `.rail__related` in
- * `app/globals.css` is what says so.
+ * The group is taller than a laptop's viewport, so something in it has to
+ * give. `.rail__sticky` in `app/globals.css` carries the ladder that decides
+ * what, in order — the newsletter card's line of copy, then its frame, then
+ * the related list, then the list entirely — measured so that all three
+ * related pieces survive down to 683px of viewport rather than the 826 they
+ * used to need. `docs/POST_PAGE_LAYOUT.md` has the numbers.
  *
  * No thumbnails, deliberately. The rail is hidden below 1280 rather than
  * reflowed, because everything in it reaches a phone another way — the related
  * posts through "Read next", the newsletter through the band — and a hidden
  * `<img>` is still a download on the device least able to afford one.
- *
- * The signup is a link to `/newsletter/` rather than the subscribe modal the
- * membership gate opens: the modal costs a client component, and the rail is
- * the one place on the page where a reader is browsing rather than deciding.
  */
 export function ArticleRail({
   headings,
@@ -75,11 +73,14 @@ export function ArticleRail({
           rest of the scroll. The contents list is deliberately outside it: it
           belongs to the top of the piece, and a reader who has scrolled past
           the sections it names is done with it. */}
-      <div className="rail__sticky">
+      {/* `--ad` is what the height rungs in `app/globals.css` key on. They
+          exist because 265.7px of the group is a unit that cannot shrink, so
+          a rail without one has nothing to shed and should shed nothing. */}
+      <div className={`rail__sticky${adClient ? ' rail__sticky--ad' : ''}`}>
         {/* Rendered only where there is a publisher to render it for. An empty
             250px reservation was right while there was no ad layer; now that
             there is one, a deployment that will never serve a unit — staging,
-            a teaser — should get the space back rather than a hole above "More
+            a teaser — should get the 279px back rather than a hole above "More
             on this". Nothing shifts either way: the reservation exists to stop
             a unit collapsing mid-view, not to stand in for one. */}
         {adClient && (
@@ -88,10 +89,10 @@ export function ArticleRail({
           </div>
         )}
 
-        {/* The elastic module. The unit keeps its 250px and the newsletter card
-            keeps its height; on a window too short for all three, this list
-            is what shrinks and scrolls, so the card a reader is meant to act
-            on is never the thing that falls off the bottom. */}
+        {/* The elastic module, and the last one to give. The unit keeps its
+            250px and the newsletter card sheds its copy and then its frame
+            before this list loses a piece — three related pieces is what
+            `RAIL_COUNT` asks for and what the ladder is measured to fit. */}
         {related.length > 0 && (
           <div className="rail__mod rail__related">
             <p className="rail__label" id="rail-related">
@@ -117,7 +118,12 @@ export function ArticleRail({
         <div className="rail__mod">
           <div className="rail__signup">
             <p className="rail__label">The newsletter</p>
-            <p>One piece a week on colour, material, and practice.</p>
+            {/* Classed because the ladder hides this line first: it is the
+                cheapest thing in the group, and 50px the third related piece
+                needs more than the framing does. */}
+            <p className="rail__copy">
+              One piece a week on colour, material, and practice.
+            </p>
             <Link href={NEWSLETTER_PATH} className="button button--primary">
               Join the list
             </Link>
