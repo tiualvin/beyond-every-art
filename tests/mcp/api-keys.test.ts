@@ -1,7 +1,11 @@
 import type { CollectionConfig, RelationshipField } from 'payload'
 import { describe, expect, it } from 'vitest'
 
-import { adminIssuableApiKeys } from '../../lib/mcp/api-keys'
+import {
+  adminIssuableApiKeys,
+  PUBLISH_FIELD,
+  PUBLISH_OPERATION,
+} from '../../lib/mcp/api-keys'
 
 /** The shape of the plugin's collection, reduced to what this file changes. */
 const pluginCollection = (): CollectionConfig =>
@@ -89,14 +93,35 @@ describe('adminIssuableApiKeys', () => {
     )
   })
 
-  it('adds and removes no field, so the schema is unchanged', () => {
+  // This used to assert that no field was added at all, which was true until
+  // publishing became a per-connector capability. The invariant worth keeping
+  // is narrower and still worth a test: exactly one field is added, it is that
+  // capability, and nothing the plugin shipped is removed or reordered — so a
+  // future edit here cannot quietly drop a capability checkbox and take a
+  // column with it.
+  it('adds the publish capability and removes nothing', () => {
     const before = pluginCollection()
     const after = adminIssuableApiKeys(before)
 
-    expect(
-      after.fields.map((field) => ('name' in field ? field.name : null)),
-    ).toEqual(
-      before.fields.map((field) => ('name' in field ? field.name : null)),
-    )
+    const names = (collection: { fields: unknown[] }) =>
+      collection.fields.map((field) =>
+        field && typeof field === 'object' && 'name' in field
+          ? (field as { name?: unknown }).name
+          : null,
+      )
+
+    expect(names(after)).toEqual([...names(before), PUBLISH_FIELD])
+  })
+
+  it('leaves that capability off unless somebody turns it on', () => {
+    const added = adminIssuableApiKeys(pluginCollection()).fields.at(-1) as {
+      name?: string
+      fields?: Array<{ name?: string; defaultValue?: unknown }>
+    }
+
+    expect(added.name).toBe(PUBLISH_FIELD)
+    expect(added.fields?.[0]?.name).toBe(PUBLISH_OPERATION)
+    // The whole safety of an open registration endpoint rests on this default.
+    expect(added.fields?.[0]?.defaultValue).toBe(false)
   })
 })

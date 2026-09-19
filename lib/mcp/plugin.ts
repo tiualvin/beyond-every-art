@@ -223,8 +223,18 @@ export const mcpPluginConfig: MCPPluginConfig = {
         req.user = grantUser as NonNullable<PayloadRequest['user']>
       }
 
-      // Read by `refuseMcpPublish`. An OAuth connector never publishes.
-      req.context = { ...(req.context ?? {}), mcpViaOAuth: true }
+      // Read by `refuseMcpPublish`. A connector publishes only where somebody
+      // ticked the box for it on the consent screen — resolved here, where the
+      // grant's capability record is already in hand, so the guard reads a
+      // boolean rather than going back to the database inside a hook.
+      const publishCapability = (
+        grant.apiKey as { publish?: { live?: unknown } } | undefined
+      )?.publish
+      req.context = {
+        ...(req.context ?? {}),
+        mcpViaOAuth: true,
+        mcpGrantMayPublish: publishCapability?.live === true,
+      }
 
       logMcpEvent(
         mcpAuthLogEntry({

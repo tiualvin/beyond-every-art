@@ -11,8 +11,11 @@
   registration, consent, tokens — serving exactly one resource, `/api/mcp`.
 - **Off by default.** `MCP_OAUTH_ENABLED=1` mounts it; unset, none of the routes
   exist and the endpoint takes API keys as before.
-- **A connector may never publish.** Stricter than an API key, deliberately —
-  see [Publishing](#publishing).
+- **A connector publishes only where it was granted that and its user is an
+  administrator.** Two gates, neither implying the other, and the capability is
+  never pre-ticked on the consent screen — see
+  [Publishing](#publishing--reversed-narrowly). This reverses an earlier
+  "never", deliberately and for a stated reason.
 - **Everything downstream is unchanged.** A grant resolves to the same
   `payload-mcp-api-keys` document an API key resolves to, so capabilities, the
   audit log, and revocation work on a connector exactly as they already do on a
@@ -103,18 +106,65 @@ blast radius small — the publish guard, the audit log, the per-capability
 checkboxes and revoke-by-delete are all the existing implementations, with no
 parallel path to keep in step.
 
-### Publishing
+### Publishing — reversed, narrowly
 
-**A grant may never publish, whatever role it acts as.** `refuseMcpPublish`
-refuses a draft→published transition whenever the credential was a grant, and
-unlike the API-key rule this one does not consult the user's role.
+**This section used to say a grant may never publish. It now may, under two
+conditions that have to hold together.** The reversal was asked for by the
+repository owner, for the case the OAuth layer exists to serve: drafting and
+publishing from a phone. It is recorded here as a reversal rather than edited
+into looking like the original decision, because the reasoning it replaced is
+still true and still the reason the conditions are what they are.
 
-The reasoning: an API key is held by a person who put it in a config file on a
-machine they control. A grant is approved once, on a phone, and then runs
-unattended from a vendor's cloud over content that includes migrated articles an
-attacker may have influenced. Those deserve different answers to "may this write
-to the live site", and this is the one place the difference is expressible.
-[`MCP_SERVER.md`](MCP_SERVER.md)'s Decision 2 still governs API keys.
+**What has not changed:** a grant is the least supervised credential this
+project issues. It runs from a vendor's cloud, over content that includes
+migrated articles an attacker may have influenced, and `/oauth/register` is
+unauthenticated by design (RFC 7591) — anybody can present a connector for
+approval. An API key, by contrast, is held by a person who put it in a config
+file on a machine they control.
+
+**What changed:** the answer to that is no longer "never". It is two
+independent gates, and `mayPublish` requires both:
+
+| Gate                                  | Where it is decided                                      | What it stops                                                                                              |
+| ------------------------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| The grant's `publish.live` capability | the consent screen, per connector, per approval          | a connector nobody deliberately trusted — including one that registered itself and was approved in a hurry |
+| The bound user's role is `admin`      | [`access/roles.ts`](../access/roles.ts), as for API keys | a connector approved by an editor, whatever its capability says                                            |
+
+Neither is derived from the other, and that is the point. "May this person
+publish" and "did anybody decide _this connector_ should" are different
+questions; an administrator connecting a phone has not thereby decided the
+phone may publish. They decide that by ticking a box that is **never
+pre-ticked**, for one connector at a time.
+
+The capability is stored on the same `payload-mcp-api-keys` document the
+consent screen already writes, so revoking it is deleting that document — the
+revocation path that already existed, unchanged. The column defaults to
+`false`, so every grant approved before this shipped keeps drafting and
+nothing is retroactively widened.
+
+**What this does not gate, honestly stated.** A publish may carry content
+changes in the same call — a single tool call can write a body and make it
+live. That was a deliberate choice: the alternative, restricting a publish to
+a bare status flip, would have made an injected instruction able to promote
+only text a person had already written and reviewed. It was considered and
+declined in favour of fewer round trips from a phone. So the containment for
+prompt injection now rests on the two gates above, on the alert below, and on
+not pointing a publishing connector at read-then-write work over migrated
+articles.
+
+**Every connector publish alerts, immediately.** `recordMcpConnectorPublish`
+posts to `ALERT_WEBHOOK_URL` on each one — no threshold and no cooldown,
+unlike the failed-authentication alarm, because one is interesting and a
+cooldown would hide the second. It names the collection and document and says
+how to revoke; it does not carry the connector's name, which is chosen by
+whoever registered and would be attacker-controlled text arriving in a chat
+room. `mcp_auth` records the client per request, which is where an
+investigation should get it. Unset `ALERT_WEBHOOK_URL` and none of this is
+sent — which also means a deployment that wants connector publishing should
+set it.
+
+[`MCP_SERVER.md`](MCP_SERVER.md)'s Decision 2 still governs API keys, and is
+unchanged: an admin-bound key publishes, an editor-bound one does not.
 
 ## Security notes
 

@@ -9,6 +9,7 @@ import * as migration_20260821_160357_relax_ghost_id_add_trash_and_og_size from 
 import * as migration_20260823_154928_add_noindex_to_posts_and_pages from './20260823_154928_add_noindex_to_posts_and_pages';
 import * as migration_20260824_043611_add_signup_campaigns from './20260824_043611_add_signup_campaigns';
 import * as migration_20260919_050651_add_media_credit_url from './20260919_050651_add_media_credit_url';
+import * as migration_20260919_070509_add_mcp_publish_capability from './20260919_070509_add_mcp_publish_capability';
 
 export const migrations = [
   {
@@ -64,6 +65,11 @@ export const migrations = [
   {
     up: migration_20260919_050651_add_media_credit_url.up,
     down: migration_20260919_050651_add_media_credit_url.down,
-    name: '20260919_050651_add_media_credit_url'
+    name: '20260919_050651_add_media_credit_url',
+  },
+  {
+    up: migration_20260919_070509_add_mcp_publish_capability.up,
+    down: migration_20260919_070509_add_mcp_publish_capability.down,
+    name: '20260919_070509_add_mcp_publish_capability'
   },
 ];

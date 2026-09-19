@@ -10,6 +10,17 @@
 // The rule: MCP may only publish when its key belongs to an administrator.
 // Editor-bound keys draft; a person presses publish in the admin panel, where
 // Live Preview shows them what they are about to publish.
+//
+// **An OAuth connector used to be refused outright, and now is not.** That was
+// the right default while no connector had a reason to publish, and it stopped
+// being right when the repository owner asked to publish from a phone — the
+// case the OAuth layer exists to serve. Reversed deliberately, and narrowly:
+// a grant publishes only where the person approving it ticked a box that is
+// never pre-ticked, *and* the bound user is an administrator. Two independent
+// answers, neither derived from the other, because "may this person publish"
+// and "did anybody decide this connector should" are different questions and
+// `/oauth/register` is open to anyone. `docs/MCP_OAUTH.md` records the
+// reversal and what it costs.
 
 import type { CollectionBeforeChangeHook } from 'payload'
 
@@ -23,16 +34,22 @@ export type PublishAttempt = {
   /**
    * Whether the credential was an OAuth grant rather than an API key.
    *
-   * OAuth connectors never publish, whatever role they act as. The reasoning is
-   * in `docs/MCP_OAUTH.md`: a connector is the least supervised client this
-   * project has — it runs from a vendor's cloud, on a schedule nobody watches,
-   * over content that includes migrated articles an attacker could have
-   * influenced. An API key is held by a person who chose to put it in a config
-   * file; a grant is approved once on a phone and then forgotten. Those deserve
-   * different answers to "may this publish to the live site", and this is the
-   * one place the difference is expressible.
+   * A connector is still the least supervised client this project has: it runs
+   * from a vendor's cloud over content that includes migrated articles an
+   * attacker could have influenced. So it is held to a condition an API key is
+   * not — `grantMayPublish` — rather than being trusted because of who it acts
+   * as.
    */
   viaOAuth?: boolean
+  /**
+   * Whether this grant's capability record permits publishing.
+   *
+   * Resolved in `overrideAuth` from the `payload-mcp-api-keys` document the
+   * consent screen wrote, so it is per connector and per approval rather than
+   * per person. Absent or false for every grant approved before this existed,
+   * which is the safe direction: an old connector keeps drafting.
+   */
+  grantMayPublish?: boolean
 }
 
 /**
@@ -47,13 +64,15 @@ export function mayPublish({
   nextStatus,
   role,
   viaOAuth,
+  grantMayPublish,
 }: PublishAttempt): boolean {
   if (payloadAPI !== 'MCP') return true
   if (nextStatus !== 'published') return true
-  // Strictly tighter than the key rule, and deliberately not role-dependent:
-  // an admin who connects a phone connector has not thereby decided that the
-  // connector may publish.
-  if (viaOAuth) return false
+  // Both, not either. The role says the person behind the credential could
+  // publish in the admin panel; the capability says somebody decided this
+  // particular connector should be able to. A connector approved by an
+  // administrator who left the box alone still only drafts.
+  if (viaOAuth) return grantMayPublish === true && role === 'admin'
   return role === 'admin'
 }
 
@@ -65,18 +84,24 @@ export const refuseMcpPublish: CollectionBeforeChangeHook = ({ data, req }) => {
   const viaOAuth =
     (req.context as { mcpViaOAuth?: unknown } | undefined)?.mcpViaOAuth === true
 
+  const grantMayPublish =
+    (req.context as { mcpGrantMayPublish?: unknown } | undefined)
+      ?.mcpGrantMayPublish === true
+
   const allowed = mayPublish({
     nextStatus: (data as { _status?: unknown })?._status,
     payloadAPI: req.payloadAPI,
     role: (req.user as { role?: string } | null | undefined)?.role,
     viaOAuth,
+    grantMayPublish,
   })
 
   if (!allowed) {
     throw new Error(
       viaOAuth
-        ? 'Publishing through an OAuth connector is not permitted. Save the document as a ' +
-            'draft and publish it from the admin panel.'
+        ? 'This connector may not publish. Publishing is granted per connector, on the ' +
+            'consent screen, and only to an administrator. Save the document as a draft and ' +
+            'publish it from the admin panel, or reconnect and approve publishing.'
         : 'Publishing through MCP requires an administrator key. Save the document as a draft ' +
             'and publish it from the admin panel.',
     )
