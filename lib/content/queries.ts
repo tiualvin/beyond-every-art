@@ -7,6 +7,7 @@ import { toArticleBody, type ArticleBody } from '@/lib/content/body'
 import { readingTimeMinutes } from '@/lib/format'
 import { getPayloadClient } from '@/lib/payload'
 import type { PreviewUser } from '@/lib/preview/session'
+import { appPath, postPath } from '@/lib/seo/site'
 
 export type NavLink = { label: string; url: string }
 
@@ -28,6 +29,16 @@ export type SiteSettings = {
   /** The homepage's meta description: the search snippet, not the standfirst. */
   metaDescription: string
   /**
+   * What fills the rail's ad box when no ad is served.
+   *
+   * Null covers three states that are all the same to a renderer: the editor
+   * chose nothing, the thing they chose was deleted (both relationships are
+   * `ON DELETE SET NULL`), or it is a draft. The rail then leaves the space
+   * empty, which is what it did before this existed.
+   */
+  railFallback: RailFallback
+
+  /**
    * The picture above the signup in the post rail, when an editor has set one.
    *
    * The only image on the site chosen outside a post, and the only reason this
@@ -37,6 +48,52 @@ export type SiteSettings = {
    */
   newsletterImage: MediaImage | null
 }
+
+/**
+ * The rail's house slot, resolved to what a component can render.
+ *
+ * A discriminated union rather than "a post or an app": the two read
+ * differently — one is a headline with a tag and a reading time, the other is
+ * a product with a tagline — and a renderer that took a bag of optional fields
+ * would have to guess which it was holding.
+ */
+export type RailPromoPost = {
+  title: string
+  href: string
+  /** Tag and reading time, already joined; empty when the post has neither. */
+  meta: string
+  /**
+   * Shown only when a single post was chosen.
+   *
+   * One headline in a 250px box reads as a mistake rather than as a choice, so
+   * a lone pick gets its standfirst and becomes a featured piece. Two or three
+   * are a list and do not need it.
+   */
+  excerpt: string
+  /**
+   * The post's featured image, used only by the single-pick layout.
+   *
+   * It is what actually fills the box: a headline and a standfirst come to
+   * about 140px of the 272px available, and the rest was paper. With the
+   * picture it is 260.
+   *
+   * It costs nothing to a reader who gets an ad. The fallback sits inside a
+   * `display: none` subtree until the slot is known to be empty, and an
+   * element with no box is never fetched — the same property the newsletter
+   * card's picture relies on to stay off phones.
+   */
+  image: MediaImage | null
+}
+
+export type RailFallback =
+  | { kind: 'post'; posts: RailPromoPost[] }
+  | {
+      kind: 'app'
+      name: string
+      tagline: string
+      href: string
+    }
+  | null
 
 export type AuthorSummary = {
   name: string
@@ -88,6 +145,7 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
     'art history, and strategic frameworks that artists need to develop deeper ' +
     'practices and build cultural literacy.',
   newsletterImage: null,
+  railFallback: null,
 }
 
 /**
@@ -176,6 +234,93 @@ function toPostCard(doc: RawPost): PostCard | null {
 }
 
 /**
+ * How many promoted posts the rail's box can hold.
+ *
+ * The same three the related list used to show, and for the same reason: the
+ * box is 250px and an item is about 60px. A fourth would either overflow or
+ * force every item smaller than it reads at.
+ */
+export const RAIL_PROMO_MAX = 3
+
+/** A relationship resolved at `depth: 1`, or an id, or nothing. */
+type RawRelation = Record<string, unknown> | number | string | null | undefined
+
+function isResolved(value: RawRelation): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+/**
+ * The rail's house slot, or null when there is nothing to show.
+ *
+ * Null for every way this can be unset, and they are not all the editor's
+ * doing: `kind` may be `none`, the relationship may be empty, the promoted
+ * document may have been deleted out from under it, or it may be a draft.
+ * A draft is the one worth calling out — the admin will happily let you point
+ * at one, and a reader following that link would get a 404. Filtering at
+ * render rather than at selection keeps it correct when the post is
+ * unpublished *after* being chosen, which is the case no form validation
+ * could catch.
+ *
+ * Exported for `tests/content/rail-fallback.test.ts`. It is the one normaliser
+ * in this file that has to be right about a document it did not fetch itself,
+ * and every branch of it is a way for the rail to show a reader a dead link.
+ */
+function toRailPromoPost(value: RawRelation): RailPromoPost | null {
+  if (!isResolved(value)) return null
+  if (value._status !== 'published') return null
+
+  const slug = typeof value.slug === 'string' ? value.slug : ''
+  const title = typeof value.title === 'string' ? value.title : ''
+  if (!slug || !title) return null
+
+  const tag = toTagRefs(value.tags as RawPost['tags'])[0]?.name
+  const minutes = readingTimeMinutes(estimateWordCount(value as RawPost))
+
+  return {
+    title,
+    href: postPath(slug),
+    meta: [tag, minutes ? `${minutes} min` : null].filter(Boolean).join(' · '),
+    excerpt: typeof value.excerpt === 'string' ? value.excerpt : '',
+    image: toMediaImage(value.featuredImage),
+  }
+}
+
+export function toRailFallback(value: unknown): RailFallback {
+  const group = (value ?? {}) as {
+    kind?: string
+    posts?: RawRelation[] | RawRelation
+    app?: RawRelation
+  }
+
+  if (group.kind === 'post') {
+    const chosen = Array.isArray(group.posts) ? group.posts : []
+    const posts = chosen
+      .map(toRailPromoPost)
+      .filter((post): post is RailPromoPost => post !== null)
+      .slice(0, RAIL_PROMO_MAX)
+
+    return posts.length > 0 ? { kind: 'post', posts } : null
+  }
+
+  if (group.kind === 'app' && isResolved(group.app)) {
+    const doc = group.app
+    if (doc._status !== 'published') return null
+    const slug = typeof doc.slug === 'string' ? doc.slug : ''
+    const name = typeof doc.name === 'string' ? doc.name : ''
+    if (!slug || !name) return null
+
+    return {
+      kind: 'app',
+      name,
+      tagline: typeof doc.tagline === 'string' ? doc.tagline : '',
+      href: appPath(slug),
+    }
+  }
+
+  return null
+}
+
+/**
  * Site-wide title/description, falling back to sensible defaults.
  *
  * `depth: 1` rather than 0, which it was until this global gained an upload
@@ -190,7 +335,10 @@ async function readSiteSettings(): Promise<SiteSettings> {
       slug: 'site-settings',
       overrideAccess: true,
       depth: 1,
-    })) as Partial<SiteSettings> & { newsletterImage?: unknown }
+    })) as Partial<SiteSettings> & {
+      newsletterImage?: unknown
+      railFallback?: unknown
+    }
     return {
       title: settings.title || DEFAULT_SITE_SETTINGS.title,
       description: settings.description || DEFAULT_SITE_SETTINGS.description,
@@ -198,6 +346,7 @@ async function readSiteSettings(): Promise<SiteSettings> {
       metaDescription:
         settings.metaDescription || DEFAULT_SITE_SETTINGS.metaDescription,
       newsletterImage: toMediaImage(settings.newsletterImage),
+      railFallback: toRailFallback(settings.railFallback),
     }
   } catch {
     return DEFAULT_SITE_SETTINGS

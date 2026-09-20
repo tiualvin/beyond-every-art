@@ -532,6 +532,45 @@ unit visible per screen and spaced a three-unit rail at `140vh`, and the built
 layout put three in one screen a third of the way down a 9-minute article. The
 rail carrying one unit removes the question.
 
+**An unfilled slot shows house content, not a blank.** Google declines
+impressions routinely — no demand, no consent, a blocker in front of the tag —
+and the reserved height is held either way, so without this a reader gets a
+labelled empty box. `rail-1` therefore has a fallback, chosen in Payload under
+Site Settings → "Article rail — when no ad is shown": up to three articles, one
+of the apps, or nothing.
+
+**Up to three, because filling 250px is the design problem.** The first version
+took a single article and put its headline in the middle of the box, which left
+most of the box as paper and read as a mistake rather than as a choice. Three
+headlines with a rule between them fill it the way the related module used to;
+one is given its own picture instead, at 2:1 rather than the newsletter card's
+3:2 so two stacked frames do not read as a repeat, and its standfirst where it
+has no picture. `pnpm measure:rail --unfilled --promo <1-3>` renders each.
+
+Three things about it are load-bearing:
+
+- **The label goes.** "Advertisement" over our own promotion is a claim that is
+  not true, and not one to be making to an ad network. It is hidden with
+  `visibility` rather than `display`, so the box does not change height as it
+  goes.
+- **The fallback is laid over the unit, not swapped into it.** Google's snippet
+  puts `display: inline-block` in the `<ins>` element's own `style` attribute,
+  which beats any stylesheet rule — so "hide the empty unit and show something
+  else" silently hides nothing and stacks the two. It shipped that way for
+  about ten minutes and made the sticky group 893px against an 800px cap, which
+  scrolls the newsletter button out of reach. Absolutely positioned over the
+  empty unit, the box is the same height either way.
+- **Google's word always wins.** The slot guesses `unfilled` after three
+  seconds of silence, because a blocked loader never sets `data-ad-status` at
+  all and that is the commonest reason of all for an empty box. The guess is
+  not latched: a tag that was merely slow can still answer, and the fallback
+  gets out of the way when it does. A promo sitting over a served ad is a
+  wasted impression and a policy problem.
+
+The general point, for the four units still to come: a placement is not
+finished when the unit renders. Decide what the space says when the network
+says nothing, because that is what a large share of readers will actually see.
+
 **The sticky unit is not refreshed.** A unit that stays in view for a whole
 article is the classic case for refresh, and refresh is the classic way to turn
 a rail into a nuisance. One impression, high viewability, no reload.

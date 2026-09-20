@@ -251,6 +251,14 @@ defence against a collapse under the reader: Google marks an unsold impression
 card up by the 250px it was holding, mid-scroll. §8 allows an unfilled slot to collapse only on a
 subsequent navigation, and this is what holds it to that.
 
+**When the unit renders but no ad is served**, the box holds house content
+instead of a blank — up to three articles, or an app, chosen in Payload under
+Site Settings. Three fill the box as a list; one fills it with its own picture
+at 2:1, or with its standfirst where it has none. It is laid over the empty unit rather than swapped into it, so the
+group is the same height in both states and none of the ladder's arithmetic
+above changes. [`ADVERTISING.md`](ADVERTISING.md) §8 has the reasoning,
+including the ten minutes it spent getting this wrong.
+
 The slot renders nothing where there is no publisher to render it for —
 staging, a teaser, ads switched off — rather than reserving 279px of blank
 paper above the card. Nothing shifts either way, because the reservation exists

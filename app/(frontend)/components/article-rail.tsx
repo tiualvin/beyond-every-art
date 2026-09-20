@@ -2,9 +2,11 @@ import Image from 'next/image'
 
 import { adClientFor } from '@/lib/ads/eligibility'
 import type { MediaImage } from '@/lib/content/media'
+import type { RailFallback as Fallback } from '@/lib/content/queries'
 import type { TocEntry } from '@/lib/content/toc'
 
 import { AdUnit } from './ad-unit'
+import { RailFallback } from './rail-fallback'
 import { SubscribeLink } from './subscribe-link'
 
 /**
@@ -53,11 +55,14 @@ const SIGNUP_IMAGE_SIZES = '300px'
 export function ArticleRail({
   headings,
   newsletterImage = null,
+  railFallback = null,
   restricted = false,
 }: {
   headings: TocEntry[]
   /** From `SiteSettings`; null is the ordinary state, not a failure. */
   newsletterImage?: MediaImage | null
+  /** What the ad box holds when no ad is served. Also from `SiteSettings`. */
+  railFallback?: Fallback
   /** A teaser carries no unit: docs/ADVERTISING.md §4, via `adClientFor`. */
   restricted?: boolean
 }) {
@@ -94,7 +99,13 @@ export function ArticleRail({
             unit collapsing mid-view, not to stand in for one. */}
         {adClient && (
           <div className="rail__slot">
-            <AdUnit placement="rail-1" client={adClient} />
+            {/* The fallback is rendered here, on the server, and handed across
+                the client boundary as children — `AdUnit` is the only thing
+                that can know whether an ad arrived, but it has no business
+                knowing what an editor chose to show instead. */}
+            <AdUnit placement="rail-1" client={adClient}>
+              <RailFallback fallback={railFallback} />
+            </AdUnit>
           </div>
         )}
 
