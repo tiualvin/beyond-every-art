@@ -2,6 +2,7 @@ import type { Where } from 'payload'
 
 import { cachedRead, CONTENT_TAGS } from '@/lib/cache/content'
 import { toMediaImage, type MediaImage } from '@/lib/content/media'
+import { htmlToPlainText, richTextToPlainText } from '@/lib/content/plain-text'
 import { live, publishedStatus } from '@/lib/content/schedule'
 import { isSubjectTag } from '@/lib/content/topics'
 import { ARCHIVE_PAGE_SIZE } from '@/lib/content/pagination'
@@ -214,14 +215,37 @@ function toTagRefs(tags: RawPost['tags']): TagRef[] {
     .filter((t) => t.name && t.slug)
 }
 
+/**
+ * How many words a card's reading time is computed from.
+ *
+ * This used to count the preserved Ghost markup and, failing that, multiply
+ * the excerpt's word count by eight. Every migrated document has `legacyHTML`,
+ * so the first branch answered for the whole site and the second was never
+ * exercised — but an article written in the Lexical editor here has an empty
+ * `legacyHTML` and lands on it. Eight words of body per word of excerpt is not
+ * an estimate of anything; a four-thousand-word essay with a one-line excerpt
+ * advertised itself as a two-minute read.
+ *
+ * `lib/content/plain-text.ts` already knew how to do this properly, for both
+ * shapes, including the text inside insertable modules — it was written and
+ * left unconsumed against exactly this kind of caller. A tag strip also reads
+ * `<script>` and `<style>` bodies as prose, which its HTML branch does not.
+ *
+ * The excerpt is still the last resort, but it is now counted rather than
+ * multiplied: for a document with no body at all, the honest floor is the one
+ * minute `readingTimeMinutes` clamps to.
+ */
 function estimateWordCount(doc: RawPost): number {
+  const words = (text: string): number =>
+    text.split(/\s+/).filter(Boolean).length
+
   const html = doc.legacyHTML ?? ''
-  if (html) {
-    const text = html.replace(/<[^>]*>/g, ' ')
-    return text.split(/\s+/).filter(Boolean).length
-  }
-  const excerpt = doc.excerpt ?? ''
-  return excerpt.split(/\s+/).filter(Boolean).length * 8
+  if (html) return words(htmlToPlainText(html))
+
+  const lexical = richTextToPlainText(doc.content)
+  if (lexical) return words(lexical)
+
+  return words(doc.excerpt ?? '')
 }
 
 function toPostCard(doc: RawPost): PostCard | null {
