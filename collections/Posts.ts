@@ -13,9 +13,11 @@ import {
   ghostUrlField,
   migrationStatusField,
 } from '../fields/ghost'
+import { reviewStateField } from '../fields/review'
 import { noindexField, seoFields } from '../fields/seo'
 import { slugField } from '../fields/slug'
 import { CONTENT_TAGS } from '../lib/cache/content'
+import { stampLastEditedBy, lastEditedByField } from '../lib/content/authorship'
 import { contentEditor } from '../lib/content/editor'
 import { stampPublishedAt } from '../lib/content/publish-date'
 import { purgeOnChange, purgeOnDelete } from '../lib/cache/purge'
@@ -60,6 +62,7 @@ export const Posts: CollectionConfig = {
         return data
       },
       refuseMcpPublish,
+      stampLastEditedBy,
       // Last, so it sees the status this write actually lands on.
       stampPublishedAt,
     ],
@@ -252,6 +255,8 @@ export const Posts: CollectionConfig = {
           'The first one labels the card; all of them file the article under a tag archive.',
       },
     },
+    reviewStateField(),
+    lastEditedByField(),
     noindexField(),
     {
       name: 'owners',

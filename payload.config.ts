@@ -31,6 +31,7 @@ import { resolvePayloadSecret } from './lib/security/secret'
 import {
   buildPreviewUrl,
   PREVIEW_COLLECTIONS,
+  PREVIEW_GLOBALS,
 } from './lib/preview/live-preview'
 
 const filename = fileURLToPath(import.meta.url)
@@ -70,12 +71,25 @@ export default buildConfig({
         { name: 'desktop', label: 'Desktop', width: 1440, height: 900 },
       ],
       collections: [...PREVIEW_COLLECTIONS],
-      url: ({ collectionConfig, data }) =>
-        buildPreviewUrl({
-          collection: collectionConfig?.slug,
-          slug: data?.slug,
-          live: true,
-        }),
+      // The masthead, the footer and the newsletter card are edited blind
+      // otherwise: all three appear on every page and none of them had a
+      // preview at all. See `PREVIEW_GLOBALS` for what this does and does not
+      // promise — a global has no drafts, so the frame follows saves rather
+      // than keystrokes.
+      globals: [...PREVIEW_GLOBALS],
+      url: ({ collectionConfig, globalConfig, data }) =>
+        // A global has no slug of its own; it is previewed against the
+        // homepage, which is the one page that carries all three at once.
+        globalConfig
+          ? '/'
+          : // Still `null` for a document with no slug yet, which is what hides
+            // the Live Preview tab instead of pointing an iframe at
+            // `/undefined/`. See `buildPreviewUrl`.
+            buildPreviewUrl({
+              collection: collectionConfig?.slug,
+              slug: data?.slug,
+              live: true,
+            }),
     },
   },
   // Which origins may spend a session cookie, and which `Host` header Payload

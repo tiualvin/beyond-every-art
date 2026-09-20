@@ -100,6 +100,16 @@ export const Media: CollectionConfig = {
     ],
   },
   fields: [
+    {
+      // What breaks if this goes. The comment on `trash` above says nothing in
+      // the admin makes a delete's blast radius visible before the click; this
+      // is what makes it visible.
+      name: 'usage',
+      type: 'ui',
+      admin: {
+        components: { Field: '/components/admin/MediaUsage#MediaUsage' },
+      },
+    },
     { name: 'alt', type: 'text', required: true },
     { name: 'caption', type: 'textarea' },
     { name: 'credit', type: 'text' },

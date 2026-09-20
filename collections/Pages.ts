@@ -5,6 +5,7 @@ import { ghostIdField } from '../fields/ghost'
 import { noindexField, seoFields } from '../fields/seo'
 import { slugField } from '../fields/slug'
 import { CONTENT_TAGS } from '../lib/cache/content'
+import { stampLastEditedBy, lastEditedByField } from '../lib/content/authorship'
 import { contentEditor } from '../lib/content/editor'
 import { stampPublishedAt } from '../lib/content/publish-date'
 import { purgeOnChange, purgeOnDelete } from '../lib/cache/purge'
@@ -31,7 +32,7 @@ export const Pages: CollectionConfig = {
   // linking to.
   trash: true,
   hooks: {
-    beforeChange: [refuseMcpPublish, stampPublishedAt],
+    beforeChange: [refuseMcpPublish, stampLastEditedBy, stampPublishedAt],
     afterChange: [recordMcpWrite, purgeOnChange(CONTENT_TAGS.pages)],
     afterDelete: [purgeOnDelete(CONTENT_TAGS.pages)],
   },
@@ -107,6 +108,7 @@ export const Pages: CollectionConfig = {
           'Set this ahead and the page stays off the site until then. Left empty, it is filled in when the page is published.',
       },
     },
+    lastEditedByField(),
     noindexField(),
   ],
 }

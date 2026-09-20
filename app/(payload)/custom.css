@@ -271,3 +271,49 @@
     color: inherit;
   }
 }
+
+/* --- Media usage (what breaks if this image goes) ----------------------- */
+
+.bea-usage {
+  border: 1px solid var(--bea-line);
+  border-radius: 2px;
+  margin-block-end: 1.5rem;
+  padding: 0.9rem 1.1rem;
+}
+
+.bea-usage__heading {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.bea-usage__list {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  margin: 0.5rem 0 0;
+  padding-inline-start: 1.1rem;
+}
+
+.bea-usage__more {
+  color: var(--bea-muted);
+  list-style: none;
+  margin-inline-start: -1.1rem;
+}
+
+.bea-usage__note {
+  color: var(--bea-muted);
+  font-size: 0.75rem;
+  line-height: 1.45;
+  margin: 0.65rem 0 0;
+  max-width: 52ch;
+}
+
+:root[data-theme='dark'] .bea-usage {
+  border-color: color-mix(in srgb, var(--bea-line) 25%, transparent);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .bea-usage {
+    border-color: color-mix(in srgb, var(--bea-line) 25%, transparent);
+  }
+}

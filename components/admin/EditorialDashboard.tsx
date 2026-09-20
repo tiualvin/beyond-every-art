@@ -21,6 +21,7 @@
 
 import type { Payload, TypedUser, Where } from 'payload'
 
+import { OPEN_REVIEW_STATES } from '../../fields/review'
 import { notScheduled } from '../../lib/content/schedule'
 
 type Props = {
@@ -98,42 +99,68 @@ export async function EditorialDashboard({ payload, user }: Props) {
     and: [published, { publishedAt: { exists: false } }],
   }
 
-  const [scheduled, missingDate, drafts, noExcerpt, noCover, noTags, troubled] =
-    await Promise.all([
-      count(payload, 'posts', future, user),
-      count(payload, 'posts', undated, user),
-      count(payload, 'posts', { _status: { equals: 'draft' } }, user),
-      count(
-        payload,
-        'posts',
-        { and: [published, notScheduled(now), { excerpt: { exists: false } }] },
-        user,
-      ),
-      count(
-        payload,
-        'posts',
-        {
-          and: [
-            published,
-            notScheduled(now),
-            { featuredImage: { exists: false } },
-          ],
-        },
-        user,
-      ),
-      count(
-        payload,
-        'posts',
-        { and: [published, notScheduled(now), { tags: { exists: false } }] },
-        user,
-      ),
-      count(
-        payload,
-        'posts',
-        { migrationStatus: { in: ['conflict', 'failed'] } },
-        user,
-      ),
-    ])
+  const [
+    scheduled,
+    missingDate,
+    drafts,
+    noExcerpt,
+    noCover,
+    noTags,
+    troubled,
+    awaitingRead,
+    agentWritten,
+  ] = await Promise.all([
+    count(payload, 'posts', future, user),
+    count(payload, 'posts', undated, user),
+    count(payload, 'posts', { _status: { equals: 'draft' } }, user),
+    count(
+      payload,
+      'posts',
+      { and: [published, notScheduled(now), { excerpt: { exists: false } }] },
+      user,
+    ),
+    count(
+      payload,
+      'posts',
+      {
+        and: [
+          published,
+          notScheduled(now),
+          { featuredImage: { exists: false } },
+        ],
+      },
+      user,
+    ),
+    count(
+      payload,
+      'posts',
+      { and: [published, notScheduled(now), { tags: { exists: false } }] },
+      user,
+    ),
+    count(
+      payload,
+      'posts',
+      { migrationStatus: { in: ['conflict', 'failed'] } },
+      user,
+    ),
+    count(
+      payload,
+      'posts',
+      { reviewState: { in: [...OPEN_REVIEW_STATES] } },
+      user,
+    ),
+    count(
+      payload,
+      'posts',
+      {
+        and: [
+          { lastEditedBy: { equals: 'agent' } },
+          { _status: { equals: 'draft' } },
+        ],
+      },
+      user,
+    ),
+  ])
 
   const rows: Row[] = [
     {
@@ -157,6 +184,25 @@ export async function EditorialDashboard({ payload, user }: Props) {
       hint: 'Published, waiting for the date to arrive. Nothing wakes up to release them — they appear once the page cache turns over.',
       count: scheduled,
       href: listUrl('posts', future),
+      tone: 'waiting' as const,
+    },
+    {
+      label: 'waiting on a read',
+      hint: 'Marked ready, or handed back with changes asked for.',
+      count: awaitingRead,
+      href: listUrl('posts', { reviewState: { in: [...OPEN_REVIEW_STATES] } }),
+      tone: 'waiting' as const,
+    },
+    {
+      label: 'drafted by an agent',
+      hint: 'The most recent change came through the MCP server. Nobody has opened them here since.',
+      count: agentWritten,
+      href: listUrl('posts', {
+        and: [
+          { lastEditedBy: { equals: 'agent' } },
+          { _status: { equals: 'draft' } },
+        ],
+      }),
       tone: 'waiting' as const,
     },
     {
