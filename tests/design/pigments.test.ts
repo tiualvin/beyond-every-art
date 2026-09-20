@@ -4,6 +4,7 @@ import {
   PIGMENTS,
   luminance,
   pigmentFor,
+  plateFor,
   textOn,
 } from '../../lib/design/pigments'
 
@@ -57,5 +58,33 @@ describe('textOn', () => {
       const contrast = (Math.max(bg, fg) + 0.05) / (Math.min(bg, fg) + 0.05)
       expect(contrast).toBeGreaterThanOrEqual(4.5)
     }
+  })
+})
+
+describe('plateFor', () => {
+  it('washes an imageless plate with its own subject', () => {
+    expect(plateFor('palette', 'red-color-psychology')).toEqual(
+      pigmentFor('palette'),
+    )
+  })
+
+  it('falls back to the slug when the piece carries no tag', () => {
+    // About a fifth of the archive is untagged. Falling back to the tag list's
+    // absence rather than to the slug would give every one of them the same
+    // colour, which is the grey hole this exists to avoid, repainted.
+    for (const absent of [undefined, null, '', '   ']) {
+      expect(plateFor(absent, 'ultramarine-science')).toEqual(
+        pigmentFor('ultramarine-science'),
+      )
+    }
+  })
+
+  it('gives two untagged pieces different colours', () => {
+    const a = plateFor(undefined, 'ultramarine-science')
+    const b = plateFor(
+      undefined,
+      'the-rothko-effect-and-how-large-color-fields-create-emotional-response',
+    )
+    expect(a.hex).not.toBe(b.hex)
   })
 })

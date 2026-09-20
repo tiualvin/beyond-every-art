@@ -7,6 +7,7 @@ import {
   getTagsWithCounts,
   type PostCard,
 } from '@/lib/content/queries'
+import { plateFor } from '@/lib/design/pigments'
 import { formatDate } from '@/lib/format'
 import { buildWebSiteJsonLd, serializeJsonLd } from '@/lib/seo/jsonld'
 import {
@@ -163,8 +164,8 @@ function LatestBand({ post }: { post: PostCard }) {
   return (
     <Link href={postPath(post.slug)} className="latest">
       <div className="container latest__inner">
-        <span className="latest__plate">
-          {post.image && (
+        {post.image ? (
+          <span className="latest__plate">
             <Image
               src={thumbnailSrc(post.image)}
               alt=""
@@ -172,8 +173,17 @@ function LatestBand({ post }: { post: PostCard }) {
               sizes="(max-width: 56rem) 4.5rem, 6.5rem"
               style={{ objectFit: 'cover' }}
             />
-          )}
-        </span>
+          </span>
+        ) : (
+          <span
+            className="latest__plate plate-wash"
+            style={
+              {
+                '--plate': plateFor(post.tags[0]?.slug, post.slug).hex,
+              } as React.CSSProperties
+            }
+          />
+        )}
 
         <div>
           <p className="eyebrow">

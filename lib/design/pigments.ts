@@ -68,3 +68,26 @@ export function textOn(hex: string): string {
     ? INK
     : ON_DARK
 }
+
+/**
+ * The pigment an imageless listing plate is washed with.
+ *
+ * Four of the five most recent published pieces carry no `featuredImage` — the
+ * Ghost editor's picker went away with the cutover and nothing has replaced it
+ * yet (`docs/STOCK_IMAGERY.md`). Until something does, the newest work is
+ * exactly what renders with an empty plate, at the top of the homepage, which
+ * is the worst place on the site to show a grey hole.
+ *
+ * It prefers the piece's own subject, so an imageless plate carries the same
+ * colour that subject carries in "What we cover" rather than introducing a
+ * second, unrelated colour system. An untagged piece — about a fifth of the
+ * archive — falls back to its slug, which still gives it a stable colour of its
+ * own rather than one shared with every other untagged piece.
+ */
+export function plateFor(
+  tagSlug: string | null | undefined,
+  slug: string,
+): Pigment {
+  const key = tagSlug?.trim()
+  return pigmentFor(key ? key : slug)
+}
