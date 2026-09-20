@@ -12,7 +12,7 @@ import {
   type PostDetail,
 } from '@/lib/content/queries'
 import { shareImageSrc } from '@/lib/content/media'
-import { RELATED_QUERY_LIMIT, splitRelated } from '@/lib/content/related'
+import { READ_NEXT_COUNT } from '@/lib/content/related'
 import { logMissingRoute } from '@/lib/observability/missing-route'
 import { getPreviewMode } from '@/lib/preview/mode'
 import {
@@ -214,18 +214,17 @@ export default async function SlugPage({
   }
 
   const { post } = resolved
-  const [settings, related] = await Promise.all([
+  const [settings, readNext] = await Promise.all([
     getSiteSettings(),
-    // Six rather than three, split between the rail and "Read next" below.
-    // One query either way: `getRelatedPosts` takes the limit and `cachedRead`
-    // keys on its arguments, so this is the same round trip it always was.
+    // Three, which is what "Read next" shows. It was six while the rail took a
+    // second helping of the same query for its own list; that module is gone
+    // and every piece it showed already closed the article below it.
     getRelatedPosts(
       post.slug,
       post.tags.map((tag) => tag.slug),
-      RELATED_QUERY_LIMIT,
+      READ_NEXT_COUNT,
     ),
   ])
-  const { readNext, rail } = splitRelated(related)
   const siteUrl = getSiteUrl()
   const url = post.canonicalURL || absoluteUrl(postPath(post.slug), siteUrl)
 
@@ -259,7 +258,12 @@ export default async function SlugPage({
         <BlockJsonLd key={index} node={node} />
       ))}
       {showBanner && <DraftBanner />}
-      <Article post={post} related={rail} preview={draft} />
+      <Article
+        post={post}
+        newsletterImage={settings.newsletterImage}
+        railFallback={settings.railFallback}
+        preview={draft}
+      />
       <ReadNext posts={readNext} topic={post.tags[0]?.name} />
     </>
   )

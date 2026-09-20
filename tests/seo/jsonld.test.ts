@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildArticleJsonLd,
   buildCollectionPageJsonLd,
+  buildItemListJsonLd,
   buildProfilePageJsonLd,
   buildWebPageJsonLd,
   buildWebSiteJsonLd,
@@ -242,6 +243,48 @@ describe('buildCollectionPageJsonLd', () => {
   })
 })
 
+describe('buildItemListJsonLd', () => {
+  const items = [
+    { url: 'https://x.test/ultramarine/', name: 'Ultramarine' },
+    { url: 'https://x.test/burnt-sienna/', name: 'Burnt Sienna' },
+  ]
+
+  it('numbers the entries from one, in the order given', () => {
+    const node = buildItemListJsonLd({ items })
+
+    expect(node['@type']).toBe('ItemList')
+    expect(node.itemListElement).toEqual([
+      {
+        '@type': 'ListItem',
+        position: 1,
+        url: 'https://x.test/ultramarine/',
+        name: 'Ultramarine',
+      },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        url: 'https://x.test/burnt-sienna/',
+        name: 'Burnt Sienna',
+      },
+    ])
+  })
+
+  it('names the list only when it was given a name', () => {
+    expect(buildItemListJsonLd({ items }).name).toBeUndefined()
+    expect(buildItemListJsonLd({ items, name: 'Featured' }).name).toBe(
+      'Featured',
+    )
+  })
+
+  it('still emits the node for a site with nothing published', () => {
+    // A builder that sometimes returns nothing pushes the decision into every
+    // caller. An empty list is true of an empty site.
+    const node = buildItemListJsonLd({ items: [] })
+    expect(node['@type']).toBe('ItemList')
+    expect(node.itemListElement).toEqual([])
+  })
+})
+
 describe('every node survives serialization', () => {
   // The escaping in `serializeJsonLd` exists so a value cannot break out of
   // the <script> element. It is applied to these nodes too, so each has to
@@ -276,6 +319,13 @@ describe('every node survives serialization', () => {
         name: 'A & B',
         siteName: 'A & B',
         siteUrl: 'https://x.test',
+      }),
+    ],
+    [
+      'ItemList',
+      buildItemListJsonLd({
+        name: 'A & B',
+        items: [{ url: 'https://x.test/a/', name: 'A </script> B' }],
       }),
     ],
   ])('%s', (type, node) => {

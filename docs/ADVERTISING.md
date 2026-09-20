@@ -4,11 +4,25 @@ An evaluation of putting ad units on the site: what is in the way, what the
 architecture should be so that AdSense is not a one-way door, where the units
 go, and in what order the work should happen.
 
-Two pieces of it are now built: `/ads.txt` (§1) and the AdSense loader itself,
-which `app/(frontend)/layout.tsx` renders whenever the deployment is indexable.
-Everything else below — consent, the slot layer, the placements — is still a
-plan. The loader alone earns nothing: it is what makes an approved account able
-to fill a unit, and there are no units yet.
+Five pieces of it are now built: `/ads.txt` (§1), the AdSense loader itself
+(`app/(frontend)/layout.tsx`, whenever the deployment is indexable), the slot
+layer (`lib/ads/placements.ts`, `lib/ads/eligibility.ts` and `lib/ads/inline.ts`,
+per §5), and two units — `rail-1`, the 300×250 in the post rail, and
+`article-inline`, repeated down the body by length. Both render through
+`app/(frontend)/components/ad-unit.tsx`.
+
+**Consent is no longer the blocker.** Google's Privacy & messaging — the
+certified CMP §9 recommends — is configured in the AdSense console, reported by
+the repository owner on 19 Sep. It needs no code here: the AdSense tag loads the
+European regulations message itself, which is exactly why it was recommended.
+
+The other half of §2 is closed too, and that half was code.
+`lib/analytics/consent.ts` declares the Consent Mode v2 defaults before either
+Google tag acts on them: granted where no banner is shown, denied across the
+EEA, the UK and Switzerland where one is. Both tags honour it, so one banner
+now governs both — which is what §2 asked for and what §9's seam argument is
+built on. [`ANALYTICS.md`](ANALYTICS.md) has the placement, which took
+measuring.
 
 Related: [`CONTENT_SECURITY_POLICY.md`](CONTENT_SECURITY_POLICY.md),
 [`DEPLOYMENT_STATUS.md`](DEPLOYMENT_STATUS.md),
@@ -25,16 +39,19 @@ ship yet, for reasons that have nothing to do with the code:
 1. The site has not cut over. It is `noindex` and behind Basic Auth, so Google
    cannot review it, and an AdSense application reviewed in that state is an
    application that gets declined.
-2. There is no consent management platform. For EEA/UK traffic that is not a
-   nice-to-have, it is the thing Google requires before it will serve ads at
-   all.
+2. There is a consent management platform now. Google's Privacy & messaging is
+   configured in the AdSense console (19 Sep, owner-reported), which is what
+   Google requires before it will serve ads to EEA/UK traffic at all. What is
+   still missing is the application's half: GA4 runs ungated, and nothing here
+   reads a Consent Mode signal. §2.
 3. `/ads.txt` is now served by Caddy from the repository-root file (§1).
    Closed on 29 Aug, with one operator action left: delete the dead redirect
    row in Payload, which can never run and which `validate:redirects` reports.
 
-The order that follows from this is: build consent, cut over, apply, then wire
-the ad layer behind a flag. `ads.txt` is no longer part of that sequence. §7 lays it out, §8 plans
-the placements, and §9 evaluates the consent platforms.
+Only the first is still a blocker. The order that follows is: cut over, apply,
+then wire the units already built. `ads.txt` and the CMP are no longer part of
+that sequence. §7 lays it out, §8 plans the placements, and §9 evaluates the
+consent platforms and records which one was chosen.
 
 The more important point is in §6: **the ceiling on RPM is traffic, not
 architecture.** Futureproofing the code is cheap and worth doing, but it is not
@@ -125,28 +142,47 @@ build or app-level test would catch.
 Verify after cutover by fetching `https://<domain>/ads.txt` and reading the
 body, not the status code.
 
-## 2. Consent is the real blocker
+## 2. Consent was the real blocker — it is closed
 
-There is no cookie consent system in this repository. Grepping for one finds
-the OAuth consent screen and the newsletter signup's consent line, and nothing
-else.
+**Settled 19 Sep, in a console rather than in this repository.** Google's
+Privacy & messaging is configured on the AdSense account, per the owner. That
+is the certified CMP §9 recommends, it is certified by construction because
+Google both requires and supplies it, and the AdSense tag serves the European
+regulations message on its own — which is why "zero integration work" was the
+argument for it and why nothing in this repository changed when it was turned
+on.
 
-Google has required a certified consent management platform for AdSense,
-Ad Manager and AdMob traffic from the EEA, UK and Switzerland since January
-2024, and the framework version has since moved — TCF v2.3 became mandatory on
-1 March 2026. Without a CMP certified at the current version, ads to those users
-are not served, and this is enforced by Google rather than merely advised. §9
-evaluates the options, including why the open-source ones cannot be used here.
+That closes the requirement below. Google has required a certified consent
+management platform for AdSense, Ad Manager and AdMob traffic from the EEA, UK
+and Switzerland since January 2024, and the framework version has since moved —
+TCF v2.3 became mandatory on 1 March 2026. Without a CMP certified at the
+current version, ads to those users are not served, and this is enforced by
+Google rather than merely advised. §9 evaluates the options, including why the
+open-source ones cannot be used here.
 
-Two things follow that are easy to get wrong:
+**What the console did not close, and what did.** There is still no cookie
+consent _banner_ in this repository — grepping finds the OAuth consent screen
+and the newsletter signup's consent line, and nothing else. That is correct:
+the ad tag brings its own. What was missing was the other side of it.
 
-**GA4 already has this problem.** `app/(frontend)/components/analytics.tsx`
-loads the GA4 tag unconditionally whenever `NEXT_PUBLIC_GA_ID` is set and the
-deployment is indexable. There is no consent gate in front of it. That is an
-existing gap rather than something ads introduce, but ads make it sharper:
-advertising cookies are unambiguously non-essential, and a site running a
-consent banner that only governs half its tags is in a worse position than one
-running no banner at all, because it has now made a claim.
+**GA4 had this problem, and the CMP made it sharper rather than softer.**
+`app/(frontend)/components/analytics.tsx` loads the GA4 tag whenever
+`NEXT_PUBLIC_GA_ID` is set and the deployment is indexable, and for a while
+there was nothing in front of it. That was a small gap while there was no
+banner at all; the moment one went live it became a claim the analytics tag was
+not honouring, on every EEA and UK visit — and a site whose banner governs half
+its tags is in a worse position than one running none, because it has made a
+promise.
+
+**Closed the way §9's last paragraph asks**, by declaring Consent Mode v2
+defaults rather than by gating the script. That distinction is the part worth
+keeping: a Google tag with no declared default treats consent as _granted_, so
+the fix is not "do not load GA4" — it is to say what it may store before it
+asks. Denied across the EEA, the UK and Switzerland; granted elsewhere, because
+Google's CMP shows no banner there and a global denial would never be updated
+for anybody else. `lib/analytics/consent.ts`, and
+[`ANALYTICS.md`](ANALYTICS.md) for where the script has to sit and why that
+took measuring rather than reading.
 
 **Consent has to be an input to the ad layer, not a wrapper around it.** The
 tempting shape is a banner component that conditionally renders the ad script.
@@ -224,6 +260,16 @@ slot between the halves. The second is better: deterministic, no shift, no
 hydration mismatch, and testable as a pure function. It is also the only one of
 the two that a strict CSP is comfortable with.
 
+**Built, as the second.** `splitHtmlForAds` in
+[`../lib/ads/inline.ts`](../lib/ads/inline.ts) scans top-level tags with a
+depth counter rather than a parser — void elements, comments, self-closing tags
+and a stray `<` all have to behave, and a regex that counted `<p` would not —
+and its failure mode is to return the body as one chunk, so a shape it cannot
+read gets no ads rather than mangled markup. It is lossless by construction and
+by test: the chunks rejoin to the original byte for byte, verified on three
+real migrated bodies. The Lexical branch splits the node list on the same plan,
+so both branches take their breaks from one function.
+
 **Restricted posts should not carry ads.** `post.restricted` renders a teaser
 plus `MembershipGate`. A truncated article with ads on it is thin content in
 the sense AdSense's policies care about, and it is also the worst possible
@@ -263,15 +309,22 @@ slot _is_, never for what fills it. `article-mid` maps to an AdSense slot ID
 today and to some other partner's unit later, and no component that renders an
 ad ever knows which. That mapping is the only thing a provider swap touches.
 
-`eligibility` earns its own module because it is where four unrelated
-conditions meet, and each of them is a bug if it is checked in only some of the
-places a unit appears:
+`eligibility` earns its own module because it is where unrelated conditions
+meet, and each of them is a bug if it is checked in only some of the places a
+unit appears:
 
 - the deployment is indexable (`isNoindex()` — no ads on staging, same reason
   analytics does not run there);
-- the reader has consented, where consent is required;
 - the post is not a restricted teaser;
 - later, the reader is not a paying member.
+
+**Consent is deliberately not on that list**, which is a correction to an
+earlier version of this section. With Google's CMP (§9) the tag enforces
+consent itself, and a reader who refuses gets limited ads rather than none — so
+withholding the `<ins>` here would not be honouring a consent decision, it
+would be throwing away the inventory Google is still willing to serve. The
+consent work that is outstanding is GA4's (§2), and it belongs in front of the
+analytics tag rather than in this predicate.
 
 The last one is why this exists now rather than later. [`ACCOUNT_MODEL.md`](ACCOUNT_MODEL.md)
 ships no reader accounts in Phase 1, so there is no member to check — but the
@@ -350,10 +403,12 @@ AdSense in the meantime.
 
 1. **Settle `/ads.txt`,** at cutover and not before — the Ghost redirect serves
    it until then. §1 has the two options and the trap in each.
-2. **Consent management.** A prerequisite for ads rather than a part of them.
-   §9 recommends Google's Privacy & messaging to start; the work in this
-   repository is reading Consent Mode v2 signals and retrofitting GA4 behind
-   them, not building a banner.
+2. **Consent management.** Done in the console on 19 Sep: Google's Privacy &
+   messaging, per §9's recommendation, serving the European regulations message
+   through the AdSense tag. The banner half needed no code and got none. The
+   remaining half is this repository's — reading Consent Mode v2 signals and
+   retrofitting GA4 behind them — and it is still outstanding, which §2 says
+   plainly rather than leaving this step looking finished.
 3. **Cut over.** [`DEPLOYMENT_STATUS.md`](DEPLOYMENT_STATUS.md)'s "Flip" —
    unset `NEXT_PUBLIC_NOINDEX` and `STAGING_BASIC_AUTH`. Nothing about
    advertising can be evaluated before this, including the AdSense
@@ -361,13 +416,19 @@ AdSense in the meantime.
 4. **Let traffic establish, then apply to AdSense.** Applying against a site
    with no organic traffic history and a fresh domain configuration invites a
    decline that is slow to appeal.
-5. **Build `lib/ads/`.** Started: `lib/ads/adsense.ts` resolves the publisher
-   and `app/(frontend)/components/adsense.tsx` renders Google's loader, gated
-   on the deployment being indexable so staging never serves ad code. It ships
-   _on_ rather than off — the publisher defaults to the id committed in
-   `ads.txt`, since a loader nobody switched on is indistinguishable from the
-   problem it was meant to fix — with `NEXT_PUBLIC_ADSENSE_CLIENT=off` as the
-   switch for pulling it without a deploy. The slot layer below is still to do.
+5. **Build `lib/ads/`.** Three of §5's four modules exist. `lib/ads/adsense.ts`
+   resolves the publisher and `app/(frontend)/components/adsense.tsx` renders
+   Google's loader, gated on the deployment being indexable so staging never
+   serves ad code. It ships _on_ rather than off — the publisher defaults to the
+   id committed in `ads.txt`, since a loader nobody switched on is
+   indistinguishable from the problem it was meant to fix — with
+   `NEXT_PUBLIC_ADSENSE_CLIENT=off` as the switch for pulling it without a
+   deploy. `lib/ads/placements.ts` holds the placement names and the sizes they
+   reserve; `lib/ads/eligibility.ts` is the one predicate, and it already
+   answers for the restricted teaser as well as the deployment. `providers` is
+   not built: there is one provider, and an interface with one implementation
+   is a guess about the second. The seam that matters — that no component knows
+   which network fills a slot — is held by the placement names on their own.
 6. **Turn it on with the CSP still in report-only**, and read the violation
    reports to build the real origin list before enforcement.
 7. **Two or three units, measured.** Watch CLS and LCP against the current
@@ -424,19 +485,37 @@ that slot's request is deferred to idle.
 
 ### Inventory
 
-| ID                 | Track / template     | Position                                          | Desktop | Mobile  | Reserved    |
-| ------------------ | -------------------- | ------------------------------------------------- | ------- | ------- | ----------- |
-| `rail-1`           | Rail, `/[slug]`      | Above the related pieces, inside the sticky group | 300×250 | —       | 250px       |
-| `article-inline-1` | Text, `/[slug]`      | After the 5th body block                          | 336×280 | 300×250 | 280 / 250px |
-| `article-end`      | Block, `/[slug]`     | Below the author card, above Read Next            | 970×250 | 300×250 | 250px       |
-| `archive-inline`   | journal, tag, author | After every 6th entry row                         | 970×250 | 300×250 | 250px       |
-| `home-mid`         | `/`                  | Between Featured and Topics                       | 970×250 | 300×250 | 250px       |
+| ID                         | Track / template     | Position                                          | Desktop | Mobile  | Reserved |
+| -------------------------- | -------------------- | ------------------------------------------------- | ------- | ------- | -------- |
+| `rail-1` **built**         | Rail, `/[slug]`      | Above the newsletter card, inside the sticky pair | 300×250 | —       | 250px    |
+| `article-inline` **built** | Text, `/[slug]`      | Repeated down the body, by length — see below     | fluid   | fluid   | 280px    |
+| `article-end`              | Block, `/[slug]`     | Below the author card, above Read Next            | 970×250 | 300×250 | 250px    |
+| `archive-inline`           | journal, tag, author | After every 6th entry row                         | 970×250 | 300×250 | 250px    |
+| `home-mid`                 | `/`                  | Between Featured and Topics                       | 970×250 | 300×250 | 250px    |
 
 Five identified placements, of which **four should be live at launch**: all but
-`home-mid`. `.rail__slot` in `app/globals.css` already reserves `rail-1`'s
-250px, so turning it on is a fill rather than a re-layout — and the reservation
-holds at every window height, because the sticky group shrinks its related list
-rather than the unit or the newsletter card (`docs/POST_PAGE_LAYOUT.md`).
+`home-mid`. Two are, and `rail-1`'s reservation held: turning it on was a fill
+rather than a re-layout.
+
+What it was _not_ was free of consequences for the rail around it, and the
+outcome is worth recording because it cost an editorial module. 279.3px of the
+sticky group is the unit, its cap and its gap, the group is capped at the
+viewport less 100, and on a 1440×900 laptop that left "More on this" showing
+one piece and part of a second where three were meant to be. A ladder fixed it
+down to 683px of viewport; then the module was removed outright, because every
+piece it listed already closes the article in "Read next" on every device
+while the rail reached desktop only. The rail is now the unit and a newsletter
+card with a picture, and the card is what gives on a short window —
+`pnpm measure:rail`, and the table in
+[`POST_PAGE_LAYOUT.md`](POST_PAGE_LAYOUT.md).
+
+**The general lesson is worth keeping for the four units still to come.** A
+unit's reserved height is not only a promise about layout shift; it is a claim
+on whatever is elastic next to it. Decide what gives before placing the unit,
+or the unit quietly eats the editorial content it was placed beside — which is
+exactly what happened here, and it took two passes to notice that the right
+answer was not a better ladder but a module that should not have been
+competing with an ad for the same 250px.
 
 **The rail carries one unit, not three.** An earlier version of this table had a
 ladder of three, spaced a viewport apart down a rail that scrolled with the
@@ -447,8 +526,44 @@ with near-perfect viewability, and by the rule below it cannot be refreshed to
 recover the other two. Whether long exposure on one unit beats three glances is
 a per-slot measurement rather than something to settle here.
 
-`article-inline-2` and `-3` remain retired: one unit inside the reading column
-rather than three.
+### The count follows the length
+
+The row above used to read "after the 5th body block", one unit, fixed. That is
+the right shape for a 900-word post and the wrong shape for this archive. The
+14 published articles average **4,800 words** and the longest is **7,899**,
+which at the measure is 27,000px of scrolling. One unit in thirty screens is
+not a placement, it is a token — and the reader who stays for a 30-minute piece
+is the one worth the most, which a fixed count cannot express.
+
+So `lib/ads/inline.ts` plans the breaks from a running word count: **the first
+unit at 400 words, one every 800 after it, at most six.** The numbers are
+measured rather than picked.
+
+- **400 words** is about a screen and a half, so the first unit is below the
+  fold and never shares the opening screen with the hero and the rail unit.
+- **800 words** is the two-units rule below, converted. Body copy at the 704px
+  measure runs about 3.3px per word, so a 900px desktop screen holds ~270 words
+  and an 844px phone screen ~128. 800 words is therefore ~3 desktop screens and
+  ~6 phone screens, and desktop is the binding case.
+- **Six** covers the mean article exactly and caps the outlier, which would
+  otherwise take ten. The cap is the part that matters here, because most of
+  this archive is long enough to reach it. The returns past six are thinner
+  than the arithmetic suggests — most readers never get there, so unit six
+  earns a fraction of unit one while costing the same in how the page reads.
+
+What that yields, on the real corpus: 3 units on the shortest article, 6 on the
+mean, 6 on the longest. Verified against three migrated bodies, where the
+splitter is also lossless — the chunks rejoin to the original byte for byte.
+
+The px-per-word figure is the one that can go stale, because it is a fact about
+the type rather than about the writing.
+[`../tests/design/article-layout.test.ts`](../tests/design/article-layout.test.ts)
+recomputes the gap from `.prose`'s size and leading and fails if a type change
+would put a third unit on a screen.
+
+`article-inline-2` and `-3` are retired as _names_: there is one placement
+inside the reading column, rendered as many times as the article is long,
+rather than three hand-placed slots.
 
 ### Rules that go with it
 
@@ -464,23 +579,102 @@ unit visible per screen and spaced a three-unit rail at `140vh`, and the built
 layout put three in one screen a third of the way down a 9-minute article. The
 rail carrying one unit removes the question.
 
+**An unfilled slot shows house content, not a blank.** Google declines
+impressions routinely — no demand, no consent, a blocker in front of the tag —
+and the reserved height is held either way, so without this a reader gets a
+labelled empty box. `rail-1` therefore has a fallback, chosen in Payload under
+Site Settings → "Article rail — when no ad is shown": up to three articles, one
+of the apps, or nothing.
+
+**Up to three, because filling 250px is the design problem.** The first version
+took a single article and put its headline in the middle of the box, which left
+most of the box as paper and read as a mistake rather than as a choice. Three
+headlines with a rule between them fill it the way the related module used to;
+one is given its own picture instead, at 2:1 rather than the newsletter card's
+3:2 so two stacked frames do not read as a repeat, and its standfirst where it
+has no picture. `pnpm measure:rail --unfilled --promo <1-3>` renders each.
+
+Three things about it are load-bearing:
+
+- **The label goes.** "Advertisement" over our own promotion is a claim that is
+  not true, and not one to be making to an ad network. It is hidden with
+  `visibility` rather than `display`, so the box does not change height as it
+  goes.
+- **The fallback is laid over the unit, not swapped into it.** Google's snippet
+  puts `display: inline-block` in the `<ins>` element's own `style` attribute,
+  which beats any stylesheet rule — so "hide the empty unit and show something
+  else" silently hides nothing and stacks the two. It shipped that way for
+  about ten minutes and made the sticky group 893px against an 800px cap, which
+  scrolls the newsletter button out of reach. Absolutely positioned over the
+  empty unit, the box is the same height either way.
+- **Google's word always wins.** The slot guesses `unfilled` after three
+  seconds of silence, because a blocked loader never sets `data-ad-status` at
+  all and that is the commonest reason of all for an empty box. The guess is
+  not latched: a tag that was merely slow can still answer, and the fallback
+  gets out of the way when it does. A promo sitting over a served ad is a
+  wasted impression and a policy problem.
+
+The general point, for the four units still to come: a placement is not
+finished when the unit renders. Decide what the space says when the network
+says nothing, because that is what a large share of readers will actually see.
+
+**A hidden slot does not ask for an ad.** `rail-1`'s track is `display: none`
+below 1280px, and hiding a box does nothing whatever to the effect inside it —
+so until this was guarded, every phone that opened an article requested an ad
+for a unit no reader would ever see. That is most of the traffic, and it is
+wrong three times over: the requests are wasted, the fill rate they come back
+with is a number about nothing, and serving into a hidden container is not
+something to do to an ad network on purpose.
+
+CSS cannot fix it, because the push is JavaScript. So the breakpoint is a
+property of the placement (`minViewportWidth` in
+[`../lib/ads/placements.ts`](../lib/ads/placements.ts)), the unit asks
+`matchMedia` before it asks Google, and it keeps listening so a window dragged
+wider still fills. The design test checks that number against the stylesheet
+that hides the track, because the failure mode of moving one without the other
+is silent.
+
+The general form, for the three units still to come: **a placement that any
+breakpoint can hide needs its breakpoint written down where the request can
+read it.** `archive-inline` and `home-mid` are in tracks that exist at every
+width; if that stops being true for one of them, it needs an entry here.
+
 **The sticky unit is not refreshed.** A unit that stays in view for a whole
 article is the classic case for refresh, and refresh is the classic way to turn
 a rail into a nuisance. One impression, high viewability, no reload.
 
 **Never split a figure from its caption.** Insertion counts top-level block
-children of the body and must skip a position that would land between a
-`figure` and text that reads as its continuation, and between a heading and the
-paragraph beneath it. For migrated Ghost bodies this is a server-side HTML
-split (§4); for Lexical bodies it is an index into the node list. Both need the
-same rule, so it belongs in `lib/ads/` next to the placement names, not in
-either renderer.
+children of the body and skips a position that would land between a `figure`
+and text that reads as its continuation, or between a heading and the paragraph
+beneath it. For migrated Ghost bodies this is a server-side HTML split (§4);
+for Lexical bodies it is an index into the node list. Both need the same rule,
+so it lives in [`../lib/ads/inline.ts`](../lib/ads/inline.ts) next to the
+placement names rather than in either renderer.
+
+Built, with one refinement the plan did not anticipate: **a refused boundary
+defers the unit, it does not drop it.** Skipping the position outright loses
+units on exactly the figure-heavy articles this archive is densest in, so the
+unit waits for the next legal boundary and the count comes out right. The last
+block never takes one either — a unit at the very end of the body is
+`article-end` with extra steps.
 
 **Reserve the maximum, always.** Each slot renders its reserved height before
 anything fills it, from this repository's CSS, keyed on placement and
 breakpoint. A 90px banner landing in a 250px reservation leaves whitespace;
 that is the correct trade. Zero layout shift is the requirement, and an unfilled
 slot must collapse to zero only on a subsequent navigation, never mid-view.
+
+**One placement cannot honour that literally, and says so.** `article-inline`
+is one of Google's in-article units, whose height comes from the creative — a
+format with no maximum has nothing exact to reserve. Its 280px is a floor
+chosen to cover the common case, not a promise, and `SlotSize` in
+[`../lib/ads/placements.ts`](../lib/ads/placements.ts) is a discriminated union
+(`fixed` | `fluid`) so the difference is in the type rather than in a comment
+somebody stops reading. Measure the real creatives after launch: routinely
+taller and the floor should rise, routinely shorter and it is costing
+whitespace on every article. The alternative — a fixed 336×280 in the column —
+was rejected because it forgoes the fluid format's native look and its mobile
+fill, which is where most of the reading happens.
 
 **Label every unit.** A small "Advertisement" cap above each slot, inside the
 reserved height so it costs no extra shift. This is an editorial-integrity
@@ -557,6 +751,13 @@ having to track certification, and requires no third-party script — which is
 worth something specific here, since §3 already establishes that every
 additional ad-adjacent origin is a line in the CSP and a phase-3 problem.
 
+**Taken, on 19 Sep.** It is configured in the AdSense console. Nothing in this
+repository records that, and nothing can: the whole point of this option is
+that the tag carries the banner, so there is no import, no origin and no
+setting here that would fail if it were switched off again. The one thing that
+would notice is EEA and UK fill rate, which is where to look if ads stop
+serving to those readers.
+
 Two honest costs. It ties consent to the ad network, so moving to a managed
 partner later means changing CMP as well — mitigated by the fact that
 Mediavine and Raptive supply their own CMP anyway, so that migration is coming
@@ -571,9 +772,18 @@ depends on the signal and not on the vendor, and swapping CMP becomes a console
 change instead of a code change. That is the same seam argument as §5, applied
 one layer down: the thing worth abstracting is the signal, not the provider.
 
-It also settles the GA4 gap in §2. Once `Analytics` reads the same signals, one
-banner governs both tags and there is no second source of truth — which was the
-actual requirement, and is the part no CMP gives you for free.
+It also settles the GA4 gap in §2, and that is built rather than planned now —
+`lib/analytics/consent.ts`. One banner governs both tags and there is no second
+source of truth, which was the actual requirement and is the part no CMP gives
+you for free.
+
+One correction to the paragraph above, learned in the building. "Read consent
+through the signals" is the wrong shape for a Google tag: there is nothing to
+read, because the tag reads them itself. What the application owes is the
+_declaration_ — the default state, before the tag looks. A reader is still the
+right seam for anything non-Google, and there is nothing non-Google yet, so
+there is no reader. The signal is the contract either way, which is the part
+that mattered.
 
 ### What the banner can be made to look like
 

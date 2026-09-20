@@ -2,14 +2,27 @@ import Image from 'next/image'
 import Link from 'next/link'
 
 import {
+  FEATURED_SLOTS,
+  RECENT_QUERY_SIZE,
+  selectPicks,
+} from '@/lib/content/homepage'
+import {
+  getFeaturedPosts,
   getRecentPosts,
   getSiteSettings,
   getTagsWithCounts,
   type PostCard,
 } from '@/lib/content/queries'
+import { plateFor } from '@/lib/design/pigments'
 import { formatDate } from '@/lib/format'
-import { buildWebSiteJsonLd, serializeJsonLd } from '@/lib/seo/jsonld'
+import { visibilityLabel } from '@/lib/membership'
 import {
+  buildItemListJsonLd,
+  buildWebSiteJsonLd,
+  serializeJsonLd,
+} from '@/lib/seo/jsonld'
+import {
+  absoluteUrl,
   getSiteUrl,
   HOME_TOPICS_ID,
   JOURNAL_PATH,
@@ -32,14 +45,23 @@ import { thumbnailSrc } from '@/lib/content/media'
 export const dynamic = 'force-dynamic'
 
 export default async function HomePage() {
-  const [settings, posts, topics] = await Promise.all([
+  const [settings, recent, flagged, topics] = await Promise.all([
     getSiteSettings(),
-    getRecentPosts(7),
-    getTagsWithCounts(6),
+    getRecentPosts(RECENT_QUERY_SIZE),
+    getFeaturedPosts(FEATURED_SLOTS),
+    getTagsWithCounts(),
   ])
 
-  const [latest, ...rest] = posts
-  const featured = rest.length > 0 ? rest : posts
+  // The newest piece carries the band; the picks are what is left, in tier
+  // order. `selectPicks` excludes the band's piece rather than the page
+  // slicing it off, which is also what stops a site with one published post
+  // from showing that post twice.
+  const latest = recent[0]
+  const picks = selectPicks({
+    featured: flagged,
+    recent,
+    exclude: latest ? [latest.id] : [],
+  })
 
   // Ghost served a WebSite node here and this page served none, which the
   // 18 Sep crawl comparison caught. The description is the standfirst rather
@@ -54,11 +76,29 @@ export default async function HomePage() {
     }),
   )
 
+  // What the page actually lists, in the order it lists it: the band's piece
+  // first, then the picks. `WebSite` says what the site is and said nothing
+  // about its contents.
+  const siteUrl = getSiteUrl()
+  const listJsonLd = serializeJsonLd(
+    buildItemListJsonLd({
+      name: 'Featured articles',
+      items: (latest ? [latest, ...picks] : picks).map((post) => ({
+        url: absoluteUrl(postPath(post.slug), siteUrl),
+        name: post.title,
+      })),
+    }),
+  )
+
   return (
     <main>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: jsonLd }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: listJsonLd }}
       />
       {/* ── Cover ── */}
       <section className="cover">
@@ -112,9 +152,9 @@ export default async function HomePage() {
             </div>
           </Reveal>
 
-          {featured.length > 0 ? (
+          {picks.length > 0 ? (
             <StaggerChildren>
-              {featured.map((post) => (
+              {picks.map((post) => (
                 <StaggerItem key={post.id}>
                   <EntryRow post={post} />
                 </StaggerItem>
@@ -140,8 +180,8 @@ export default async function HomePage() {
                   <h2>What we cover</h2>
                 </div>
                 <p className="section__note">
-                  Fill height shows how much of the archive each subject
-                  accounts for.
+                  Fill height is each subject&rsquo;s size against the largest
+                  one.
                 </p>
               </div>
             </Reveal>
@@ -155,16 +195,22 @@ export default async function HomePage() {
 
 function LatestBand({ post }: { post: PostCard }) {
   const byline = post.authors.map((author) => author.name).join(', ')
-  const meta = [post.publishedAt ? formatDate(post.publishedAt) : null]
-    .concat(`${post.readingTime} min`)
+  // Same three parts, in the same order, as an `EntryRow`: the band showed no
+  // membership label, so a members-only newest piece was badged everywhere on
+  // the site except the most prominent place it appears.
+  const meta = [
+    visibilityLabel(post.visibility),
+    post.publishedAt ? formatDate(post.publishedAt) : null,
+    `${post.readingTime} min`,
+  ]
     .filter(Boolean)
     .join(' · ')
 
   return (
     <Link href={postPath(post.slug)} className="latest">
       <div className="container latest__inner">
-        <span className="latest__plate">
-          {post.image && (
+        {post.image ? (
+          <span className="latest__plate">
             <Image
               src={thumbnailSrc(post.image)}
               alt=""
@@ -172,8 +218,17 @@ function LatestBand({ post }: { post: PostCard }) {
               sizes="(max-width: 56rem) 4.5rem, 6.5rem"
               style={{ objectFit: 'cover' }}
             />
-          )}
-        </span>
+          </span>
+        ) : (
+          <span
+            className="latest__plate plate-wash"
+            style={
+              {
+                '--plate': plateFor(post.tags[0]?.slug, post.slug).hex,
+              } as React.CSSProperties
+            }
+          />
+        )}
 
         <div>
           <p className="eyebrow">

@@ -90,11 +90,39 @@ query parameter can turn it into an open redirect.
   [`next.config.ts`](../next.config.ts) or the [`Caddyfile`](../Caddyfile), and
   the draft-mode cookie is `SameSite=Lax`, so the iframe works with nothing
   extra. Any future security-header work must keep `frame-ancestors 'self'`.
-  Moving the admin to its own hostname would break both the cookie and the
-  postMessage origin check, and would need `SameSite=None; Secure`.
-- **`NEXT_PUBLIC_SITE_URL` must be the origin the admin is served from.** It is
-  the iframe's origin and the only origin whose save messages the listener
-  trusts.
+- ~~**`NEXT_PUBLIC_SITE_URL` must be the origin the admin is served from.**~~
+  **It no longer is, and preview no longer depends on it.** This constraint was
+  written while the admin and the public site were one application on one
+  origin. They are not: the admin is served only on `CMS_ADDRESS`, and the
+  public hostname answers `/admin` with a 404 on purpose
+  ([`Caddyfile`](../Caddyfile)).
+
+  The constraint was therefore violated in production the day that split
+  landed, and it broke exactly as predicted — quietly, and only for the people
+  who use it. `buildPreviewUrl` built an absolute URL from
+  `NEXT_PUBLIC_SITE_URL`, so the Preview button and the Live Preview iframe
+  both sent an editor from the host holding their Payload session to one that
+  had never seen it. A session cookie does not travel between hostnames, so
+  `/api/preview` saw an anonymous request and refused it — correctly — with
+  `Not authorized to preview`. Nothing was broken except the assumption.
+
+  It is now a **relative** URL, which resolves against whichever host is
+  serving the admin, and `/api/preview` redirects to a path rather than a URL,
+  so the whole flow stays there. The arrangement of hostnames no longer matters
+  to preview, and `tests/preview/live-preview.test.ts` fails if the URL ever
+  becomes absolute again.
+
+  Repointing `NEXT_PUBLIC_SITE_URL` at `CMS_ADDRESS` would also have "fixed"
+  this, and must not be done: the same value builds canonical tags, the sitemap
+  and the feed, and aiming those at the staff hostname trades a broken button
+  for an SEO fault that a recrawl makes expensive to undo.
+
+  **What the split still costs**, and is not fixed here: the postMessage origin
+  check and `SameSite=Lax`. Both work today because the iframe and the page
+  inside it are now the same origin — the admin's. If the iframe is ever
+  pointed at the public hostname again, both break and it would need
+  `SameSite=None; Secure`.
+
 - The listener is mounted only when a live-preview session is active, so no
   live-preview JavaScript reaches public readers.
 

@@ -1,9 +1,14 @@
 import Image from 'next/image'
 import Link from 'next/link'
 
+import { adClientFor } from '@/lib/ads/eligibility'
 import { attributionHref } from '@/lib/content/attribution'
 import { thumbnailSrc, type MediaImage } from '@/lib/content/media'
-import type { AuthorSummary, PostCard, PostDetail } from '@/lib/content/queries'
+import type {
+  AuthorSummary,
+  PostDetail,
+  RailFallback,
+} from '@/lib/content/queries'
 import { extractHeadings } from '@/lib/content/toc'
 import { formatDate } from '@/lib/format'
 import { authorPath, tagPath } from '@/lib/seo/site'
@@ -43,12 +48,15 @@ const FIGURE_SIZES =
  */
 export function Article({
   post,
-  related = [],
+  newsletterImage = null,
+  railFallback = null,
   preview = false,
 }: {
   post: PostDetail
-  /** Related pieces for the rail; "Read next" is given its own share. */
-  related?: PostCard[]
+  /** The rail's signup picture, from `SiteSettings`. */
+  newsletterImage?: MediaImage | null
+  /** What the rail's ad box holds when no ad is served. */
+  railFallback?: RailFallback
   preview?: boolean
 }) {
   const primaryTag = post.tags[0]
@@ -63,6 +71,11 @@ export function Article({
   // Derived here rather than in the route: it is a pure function of the body
   // this component already holds, and no other caller needs it.
   const headings = extractHeadings(post.body)
+
+  // One answer, used by the body and the rail, so the two can never disagree
+  // about whether this page carries ads. A restricted teaser carries none —
+  // docs/ADVERTISING.md §4.
+  const adClient = adClientFor({ restricted: post.restricted })
 
   return (
     <main>
@@ -111,6 +124,7 @@ export function Article({
               body={post.body}
               className={post.restricted ? 'prose prose--teaser' : 'prose'}
               preview={preview}
+              adClient={adClient}
               emptyMessage={
                 post.restricted
                   ? undefined
@@ -143,7 +157,12 @@ export function Article({
             )}
           </div>
 
-          <ArticleRail headings={headings} related={related} />
+          <ArticleRail
+            headings={headings}
+            newsletterImage={newsletterImage}
+            railFallback={railFallback}
+            restricted={post.restricted}
+          />
         </div>
       </article>
     </main>

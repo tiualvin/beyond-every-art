@@ -78,53 +78,89 @@ gives the browser a language to hyphenate against; without it the property is
 inert, which is the one way this can silently stop working.
 
 **Rail — 300px, from 1280.** A contents list in flow at the top, then a sticky
-group of three: space reserved for a square ad, the related pieces, and the
-newsletter card. The group travels with the reader for the rest of the scroll;
-the contents list does not, because a reader below the sections it names is
-done with it.
+pair: the square ad unit, and the newsletter card. The pair travels with the
+reader for the rest of the scroll; the contents list does not, because a reader
+below the sections it names is done with it.
 
-The group is capped at the height of the space it pins into, which is what
+**"More on this" used to be the third module, and removing it is what this
+section is now about.** Three related pieces, a 300×250 unit and a signup came
+to 712px in a box capped at the viewport less 100px, so on an ordinary laptop —
+a 1440×900 has about 800px of viewport — something was always being cut. What
+got cut was the related list, because it was the only module that could shrink:
+it showed one piece and part of a second, cut through the middle of a word.
+
+A ladder was built to fix that and it worked, down to 683px of viewport. The
+better answer was to notice what the module was: the one thing in the rail that
+duplicated something else on the same page. Every piece it listed already
+closes the article in "Read next", which reaches every device, where the rail
+reached desktop only. So it goes, and nothing a reader can reach goes with it —
+what changes is that the page reads three rows from the database instead of
+six, and the card gets the 245px back.
+
+**The card spends it on being worth looking at:** a picture an editor chooses
+in `SiteSettings` → Newsletter card image, an eyebrow, a heading, a line, and
+the control. It is the rail's own content now rather than a footnote under a
+list of links.
+
+The pair is still capped at the height of the space it pins into, which is what
 keeps a sticky box from hanging its bottom off the screen where nothing can
-reach it. The group is 686px and the cap is the viewport less 100px, so it
-binds under about 790px of viewport — which is most windows, and means
-something in the group has to give.
+reach it. Whole, it is 658px against that cap, so it needs 758px of viewport —
+and the unit cannot shrink, because a 300×250 is a 300×250. So the card is the
+only thing that can give, and what it gives is decided rather than left to the
+group's scrollbar, which would take the button first.
 
-**Which module gives is decided, not left to the scrollbar.** The unit keeps
-its 250px and the newsletter card keeps its height; the related list is the
-only module allowed to shrink and scroll inside itself. Capping the group and
-scrolling it whole had made the card — the last thing in the group, and the
-only thing in it a reader is meant to act on — the first thing off the bottom.
+**The picture gives, in two steps, then the words.** The picture is the only
+thing here worth less at a smaller size rather than worthless, so a 3:2 frame
+becomes a 3:1 band before it goes at all:
 
-| Viewport | Cap  | Group | Related list | What the reader sees     |
-| -------- | ---- | ----- | ------------ | ------------------------ |
-| ≥790     | ≥690 | 686   | 184          | all three pieces         |
-| 760      | 660  | 660   | 158          | two, and part of a third |
-| 680      | 580  | 580   | 78           | one                      |
-| ≤649     | —    | 421   | —            | the unit and the card    |
+| Viewport | Cap | Group | What the card has shed         | The picture |
+| -------- | --- | ----- | ------------------------------ | ----------- |
+| ≥761     | 661 | 658   | nothing                        | 3:2 frame   |
+| 663–760  | 563 | 559   | the frame becomes a band       | 3:1 band    |
+| 564–662  | 464 | 460   | the band                       | none        |
+| 508–563  | 408 | 408   | the line of copy too           | none        |
+| ≤507     | —   | 408   | nothing left; the pair scrolls | none        |
 
-Under 650px the list has nothing whole left to show, so it is dropped instead —
-the related pieces close the article on every device, so nothing in the rail is
-only in the rail.
+The cap and group columns are taken at the bottom of each band, which is where
+the band binds; above it the cap is larger and the group unchanged.
 
-**That threshold shipped wrong once, at 700px.** A laptop with a bookmarks bar
-sits just under 700, so for a large share of real windows the module simply
-vanished, which reads as a bug rather than a decision. The fix was not to move
-the number on its own but to buy the space back: the gap under the unit, the
-rhythm between the group's modules, the card's padding and the sticky box's own
-breathing room were tightened, 37px in total, which moved the point where a
-whole item still fits from 695 to 650. 649 is now a window that genuinely
-cannot hold the module.
+**The whole card stays on screen down to 508px of viewport**, and a picture of
+some kind survives to 663 — which covers a 1366×768 laptop, roughly 620–680px
+of viewport once the OS and browser chrome are off it, on the band rung.
 
-Note it is a `max-height` guard, and not the `@media (min-height: 820px)` one it
-replaced upstream: that turned the sticky group off entirely, on a group about
-700px tall against a 1440×900 laptop's roughly 800px of viewport, so on most
-screens there was no sticky at all and it looked like the feature had never been
-built. This one drops one supplementary module on the windows that cannot hold
-it, and the test asserts the threshold can only go down.
+Every rung carries about 3px of slack over what the measurement demands, and
+that is deliberate rather than sloppy: each boundary landed on exactly zero
+when first computed — a group of 658 against a cap of 658 — and a boundary with
+no margin is one font-rendering difference away from being wrong on somebody
+else's machine.
 
-The space above "More on this" is the unit and a gap — 250px and 1rem — not the
-unit and a second band. At the 2.5rem module rhythm it read as 290px of nothing,
-and those pixels were also pixels the card did not have.
+The rungs apply only where the rail is carrying a unit. Without one the pair is
+just the card, 379px, which fits any window a desktop browser opens in — so a
+members-only teaser, which carries no unit at all by
+[`ADVERTISING.md`](ADVERTISING.md) §4, keeps its picture at every height.
+
+`pnpm measure:rail` prints the table above from the real `ArticleRail` in
+Chromium, and `tests/design/article-layout.test.ts` fails if a rung starts
+lower than its own group fits — which is the fault that ships invisibly. The
+previous ladder had exactly that bug at one boundary, found by the browser and
+not by reading.
+
+**The picture costs a phone nothing.** The rail is hidden below 1280 rather
+than reflowed, and a `display: none` `<img>` is still a download — which is why
+this column carried no thumbnails for as long as it had a list of posts in it.
+`next/image` lazy-loads unless told otherwise, and an element with no box never
+intersects the viewport, so the request is never made. Verified in Chromium
+rather than assumed: at 390px wide the rail's picture is requested zero times,
+and at 1440 with the rail scrolled into view, once. The one thing that would
+break it is `priority`, which is what the featured image needs and is easy to
+copy from one to the other, so a test fails if it ever appears in the rail.
+
+The space above the card is the unit, its "Advertisement" cap and a gap —
+265.7px and 0.85rem — not the unit and a second band. At the 2.5rem module
+rhythm it read as 290px of nothing, and those pixels were also pixels the card
+did not have. The unit is aligned to the top of its line box, too: Google's
+snippet styles it `display: inline-block`, which parks it on a text baseline
+and reserves 8px of descender space underneath that nothing ever fills.
 
 ## Decisions worth not relitigating
 
@@ -192,12 +228,86 @@ only thing that absorbs it. The options, if it ever matters:
   it and the text would not, which is what the notes margin should have been.
   It reintroduces an empty column on articles with no media.
 
+## The unit in the rail
+
+`rail-1` from [`ADVERTISING.md`](ADVERTISING.md) §8 is built: a 300×250 unit
+above the newsletter card, inside the sticky pair, with an "Advertisement" cap
+above it. `ArticleRail` renders it through `AdUnit`, and `lib/ads/eligibility.ts`
+decides whether it renders at all — not on a non-indexable deployment, not with
+`NEXT_PUBLIC_ADSENSE_CLIENT=off`, and not on a restricted teaser (§4: a
+truncated article with ads on it is thin content, and it is the worst possible
+moment to be asking someone to subscribe).
+
+Two things about it that the rest of this document depends on:
+
+**It is the whole reason the ladder exists.** 279.3px of a 658px group is the
+unit, its cap and its gap, and it cannot shrink — a 300×250 is a 300×250.
+Everything the card gives on a short window, it gives because of this, which is
+why every rung is scoped to a rail that is actually carrying a unit.
+
+**`min-height: 250px` is no longer a reservation for an empty box.** It is the
+defence against a collapse under the reader: Google marks an unsold impression
+`data-adsbygoogle-status="unfilled"` and hides the `<ins>`, which would drag the
+card up by the 250px it was holding, mid-scroll. §8 allows an unfilled slot to collapse only on a
+subsequent navigation, and this is what holds it to that.
+
+**When the unit renders but no ad is served**, the box holds house content
+instead of a blank — up to three articles, or an app, chosen in Payload under
+Site Settings. Three fill the box as a list; one fills it with its own picture
+at 2:1, or with its standfirst where it has none. It is laid over the empty unit rather than swapped into it, so the
+group is the same height in both states and none of the ladder's arithmetic
+above changes. [`ADVERTISING.md`](ADVERTISING.md) §8 has the reasoning,
+including the ten minutes it spent getting this wrong.
+
+The slot renders nothing where there is no publisher to render it for —
+staging, a teaser, ads switched off — rather than reserving 279px of blank
+paper above the card. Nothing shifts either way, because the reservation exists
+to stop a unit collapsing mid-view rather than to stand in for one.
+
+**Below 1280 it does not ask for an ad at all.** `.article__rail` is
+`display: none` there, which hides the box and does nothing to the effect
+inside it — so the unit used to request an ad on every phone that opened an
+article. `AdUnit` now reads the breakpoint from the placement and waits on
+`matchMedia`, and the design test checks that number against the rule above, so
+moving the breakpoint here without moving it there fails rather than quietly
+costing requests.
+
+## The units in the column
+
+`article-inline` is the other built placement, and unlike the rail unit it is
+not one box: `lib/ads/inline.ts` plans the breaks from a running word count —
+the first at 400 words, one every 800, at most six — so a long piece carries
+more of them than a short one. [`ADVERTISING.md`](ADVERTISING.md) §8 has the
+measurement behind those numbers.
+
+Three things about it that touch this document:
+
+**It does not change any width.** The unit is a child of the reading column and
+sized by it, so the 704px measure, the block, and the rail's arithmetic above
+are all untouched. Nothing here had to move to make room.
+
+**Its reservation is a floor, not a promise.** It is one of Google's in-article
+units, whose height comes from the creative. `SLOT_SIZES` marks it `fluid` and
+reserves 280px as a floor — which is the one place in this template where
+"reserve the maximum" cannot be taken literally, and §8 says why.
+
+**The drop cap only belongs to the first chunk.** The two body branches split
+differently, and the HTML one is where this bites. Rich text hands each part to
+its own `RichText` inside a single `.prose`, which renders exactly the children
+one part would have — nothing in the stylesheet can tell. Preserved Ghost
+markup cannot do that, because `dangerouslySetInnerHTML` needs an element to
+hang on, so each chunk is its own `.prose`. That keeps `.prose > *` meaning
+"a top-level block of the body", and breaks one rule:
+`.prose > p:first-of-type::first-letter` would put a 3.6em burgundy letter
+after every ad. `prose--continued` turns it off for every chunk after the
+first.
+
 ## Not built, deliberately
 
-- **Ads.** No slot renders. `.rail__slot` reserves 250px above the related
-  pieces so that turning ads on is a fill rather than a re-layout, and §7 of
-  [`ADVERTISING.md`](ADVERTISING.md) still puts consent and the cutover ahead
-  of any ad code.
+- **The other three placements.** [`ADVERTISING.md`](ADVERTISING.md) §8 has
+  five and two are rendered: `rail-1` and `article-inline`. `article-end`,
+  `archive-inline` and `home-mid` are not, and `lib/ads/placements.ts`
+  deliberately does not name a placement that nothing renders.
 - **A contents list on every article.** `extractHeadings` stops at the first
   block node. Anchors come from a stateful allocator the renderer shares
   between the body's headings and any block that emits one, so past a block
@@ -215,8 +325,23 @@ content before believing a change here:
 1. A migrated Ghost post with figures, a wide card and a gallery, at 1280 and
    1440 — the archive is most of the site, and it is the content this grid has
    to hold rather than the seeded examples.
-2. A short viewport. 1280×800 and 1366×768 are where the height cap binds. The
-   newsletter card should be whole at every height, the reserved 250px should
-   still be 250px, and the related list should be the only thing that gives.
-   Check "More on this" is there at all: it is the one module a change here can
-   remove from the page entirely, and it does so silently.
+2. A short viewport. `pnpm measure:rail` sweeps them in Chromium against the
+   real `ArticleRail` and prints the table above; run it before and after and
+   compare, rather than eyeballing one window. The numbers it prints belong in
+   three places, and a change that updates only some of them is the drift this
+   document exists to prevent: the rung boundaries in `app/globals.css`, the
+   `GROUP` constants in `tests/design/article-layout.test.ts`, and the table
+   above.
+
+   Then look at the two heights either side of each rung — 760/761, 662/663,
+   563/564 — because a rung that starts too low scrolls the card's button out
+   of reach across a band a few pixels wide, which is invisible unless you are
+   looking at exactly it.
+
+3. Check the picture is there, and that "Join the list" is reachable without
+   scrolling the rail. Those are the two things a change here can take away,
+   and it takes them away silently.
+
+4. A post with no newsletter image set, which is what every database looks
+   like until someone sets one. The card should read as a card rather than as
+   a card missing its top.

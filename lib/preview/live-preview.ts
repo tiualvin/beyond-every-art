@@ -1,4 +1,4 @@
-import { appPath, getSiteUrl, pagePath, postPath } from '../seo/site'
+import { appPath, pagePath, postPath } from '../seo/site'
 
 /** Collections an editor can preview on the public site. */
 export const PREVIEW_COLLECTIONS = ['posts', 'pages', 'apps'] as const
@@ -54,7 +54,6 @@ type PreviewUrlArgs = {
   slug: unknown
   /** Build the URL for the admin's Live Preview iframe rather than a new tab. */
   live?: boolean
-  siteUrl?: string
 }
 
 /**
@@ -65,17 +64,34 @@ type PreviewUrlArgs = {
  * Payload reads a `null` here as "no preview available", hiding the button and
  * the Live Preview tab instead of pointing an iframe at `/undefined/`.
  *
- * No secret is included. The admin and the site are one Next.js application on
- * one origin, so the browser sends the Payload session cookie with the iframe
- * and new-tab requests alike, and `/api/preview` authorizes against that. A
- * secret in this URL would buy nothing and would leak into browser history,
- * referrers, and any screenshot of the edit view.
+ * No secret is included. `/api/preview` authorizes against the Payload session
+ * cookie the browser already holds, and a secret here would buy nothing while
+ * leaking into browser history, referrers, and any screenshot of the edit view.
+ *
+ * **Relative, deliberately, and this used to be absolute.** It was built from
+ * `NEXT_PUBLIC_SITE_URL` while the admin and the public site were one
+ * application on one origin, which they no longer are: the admin is served
+ * only on `CMS_ADDRESS` and the public site only on the site address. An
+ * absolute URL therefore sent an editor from the host holding their session to
+ * one that had never seen it, and Payload's session cookie does not travel
+ * between hostnames — so the Preview button and the Live Preview iframe both
+ * arrived at `/api/preview` anonymous and were refused, correctly, with
+ * `Not authorized to preview`.
+ *
+ * A relative URL resolves against whichever host the admin is being served
+ * from, so the cookie is always present and the arrangement of hostnames stops
+ * mattering. `/api/preview` then redirects to a path rather than a URL, which
+ * keeps the whole flow on that host.
+ *
+ * The alternative — repointing `NEXT_PUBLIC_SITE_URL` at `CMS_ADDRESS` — is
+ * not available and should not be reached for: the same value builds canonical
+ * tags, the sitemap and the feed, and aiming those at the staff hostname would
+ * trade a broken button for a genuine SEO fault.
  */
 export function buildPreviewUrl({
   collection,
   slug,
   live = false,
-  siteUrl = getSiteUrl(),
 }: PreviewUrlArgs): string | null {
   if (!isPreviewCollection(collection)) return null
   if (typeof slug !== 'string' || !slug.trim()) return null
@@ -83,5 +99,5 @@ export function buildPreviewUrl({
   const params = new URLSearchParams({ collection, slug })
   if (live) params.set('live', '1')
 
-  return `${siteUrl}${PREVIEW_PATH}?${params.toString()}`
+  return `${PREVIEW_PATH}?${params.toString()}`
 }

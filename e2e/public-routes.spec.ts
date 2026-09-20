@@ -85,6 +85,33 @@ test.describe('representative public journeys', () => {
     )
   })
 
+  // The rail's signup used to be a plain link to /newsletter/, which took a
+  // reader out of the piece they were half way through. It opens the masthead's
+  // modal now — the same one the membership gate opens — and the thing worth
+  // guarding is that it is still a real link underneath, so a click that lands
+  // before hydration goes somewhere sensible rather than nowhere at all.
+  test('the rail signup opens the subscribe modal without leaving the post', async ({
+    page,
+  }) => {
+    await page.goto(`/${fixtures.publicPost.slug}/`)
+
+    const signup = page.locator('.rail__signup').getByRole('link', {
+      name: 'Join the list',
+    })
+    await expect(signup).toHaveAttribute('href', '/newsletter/')
+
+    // The modal is React state inside `SiteChrome`; `data-ready` is how the
+    // other specs wait for that component to hydrate before clicking anything
+    // wired to it.
+    await expect(
+      page.locator('.site-header__actions[data-ready]'),
+    ).toBeAttached()
+    await signup.click()
+
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await expect(page).toHaveURL(new RegExp(`/${fixtures.publicPost.slug}/?$`))
+  })
+
   test('newsletter accepts an idempotent synthetic signup', async ({
     page,
   }) => {

@@ -82,3 +82,57 @@ Exercised by temporarily seeding 14 posts, since the default seed produces four.
 Those extra posts were removed again afterwards.
 
 ![Journal page two at 1280px: two cards, and a footer row with a "Newer stories" link on the left and "Page 2 of 2" beside it.](gap4-journal-page2-desktop-after.jpg)
+
+---
+
+## 5. Homepage modules: imageless plates, curated picks, and the topics chart
+
+Four changes to `app/(frontend)/page.tsx` and what feeds it. Same capture
+conditions as above — seeded development site, Chromium, 1280px and 390px, full
+page — with `prefers-reduced-motion` forced so the cover's canvas is a still
+frame and the reveal modules have settled.
+
+### Home page — desktop
+
+| Before                                                                                                                                                                                                                                                                                                          | After                                                                                                                                                                                                                                                                                                         |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ![Home page at 1280px before: the third entry, "Building Texture", has no plate beside its title, only empty paper. The Latest band's metadata reads "May 20, 2025 · 1 min". The topics note claims fill height shows how much of the archive each subject accounts for.](home-modules-home-desktop-before.jpg) | ![Home page at 1280px after: "Building Texture" carries a deep blue plate matching its Creative Practice swatch. The Latest band's metadata reads "Members · May 20, 2025 · 1 min". The topics note reads "Fill height is each subject's size against the largest one."](home-modules-home-desktop-after.jpg) |
+
+### Home page — mobile
+
+| Before                                                                                                                                                               | After                                                                                                                                                     |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ![Home page at 390px before: the same empty plate on "Building Texture" and the same unbadged Latest band, in a single column.](home-modules-home-mobile-before.jpg) | ![Home page at 390px after: the blue plate and the "Members" badge, with the topic swatches reflowed to two columns.](home-modules-home-mobile-after.jpg) |
+
+### What these shots do and do not show
+
+**The plate wash** is the clearest difference: "Building Texture" is seeded
+without a featured image on purpose, and the pigment it takes is its subject's —
+the same blue as the Creative Practice swatch further down the page. The first
+pass of this change rendered nothing at all here, because `.entry__thumb` used
+the `background` shorthand and reset the `background-image` the wash sets. Only
+the screenshot caught it; `tests/design/plate-wash.test.ts` now catches it.
+
+**The membership badge** on the Latest band appears because the seeded newest
+post was set to `members` for the capture. It is public in the seed as shipped.
+
+**The topics note** changes wording because the old claim was not true: the fill
+has a 30% floor and a fifth of published posts carry no tag.
+
+**The curation order is not visible here, and cannot be from this seed.** The
+development seed has four posts, three of them flagged `featured`, and they are
+also the three newest — so the tier chain and reverse-chronological order
+produce the same list. What the shots do show is that the Latest band's piece
+no longer repeats below it. The tiers themselves are covered by
+`tests/content/homepage-picks.test.ts`, which is where the behaviour is pinned;
+against the production archive the section becomes three flagged pieces followed
+by three recent ones.
+
+**The topics chart shows three swatches because the seed has three tags.** The
+change that lifts the limit is only observable against a library with more
+subjects than the old cap of six — production has eight after the workflow tag
+is dropped.
+
+**The footer carries links here because the seed populates the `footer` global.**
+It is empty in production, where the footer renders as the wordmark and the
+copyright line alone.

@@ -1,66 +1,44 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
-import type { PostCard } from '../../lib/content/queries'
-import {
-  RAIL_COUNT,
-  READ_NEXT_COUNT,
-  RELATED_QUERY_LIMIT,
-  splitRelated,
-} from '../../lib/content/related'
+import { READ_NEXT_COUNT } from '../../lib/content/related'
 
-const post = (slug: string): PostCard => ({
-  id: slug,
-  slug,
-  title: slug,
-  excerpt: '',
-  publishedAt: null,
-  featured: false,
-  authors: [],
-  tags: [],
-  image: null,
-  readingTime: 4,
-  visibility: 'public',
-})
+const page = readFileSync(
+  join(process.cwd(), 'app/(frontend)/[slug]/page.tsx'),
+  'utf8',
+)
+const rail = readFileSync(
+  join(process.cwd(), 'app/(frontend)/components/article-rail.tsx'),
+  'utf8',
+)
 
-const slugs = (posts: PostCard[]) => posts.map((entry) => entry.slug)
-
-describe('splitRelated', () => {
-  it('fills both surfaces when there are enough posts', () => {
-    const { readNext, rail } = splitRelated(
-      ['a', 'b', 'c', 'd', 'e', 'f'].map(post),
-    )
-
-    expect(slugs(readNext)).toEqual(['a', 'b', 'c'])
-    expect(slugs(rail)).toEqual(['d', 'e', 'f'])
+describe('related posts on a post page', () => {
+  it('shows three, which is what "Read next" holds', () => {
+    expect(READ_NEXT_COUNT).toBe(3)
   })
 
-  // The query returns tag matches before its recency top-up, so the front of
-  // the list is the most relevant. "Read next" shows on every device and the
-  // rail is hidden below 1280, so the front of the list goes to "Read next".
-  it('spends the closest matches where every reader sees them', () => {
-    const { readNext, rail } = splitRelated(['a', 'b', 'c', 'd'].map(post))
-
-    expect(slugs(readNext)).toEqual(['a', 'b', 'c'])
-    expect(slugs(rail)).toEqual(['d'])
+  // The page asked for six while the rail took a second helping of the same
+  // query for its own list. That module is gone, and a limit left at six would
+  // be three rows read on every post render that nothing renders — the kind of
+  // cost that survives a deletion because nothing fails when it does.
+  it('asks the database for exactly what it renders', () => {
+    expect(page).toContain('READ_NEXT_COUNT,')
+    expect(page).not.toContain('RELATED_QUERY_LIMIT')
+    expect(page).not.toContain('splitRelated')
   })
 
-  it('leaves the rail empty rather than repeat a post already shown', () => {
-    const { readNext, rail } = splitRelated(['a', 'b', 'c'].map(post))
-
-    expect(slugs(readNext)).toEqual(['a', 'b', 'c'])
-    expect(rail).toEqual([])
-  })
-
-  it('survives a tag with nothing else in it', () => {
-    expect(splitRelated([])).toEqual({ readNext: [], rail: [] })
-  })
-
-  it('asks for exactly what the two surfaces can show', () => {
-    expect(RELATED_QUERY_LIMIT).toBe(READ_NEXT_COUNT + RAIL_COUNT)
-    expect(
-      slugs(
-        splitRelated(Array.from({ length: 9 }, (_, i) => post(`p${i}`))).rail,
-      ),
-    ).toHaveLength(RAIL_COUNT)
+  // The rail's copy of this list is gone. Everything it showed still closes
+  // the article in "Read next", on every device rather than desktop only, so
+  // a reader lost nothing — but a rail that quietly took posts again would put
+  // the sticky group back over the height it is budgeted for.
+  it('does not feed the rail a second copy of the list', () => {
+    // The markup, not the prose: the component's doc comment explains why the
+    // module went, so matching on its name would fail on the explanation.
+    expect(rail).not.toContain('rail__related')
+    expect(rail).not.toContain('rail__list')
+    expect(rail).not.toContain('PostCard')
+    expect(rail).not.toMatch(/related[?]?:/)
   })
 })
