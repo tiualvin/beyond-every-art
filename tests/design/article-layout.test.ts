@@ -494,6 +494,98 @@ describe('the ad box when nothing is served', () => {
   })
 })
 
+describe('the in-body house box', () => {
+  const rule = (selector: string): string => {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const match = new RegExp(`\\n${escaped} \\{([^}]*)\\}`).exec(css)
+    expect(match, `${selector} is missing from globals.css`).toBeTruthy()
+    return match![1]
+  }
+
+  const promoSource = readFileSync(
+    resolve(
+      import.meta.dirname,
+      '../../app/(frontend)/components/inline-promo.tsx',
+    ),
+    'utf8',
+  )
+
+  /**
+   * The component with its prose removed.
+   *
+   * Its doc comment argues about the `<h3>` this deliberately does not render,
+   * so a check for one matches the explanation and fails. `related.test.ts`
+   * has the same note for the same reason: match the markup, not the reasons.
+   */
+  const promo = promoSource
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '')
+
+  // The whole visual argument, and the one a later change is most likely to
+  // undo by "tidying" this into the house card style. Every module an author
+  // can drop into this column is bordered or filled — `.callout`, `.bookmark`,
+  // `.signup` — so a house box built as a card reads as something the writer
+  // placed rather than as the publication speaking.
+  it('is a band rather than another card in the column', () => {
+    const band = rule('.inline-promo')
+    expect(band).toMatch(/border-top: 1px solid/)
+    expect(band).toMatch(/border-bottom: 1px solid/)
+    expect(band).not.toMatch(/border-radius/)
+    expect(band).not.toMatch(/background/)
+    // `.module` is the author-block wrapper. Sharing it would put this inside
+    // the vocabulary the band exists to stay out of.
+    expect(promo).not.toMatch(/className="module/)
+  })
+
+  // The two body branches put the slot in different places: a rich-text body
+  // renders it inside `.prose`, a preserved Ghost body beside one. Anything
+  // inherited therefore differs between two articles that look identical to an
+  // editor, which is a bug nobody would think to look for.
+  it('declares its own type instead of inheriting the column’s', () => {
+    const band = rule('.inline-promo')
+    expect(band).toMatch(/font-family:/)
+    expect(band).toMatch(/font-size:/)
+    expect(band).toMatch(/line-height:/)
+    // `.prose > p` is justified; this is not a paragraph of the article.
+    expect(band).toMatch(/text-align: left/)
+    // A heading would take `.prose`'s size on one branch and not the other,
+    // so the lines are spans carrying their own rules — the way `Bookmark`
+    // does it, and for the same reason. The eyebrow is the one `<p>`, and it
+    // carries `.eyebrow`, which sets its own face and size.
+    expect(promo).not.toMatch(/<h[1-6][ >]/)
+    expect(promo).toMatch(/<span className="inline-promo__title">/)
+    expect(promo).toMatch(/className="eyebrow inline-promo__label"/)
+  })
+
+  // The fallback is laid over the unit at `inset: 0`, so anything taller than
+  // the slot prints over the paragraph beneath it. At 390px the measure is
+  // 342px against 704 and the same words take about twice the lines, which is
+  // where this would first go wrong.
+  it('cannot outgrow the box it is laid over', () => {
+    expect(rule('.inline-promo')).toMatch(/overflow: hidden/)
+    expect(rule('.inline-promo__title')).toMatch(/-webkit-line-clamp: 2/)
+    expect(rule('.inline-promo__excerpt')).toMatch(/-webkit-line-clamp: 3/)
+  })
+
+  // The complaint the first build earned in the browser: the type comes to
+  // about 165px of a box that is 296, and pinning the meta line to the bottom
+  // rule spent all of the difference in one place. A 130px hole under the
+  // standfirst reads as broken; the same air split evenly reads as padding.
+  it('spreads the air rather than leaving a hole in the middle', () => {
+    expect(rule('.inline-promo')).toMatch(/justify-content: center/)
+    expect(rule('.inline-promo__meta')).not.toMatch(/margin-top: auto/)
+  })
+
+  // `.prose a` underlines every link in a body and paints it burgundy, and it
+  // outranks a single class. On a promo that lands under the headline and the
+  // standfirst alike — the same damage `.bookmark` had to undo.
+  it('wins the argument with the body link style', () => {
+    expect(css).toMatch(
+      /\.prose \.inline-promo__item[^{]*\{[^}]*text-decoration: none/,
+    )
+  })
+})
+
 describe('the ladder', () => {
   /** Every `max-height` rung in the stylesheet, tallest first, with its body. */
   const rungs = [

@@ -3634,6 +3634,138 @@ ol.feature-list__items .feature-list__title::before {
   color: var(--color-muted);
 }
 
+/* --- The in-body house box ----------------------------------------------
+   What an in-article slot holds when no ad is served, the way `.rail__promo`
+   is what the rail's box holds. Same job, different room, and the differences
+   are the whole design:
+
+   **It is a band, not a card.** Every module an author can drop into this
+   column is bordered or filled — `.callout`, `.bookmark`, `.signup` — so a
+   house box built as a card would read as something the writer placed. Ruled
+   across the measure and carrying no surface, it reads as the publication
+   speaking, which is what it is. Nothing else in a reading column is ruled top
+   and bottom.
+
+   **It declares its own type.** The two body branches put the slot in
+   different places: a rich-text body renders it inside `.prose`, a preserved
+   Ghost body renders it beside one. Anything inherited would therefore differ
+   between two articles that look identical to an editor, so every size, face
+   and leading below is set here rather than taken from a parent.
+
+   **It cannot outgrow its box.** The fallback is laid over the unit at
+   `inset: 0`, so content taller than the slot would print over the paragraph
+   beneath it. The clamps are what stop that, and `overflow: hidden` is the
+   backstop for the case a clamp does not cover. */
+.inline-promo {
+  display: flex;
+  flex-direction: column;
+  /* Centred, and this took a browser to settle. The type comes to about 165px
+     of a box that is 296, and the first build spent the difference in one
+     place: the meta line pinned to the bottom rule left a 130px hole under the
+     standfirst, which is the rail's original mistake — a box with a hole in it
+     reads as broken, where the same air split evenly reads as a band with
+     generous padding. */
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  padding: 0.9rem 0;
+  border-top: 1px solid var(--color-line);
+  border-bottom: 1px solid var(--color-line);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.5;
+  /* `.prose > p` is justified and this is not a paragraph of the article. */
+  text-align: left;
+}
+
+/* Pinned under the top rule. `.eyebrow` carries the face and the colour, the
+   same one "Read next" uses two screens below; the margin is all this adds. */
+.inline-promo__label {
+  flex: none;
+  margin: 0 0 0.7rem;
+}
+
+/* The rest of the box, so the hit area is the band rather than one line of
+   text. */
+.inline-promo__item {
+  display: flex;
+  flex: none;
+  min-height: 0;
+  flex-direction: column;
+  width: 100%;
+}
+
+/* `.prose a` underlines every link in a body and paints it burgundy. On a
+   promo that lands under the headline and the standfirst alike and reads as
+   damage, the same way it did on `.bookmark`. */
+.prose .inline-promo__item,
+.prose .inline-promo__item:hover {
+  text-decoration: none;
+}
+
+.inline-promo__item,
+.inline-promo__item:hover {
+  color: inherit;
+  text-decoration: none;
+}
+
+.inline-promo__title {
+  font-family: var(--font-serif);
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--color-ink);
+  /* Bounded, like every other headline that shares a box with something: an
+     item has to have a knowable height or the box does not. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.inline-promo__item:hover .inline-promo__title {
+  color: var(--color-burgundy);
+}
+
+.inline-promo__item:focus-visible {
+  outline: 2px solid var(--color-burgundy);
+  outline-offset: 3px;
+}
+
+.inline-promo__excerpt {
+  margin-top: 0.5rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--color-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.inline-promo__meta {
+  margin-top: 0.7rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+  color: var(--color-muted);
+}
+
+/* The measure is 342px here against 704, so the same words take about twice
+   the lines. The headline keeps both of its and the standfirst gives one,
+   which is what keeps the group inside a box that does not grow. */
+@media (max-width: 47rem) {
+  .inline-promo__title {
+    font-size: 1.25rem;
+  }
+
+  .inline-promo__excerpt {
+    font-size: 0.9rem;
+    -webkit-line-clamp: 2;
+  }
+}
+
 /* "Advertisement", above the unit. docs/ADVERTISING.md calls this an
    editorial-integrity requirement before a policy one: PRODUCT.md describes a
    publication whose credibility is the product, and an unlabelled display unit

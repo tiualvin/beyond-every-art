@@ -291,6 +291,16 @@ units, whose height comes from the creative. `SLOT_SIZES` marks it `fluid` and
 reserves 280px as a floor — which is the one place in this template where
 "reserve the maximum" cannot be taken literally, and §8 says why.
 
+**Each box holds a piece when no ad is served.** The same rule the rail's box
+follows, with a different answer to what fills it: one related article per
+slot, taken from the tail of the pool this page already reads for "Read next",
+so no two slots down an article show the same piece and none of them shows what
+the reader will meet again at the end. It is a band ruled across the measure
+rather than a card, because every module an author can place in this column is
+a card and a house box must not read as one. It does not collapse when empty
+either — [`ADVERTISING.md`](ADVERTISING.md) §8 has the argument, which turns on
+the slot's guess not being latched rather than on layout shift in general.
+
 **The drop cap only belongs to the first chunk.** The two body branches split
 differently, and the HTML one is where this bites. Rich text hands each part to
 its own `RichText` inside a single `.prose`, which renders exactly the children
