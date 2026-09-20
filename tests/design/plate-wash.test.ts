@@ -49,7 +49,11 @@ function declarations(selector: string): string {
 }
 
 /** The rules `.plate-wash` is combined with in the markup. */
-const PLATE_HOSTS = ['.latest__plate', '.entry__thumb']
+const PLATE_HOSTS = [
+  '.opening__plate',
+  '.opening__runner-plate',
+  '.entry__thumb',
+]
 
 /** Every rule that paints the placeholder, including the card grid's own. */
 const PLACEHOLDER_SURFACES = ['.plate-wash', '.story-card__thumb']

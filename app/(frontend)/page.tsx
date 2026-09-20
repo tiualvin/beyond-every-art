@@ -1,8 +1,8 @@
-import Image from 'next/image'
 import Link from 'next/link'
 
 import {
   FEATURED_SLOTS,
+  OPENING_SLOTS,
   RECENT_QUERY_SIZE,
   selectPicks,
 } from '@/lib/content/homepage'
@@ -12,10 +12,7 @@ import {
   getRecentPosts,
   getSiteSettings,
   getTagsWithCounts,
-  type PostCard,
 } from '@/lib/content/queries'
-import { formatDate } from '@/lib/format'
-import { visibilityLabel } from '@/lib/membership'
 import {
   buildItemListJsonLd,
   buildWebSiteJsonLd,
@@ -32,12 +29,12 @@ import {
 } from '@/lib/seo/site'
 
 import { CoverField } from './components/cover-field'
+import { Opening } from './components/opening'
 import { EntryRow } from './components/entry-row'
 import { TopicSwatches } from './components/topic-swatches'
 import { FadeIn } from './components/motion/fade-in'
 import { Reveal } from './components/motion/reveal'
 import { StaggerChildren, StaggerItem } from './components/motion/stagger'
-import { thumbnailSrc } from '@/lib/content/media'
 
 // Rendered per request so canonical URLs, feeds and JSON-LD come from the
 // running container's environment rather than the build's; the database reads
@@ -53,16 +50,16 @@ export default async function HomePage() {
     getTagsWithCounts(),
   ])
 
-  // The newest piece carries the band; the picks are what is left, in tier
-  // order. `selectPicks` excludes the band's piece rather than the page
-  // slicing it off, which is also what stops a site with one published post
-  // from showing that post twice.
-  const latest = recent[0]
+  // The opening takes the newest work; the picks are what is left, in tier
+  // order. Excluding by id rather than slicing is what keeps a piece from
+  // appearing twice on one page — including the case of a site with a single
+  // published post, where the old band and the list below it both showed it.
+  const opening = recent.slice(0, OPENING_SLOTS)
   const picks = selectPicks({
     curated: homepage.picks,
     featured: flagged,
     recent,
-    exclude: latest ? [latest.id] : [],
+    exclude: opening.map((post) => post.id),
   })
 
   // Ghost served a WebSite node here and this page served none, which the
@@ -78,14 +75,14 @@ export default async function HomePage() {
     }),
   )
 
-  // What the page actually lists, in the order it lists it: the band's piece
-  // first, then the picks. `WebSite` says what the site is and said nothing
-  // about its contents.
+  // What the page actually lists, in the order it lists it: the opening's
+  // lead and its runners, then the picks. `WebSite` says what the site is and
+  // said nothing about its contents.
   const siteUrl = getSiteUrl()
   const listJsonLd = serializeJsonLd(
     buildItemListJsonLd({
       name: 'Featured articles',
-      items: (latest ? [latest, ...picks] : picks).map((post) => ({
+      items: [...opening, ...picks].map((post) => ({
         url: absoluteUrl(postPath(post.slug), siteUrl),
         name: post.title,
       })),
@@ -136,10 +133,12 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ── Latest ──
+      {/* ── The opening ──
           The cover carries the publication rather than a story, so the newest
-          piece needs its own entry point before the curated sections begin. */}
-      {latest && <LatestBand post={latest} />}
+          work needs its own entry point before the curated sections begin. */}
+      {opening.length > 0 && (
+        <Opening lead={opening[0]!} runners={opening.slice(1)} />
+      )}
 
       {/* ── Featured ── */}
       <section className="section" id="featured">
@@ -163,9 +162,14 @@ export default async function HomePage() {
               ))}
             </StaggerChildren>
           ) : (
+            // Reachable by a reader now, where it was not before. The opening
+            // above takes the six newest pieces, so an archive of six or fewer
+            // leaves this section genuinely empty — and it used to need an
+            // archive of none. A developer reading `pnpm seed:dev` on a live
+            // page was always wrong; at this threshold it is also likely.
             <p className="muted">
-              Stories will appear here once content is published. Run{' '}
-              <code>pnpm seed:dev</code> to load sample content locally.
+              Everything published is in the opening above, for now. More will
+              appear here as the archive grows.
             </p>
           )}
         </div>
@@ -192,67 +196,5 @@ export default async function HomePage() {
         </section>
       )}
     </main>
-  )
-}
-
-function LatestBand({ post }: { post: PostCard }) {
-  const byline = post.authors.map((author) => author.name).join(', ')
-  // Same three parts, in the same order, as an `EntryRow`: the band showed no
-  // membership label, so a members-only newest piece was badged everywhere on
-  // the site except the most prominent place it appears.
-  const meta = [
-    visibilityLabel(post.visibility),
-    post.publishedAt ? formatDate(post.publishedAt) : null,
-    `${post.readingTime} min`,
-  ]
-    .filter(Boolean)
-    .join(' · ')
-
-  return (
-    <Link href={postPath(post.slug)} className="latest">
-      <div className="container latest__inner">
-        {post.image ? (
-          <span className="latest__plate">
-            <Image
-              src={thumbnailSrc(post.image)}
-              alt=""
-              fill
-              sizes="(max-width: 56rem) 4.5rem, 6.5rem"
-              style={{ objectFit: 'cover' }}
-            />
-          </span>
-        ) : (
-          <span className="latest__plate plate-wash" />
-        )}
-
-        <div>
-          <p className="eyebrow">
-            {['Latest', post.tags[0]?.name].filter(Boolean).join(' · ')}
-          </p>
-          <h2 className="latest__title">{post.title}</h2>
-          {post.excerpt && <p className="latest__excerpt">{post.excerpt}</p>}
-        </div>
-
-        <p className="latest__meta">
-          {byline && <span>{byline}</span>}
-          <span>{meta}</span>
-        </p>
-
-        <span className="latest__arrow" aria-hidden="true">
-          <svg
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M5 12h13M12 5l7 7-7 7" />
-          </svg>
-        </span>
-      </div>
-    </Link>
   )
 }

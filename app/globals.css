@@ -1146,97 +1146,182 @@ img {
   text-decoration: none;
 }
 
-/* --- Latest band -------------------------------------------------------- */
+/* --- The opening ------------------------------------------------------- */
 
-/* The cover carries the publication rather than a story, so the newest piece
-   needs its own entry point before the curated sections begin. */
-.latest {
-  display: block;
-  border-bottom: 1px solid var(--color-line);
+/* The cover carries the publication rather than a story, so the newest work
+   needs its own entry point before the curated sections begin. This replaces a
+   single row that did that job in about 5rem of height, directly under a wash
+   nearly a screen tall.
+
+   Two columns that end level: the lead is sized by its plate and its headline,
+   and the runner count is chosen so the second column lands within a few
+   pixels of it. That is what makes the module read as one rectangle rather
+   than as a lead with an afterthought beside it — see `Opening`. */
+.opening-band {
   background: var(--color-surface);
+  border-bottom: 1px solid var(--color-line);
 }
 
-.latest:hover {
-  background: color-mix(
-    in srgb,
-    var(--color-burgundy) 4%,
-    var(--color-surface)
-  );
+.opening {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 3rem;
+  padding-top: 2.75rem;
+  padding-bottom: 2.75rem;
+}
+
+.opening__lead {
+  display: flex;
+  flex-direction: column;
+}
+
+.opening__lead:hover {
   text-decoration: none;
 }
 
-.latest__inner {
-  display: grid;
-  grid-template-columns: 6.5rem minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: 1.75rem;
-  padding-top: 1.5rem;
-  padding-bottom: 1.5rem;
-}
-
-.latest__plate {
+.opening__plate {
   position: relative;
-  aspect-ratio: 4 / 3;
+  display: block;
+  aspect-ratio: 16 / 9;
   overflow: hidden;
   border-radius: var(--radius);
   /* `background-color`, not the shorthand: the shorthand resets
-     `background-image`, which is the only property `.plate-wash` sets,
-     and both of these rules come later in the sheet than it does. */
+     `background-image`, which is the only property `.plate-wash` sets. */
   background-color: var(--color-paper);
 }
 
-.latest__title {
-  font-size: clamp(1.15rem, 1.9vw, 1.5rem);
-  letter-spacing: -0.02em;
-  margin: 0.4rem 0 0.35rem;
+.opening__eyebrow {
+  margin: 1.1rem 0 0;
 }
 
-.latest:hover .latest__title {
+.opening__title {
+  font-size: clamp(1.7rem, 3.2vw, 2.25rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin: 0.65rem 0 0;
+}
+
+.opening__lead:hover .opening__title {
   color: var(--color-burgundy);
 }
 
-.latest__excerpt {
-  margin: 0;
-  font-size: 0.9rem;
+.opening__standfirst {
+  margin: 0.7rem 0 0;
+  font-size: 1rem;
+  line-height: 1.55;
   color: var(--color-muted);
-  max-width: 56ch;
+  max-width: 54ch;
 }
 
-.latest__meta {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  margin: 0;
-  text-align: right;
-  font-size: 0.78rem;
+.opening__meta {
+  margin: 0.9rem 0 0;
+  font-size: 0.8rem;
   color: var(--color-muted);
-  white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 
-.latest__arrow {
-  color: var(--color-burgundy);
-  display: flex;
+/* The rule is what closes the rectangle on the open side. */
+.opening__runners {
+  border-left: 1px solid var(--color-line);
+  padding-left: 2.5rem;
 }
 
-@media (max-width: 900px) {
-  .latest__inner {
-    grid-template-columns: 4.5rem minmax(0, 1fr);
-    gap: 1rem 1.25rem;
+/* An ink rule rather than the hairline the rest of the page uses: it caps the
+   column, so the list below it reads as one block instead of five cards. */
+.opening__label {
+  margin: 0 0 0.25rem;
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid var(--color-ink);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.opening__runner-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.opening__runner-list li + li .opening__runner {
+  border-top: 1px solid var(--color-line);
+}
+
+.opening__runner {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr);
+  gap: 0.8rem;
+  align-items: start;
+  padding: 1.05rem 0;
+}
+
+.opening__runner:hover {
+  text-decoration: none;
+}
+
+.opening__runner-plate {
+  position: relative;
+  display: block;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background-color: var(--color-paper);
+}
+
+.opening__runner-body {
+  display: block;
+}
+
+.opening__runner-title {
+  font-family: var(--font-serif);
+  font-size: 1rem;
+  font-weight: 500;
+  line-height: 1.24;
+  margin: 0;
+}
+
+.opening__runner:hover .opening__runner-title {
+  color: var(--color-burgundy);
+}
+
+.opening__runner-meta {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.72rem;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* One column below the width where two would squeeze the runner titles into
+   three lines each. The rule moves to the top, where it still separates the
+   two halves but no longer implies a column that is not there. */
+@media (max-width: 56rem) {
+  .opening {
+    grid-template-columns: 1fr;
+    gap: 2rem;
   }
 
-  .latest__meta {
-    grid-column: 2;
-    text-align: left;
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 0.15rem 0.9rem;
-    white-space: normal;
+  .opening__runners {
+    border-left: 0;
+    padding-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .opening__title,
+  .opening__runner-title {
+    transition: color 0.22s ease;
   }
 
-  .latest__excerpt,
-  .latest__arrow {
-    display: none;
+  .opening__plate img {
+    transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .opening__lead:hover .opening__plate img {
+    transform: scale(1.02);
   }
 }
 
