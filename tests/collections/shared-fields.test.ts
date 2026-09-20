@@ -18,6 +18,7 @@ import { Tags } from '../../collections/Tags'
 import { ghostIdField } from '../../fields/ghost'
 import { seoFields } from '../../fields/seo'
 import { slugField } from '../../fields/slug'
+import { findField } from '../support/fields'
 
 /** Every collection whose documents are addressable by slug. */
 const SLUGGED = [Posts, Pages, Apps, Tags, Authors]
@@ -35,9 +36,12 @@ const INTERNAL_FIELDS: Array<[string, Field[], string[]]> = [
   ['authors', Authors.fields, ['ghostID']],
 ]
 
-function fieldNamed(fields: Field[], name: string): Field | undefined {
-  return fields.find((field) => 'name' in field && field.name === name)
-}
+/**
+ * Looks through tabs as well as the top level: Posts and Pages arrange their
+ * edit view into tabs, and every assertion below is about what a field *is*,
+ * not where it is drawn. See `tests/support/fields.ts`.
+ */
+const fieldNamed = findField
 
 /** Runs a slug field's validator the way Payload would. */
 function validateSlug(field: TextField, value: string) {

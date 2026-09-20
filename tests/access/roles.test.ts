@@ -2,6 +2,7 @@ import type { FieldAccess } from 'payload'
 import { describe, expect, it } from 'vitest'
 
 import { Posts } from '../../collections/Posts'
+import { findField } from '../support/fields'
 import {
   deleteOwnedDrafts,
   isAdmin,
@@ -81,9 +82,7 @@ describe('role checks', () => {
     // The field is rendered with `dangerouslySetInnerHTML`, and an author can
     // create and update their own posts, so an unrestricted field here is
     // stored XSS reachable by the least privileged CMS role.
-    const legacyHTML = Posts.fields.find(
-      (field) => 'name' in field && field.name === 'legacyHTML',
-    )
+    const legacyHTML = findField(Posts.fields, 'legacyHTML')
     const access = (legacyHTML as { access?: Record<string, FieldAccess> })
       ?.access
 
