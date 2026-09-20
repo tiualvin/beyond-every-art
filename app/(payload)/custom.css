@@ -148,3 +148,126 @@
 :root[data-theme='dark'] .bea-dash__count {
   color: inherit;
 }
+
+/* --- Search result preview (Search & sharing tab) ----------------------- */
+
+.bea-seo {
+  border: 1px solid var(--bea-line);
+  border-radius: 2px;
+  margin-block-end: 1.5rem;
+  padding: 1rem 1.25rem 1.25rem;
+}
+
+.bea-seo__caption,
+.bea-ready__heading {
+  color: var(--bea-muted);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  margin: 0 0 0.85rem;
+}
+
+.bea-seo__card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  max-width: 44rem;
+}
+
+.bea-seo__url {
+  color: var(--bea-muted);
+  font-size: 0.75rem;
+}
+
+/* Deliberately not Google's blue. Imitating the exact chrome of a search
+ * result would make a preview look like a guarantee of one; this is the shape,
+ * in the publication's own colours, which is all an editor needs to judge
+ * length and phrasing. */
+.bea-seo__title {
+  color: var(--bea-burgundy);
+  font-size: 1.05rem;
+  line-height: 1.3;
+}
+
+.bea-seo__desc {
+  color: var(--bea-ink);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.bea-seo__meter {
+  color: var(--bea-muted);
+  display: flex;
+  font-size: 0.75rem;
+  gap: 1rem;
+  justify-content: space-between;
+  margin: 0.75rem 0 0;
+  max-width: 44rem;
+}
+
+.bea-seo__meter--over {
+  color: var(--bea-burgundy);
+}
+
+/* --- Publish readiness (sidebar) ---------------------------------------- */
+
+.bea-ready {
+  border-block-end: 1px solid var(--bea-line);
+  margin-block-end: 1.25rem;
+  padding-block-end: 1rem;
+}
+
+.bea-ready:empty {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.bea-ready__heading {
+  font-weight: 600;
+  margin-block-end: 0.5rem;
+}
+
+.bea-ready__list {
+  color: var(--bea-muted);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  margin: 0;
+  padding-inline-start: 1.1rem;
+}
+
+.bea-ready__list li + li {
+  margin-block-start: 0.4rem;
+}
+
+.bea-ready__note {
+  color: var(--bea-muted);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  margin: 0 0 0.75rem;
+}
+
+.bea-ready__note--ok {
+  margin-block-end: 0;
+}
+
+:root[data-theme='dark'] .bea-seo,
+:root[data-theme='dark'] .bea-ready {
+  border-color: color-mix(in srgb, var(--bea-line) 25%, transparent);
+}
+
+:root[data-theme='dark'] .bea-seo__title,
+:root[data-theme='dark'] .bea-seo__desc {
+  color: inherit;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .bea-seo,
+  :root:not([data-theme='light']) .bea-ready {
+    border-color: color-mix(in srgb, var(--bea-line) 25%, transparent);
+  }
+
+  :root:not([data-theme='light']) .bea-seo__title,
+  :root:not([data-theme='light']) .bea-seo__desc {
+    color: inherit;
+  }
+}

@@ -22,8 +22,10 @@ import { StrikethroughFeatureClient as StrikethroughFeatureClient_e70f5e05f09f93
 import { UnderlineFeatureClient as UnderlineFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { BoldFeatureClient as BoldFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { ItalicFeatureClient as ItalicFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
-import { S3ClientUploadHandler as S3ClientUploadHandler_f97aa6c64367fa259c5bc0567239ef24 } from '@payloadcms/storage-s3/client'
+import { SearchPreview as SearchPreview_90dc079ae30fcc0c41ba8ebe2c510c59 } from '../../../components/admin/SearchPreview'
+import { PublishReadiness as PublishReadiness_c2eff868e042eeca54e4c4d0f269a6b7 } from '../../../components/admin/PublishReadiness'
 import { EditorialDashboard as EditorialDashboard_7159b68b12eabee670cd54ce9954b477 } from '../../../components/admin/EditorialDashboard'
+import { S3ClientUploadHandler as S3ClientUploadHandler_f97aa6c64367fa259c5bc0567239ef24 } from '@payloadcms/storage-s3/client'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 
 /** @type import('payload').ImportMap */
@@ -76,10 +78,14 @@ export const importMap = {
     BoldFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
   '@payloadcms/richtext-lexical/client#ItalicFeatureClient':
     ItalicFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
-  '@payloadcms/storage-s3/client#S3ClientUploadHandler':
-    S3ClientUploadHandler_f97aa6c64367fa259c5bc0567239ef24,
+  '/components/admin/SearchPreview#SearchPreview':
+    SearchPreview_90dc079ae30fcc0c41ba8ebe2c510c59,
+  '/components/admin/PublishReadiness#PublishReadiness':
+    PublishReadiness_c2eff868e042eeca54e4c4d0f269a6b7,
   '/components/admin/EditorialDashboard#EditorialDashboard':
     EditorialDashboard_7159b68b12eabee670cd54ce9954b477,
+  '@payloadcms/storage-s3/client#S3ClientUploadHandler':
+    S3ClientUploadHandler_f97aa6c64367fa259c5bc0567239ef24,
   '@payloadcms/next/rsc#CollectionCards':
     CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1,
 }

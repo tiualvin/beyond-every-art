@@ -146,7 +146,20 @@ export const Posts: CollectionConfig = {
           label: 'Search & sharing',
           description:
             'How this looks in a search result and when somebody posts the link. Every field here is optional; each falls back to the article itself.',
-          fields: seoFields({ canonical: true }),
+          fields: [
+            // Draws the result from the values in the form, so the guidance
+            // these fields already carried has something to measure against.
+            {
+              name: 'searchPreview',
+              type: 'ui',
+              admin: {
+                components: {
+                  Field: '/components/admin/SearchPreview#SearchPreview',
+                },
+              },
+            },
+            ...seoFields({ canonical: true }),
+          ],
         },
         {
           label: 'Migration',
@@ -164,6 +177,18 @@ export const Posts: CollectionConfig = {
 
     // --- Sidebar: the decisions about the article, beside the publish button.
 
+    {
+      // What is missing, while it is still cheap to fix. Not validation: see
+      // the component for why none of this refuses a save or a publish.
+      name: 'readiness',
+      type: 'ui',
+      admin: {
+        position: 'sidebar',
+        components: {
+          Field: '/components/admin/PublishReadiness#PublishReadiness',
+        },
+      },
+    },
     slugField({ reserved: true, sidebar: true }),
     {
       name: 'publishedAt',

@@ -72,7 +72,18 @@ export const Pages: CollectionConfig = {
           label: 'Search & sharing',
           description:
             'How this looks in a search result and when somebody posts the link. Every field here is optional; each falls back to the page itself.',
-          fields: seoFields({ canonical: true }),
+          fields: [
+            {
+              name: 'searchPreview',
+              type: 'ui',
+              admin: {
+                components: {
+                  Field: '/components/admin/SearchPreview#SearchPreview',
+                },
+              },
+            },
+            ...seoFields({ canonical: true }),
+          ],
         },
         {
           label: 'Migration',

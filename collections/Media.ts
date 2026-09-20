@@ -60,6 +60,22 @@ export const Media: CollectionConfig = {
     // body limit in front of the application is still the real defence, and is
     // recorded in docs/EDGE_PROTECTION.md as unfinished rather than left to be
     // rediscovered.
+    // Where the subject of the picture is, so a crop keeps it.
+    //
+    // The `og` derivative below is the only size with both a width and a
+    // height, which makes it the only one Payload crops — and without this it
+    // crops from the centre, blind. For a publication that writes about
+    // specific works, a centre crop is close to the worst available default:
+    // the share card for an essay about a figure at the edge of a canvas cuts
+    // the figure out, and nothing about the admin says it happened.
+    //
+    // `crop` turns on the editor's own cropping handles beside it. Neither
+    // changes an existing file: derivatives are generated at upload, so media
+    // stored before this has the crop it already had, and `pnpm backfill:media`
+    // is what regenerates them once somebody sets a point worth regenerating
+    // for.
+    focalPoint: true,
+    crop: true,
     imageSizes: [
       // Listing thumbnails. `lib/content/media.ts` hands this to `next/image`
       // as the source for cards, so the optimiser resizes from 768px instead of
