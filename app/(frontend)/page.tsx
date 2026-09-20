@@ -8,6 +8,7 @@ import {
 } from '@/lib/content/homepage'
 import {
   getFeaturedPosts,
+  getHomepage,
   getRecentPosts,
   getSiteSettings,
   getTagsWithCounts,
@@ -44,8 +45,9 @@ import { thumbnailSrc } from '@/lib/content/media'
 export const dynamic = 'force-dynamic'
 
 export default async function HomePage() {
-  const [settings, recent, flagged, topics] = await Promise.all([
+  const [settings, homepage, recent, flagged, topics] = await Promise.all([
     getSiteSettings(),
+    getHomepage(),
     getRecentPosts(RECENT_QUERY_SIZE),
     getFeaturedPosts(FEATURED_SLOTS),
     getTagsWithCounts(),
@@ -57,6 +59,7 @@ export default async function HomePage() {
   // from showing that post twice.
   const latest = recent[0]
   const picks = selectPicks({
+    curated: homepage.picks,
     featured: flagged,
     recent,
     exclude: latest ? [latest.id] : [],
