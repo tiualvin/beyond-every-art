@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next'
 
 import { cachedRead, CONTENT_TAGS } from '@/lib/cache/content'
+import { live } from '@/lib/content/schedule'
 import { getPayloadClient } from '@/lib/payload'
 import { getSiteUrl } from '@/lib/seo/site'
 import {
@@ -55,8 +56,10 @@ const readSlugs = cachedRead(
         pagination: false,
         limit: 0,
         // Restricted posts have real, indexable URLs that serve a teaser, so
-        // they are listed like any other published post.
-        where: { _status: { equals: 'published' } },
+        // they are listed like any other published post. A *scheduled* one is
+        // not: `live()` withholds it until its date arrives, and offering a
+        // crawler a URL that 404s is worse than offering it late.
+        where: live(),
         // `noindex` is selected rather than filtered on in the query: the
         // column is null for every document written before the field existed,
         // and a `not_equals: true` filter would have to be trusted to treat
@@ -126,10 +129,7 @@ const readSlugs = cachedRead(
             collection: 'posts',
             overrideAccess: true,
             where: {
-              and: [
-                { tags: { in: [tag.id] } },
-                { _status: { equals: 'published' } },
-              ],
+              and: [{ tags: { in: [tag.id] } }, live()],
             },
           })
         ).totalDocs,

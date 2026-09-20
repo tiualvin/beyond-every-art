@@ -3,6 +3,25 @@ import { appPath, pagePath, postPath } from '../seo/site'
 /** Collections an editor can preview on the public site. */
 export const PREVIEW_COLLECTIONS = ['posts', 'pages', 'apps'] as const
 
+/**
+ * Globals an editor can preview, and the page each is previewed against.
+ *
+ * All three appear on every page, so the homepage is the honest choice: it is
+ * the one URL that carries the masthead, the footer and the newsletter card at
+ * once, which is what these globals actually control.
+ *
+ * Narrower than a collection preview, and worth being exact about. Globals have
+ * no drafts and no autosave, so the iframe shows the *saved* global and
+ * refreshes when one is saved — it does not follow keystrokes the way a post
+ * does. Closing that gap needs the client-side `useLivePreview` hook and the
+ * isomorphic mapper that `docs/LIVE_PREVIEW.md` lists as not built. Seeing the
+ * nav you just saved, in place, without leaving the panel, is the part that was
+ * missing and the part this gives.
+ */
+export const PREVIEW_GLOBALS = ['header', 'footer', 'site-settings'] as const
+
+export type PreviewGlobal = (typeof PREVIEW_GLOBALS)[number]
+
 export type PreviewCollection = (typeof PREVIEW_COLLECTIONS)[number]
 
 /**

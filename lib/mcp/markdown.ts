@@ -15,7 +15,7 @@ import {
   convertMarkdownToLexical,
   editorConfigFactory,
 } from '@payloadcms/richtext-lexical'
-import type { Payload, RichTextField } from 'payload'
+import type { Field, Payload, RichTextField } from 'payload'
 
 /** Collections whose `content` field these tools may convert. */
 export type MarkdownCollection = 'posts' | 'pages'
@@ -51,15 +51,51 @@ export type EditorState = {
  * converting against a different feature set than the one that stores the
  * result.
  */
+/**
+ * The `content` field, wherever the edit view puts it.
+ *
+ * This used to look only at the top level of `fields`, which was true until
+ * Posts and Pages were arranged into tabs — and then it was false in a way
+ * nothing caught until an agent tried to draft an article and was told the
+ * collection had no rich-text body. An unnamed tab changes no schema and no
+ * stored document, so every other reader of the field carried on working; this
+ * one was reading the *config* rather than the data, and the config is exactly
+ * what a tab reshapes.
+ *
+ * So it walks containers now, and the shape of the edit screen stops being
+ * something the MCP tools have an opinion about.
+ */
+function findRichText(
+  fields: Field[] | undefined,
+  name: string,
+): RichTextField | undefined {
+  for (const field of fields ?? []) {
+    if ('name' in field && field.name === name && field.type === 'richText') {
+      return field as RichTextField
+    }
+
+    const container = field as {
+      fields?: Field[]
+      tabs?: { fields?: Field[] }[]
+    }
+    const nested =
+      findRichText(container.fields, name) ??
+      container.tabs?.reduce<RichTextField | undefined>(
+        (found, tab) => found ?? findRichText(tab.fields, name),
+        undefined,
+      )
+    if (nested) return nested
+  }
+  return undefined
+}
+
 export function contentEditorConfig(
   payload: Payload,
   collection: MarkdownCollection,
 ): EditorConfig {
-  const field = payload.collections[collection]?.config.fields.find(
-    (candidate): candidate is RichTextField =>
-      'name' in candidate &&
-      candidate.name === 'content' &&
-      candidate.type === 'richText',
+  const field = findRichText(
+    payload.collections[collection]?.config.fields,
+    'content',
   )
 
   if (!field) {

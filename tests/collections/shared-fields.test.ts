@@ -18,22 +18,30 @@ import { Tags } from '../../collections/Tags'
 import { ghostIdField } from '../../fields/ghost'
 import { seoFields } from '../../fields/seo'
 import { slugField } from '../../fields/slug'
+import { findField } from '../support/fields'
 
 /** Every collection whose documents are addressable by slug. */
 const SLUGGED = [Posts, Pages, Apps, Tags, Authors]
 
 /** Fields that used to be public and are now editor-only, by collection. */
 const INTERNAL_FIELDS: Array<[string, Field[], string[]]> = [
-  ['posts', Posts.fields, ['ghostID', 'ghostURL', 'migrationStatus']],
+  [
+    'posts',
+    Posts.fields,
+    ['ghostID', 'ghostURL', 'ghostUpdatedAt', 'migrationStatus'],
+  ],
   ['pages', Pages.fields, ['ghostID']],
   ['media', Media.fields, ['ghostURL', 'migrationStatus']],
   ['tags', Tags.fields, ['ghostID']],
   ['authors', Authors.fields, ['ghostID']],
 ]
 
-function fieldNamed(fields: Field[], name: string): Field | undefined {
-  return fields.find((field) => 'name' in field && field.name === name)
-}
+/**
+ * Looks through tabs as well as the top level: Posts and Pages arrange their
+ * edit view into tabs, and every assertion below is about what a field *is*,
+ * not where it is drawn. See `tests/support/fields.ts`.
+ */
+const fieldNamed = findField
 
 /** Runs a slug field's validator the way Payload would. */
 function validateSlug(field: TextField, value: string) {

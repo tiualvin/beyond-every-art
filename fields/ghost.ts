@@ -1,6 +1,6 @@
 // Migration bookkeeping, shared by every collection that carries it.
 //
-// Two problems, one file.
+// Three problems, one file.
 //
 // **It was public.** `posts`, `tags`, `authors` and `media` are all readable by
 // anyone, so `GET /api/posts` handed an anonymous caller the publication's
@@ -18,8 +18,14 @@
 // nothing could work around it for pages. Autofilling a `native:` value keeps
 // every document identified, keeps uniqueness intact, and leaves an explicitly
 // supplied ID — the importer's — untouched.
+//
+// **`ghostUpdatedAt` was not in here at all.** It was declared inline on Posts
+// as a bare `date`, so the one field of the family that lived somewhere else
+// was also the only one that stayed editable, unlabelled and publicly
+// readable — the exact drift this file exists to prevent, surviving inside it.
+// See `ghostUpdatedAtField` below.
 
-import type { SelectField, TextField } from 'payload'
+import type { DateField, SelectField, TextField } from 'payload'
 
 import { editorsAndAdminsField } from '../access/roles'
 import { nativeGhostID } from '../lib/migration/native-id'
@@ -92,6 +98,35 @@ export function ghostUrlField({
     admin: {
       readOnly: true,
       description: 'Where this lived on the Ghost site.',
+    },
+  }
+}
+
+/**
+ * When Ghost last changed this document.
+ *
+ * The importer writes it and nothing else reads it; it exists so a rerun can
+ * tell a document that moved on from one that did not. It was the one field in
+ * this family that never made it into this file — declared inline on Posts as a
+ * bare `date`, so it alone stayed editable, unexplained, and readable by anyone
+ * who called `GET /api/posts`, while `ghostID`, `ghostURL` and
+ * `migrationStatus` beside it were all read-only and staff-only. Nothing chose
+ * that difference; it is what happens when one field of a set is written out
+ * somewhere else.
+ *
+ * Access control and admin presentation are runtime configuration, so closing
+ * this changes no column and needs no migration.
+ */
+export function ghostUpdatedAtField(): DateField {
+  return {
+    name: 'ghostUpdatedAt',
+    label: 'Ghost updated at',
+    type: 'date',
+    access: internalOnly,
+    admin: {
+      readOnly: true,
+      description:
+        'When Ghost last changed this. Written by the import, which compares against it on a rerun.',
     },
   }
 }
