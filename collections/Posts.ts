@@ -9,6 +9,7 @@ import {
 } from '../access/roles'
 import {
   ghostIdField,
+  ghostUpdatedAtField,
   ghostUrlField,
   migrationStatusField,
 } from '../fields/ghost'
@@ -74,7 +75,6 @@ export const Posts: CollectionConfig = {
     { name: 'title', type: 'text', required: true },
     slugField({ reserved: true }),
     { name: 'publishedAt', type: 'date', index: true },
-    { name: 'ghostUpdatedAt', type: 'date' },
     {
       name: 'owners',
       type: 'relationship',
@@ -127,6 +127,7 @@ export const Posts: CollectionConfig = {
       defaultValue: 'public',
     },
     ghostIdField({ autofill: true }),
+    ghostUpdatedAtField(),
     ghostUrlField(),
     migrationStatusField(['pending', 'migrated', 'conflict', 'failed']),
   ],

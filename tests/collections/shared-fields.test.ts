@@ -24,7 +24,11 @@ const SLUGGED = [Posts, Pages, Apps, Tags, Authors]
 
 /** Fields that used to be public and are now editor-only, by collection. */
 const INTERNAL_FIELDS: Array<[string, Field[], string[]]> = [
-  ['posts', Posts.fields, ['ghostID', 'ghostURL', 'migrationStatus']],
+  [
+    'posts',
+    Posts.fields,
+    ['ghostID', 'ghostURL', 'ghostUpdatedAt', 'migrationStatus'],
+  ],
   ['pages', Pages.fields, ['ghostID']],
   ['media', Media.fields, ['ghostURL', 'migrationStatus']],
   ['tags', Tags.fields, ['ghostID']],
