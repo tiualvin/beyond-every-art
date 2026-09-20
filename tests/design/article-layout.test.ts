@@ -279,13 +279,13 @@ describe('the rail', () => {
   // is the kind nothing fails over: the rules keep matching nothing, the next
   // reader takes them for a module that exists, and the file grows a wing
   // nobody lives in.
+  //
+  // `.rail__meta` is deliberately not on this list. It came back with the ad
+  // slot's house fallback, which needs exactly what it always was — a small
+  // caption line under a headline in this column — so it has a live consumer
+  // again rather than being a leftover.
   it('carries no trace of the related list it used to hold', () => {
-    for (const selector of [
-      '.rail__list',
-      '.rail__item',
-      '.rail__meta',
-      '.rail__related',
-    ]) {
+    for (const selector of ['.rail__list', '.rail__item', '.rail__related']) {
       expect(css, `${selector} outlived the module it styled`).not.toContain(
         selector,
       )
@@ -347,6 +347,116 @@ describe('the signup card', () => {
   // grey band above the heading on every post.
   it('renders without a picture when there is none', () => {
     expect(rail).toMatch(/\{newsletterImage && \(/)
+  })
+})
+
+describe('the ad box when nothing is served', () => {
+  const rule = (selector: string): string => {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const match = new RegExp(`\\n${escaped} \\{([^}]*)\\}`).exec(css)
+    expect(match, `${selector} is missing from globals.css`).toBeTruthy()
+    return match![1]
+  }
+
+  // The defect this block exists for, and it failed silently. Google's snippet
+  // puts `display: inline-block` in the `<ins>` element's own `style`
+  // attribute, which beats any rule in this stylesheet — so the first version
+  // of the fallback "hid" the empty unit, hid nothing, and stacked 250px of
+  // promo on top of 250px of empty ad. The group went from 658 to 893 against
+  // a cap of 800, which scrolls the newsletter button out of reach.
+  it('lays the fallback over the unit rather than swapping it in', () => {
+    const fallback = rule(".ad-slot[data-fill='unfilled'] .ad-slot__fallback")
+    expect(fallback).toMatch(/position: absolute/)
+    expect(fallback).toMatch(/inset: 0/)
+    // Which only works if the box it covers is a containing block.
+    expect(rule('.ad-slot')).toMatch(/position: relative/)
+  })
+
+  // Losing that argument with an inline style is silent, so do not start it.
+  it('never tries to hide the unit itself', () => {
+    expect(css).not.toMatch(/\.adsbygoogle \{[^}]*display: none/)
+    expect(css).not.toMatch(/\.ad-slot\[[^\]]*\] \.adsbygoogle/)
+  })
+
+  // "Advertisement" over our own promo is a claim that is not true, but
+  // removing it from the flow would shorten the box by 22px at the moment the
+  // fallback appears — a shift under the reader, for a word.
+  it('hides the label without taking its space', () => {
+    const label = rule(".ad-slot[data-fill='unfilled'] .ad-slot__label")
+    expect(label).toMatch(/visibility: hidden/)
+    expect(label).not.toMatch(/display: none/)
+  })
+
+  // Hidden until the slot is known to be empty. `pending` is the third state
+  // and it must look like a filled one, or every page would flash a promo
+  // before the ad arrives.
+  it('shows nothing until the slot is known to be empty', () => {
+    expect(rule('.ad-slot__fallback')).toMatch(/display: none/)
+    const unit = readFileSync(
+      resolve(
+        import.meta.dirname,
+        '../../app/(frontend)/components/ad-unit.tsx',
+      ),
+      'utf8',
+    )
+    expect(unit).toMatch(/useState<Fill>\('pending'\)/)
+  })
+
+  // The complaint that produced this layout: one headline sat in the middle of
+  // a 250px box and the rest was paper. The list grows into whatever the label
+  // leaves, and each item takes an even share of it, so the group reaches the
+  // bottom of the box at one item or at three without any height being written
+  // down anywhere.
+  it('fills the reserved box rather than centring a short block in it', () => {
+    expect(rule('.rail__promo')).toMatch(/height: 100%/)
+    expect(rule('.rail__promo-list')).toMatch(/flex: 1/)
+
+    const item = rule('.rail__promo-list > li')
+    expect(item).toMatch(/flex: 1/)
+    // A three-line headline would otherwise push the group past its box.
+    expect(item).toMatch(/min-height: 0/)
+  })
+
+  // Three items centre inside their own third, which is what spaces them
+  // evenly. One item centring inside the whole box put a 60px hole between the
+  // eyebrow and the headline it belonged to.
+  it('top-aligns the single pick instead of centring it', () => {
+    expect(rule('.rail__promo--featured .rail__promo-list > li')).toMatch(
+      /align-items: flex-start/,
+    )
+  })
+
+  // Bounded for the same reason the old related list's titles were: an item
+  // has to have a knowable height, or the box it shares with two others does
+  // not.
+  it('clamps a promoted headline', () => {
+    expect(rule('.rail__promo-item h3')).toMatch(/-webkit-line-clamp: 2/)
+    expect(rule('.rail__promo-item h3')).toMatch(/display: -webkit-box/)
+  })
+
+  // Shallower than the newsletter card's 3:2 directly beneath it. Two frames
+  // of the same shape stacked read as a repeat rather than as a rail.
+  it('gives the featured picture a different shape from the card below', () => {
+    const promo = rule('.rail__promo-figure')
+    expect(promo).toMatch(/aspect-ratio: 2 \/ 1/)
+    expect(rule('.rail__signup-figure')).toMatch(/aspect-ratio: 3 \/ 2/)
+  })
+
+  // A tag that was merely slow can answer after the timeout has already
+  // guessed. If the guess were latched, the promo would sit over a real ad —
+  // a wasted impression, and something an ad network would object to.
+  it('lets a late answer from Google overrule the guess', () => {
+    const unit = readFileSync(
+      resolve(
+        import.meta.dirname,
+        '../../app/(frontend)/components/ad-unit.tsx',
+      ),
+      'utf8',
+    )
+    expect(unit).toContain('MutationObserver')
+    expect(unit).toContain("attributeFilter: ['data-ad-status']")
+    // No latch: nothing may stop the observer from reporting a later fill.
+    expect(unit).not.toMatch(/settled\s*=\s*true/)
   })
 })
 

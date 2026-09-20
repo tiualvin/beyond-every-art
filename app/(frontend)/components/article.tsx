@@ -3,7 +3,11 @@ import Link from 'next/link'
 
 import { attributionHref } from '@/lib/content/attribution'
 import { thumbnailSrc, type MediaImage } from '@/lib/content/media'
-import type { AuthorSummary, PostDetail } from '@/lib/content/queries'
+import type {
+  AuthorSummary,
+  PostDetail,
+  RailFallback,
+} from '@/lib/content/queries'
 import { extractHeadings } from '@/lib/content/toc'
 import { formatDate } from '@/lib/format'
 import { authorPath, tagPath } from '@/lib/seo/site'
@@ -44,11 +48,14 @@ const FIGURE_SIZES =
 export function Article({
   post,
   newsletterImage = null,
+  railFallback = null,
   preview = false,
 }: {
   post: PostDetail
   /** The rail's signup picture, from `SiteSettings`. */
   newsletterImage?: MediaImage | null
+  /** What the rail's ad box holds when no ad is served. */
+  railFallback?: RailFallback
   preview?: boolean
 }) {
   const primaryTag = post.tags[0]
@@ -146,6 +153,7 @@ export function Article({
           <ArticleRail
             headings={headings}
             newsletterImage={newsletterImage}
+            railFallback={railFallback}
             restricted={post.restricted}
           />
         </div>

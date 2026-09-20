@@ -136,3 +136,30 @@ The picture costs a phone nothing despite the rail being `display: none` below 1
 intersects the viewport, so the request is never made — measured in Chromium at
 390px wide, where it is requested zero times, against 1440px scrolled into
 view, where it is requested once.
+
+## 300x250 — the ad box with no ad in it
+
+The slot reserves 300x250 and holds it whether or not Google fills it, so an
+unfilled unit is a labelled empty box unless something else goes in. What goes
+in is chosen in Payload under Site Settings → "Article rail — when no ad is
+shown".
+
+Both shots are `pnpm measure:rail --unfilled --promo <n> --shot`, rendering the
+real `ArticleRail` over the real `app/globals.css` with the fill state forced.
+The gradients stand in for photographs, as everywhere else in this file.
+
+| One article                                                                                                                                                                                       | Three articles                                                                                                                                                                  |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ![The ad box holding one promoted article: a WORTH READING eyebrow, a 2:1 picture, a two-line serif headline and a tag and reading time, filling the box to its bottom edge.](rail-promo-one.jpg) | ![The same box holding three: a MORE FROM THE JOURNAL eyebrow, then three serif headlines each with a tag and reading time, separated by hairline rules.](rail-promo-three.jpg) |
+
+The first version of this put one headline in the middle of the box and left
+the rest as paper, which reads as a mistake rather than as a choice. A list
+fills the height by growing into whatever the eyebrow leaves and giving each
+item an even share of it, so it reaches the bottom at one item or three without
+any height being written down. A single pick is the exception: it is
+top-aligned under its eyebrow and takes the post's own picture, at 2:1 rather
+than the newsletter card's 3:2 so two stacked frames do not read as a repeat.
+
+The box is the same height in both fill states — the fallback is laid over the
+empty unit rather than swapped into it — so nothing on the page moves whether
+an ad arrives or not.

@@ -261,6 +261,7 @@ export default async function SlugPage({
       <Article
         post={post}
         newsletterImage={settings.newsletterImage}
+        railFallback={settings.railFallback}
         preview={draft}
       />
       <ReadNext posts={readNext} topic={post.tags[0]?.name} />

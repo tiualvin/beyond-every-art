@@ -20,6 +20,7 @@
  * this needs network access; the line boxes depend on the real metrics and a
  * fallback face would quietly change every number below.
  *
+ *   pnpm measure:rail --unfilled             # as it looks with no ad served
  *   pnpm measure:rail                        # the default sweep
  *   pnpm measure:rail 900 800                # specific viewport heights
  *   pnpm measure:rail --shot docs/... 800    # and write a PNG per height
@@ -38,6 +39,9 @@ import { renderToStaticMarkup } from 'react-dom/server'
 
 import { ArticleRail } from '@/app/(frontend)/components/article-rail'
 import type { MediaImage } from '@/lib/content/media'
+import type { RailFallback } from '@/lib/content/queries'
+
+/** A house promo for the ad box, so `--unfilled` has something to show. */
 
 /**
  * A picture for the signup card.
@@ -65,20 +69,68 @@ const NEWSLETTER_IMAGE = {
   ogUrl: null,
 } satisfies MediaImage
 
+const PROMO_POSTS = [
+  {
+    title: 'Why Ultramarine Was Worth More Than Gold',
+    href: '/ultramarine-science/',
+    meta: 'materials · 12 min',
+    excerpt:
+      'Ground lapis travelled further than the painters who used it, and the ' +
+      'price followed the distance rather than the colour.',
+    // The single-pick layout uses the picture where there is one, so the
+    // harness has to be able to show both halves of that.
+    image: NEWSLETTER_IMAGE,
+  },
+  {
+    title: 'The Physics of Light in Renaissance Painting',
+    href: '/physics-light-renaissance-painting/',
+    meta: 'technique · 9 min',
+    excerpt: '',
+    image: null,
+  },
+  {
+    title: 'Why Burnt Sienna Behaves Differently in Oil Than in Watercolour',
+    href: '/why-burnt-sienna-behaves-differently-in-oil-than-in-watercolor/',
+    meta: 'materials · 14 min',
+    excerpt: '',
+    image: null,
+  },
+]
+
+/**
+ * A house promo for the ad box, so `--unfilled` has something to show.
+ *
+ * `--promo <n>` takes the first n, because one and three are different
+ * layouts: a lone pick becomes a featured piece with its standfirst, and two
+ * or three become a list. Both have to fill the same 250px.
+ */
+const railFallback = (count: number): RailFallback => ({
+  kind: 'post',
+  posts: PROMO_POSTS.slice(0, count),
+})
+
 const HEIGHTS = [
   1200, 1080, 937, 900, 860, 800, 758, 757, 700, 659, 658, 600, 560, 559, 520,
   508, 507,
 ]
 
-function page(): string {
+function page(unfilled: boolean, promo: number): string {
   const css = readFileSync(resolve(process.cwd(), 'app/globals.css'), 'utf8')
-  const rail = renderToStaticMarkup(
+  let rail = renderToStaticMarkup(
     ArticleRail({
       headings: [],
       newsletterImage: NEWSLETTER_IMAGE,
+      railFallback: railFallback(promo),
       restricted: false,
     }),
   )
+
+  // `data-fill` is set by `AdUnit` on the client once it knows whether an ad
+  // arrived, and nothing hydrates here. Rewriting it is how the empty-slot
+  // state gets looked at without waiting on a real no-fill from Google.
+  if (unfilled) {
+    rail = rail.replace('data-fill="pending"', 'data-fill="unfilled"')
+  }
 
   return `<!doctype html>
 <html lang="en">
@@ -107,14 +159,18 @@ async function main() {
   const argv = process.argv.slice(2)
   const shotAt = argv.indexOf('--shot')
   const shotDir = shotAt === -1 ? null : argv[shotAt + 1]
+  const unfilled = argv.includes('--unfilled')
+  const promoAt = argv.indexOf('--promo')
+  const promo = promoAt === -1 ? 3 : Number(argv[promoAt + 1]) || 3
+  const consumed = new Set(
+    [shotAt, shotAt + 1, promoAt, promoAt + 1].filter((i) => i > 0),
+  )
   const heights = argv
-    .filter(
-      (_, index) => shotAt === -1 || (index !== shotAt && index !== shotAt + 1),
-    )
+    .filter((_, index) => !consumed.has(index))
     .map(Number)
     .filter(Boolean)
   const browser = await chromium.launch()
-  const html = page()
+  const html = page(unfilled, promo)
 
   console.log(
     ['viewport', 'cap', 'group', 'card', 'figure', 'copy', 'fits'].join('\t'),

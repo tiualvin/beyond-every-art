@@ -3391,6 +3391,180 @@ ol.feature-list__items .feature-list__title::before {
   vertical-align: top;
 }
 
+/* The ad box: the unit, its cap, and whatever goes there when no ad is served.
+   `data-fill` is set by `AdUnit` once it knows — `pending` until then, so the
+   fallback is never flashed over an ad that is still arriving.
+
+   The reserved height does not change between the two states. An unfilled slot
+   may collapse only on a subsequent navigation and never mid-view
+   (docs/ADVERTISING.md §8), and a fallback that appeared by pushing the
+   newsletter card down would be the same defect wearing better clothes. */
+.ad-slot {
+  position: relative;
+}
+
+.ad-slot__fallback {
+  display: none;
+}
+
+/* The fallback is laid over the slot rather than swapped into it, and that is
+   the whole trick. Google's snippet puts `display: inline-block` in the `<ins>`
+   element's own `style` attribute, which beats any rule here — so hiding the
+   empty unit takes `!important`, and a stylesheet arguing with a third party's
+   inline styles is a fight that gets lost the next time they change it. The
+   first version of this did exactly that, silently failed to hide anything, and
+   made the group 893px against an 800px cap: the newsletter button scrolled out
+   of reach, which is the one thing the ladder above exists to prevent.
+
+   Absolutely positioned over the unit instead, the box is the same height in
+   both states, so nothing moves whether an ad arrives or not. There is nothing
+   underneath to obscure: an unfilled `<ins>` renders nothing at all. */
+.ad-slot[data-fill='unfilled'] .ad-slot__fallback {
+  display: flex;
+  position: absolute;
+  inset: 0;
+}
+
+/* `visibility`, not `display`. "Advertisement" over the house promo would be a
+   claim about our own content that is not true, and the sort of thing an ad
+   network is entitled to take a dim view of — but removing the label from the
+   flow would shorten the box by 22px at the moment the fallback appears, which
+   is a layout shift under the reader for the sake of a word. */
+.ad-slot[data-fill='unfilled'] .ad-slot__label {
+  visibility: hidden;
+}
+
+/* Quieter than the newsletter card directly beneath it, on purpose: that one
+   carries a surface and a border, and a second box stacked on top would read
+   as two competing cards rather than as a rail. This is the grammar the
+   related list used to have — an eyebrow, serif lines, a detail under each.
+
+   The job is to fill 250px. A column with the list growing into whatever the
+   label leaves is what does it, at one item or three, without any of the
+   heights being written down. */
+.rail__promo {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+}
+
+.rail__promo-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The rules between items are what make three headlines read as a list rather
+   than as a paragraph that lost its way, and they are drawn between rather
+   than around: a rule under the last item would box the group and start
+   competing with the card below. */
+.rail__promo-list > li + li {
+  border-top: 1px solid var(--color-line);
+}
+
+/* Even shares of the leftover space, so the list reaches the bottom of the box
+   at any count. `min-height: 0` because a flex item's automatic minimum is its
+   content, and a three-line headline would otherwise push the group past the
+   250px it has. */
+.rail__promo-list > li {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+}
+
+.rail__promo-item {
+  display: block;
+  width: 100%;
+}
+
+.rail__promo-item h3 {
+  font-size: 0.95rem;
+  line-height: 1.25;
+  margin: 0 0 0.2rem;
+  /* Bounded for the same reason the related list's titles were: an item has to
+     have a knowable height or the box it shares with two others does not. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.rail__promo-item:hover h3 {
+  color: var(--color-burgundy);
+}
+
+/* The single-pick layout. One headline in the middle of a 250px box reads as a
+   mistake, so a lone article is given its standfirst and a larger line and
+   becomes a featured piece — the same space, filled deliberately. */
+.rail__promo--featured .rail__promo-item h3 {
+  font-size: 1.2rem;
+  line-height: 1.2;
+  -webkit-line-clamp: 3;
+  margin-bottom: 0.45rem;
+}
+
+/* Top-aligned, unlike the list. Three items centre inside their own third and
+   that is what spaces them evenly; one item centring inside the whole box puts
+   a 60px hole between the eyebrow and the headline it belongs to, which reads
+   as a bug rather than as air. */
+.rail__promo--featured .rail__promo-list > li {
+  align-items: flex-start;
+}
+
+.rail__promo--featured .rail__promo-excerpt {
+  -webkit-line-clamp: 4;
+}
+
+/* The picture in the single-pick layout, and the thing that actually fills the
+   box: 2:1 at 298px is 149 of the 272 available, which a headline and a meta
+   line finish off almost exactly. Shallower than the newsletter card's 3:2 on
+   purpose — two frames of the same shape stacked would read as a repeat. */
+.rail__promo-figure {
+  display: block;
+  position: relative;
+  aspect-ratio: 2 / 1;
+  margin-bottom: 0.55rem;
+  background: var(--color-rule);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+/* With a picture above it the headline has less room and needs none of the
+   standfirst's, so it holds two lines rather than three. */
+.rail__promo--featured .rail__promo-figure ~ h3 {
+  -webkit-line-clamp: 2;
+}
+
+.rail__promo-excerpt {
+  margin: 0 0 0.4rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--color-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.rail__promo .rail__label {
+  border-bottom: 0;
+  padding-bottom: 0;
+  margin-bottom: 0.5rem;
+  flex: none;
+}
+
+.rail__meta {
+  margin: 0;
+  font-size: 0.74rem;
+  line-height: 1.35;
+  color: var(--color-muted);
+}
+
 /* "Advertisement", above the unit. docs/ADVERTISING.md calls this an
    editorial-integrity requirement before a policy one: PRODUCT.md describes a
    publication whose credibility is the product, and an unlabelled display unit

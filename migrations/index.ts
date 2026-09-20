@@ -11,6 +11,7 @@ import * as migration_20260824_043611_add_signup_campaigns from './20260824_0436
 import * as migration_20260919_050651_add_media_credit_url from './20260919_050651_add_media_credit_url';
 import * as migration_20260919_070509_add_mcp_publish_capability from './20260919_070509_add_mcp_publish_capability';
 import * as migration_20260919_141233_add_newsletter_card_image from './20260919_141233_add_newsletter_card_image';
+import * as migration_20260920_010521_add_rail_fallback from './20260920_010521_add_rail_fallback';
 
 export const migrations = [
   {
@@ -76,6 +77,11 @@ export const migrations = [
   {
     up: migration_20260919_141233_add_newsletter_card_image.up,
     down: migration_20260919_141233_add_newsletter_card_image.down,
-    name: '20260919_141233_add_newsletter_card_image'
+    name: '20260919_141233_add_newsletter_card_image',
+  },
+  {
+    up: migration_20260920_010521_add_rail_fallback.up,
+    down: migration_20260920_010521_add_rail_fallback.down,
+    name: '20260920_010521_add_rail_fallback'
   },
 ];
