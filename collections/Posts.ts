@@ -16,6 +16,7 @@ import { seoFields } from '../fields/seo'
 import { slugField } from '../fields/slug'
 import { CONTENT_TAGS } from '../lib/cache/content'
 import { contentEditor } from '../lib/content/editor'
+import { stampPublishedAt } from '../lib/content/publish-date'
 import { purgeOnChange, purgeOnDelete } from '../lib/cache/purge'
 import { recordMcpWrite } from '../lib/mcp/audit'
 import { refuseMcpPublish } from '../lib/mcp/publish-guard'
@@ -58,6 +59,8 @@ export const Posts: CollectionConfig = {
         return data
       },
       refuseMcpPublish,
+      // Last, so it sees the status this write actually lands on.
+      stampPublishedAt,
     ],
     afterChange: [recordMcpWrite, purgeOnChange(CONTENT_TAGS.posts)],
     afterDelete: [purgeOnDelete(CONTENT_TAGS.posts)],
