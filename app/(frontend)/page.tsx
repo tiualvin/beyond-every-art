@@ -13,7 +13,6 @@ import {
   getTagsWithCounts,
   type PostCard,
 } from '@/lib/content/queries'
-import { plateFor } from '@/lib/design/pigments'
 import { formatDate } from '@/lib/format'
 import { visibilityLabel } from '@/lib/membership'
 import {
@@ -220,14 +219,7 @@ function LatestBand({ post }: { post: PostCard }) {
             />
           </span>
         ) : (
-          <span
-            className="latest__plate plate-wash"
-            style={
-              {
-                '--plate': plateFor(post.tags[0]?.slug, post.slug).hex,
-              } as React.CSSProperties
-            }
-          />
+          <span className="latest__plate plate-wash" />
         )}
 
         <div>

@@ -16,6 +16,18 @@
   --font-sans:
     var(--font-inter), system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 
+  /* The one thing a listing shows where a featured image should have been.
+     Uniform on purpose: a per-piece colour made the absence look like a design
+     decision, and it is not one — every article here is meant to carry an
+     image, and a missing one is an omission to go and fix. One burgundy wash
+     says that in the brand's own voice, and says it the same way everywhere. */
+  --plate-wash: linear-gradient(
+    148deg,
+    var(--color-burgundy) 0%,
+    var(--color-burgundy-deep) 55%,
+    var(--color-dark) 100%
+  );
+
   --maxw: 72rem;
   --radius: 2px;
   /* Height of the masthead. The search drawer and the mobile menu both open
@@ -246,24 +258,11 @@ img {
 
 /* --- Plate wash --------------------------------------------------------- */
 
-/* What a listing plate shows when its piece has no featured image.
-   A flat fill would read as a missing asset and six of them in a column read as
-   a broken page, so the plate becomes a wash of the piece's own subject pigment
-   instead — the same colour that subject carries in "What we cover". Nothing is
-   ever set over it, so the pale end of the palette is safe here: `plateFor` in
-   `lib/design/pigments.ts` picks the pigment and `--plate` carries it in. */
+/* Applied to a listing plate that has no image to show. It sets exactly one
+   property, and `--plate-wash` above is the whole of what it says, so the card
+   grid, the entry list and the opening cannot drift apart. */
 .plate-wash {
-  background-image: linear-gradient(
-    148deg,
-    var(--plate, var(--color-burgundy-deep)) 0%,
-    color-mix(
-        in srgb,
-        var(--plate, var(--color-burgundy-deep)) 40%,
-        var(--color-dark)
-      )
-      62%,
-    var(--color-dark) 100%
-  );
+  background-image: var(--plate-wash);
 }
 
 /* --- Site header -------------------------------------------------------- */
@@ -1451,11 +1450,7 @@ img {
   position: relative;
   aspect-ratio: 3 / 2;
   overflow: hidden;
-  background: linear-gradient(
-    135deg,
-    var(--color-burgundy-deep),
-    var(--color-dark)
-  );
+  background-image: var(--plate-wash);
   border-radius: var(--radius);
 }
 

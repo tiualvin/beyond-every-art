@@ -4,7 +4,6 @@ import {
   PIGMENTS,
   luminance,
   pigmentFor,
-  plateFor,
   textOn,
 } from '../../lib/design/pigments'
 
@@ -61,30 +60,23 @@ describe('textOn', () => {
   })
 })
 
-describe('plateFor', () => {
-  it('washes an imageless plate with its own subject', () => {
-    expect(plateFor('palette', 'red-color-psychology')).toEqual(
-      pigmentFor('palette'),
-    )
+describe('textOn', () => {
+  // The palette spans near-white to near-black, so a single text colour is
+  // guaranteed to fail at one end. These are the two ends.
+  it('puts ink on the palest pigment', () => {
+    expect(textOn('#efe9dd')).toBe('#1b1714')
   })
 
-  it('falls back to the slug when the piece carries no tag', () => {
-    // About a fifth of the archive is untagged. Falling back to the tag list's
-    // absence rather than to the slug would give every one of them the same
-    // colour, which is the grey hole this exists to avoid, repainted.
-    for (const absent of [undefined, null, '', '   ']) {
-      expect(plateFor(absent, 'ultramarine-science')).toEqual(
-        pigmentFor('ultramarine-science'),
-      )
+  it('puts cream on the darkest pigment', () => {
+    expect(textOn('#20211f')).toBe('#f3ede4')
+  })
+
+  it('clears WCAG AA body text against every pigment', () => {
+    for (const pigment of PIGMENTS) {
+      const bg = luminance(pigment.hex)
+      const fg = luminance(textOn(pigment.hex))
+      const contrast = (Math.max(bg, fg) + 0.05) / (Math.min(bg, fg) + 0.05)
+      expect(contrast).toBeGreaterThanOrEqual(4.5)
     }
-  })
-
-  it('gives two untagged pieces different colours', () => {
-    const a = plateFor(undefined, 'ultramarine-science')
-    const b = plateFor(
-      undefined,
-      'the-rothko-effect-and-how-large-color-fields-create-emotional-response',
-    )
-    expect(a.hex).not.toBe(b.hex)
   })
 })

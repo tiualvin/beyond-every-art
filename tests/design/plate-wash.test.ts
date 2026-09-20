@@ -1,17 +1,27 @@
-// The wash on an imageless listing plate, checked against the stylesheet that
-// has to let it paint.
+// The placeholder a listing shows where a featured image should have been.
 //
-// `.plate-wash` sets one property — `background-image` — and it is declared
-// early in `app/globals.css`, above the site header. `.latest__plate` and
-// `.entry__thumb` are declared much later. Both carry the same specificity, so
-// source order decides, and the `background` shorthand resets `background-image`
-// to `none`. Writing `background: var(--color-paper)` in either of those rules
-// therefore silently erases the wash while leaving the markup, the custom
-// property and every unit test intact — the class is applied, the pigment is
-// computed, and the plate renders as an empty paper-coloured box.
+// Four of the five most recent published pieces carry no `featuredImage` — the
+// Ghost editor's picker went away with the cutover and nothing has replaced it
+// (`docs/STOCK_IMAGERY.md`). Those are the pieces the homepage puts at the top,
+// so the placeholder is not an edge case here, it is what most of the opening
+// renders.
 //
-// That is exactly what happened on the first pass, and only a screenshot caught
-// it. This is the check that would have.
+// It is one gradient, held in `--plate-wash`, and every surface that needs it
+// refers to that token. An earlier pass gave each piece a wash drawn from its
+// own subject's pigment; that was dropped deliberately, because a per-piece
+// colour makes a missing image look like a design decision. It is not one —
+// every article here is meant to carry an image, and a missing one is an
+// omission to go and fix.
+//
+// Two separate traps are pinned below, and both have bitten:
+//
+//  - `.plate-wash` sets `background-image`, and the rules it is combined with
+//    are declared later in the sheet at equal specificity. A `background`
+//    shorthand in either of those resets `background-image` to `none`, which
+//    silently erases the wash while leaving the markup, the class and every
+//    other test intact. Only a screenshot caught it the first time.
+//  - Three surfaces show this placeholder. When each carried its own gradient,
+//    "similar" was doing the work that "the same" should have been.
 
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -25,7 +35,10 @@ const css = readFileSync(
 /** The declarations inside one top-level rule, by selector. */
 function block(selector: string): string {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const match = new RegExp(`${escaped} \\{([^}]*)\\}`).exec(css)
+  // Anchored to the start of a line: `.story-card--horizontal .story-card__thumb`
+  // would otherwise answer for `.story-card__thumb`, and a compound selector
+  // carries only the overrides, never the base rule's declarations.
+  const match = new RegExp(`(?:^|\\n)${escaped} \\{([^}]*)\\}`).exec(css)
   expect(match, `${selector} is missing from globals.css`).toBeTruthy()
   return match![1]!
 }
@@ -35,15 +48,37 @@ function declarations(selector: string): string {
   return block(selector).replace(/\/\*[\s\S]*?\*\//g, '')
 }
 
-/** The rules that `.plate-wash` is combined with in the markup. */
+/** The rules `.plate-wash` is combined with in the markup. */
 const PLATE_HOSTS = ['.latest__plate', '.entry__thumb']
 
-describe('the imageless plate wash', () => {
-  it('is declared, and sets only background-image', () => {
+/** Every rule that paints the placeholder, including the card grid's own. */
+const PLACEHOLDER_SURFACES = ['.plate-wash', '.story-card__thumb']
+
+describe('the missing-image placeholder', () => {
+  it('is one gradient, defined once', () => {
+    const root = declarations(':root')
+    expect(root).toMatch(/--plate-wash:\s*linear-gradient\(/)
+  })
+
+  it('is burgundy, not a per-piece colour', () => {
+    // The whole point of dropping `plateFor` was that the placeholder should
+    // read as an omission in the brand's own voice, not as a chosen accent.
+    const root = block(':root')
+    const value = /--plate-wash:([^;]*);/.exec(root)
+    expect(value, '--plate-wash is missing from :root').toBeTruthy()
+    expect(value![1]).toContain('--color-burgundy')
+    expect(value![1]).toContain('--color-dark')
+  })
+
+  it.each(PLACEHOLDER_SURFACES)('%s uses the shared token', (selector) => {
+    // Not "a similar gradient" — the same one. Two hand-written gradients is
+    // how the card grid and the entry list quietly stopped matching.
+    expect(declarations(selector)).toContain('var(--plate-wash)')
+  })
+
+  it('sets only background-image where it is combined with another rule', () => {
     const wash = declarations('.plate-wash')
     expect(wash).toMatch(/background-image\s*:/)
-    // A shorthand here would take a background-color with it and paint over
-    // whatever the host rule set.
     expect(wash).not.toMatch(/(^|[;{\s])background\s*:/)
   })
 
