@@ -15,8 +15,14 @@ import {
 } from '@/lib/content/queries'
 import { plateFor } from '@/lib/design/pigments'
 import { formatDate } from '@/lib/format'
-import { buildWebSiteJsonLd, serializeJsonLd } from '@/lib/seo/jsonld'
+import { visibilityLabel } from '@/lib/membership'
 import {
+  buildItemListJsonLd,
+  buildWebSiteJsonLd,
+  serializeJsonLd,
+} from '@/lib/seo/jsonld'
+import {
+  absoluteUrl,
   getSiteUrl,
   HOME_TOPICS_ID,
   JOURNAL_PATH,
@@ -70,11 +76,29 @@ export default async function HomePage() {
     }),
   )
 
+  // What the page actually lists, in the order it lists it: the band's piece
+  // first, then the picks. `WebSite` says what the site is and said nothing
+  // about its contents.
+  const siteUrl = getSiteUrl()
+  const listJsonLd = serializeJsonLd(
+    buildItemListJsonLd({
+      name: 'Featured articles',
+      items: (latest ? [latest, ...picks] : picks).map((post) => ({
+        url: absoluteUrl(postPath(post.slug), siteUrl),
+        name: post.title,
+      })),
+    }),
+  )
+
   return (
     <main>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: jsonLd }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: listJsonLd }}
       />
       {/* ── Cover ── */}
       <section className="cover">
@@ -171,8 +195,14 @@ export default async function HomePage() {
 
 function LatestBand({ post }: { post: PostCard }) {
   const byline = post.authors.map((author) => author.name).join(', ')
-  const meta = [post.publishedAt ? formatDate(post.publishedAt) : null]
-    .concat(`${post.readingTime} min`)
+  // Same three parts, in the same order, as an `EntryRow`: the band showed no
+  // membership label, so a members-only newest piece was badged everywhere on
+  // the site except the most prominent place it appears.
+  const meta = [
+    visibilityLabel(post.visibility),
+    post.publishedAt ? formatDate(post.publishedAt) : null,
+    `${post.readingTime} min`,
+  ]
     .filter(Boolean)
     .join(' · ')
 

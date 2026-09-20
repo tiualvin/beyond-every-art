@@ -232,6 +232,47 @@ export function buildProfilePageJsonLd(
   }
 }
 
+export type ItemListJsonLdInput = {
+  /** Absolute URLs, in the order the page lists them. */
+  items: readonly { url: string; name: string }[]
+  /** What the list is, for a consumer reading more than the members. */
+  name?: string
+}
+
+/**
+ * The articles a listing page names, in the order it names them.
+ *
+ * The homepage served a `WebSite` node and nothing about its contents, so the
+ * one thing the page is for — a reader's way into the archive — was the part a
+ * crawler had to infer from markup. `ItemList` states it: these pieces, this
+ * order. Each entry is a bare `url`, which is what Google asks for when the
+ * target page carries its own `Article` node; every post page here does
+ * (`buildArticleJsonLd`), so repeating the article's fields in the list would
+ * be a second copy to keep in step for no gain.
+ *
+ * Returns the node whether or not the list is empty. An empty `itemListElement`
+ * is still true of a site with nothing published, and a builder that sometimes
+ * returns nothing pushes the decision into every caller.
+ */
+export function buildItemListJsonLd(
+  input: ItemListJsonLdInput,
+): Record<string, unknown> {
+  const jsonLd: Record<string, unknown> = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    itemListElement: input.items.map((item, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      url: item.url,
+      name: item.name,
+    })),
+  }
+
+  if (input.name) jsonLd.name = input.name
+
+  return jsonLd
+}
+
 /**
  * Serializes a JSON-LD object for safe inline embedding, escaping the
  * characters that could otherwise break out of a <script> element.
