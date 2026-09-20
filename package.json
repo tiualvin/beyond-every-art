@@ -20,7 +20,7 @@
     "format:check": "prettier --check .",
     "payload": "payload",
     "generate:types": "payload generate:types",
-    "generate:importmap": "payload generate:importmap",
+    "generate:importmap": "node scripts/generate-importmap.mjs",
     "bootstrap:admin": "tsx scripts/bootstrap-admin.ts",
     "migrate:db": "node scripts/run-migrations.mjs",
     "migrate:db:create": "payload migrate:create",

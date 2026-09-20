@@ -2,6 +2,8 @@ import type { Where } from 'payload'
 
 import { cachedRead, CONTENT_TAGS } from '@/lib/cache/content'
 import { toMediaImage, type MediaImage } from '@/lib/content/media'
+import { htmlToPlainText, richTextToPlainText } from '@/lib/content/plain-text'
+import { live, publishedStatus } from '@/lib/content/schedule'
 import { isSubjectTag } from '@/lib/content/topics'
 import { ARCHIVE_PAGE_SIZE } from '@/lib/content/pagination'
 import { toArticleBody, type ArticleBody } from '@/lib/content/body'
@@ -150,15 +152,21 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
 }
 
 /**
- * Every published post, whatever its visibility.
+ * Published apps.
  *
- * Members-only and subscriber-only posts are listed, searched, syndicated and
- * routed exactly like public ones; what changes is how much of the body a
- * reader is given. Filtering them out here instead is what made them vanish
- * from the site after the Ghost import, taking their URLs and rankings with
- * them. Withholding happens in one place, `toPostDetail`.
+ * Apps carry no publication date — they are a roadmap, ordered by hand — so
+ * status is the whole of the question for them. Posts and pages go through
+ * `live()` instead, which also refuses one whose date has not arrived; see
+ * `lib/content/schedule.ts` for why those two collections need more than this.
+ *
+ * Either way visibility is not part of it. Members-only and subscriber-only
+ * posts are listed, searched, syndicated and routed exactly like public ones;
+ * what changes is how much of the body a reader is given. Filtering them out
+ * here instead is what made them vanish from the site after the Ghost import,
+ * taking their URLs and rankings with them. Withholding happens in one place,
+ * `toPostDetail`.
  */
-const published: Where = { _status: { equals: 'published' } }
+const publishedApps: Where = publishedStatus
 
 function toVisibility(value: unknown): PostVisibility {
   return value === 'members' || value === 'paid' ? value : 'public'
@@ -207,14 +215,37 @@ function toTagRefs(tags: RawPost['tags']): TagRef[] {
     .filter((t) => t.name && t.slug)
 }
 
+/**
+ * How many words a card's reading time is computed from.
+ *
+ * This used to count the preserved Ghost markup and, failing that, multiply
+ * the excerpt's word count by eight. Every migrated document has `legacyHTML`,
+ * so the first branch answered for the whole site and the second was never
+ * exercised — but an article written in the Lexical editor here has an empty
+ * `legacyHTML` and lands on it. Eight words of body per word of excerpt is not
+ * an estimate of anything; a four-thousand-word essay with a one-line excerpt
+ * advertised itself as a two-minute read.
+ *
+ * `lib/content/plain-text.ts` already knew how to do this properly, for both
+ * shapes, including the text inside insertable modules — it was written and
+ * left unconsumed against exactly this kind of caller. A tag strip also reads
+ * `<script>` and `<style>` bodies as prose, which its HTML branch does not.
+ *
+ * The excerpt is still the last resort, but it is now counted rather than
+ * multiplied: for a document with no body at all, the honest floor is the one
+ * minute `readingTimeMinutes` clamps to.
+ */
 function estimateWordCount(doc: RawPost): number {
+  const words = (text: string): number =>
+    text.split(/\s+/).filter(Boolean).length
+
   const html = doc.legacyHTML ?? ''
-  if (html) {
-    const text = html.replace(/<[^>]*>/g, ' ')
-    return text.split(/\s+/).filter(Boolean).length
-  }
-  const excerpt = doc.excerpt ?? ''
-  return excerpt.split(/\s+/).filter(Boolean).length * 8
+  if (html) return words(htmlToPlainText(html))
+
+  const lexical = richTextToPlainText(doc.content)
+  if (lexical) return words(lexical)
+
+  return words(doc.excerpt ?? '')
 }
 
 function toPostCard(doc: RawPost): PostCard | null {
@@ -431,7 +462,7 @@ async function readPublishedPosts({
       page,
       limit,
       sort: '-publishedAt',
-      where: published,
+      where: live(),
     })
     return {
       posts: (result.docs as RawPost[])
@@ -462,7 +493,7 @@ async function readRecentPosts(limit = 6): Promise<PostCard[]> {
       depth: 1,
       limit,
       sort: '-publishedAt',
-      where: published,
+      where: live(),
     })
     return (result.docs as RawPost[])
       .map(toPostCard)
@@ -494,7 +525,7 @@ async function readFeaturedPosts(limit: number): Promise<PostCard[]> {
       depth: 1,
       limit,
       sort: '-publishedAt',
-      where: { and: [{ featured: { equals: true } }, published] },
+      where: { and: [{ featured: { equals: true } }, live()] },
     })
     return (result.docs as RawPost[])
       .map(toPostCard)
@@ -546,7 +577,7 @@ async function readSearchPosts(
       sort: '-publishedAt',
       where: {
         and: [
-          published,
+          live(),
           {
             or: [
               { title: { contains: term } },
@@ -718,7 +749,7 @@ async function readPostBySlug(
       draft: options.draft,
       where: options.draft
         ? { slug: { equals: slug } }
-        : { and: [{ slug: { equals: slug } }, published] },
+        : { and: [{ slug: { equals: slug } }, live()] },
     })
     const doc = result.docs[0] as RawContentDoc | undefined
     if (!doc?.slug) return null
@@ -782,7 +813,7 @@ async function readRelatedPosts(
             limit,
             sort: '-publishedAt',
             where: {
-              and: [published, notThisPost, { 'tags.slug': { in: tagSlugs } }],
+              and: [live(), notThisPost, { 'tags.slug': { in: tagSlugs } }],
             },
           })
         : { docs: [] }
@@ -801,7 +832,7 @@ async function readRelatedPosts(
       sort: '-publishedAt',
       where: {
         and: [
-          published,
+          live(),
           notThisPost,
           { slug: { not_in: related.map((p) => p.slug) } },
         ],
@@ -844,10 +875,7 @@ async function readPageBySlug(
       where: options.draft
         ? { slug: { equals: slug } }
         : {
-            and: [
-              { slug: { equals: slug } },
-              { _status: { equals: 'published' } },
-            ],
+            and: [{ slug: { equals: slug } }, live()],
           },
     })
     const doc = result.docs[0] as RawContentDoc | undefined
@@ -923,7 +951,7 @@ async function readArchive(
       depth: 1,
       limit: 100,
       sort: '-publishedAt',
-      where: { and: [{ [relationField]: { in: [doc.id] } }, published] },
+      where: { and: [{ [relationField]: { in: [doc.id] } }, live()] },
     })
 
     return {
@@ -1037,7 +1065,7 @@ async function readTagsWithCounts(): Promise<TopicCard[]> {
         collection: 'posts',
         overrideAccess: true,
         where: {
-          and: [{ tags: { in: [tag.id] } }, published],
+          and: [{ tags: { in: [tag.id] } }, live()],
         },
       })
       results.push({
@@ -1178,7 +1206,7 @@ async function readApps(): Promise<AppCard[]> {
       pagination: false,
       limit: 0,
       sort: ['order', 'name'],
-      where: published,
+      where: publishedApps,
     })
     return (result.docs as RawApp[])
       .map(toAppCard)
@@ -1210,7 +1238,7 @@ async function readAppBySlug(
       draft: options.draft,
       where: options.draft
         ? { slug: { equals: slug } }
-        : { and: [{ slug: { equals: slug } }, published] },
+        : { and: [{ slug: { equals: slug } }, publishedApps] },
     })
 
     const doc = result.docs[0] as RawApp | undefined
@@ -1274,7 +1302,7 @@ export const getAppSlugs = cachedRead(
         depth: 0,
         pagination: false,
         limit: 0,
-        where: published,
+        where: publishedApps,
         select: { slug: true, updatedAt: true },
       })
       return (result.docs as Array<{ slug?: string; updatedAt?: string }>)

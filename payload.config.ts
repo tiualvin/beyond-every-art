@@ -31,6 +31,7 @@ import { resolvePayloadSecret } from './lib/security/secret'
 import {
   buildPreviewUrl,
   PREVIEW_COLLECTIONS,
+  PREVIEW_GLOBALS,
 } from './lib/preview/live-preview'
 
 const filename = fileURLToPath(import.meta.url)
@@ -42,6 +43,24 @@ export default buildConfig({
   admin: {
     user: Users.slug,
     importMap: { baseDir: path.resolve(dirname) },
+    // The browser tab said "Payload", which is the name of the tool rather
+    // than of anything an editor is working on. Someone with the site, the
+    // admin and a preview open had three tabs and no way to tell two of them
+    // apart.
+    meta: {
+      titleSuffix: ' · Beyond Every Art',
+      description:
+        'Editorial CMS for Beyond Every Art — art, colour, materials and creative practice.',
+    },
+    // The publication's own palette lives in `app/(payload)/custom.css`, which
+    // the admin layout imports. Payload 3 has no `admin.css` key — a stylesheet
+    // is an import in the layout, not configuration.
+    components: {
+      // What needs an editor today, above the stock grid of collection names.
+      beforeDashboard: [
+        '/components/admin/EditorialDashboard#EditorialDashboard',
+      ],
+    },
     // Live Preview renders the real frontend in an iframe beside the editor.
     // Breakpoints match the widths the visual direction and the Playwright
     // projects already use, so what an editor checks is what is tested.
@@ -52,12 +71,25 @@ export default buildConfig({
         { name: 'desktop', label: 'Desktop', width: 1440, height: 900 },
       ],
       collections: [...PREVIEW_COLLECTIONS],
-      url: ({ collectionConfig, data }) =>
-        buildPreviewUrl({
-          collection: collectionConfig?.slug,
-          slug: data?.slug,
-          live: true,
-        }),
+      // The masthead, the footer and the newsletter card are edited blind
+      // otherwise: all three appear on every page and none of them had a
+      // preview at all. See `PREVIEW_GLOBALS` for what this does and does not
+      // promise — a global has no drafts, so the frame follows saves rather
+      // than keystrokes.
+      globals: [...PREVIEW_GLOBALS],
+      url: ({ collectionConfig, globalConfig, data }) =>
+        // A global has no slug of its own; it is previewed against the
+        // homepage, which is the one page that carries all three at once.
+        globalConfig
+          ? '/'
+          : // Still `null` for a document with no slug yet, which is what hides
+            // the Live Preview tab instead of pointing an iframe at
+            // `/undefined/`. See `buildPreviewUrl`.
+            buildPreviewUrl({
+              collection: collectionConfig?.slug,
+              slug: data?.slug,
+              live: true,
+            }),
     },
   },
   // Which origins may spend a session cookie, and which `Host` header Payload

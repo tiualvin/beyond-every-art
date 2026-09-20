@@ -1,5 +1,6 @@
 import { cachedRead, CONTENT_TAGS } from '@/lib/cache/content'
 import { DEFAULT_SITE_SETTINGS } from '@/lib/content/queries'
+import { live } from '@/lib/content/schedule'
 import { getPayloadClient } from '@/lib/payload'
 import { renderRssFeed, type RssItem } from '@/lib/seo/rss'
 import { absoluteUrl, FEED_PATH, getSiteUrl, postPath } from '@/lib/seo/site'
@@ -54,7 +55,11 @@ const readFeed = cachedRead(
       // archive: an item is a title, a link and an excerpt, which is exactly
       // what a signed-out reader gets on the post itself. No body is rendered
       // here, so nothing gated escapes through the feed.
-      where: { _status: { equals: 'published' } },
+      // A scheduled post is withheld here too. A feed item is the one thing a
+      // reader cannot be asked to come back for: it is fetched once, cached by
+      // aggregators, and mailed onward — so publishing one early is not a
+      // display fault that a later render corrects.
+      where: live(),
     })
 
     return { settings, posts }

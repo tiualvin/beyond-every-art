@@ -14,6 +14,7 @@
 import type { Block, Field } from 'payload'
 
 import type { LinkRelationship } from '../lib/content/link-rel'
+import { BLOCK_GROUPS, BLOCK_ICONS, type BlockIconName } from './icons'
 
 export const ACCORDION_BLOCK = 'accordion'
 export const PULL_QUOTE_BLOCK = 'pullQuote'
@@ -916,6 +917,40 @@ export const ComparisonTableBlock: Block = {
 }
 
 /** The blocks offered inside a Post or Page body. */
+/**
+ * Gives every block its drawing and its group in the picker.
+ *
+ * Applied here rather than written into each block's own definition, for the
+ * reason the header gives about slugs: these definitions are a contract with
+ * stored documents, and the less that is mixed into them the easier it is to
+ * see what is contract and what is decoration. `admin.images` and
+ * `admin.group` are decoration — nothing is stored, and removing them changes
+ * no document.
+ *
+ * Unknown slugs are left exactly as they are, so adding a block without an icon
+ * is a block with no icon rather than a crash in the editor.
+ */
+function presented(block: Block): Block {
+  const slug = block.slug as BlockIconName
+  const iconUrl = BLOCK_ICONS[slug]
+  const group = BLOCK_GROUPS[slug]
+  if (!iconUrl && !group) return block
+
+  const label =
+    typeof block.labels?.singular === 'string' ? block.labels.singular : slug
+
+  return {
+    ...block,
+    admin: {
+      ...block.admin,
+      ...(group ? { group } : {}),
+      ...(iconUrl
+        ? { images: { icon: { url: iconUrl, alt: `${label} block` } } }
+        : {}),
+    },
+  }
+}
+
 export const CONTENT_BLOCKS: Block[] = [
   KeyTakeawaysBlock,
   FaqBlock,
@@ -931,4 +966,4 @@ export const CONTENT_BLOCKS: Block[] = [
   BookmarkBlock,
   EmbedBlock,
   PaywallBlock,
-]
+].map(presented)

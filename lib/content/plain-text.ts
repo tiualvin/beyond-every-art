@@ -4,13 +4,16 @@
 // element's copy is invisible to a naive tag strip, and a signup form's button
 // label is not editorial text that belongs in a feed or a search index.
 //
-// Nothing consumes this yet, and that is deliberate rather than an oversight.
-// The RSS feed emits `excerpt`/`metaDescription` only, and `searchPosts`
-// matches `title` and `excerpt` — so wiring either one to block text is a
-// change to what that consumer indexes or publishes, with its own relevance,
-// performance and full-content-feed decisions. Those are separate pieces of
-// work. The obligation here is that the serializer exists and is correct when
-// somebody makes that call.
+// One consumer so far: `estimateWordCount` in `lib/content/queries.ts`, which
+// is what a card's reading time is computed from. It counts words and publishes
+// nothing, so it needed the serializer to be correct and needed none of the
+// decisions below.
+//
+// The two obvious consumers are still deliberately not wired. The RSS feed
+// emits `excerpt`/`metaDescription` only, and `searchPosts` matches `title` and
+// `excerpt` — so pointing either at block text is a change to what that
+// consumer indexes or publishes, with its own relevance, performance and
+// full-content-feed decisions attached. Those remain separate pieces of work.
 
 import { convertLexicalToPlaintext } from '@payloadcms/richtext-lexical/plaintext'
 

@@ -29,11 +29,21 @@ type SlugFieldOptions = {
   reserved?: boolean
   /** Field to derive an empty slug from on create. */
   from?: string
+  /**
+   * Put the field in the sidebar rather than the document body.
+   *
+   * For the collections whose edit view is arranged around writing — Posts and
+   * Pages. A slug is the document's address, which is a decision about it
+   * rather than part of it, and it belongs beside the other publishing controls
+   * instead of between the title and the excerpt.
+   */
+  sidebar?: boolean
 }
 
 export function slugField({
   reserved = false,
   from = 'title',
+  sidebar = false,
 }: SlugFieldOptions = {}): TextField {
   return {
     name: 'slug',
@@ -69,8 +79,9 @@ export function slugField({
       return reserved ? validateRootContentSlug(value) : true
     }) as TextFieldSingleValidation,
     admin: {
+      ...(sidebar ? { position: 'sidebar' as const } : {}),
       description:
-        'Used verbatim as the URL. Lowercase letters, numbers and hyphens.',
+        'Used verbatim as the URL. Lowercase letters, numbers and hyphens. Changing it on a published document changes a live address.',
     },
   }
 }

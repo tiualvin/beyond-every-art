@@ -153,11 +153,30 @@ headline inside the iframe, and rewriting the excerpt changed the dek.
 Unit tests cover the URL builder, including the `null` that hides the button for
 a document with no slug yet, the collection allowlist, and the role gate.
 
+## Globals
+
+`Header`, `Footer` and `SiteSettings` are previewed against the homepage — the
+one URL that carries the masthead, the footer and the newsletter card at once,
+which is what those three globals control. `livePreview.globals` in
+`payload.config.ts` names them; the `url` callback returns `/` for a global
+rather than an `/api/preview` URL, because there is no draft to open and no slug
+to carry.
+
+Relative for the same reason the collection URL is: it resolves against whichever
+host the admin is served from. Caddy's `{$CMS_ADDRESS}` block ends in a catch-all
+`handle` that proxies to the same application, so `/` on the staff hostname
+renders the homepage.
+
+What this does not do is follow typing. See "Not built" below.
+
 ## Not built
 
-- Live preview for globals (`Header`, `Footer`, `SiteSettings`) and for
-  `Media`, `Authors`, `Tags`, `Redirects`.
-- Client-side `useLivePreview` and the isomorphic mapper it would need.
+- Live preview for `Media`, `Authors`, `Tags`, `Redirects`.
+- Client-side `useLivePreview` and the isomorphic mapper it would need. This
+  is what separates the globals below from the collections above: a post's
+  iframe follows keystrokes because autosave writes a version per typing pause
+  and the frame reloads on it, and a global has no drafts and no autosave, so
+  its frame follows _saves_.
 - A Playwright spec in `e2e/`. The browser run above was a one-off against a
   seeded instance, not a committed regression test.
 - Preview of publication-system surfaces, which are gated behind cutover by
