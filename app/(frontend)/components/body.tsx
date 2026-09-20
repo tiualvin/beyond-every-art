@@ -2,8 +2,10 @@ import { RichText } from '@payloadcms/richtext-lexical/react'
 
 import { splitHtmlForAds, splitLexicalForAds } from '@/lib/ads/inline'
 import type { ArticleBody as ArticleBodyValue } from '@/lib/content/body'
+import type { PostCard } from '@/lib/content/queries'
 
 import { AdUnit } from './ad-unit'
+import { InlinePromo } from './inline-promo'
 import { buildConverters } from './blocks/registry'
 
 /**
@@ -19,6 +21,14 @@ import { buildConverters } from './blocks/registry'
  * boundaries `lib/ads/inline.ts` picks. Without it every line below renders
  * exactly what it rendered before, which is what a Page and a restricted
  * teaser get.
+ *
+ * **Each slot carries a piece to show when no ad is served.** They arrive as
+ * data and are turned into elements here, on the server, because `AdUnit` is
+ * the only thing that can know whether an ad came and has no business knowing
+ * what goes there if it did not — the same division `ArticleRail` makes for the
+ * rail's box. One piece per slot, in order, and a slot past the end of the list
+ * gets none: `AdUnit` leaves a childless slot alone entirely, so a short list
+ * costs nothing rather than repeating itself. `docs/ADVERTISING.md` §8.
  *
  * The two branches need different shapes and it is worth knowing why, because
  * the HTML one looks like the odd one out and is not arbitrary:
@@ -42,6 +52,7 @@ export function ArticleBody({
   preview = false,
   emptyMessage,
   adClient = null,
+  inlinePromos = [],
 }: {
   body: ArticleBodyValue
   className?: string
@@ -49,6 +60,13 @@ export function ArticleBody({
   emptyMessage?: string
   /** The publisher to run in-article units for, or null for none. */
   adClient?: string | null
+  /**
+   * One piece per in-article slot, for the slots no ad fills.
+   *
+   * The tail of the pool `lib/content/related.ts` divides. Shorter than the
+   * number of slots is an ordinary state on a thin archive, not an error.
+   */
+  inlinePromos?: PostCard[]
 }) {
   if (body.kind === 'empty') {
     return emptyMessage ? <p className="muted">{emptyMessage}</p> : null
@@ -62,7 +80,7 @@ export function ArticleBody({
         {chunks.map((chunk, index) => (
           <ArticleBodyChunk key={index}>
             {index > 0 && (
-              <AdUnit placement="article-inline" client={adClient!} />
+              <InlineSlot client={adClient!} promo={inlinePromos[index - 1]} />
             )}
             <div
               className={
@@ -83,7 +101,7 @@ export function ArticleBody({
       {parts.map((part, index) => (
         <ArticleBodyChunk key={index}>
           {index > 0 && (
-            <AdUnit placement="article-inline" client={adClient!} />
+            <InlineSlot client={adClient!} promo={inlinePromos[index - 1]} />
           )}
           <RichText
             data={part as never}
@@ -93,6 +111,22 @@ export function ArticleBody({
         </ArticleBodyChunk>
       ))}
     </div>
+  )
+}
+
+/**
+ * One in-article unit, and the piece it shows when no ad is served.
+ *
+ * Both body branches render this, so what a slot holds is decided once. The
+ * promo is optional and deliberately so: `AdUnit` only watches a slot it was
+ * given children for, so a slot with nothing to show stays exactly the box it
+ * was before any of this existed rather than becoming an emptier one.
+ */
+function InlineSlot({ client, promo }: { client: string; promo?: PostCard }) {
+  return (
+    <AdUnit placement="article-inline" client={client}>
+      {promo && <InlinePromo post={promo} />}
+    </AdUnit>
   )
 }
 

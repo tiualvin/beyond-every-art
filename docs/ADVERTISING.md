@@ -494,8 +494,8 @@ that slot's request is deferred to idle.
 | `home-mid`                 | `/`                  | Between Featured and Topics                       | 970×250 | 300×250 | 250px    |
 
 Five identified placements, of which **four should be live at launch**: all but
-`home-mid`. Two are, and `rail-1`'s reservation held: turning it on was a fill
-rather than a re-layout.
+`home-mid`. Two are, both with house content behind them, and `rail-1`'s
+reservation held: turning it on was a fill rather than a re-layout.
 
 What it was _not_ was free of consequences for the rail around it, and the
 outcome is worth recording because it cost an editorial module. 279.3px of the
@@ -582,9 +582,10 @@ rail carrying one unit removes the question.
 **An unfilled slot shows house content, not a blank.** Google declines
 impressions routinely — no demand, no consent, a blocker in front of the tag —
 and the reserved height is held either way, so without this a reader gets a
-labelled empty box. `rail-1` therefore has a fallback, chosen in Payload under
-Site Settings → "Article rail — when no ad is shown": up to three articles, one
-of the apps, or nothing.
+labelled empty box. Both built placements now answer this. `rail-1`'s fallback
+is chosen in Payload under Site Settings → "Article rail — when no ad is
+shown": up to three articles, one of the apps, or nothing. `article-inline`'s
+is not chosen at all — see "Six boxes, not one" below.
 
 **Up to three, because filling 250px is the design problem.** The first version
 took a single article and put its headline in the middle of the box, which left
@@ -614,9 +615,51 @@ Three things about it are load-bearing:
   gets out of the way when it does. A promo sitting over a served ad is a
   wasted impression and a policy problem.
 
-The general point, for the four units still to come: a placement is not
+The general point, for the three units still to come: a placement is not
 finished when the unit renders. Decide what the space says when the network
 says nothing, because that is what a large share of readers will actually see.
+That point was made here while `article-inline` was rendering a labelled empty
+box on every article a blocker touched, which is how long a rule can sit in a
+document without being applied to the next unit down the page.
+
+### Six boxes, not one
+
+The in-body placement is the same rule and a different problem, because an
+article carries up to six of these where the rail carries one. Three decisions
+came out of it.
+
+**One piece per slot, and never the same piece twice.** A single promo repeated
+six times down an article is worse than six empty boxes: it reads as a broken
+template rather than as a suggestion. So the supply is a list, not a pick — the
+tail of the related-posts pool the page already reads for "Read next", divided
+in [`../lib/content/related.ts`](../lib/content/related.ts). "Read next" takes
+the first three, the slots take the rest in order, and the two surfaces are
+disjoint by construction rather than by a dedupe pass. That also makes the
+content contextual to the piece for free, and leaves nothing for an editor to
+keep up to date on every article — which is why this one is derived where the
+rail's is chosen. A slot past the end of the list is given nothing and renders
+exactly the box it rendered before; that needs an archive of fewer than ten
+published pieces to happen at all.
+
+**It does not collapse, and the fluid format is not the reason to.** This is
+the one placement where collapsing is arguable: the box is in flow, nothing
+measures against it, and §8's "reserve the maximum" already concedes that a
+format with no maximum has nothing exact to reserve. It still loses, on a point
+that is not about layout shift in the abstract. The slot deliberately does not
+latch its guess, so a tag that was merely slow can still answer — and a box that
+collapsed at three seconds and re-expanded at four would shift twice instead of
+never, the second time certainly under a reader. Holding the height is what
+makes the non-latching guess safe to make. The first unit also lands at 400
+words, about a screen and a half, so it is plausibly in view when the guess
+fires.
+
+**It is a band, not a card.** The box sits in the reading column next to the
+insertable modules an author can place — callout, bookmark, signup — and every
+one of those is bordered or filled. A house box built as a card would read as
+something the writer put there. Ruled top and bottom with no surface, carrying
+an eyebrow none of those blocks has, it reads as the publication speaking.
+`tests/design/article-layout.test.ts` pins that, because "tidying" it into the
+house card style is the obvious later change.
 
 **A hidden slot does not ask for an ad.** `rail-1`'s track is `display: none`
 below 1280px, and hiding a box does nothing whatever to the effect inside it —
