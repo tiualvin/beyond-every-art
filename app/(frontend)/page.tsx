@@ -30,6 +30,7 @@ import {
 
 import { CoverField } from './components/cover-field'
 import { Opening } from './components/opening'
+import { Pairing } from './components/pairing'
 import { EntryRow } from './components/entry-row'
 import { TopicSwatches } from './components/topic-swatches'
 import { FadeIn } from './components/motion/fade-in'
@@ -174,6 +175,12 @@ export default async function HomePage() {
           )}
         </div>
       </section>
+
+      {/* ── Read together ──
+          The one module here a query cannot produce: two pieces and the
+          editor's reason for reading them in sequence. Absent until all three
+          parts are set. */}
+      {homepage.pairing && <Pairing pairing={homepage.pairing} />}
 
       {/* ── Topics ── */}
       {topics.length > 0 && (

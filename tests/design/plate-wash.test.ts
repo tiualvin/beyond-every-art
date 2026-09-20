@@ -52,6 +52,7 @@ function declarations(selector: string): string {
 const PLATE_HOSTS = [
   '.opening__plate',
   '.opening__runner-plate',
+  '.pairing__plate',
   '.entry__thumb',
 ]
 

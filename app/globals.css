@@ -1565,6 +1565,125 @@ img {
   color: var(--color-muted);
 }
 
+/* --- Read together ------------------------------------------------------ */
+
+/* Two pieces and the editor's reason for putting them beside each other. The
+   grammar is deliberately not the entry list's: this is a claim about two
+   articles, and a claim needs room to be read rather than scanned. */
+.pairing__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2.5rem;
+  margin-top: 2.25rem;
+}
+
+.pairing__item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.pairing__item:hover {
+  text-decoration: none;
+}
+
+/* Aligned row by row, so the two metadata lines sit level whatever the titles
+   do. Without it a two-line title beside a three-line one steps everything
+   below it out of true, which is exactly the sloppiness a pairing cannot
+   afford — it is asking to be read as one argument. Behind `@supports` because
+   the flex fallback above is perfectly serviceable, just not aligned. */
+@supports (grid-template-rows: subgrid) {
+  .pairing__grid {
+    grid-template-rows: auto auto auto auto auto;
+  }
+
+  .pairing__item {
+    display: grid;
+    grid-row: span 5;
+    grid-template-rows: subgrid;
+    gap: 0.7rem;
+  }
+}
+
+.pairing__plate {
+  position: relative;
+  display: block;
+  aspect-ratio: 3 / 2;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background-color: var(--color-paper);
+}
+
+.pairing__title {
+  font-size: clamp(1.25rem, 2.2vw, 1.6rem);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  margin: 0;
+}
+
+.pairing__item:hover .pairing__title {
+  color: var(--color-burgundy);
+}
+
+.pairing__excerpt {
+  display: block;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--color-muted);
+}
+
+.pairing__meta {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The note is the module. Set in the serif at reading size rather than as
+   small print, because it is the editorial voice and the two articles above it
+   are the evidence. */
+.pairing__note {
+  margin: 2.25rem 0 0;
+  padding-top: 1.4rem;
+  border-top: 1px solid var(--color-line);
+  font-family: var(--font-serif);
+  font-size: 1.1rem;
+  line-height: 1.5;
+  max-width: 78ch;
+}
+
+.pairing__note cite {
+  display: block;
+  margin-top: 0.6rem;
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+@media (max-width: 51rem) {
+  .pairing__grid {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+
+  /* One column: there is no neighbour to align to, and a spanning item would
+     otherwise claim five rows of a single-column grid. */
+  .pairing__item {
+    display: flex;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pairing__title {
+    transition: color 0.22s ease;
+  }
+}
+
 /* --- Topics (dark section) ---------------------------------------------- */
 
 .topics {
