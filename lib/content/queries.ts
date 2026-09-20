@@ -2,6 +2,7 @@ import type { Where } from 'payload'
 
 import { cachedRead, CONTENT_TAGS } from '@/lib/cache/content'
 import { toMediaImage, type MediaImage } from '@/lib/content/media'
+import { isSubjectTag } from '@/lib/content/topics'
 import { ARCHIVE_PAGE_SIZE } from '@/lib/content/pagination'
 import { toArticleBody, type ArticleBody } from '@/lib/content/body'
 import { readingTimeMinutes } from '@/lib/format'
@@ -476,6 +477,38 @@ export const getRecentPosts = cachedRead('recent-posts', readRecentPosts, [
   CONTENT_TAGS.tags,
   CONTENT_TAGS.media,
 ])
+
+/**
+ * Published posts an editor has flagged `featured`, newest first.
+ *
+ * The flag came across from Ghost and until now nothing read it — see
+ * `lib/content/homepage.ts` for what the homepage does with it, and why the
+ * tier it feeds is capped rather than allowed to fill the section.
+ */
+async function readFeaturedPosts(limit: number): Promise<PostCard[]> {
+  try {
+    const payload = await getPayloadClient()
+    const result = await payload.find({
+      collection: 'posts',
+      overrideAccess: true,
+      depth: 1,
+      limit,
+      sort: '-publishedAt',
+      where: { and: [{ featured: { equals: true } }, published] },
+    })
+    return (result.docs as RawPost[])
+      .map(toPostCard)
+      .filter((p): p is PostCard => p !== null)
+  } catch {
+    return []
+  }
+}
+
+export const getFeaturedPosts = cachedRead(
+  'featured-posts',
+  readFeaturedPosts,
+  [CONTENT_TAGS.posts, CONTENT_TAGS.tags, CONTENT_TAGS.media],
+)
 
 /**
  * The longest search term that will ever reach the database.
@@ -965,18 +998,32 @@ export type TopicCard = {
   name: string
   slug: string
   postCount: number
-  image: MediaImage | null
 }
 
-async function readTagsWithCounts(limit = 6): Promise<TopicCard[]> {
+/**
+ * Every subject with at least one published post behind it, largest first.
+ *
+ * Unlimited, and the callers slice: the homepage is the site's only topics
+ * index — the masthead's "Topics" points at `/#topics`, there is no `/topics`
+ * route — so a limit there hid whole archives behind no link at all. One cached
+ * entry now serves both the homepage chart and the tag page's sibling list,
+ * where two limits meant two entries and two runs of the count-per-tag loop.
+ *
+ * `isSubjectTag` drops Ghost's workflow tags; see `lib/content/topics.ts` for
+ * why that is a denylist and why the archives themselves are unaffected.
+ */
+async function readTagsWithCounts(): Promise<TopicCard[]> {
   try {
     const payload = await getPayloadClient()
     const tags = await payload.find({
       collection: 'tags',
       overrideAccess: true,
-      depth: 1,
+      // Nothing here renders a tag's `featuredImage`, and it is unset on every
+      // tag in the library — so `depth: 1` was joining media to discard it.
+      depth: 0,
       pagination: false,
       limit: 0,
+      select: { name: true, slug: true },
     })
 
     const results: TopicCard[] = []
@@ -984,9 +1031,8 @@ async function readTagsWithCounts(limit = 6): Promise<TopicCard[]> {
       id?: string | number
       name?: string
       slug?: string
-      featuredImage?: unknown
     }>) {
-      if (!tag.slug || !tag.name) continue
+      if (!tag.slug || !tag.name || !isSubjectTag(tag.slug)) continue
       const count = await payload.count({
         collection: 'posts',
         overrideAccess: true,
@@ -998,14 +1044,12 @@ async function readTagsWithCounts(limit = 6): Promise<TopicCard[]> {
         name: tag.name,
         slug: tag.slug,
         postCount: count.totalDocs,
-        image: toMediaImage(tag.featuredImage),
       })
     }
 
     return results
       .filter((t) => t.postCount > 0)
       .sort((a, b) => b.postCount - a.postCount)
-      .slice(0, limit)
   } catch {
     return []
   }
@@ -1014,7 +1058,7 @@ async function readTagsWithCounts(limit = 6): Promise<TopicCard[]> {
 export const getTagsWithCounts = cachedRead(
   'tags-with-counts',
   readTagsWithCounts,
-  [CONTENT_TAGS.posts, CONTENT_TAGS.tags, CONTENT_TAGS.media],
+  [CONTENT_TAGS.posts, CONTENT_TAGS.tags],
 )
 
 // --- Apps -----------------------------------------------------------------

@@ -244,6 +244,28 @@ img {
   color: var(--color-on-dark);
 }
 
+/* --- Plate wash --------------------------------------------------------- */
+
+/* What a listing plate shows when its piece has no featured image.
+   A flat fill would read as a missing asset and six of them in a column read as
+   a broken page, so the plate becomes a wash of the piece's own subject pigment
+   instead — the same colour that subject carries in "What we cover". Nothing is
+   ever set over it, so the pale end of the palette is safe here: `plateFor` in
+   `lib/design/pigments.ts` picks the pigment and `--plate` carries it in. */
+.plate-wash {
+  background-image: linear-gradient(
+    148deg,
+    var(--plate, var(--color-burgundy-deep)) 0%,
+    color-mix(
+        in srgb,
+        var(--plate, var(--color-burgundy-deep)) 40%,
+        var(--color-dark)
+      )
+      62%,
+    var(--color-dark) 100%
+  );
+}
+
 /* --- Site header -------------------------------------------------------- */
 
 .site-header {
@@ -1158,7 +1180,10 @@ img {
   aspect-ratio: 4 / 3;
   overflow: hidden;
   border-radius: var(--radius);
-  background: var(--color-paper);
+  /* `background-color`, not the shorthand: the shorthand resets
+     `background-image`, which is the only property `.plate-wash` sets,
+     and both of these rules come later in the sheet than it does. */
+  background-color: var(--color-paper);
 }
 
 .latest__title {
@@ -1261,7 +1286,10 @@ img {
   margin-top: 0.2rem;
   overflow: hidden;
   border-radius: var(--radius);
-  background: var(--color-paper);
+  /* `background-color`, not the shorthand: the shorthand resets
+     `background-image`, which is the only property `.plate-wash` sets,
+     and both of these rules come later in the sheet than it does. */
+  background-color: var(--color-paper);
 }
 
 .entry__title {
