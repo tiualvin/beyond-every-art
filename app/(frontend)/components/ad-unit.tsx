@@ -2,7 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react'
 
-import { AD_SLOTS, SLOT_SIZES, type Placement } from '@/lib/ads/placements'
+import {
+  AD_SLOTS,
+  minViewportWidth,
+  SLOT_SIZES,
+  type Placement,
+} from '@/lib/ads/placements'
 
 declare global {
   interface Window {
@@ -19,7 +24,7 @@ declare global {
  * loader would break the moment a second unit appeared. This component renders
  * the `<ins>` and asks the already-loaded tag to fill it.
  *
- * Three things about that request are deliberate:
+ * Four things about that request are deliberate:
  *
  * **It is deferred to idle.** `docs/ADVERTISING.md` §8 excludes any unit above
  * the featured image because the image is the LCP element and anything above
@@ -37,6 +42,13 @@ declare global {
  * the `data-adsbygoogle-status` check are both needed: the ref catches a
  * second effect in the same mount, the attribute catches a remount over an
  * `<ins>` the tag has already claimed.
+ *
+ * **It is not asked for where it cannot be seen.** `rail-1` sits in a track
+ * that is `display: none` below 1280px, which hides the box and does nothing
+ * at all to this effect — so without a guard every phone that loads an article
+ * requests an ad for a slot no reader will ever see. The placement carries the
+ * breakpoint (`minViewportWidth`) and the push waits on a `matchMedia` that
+ * keeps listening, so a window dragged wider still fills.
  *
  * **It is not refreshed.** The rail unit sits in a sticky group and is in view
  * for most of an article, which is the classic case for refresh and the
@@ -91,14 +103,45 @@ export function AdUnit({
       }
     }
 
-    if (typeof window.requestIdleCallback === 'function') {
-      const handle = window.requestIdleCallback(fill, { timeout: 2000 })
-      return () => window.cancelIdleCallback?.(handle)
+    let idle: number | undefined
+    let timer: number | undefined
+
+    const schedule = () => {
+      if (typeof window.requestIdleCallback === 'function') {
+        idle = window.requestIdleCallback(fill, { timeout: 2000 })
+      } else {
+        timer = window.setTimeout(fill, 1200)
+      }
     }
 
-    const timer = window.setTimeout(fill, 1200)
-    return () => window.clearTimeout(timer)
-  }, [])
+    // A placement its track has hidden must not ask for an ad. `display: none`
+    // stops nothing here — the component still mounts and this effect still
+    // runs — so the breakpoint the stylesheet uses is read back from
+    // `lib/ads/placements.ts` and asked directly.
+    const min = minViewportWidth(placement)
+    const query =
+      min === null ? null : window.matchMedia(`(min-width: ${min}px)`)
+
+    // Watched rather than read once: a window dragged wider, or a tablet
+    // turned landscape, brings the track back, and the unit inside it should
+    // then fill like any other. The listener is dropped on the way past so
+    // nothing can push twice.
+    const onChange = () => {
+      if (!query?.matches) return
+      query.removeEventListener('change', onChange)
+      schedule()
+    }
+
+    if (!query) schedule()
+    else if (query.matches) schedule()
+    else query.addEventListener('change', onChange)
+
+    return () => {
+      query?.removeEventListener('change', onChange)
+      if (idle !== undefined) window.cancelIdleCallback?.(idle)
+      if (timer !== undefined) window.clearTimeout(timer)
+    }
+  }, [placement])
 
   // Whether anything arrived. Separate from the push above because it has to
   // survive the push failing: a blocked loader throws, or never runs, and that
@@ -142,10 +185,26 @@ export function AdUnit({
     }
   }, [children])
 
-  const { width, height } = SLOT_SIZES[placement]
+  const size = SLOT_SIZES[placement]
+  // Google's two shapes. A fixed unit is sized by its own inline style; a
+  // fluid one is sized by the creative, and is told which layout to use.
+  const insProps =
+    size.kind === 'fixed'
+      ? {
+          style: {
+            display: 'inline-block',
+            width: size.width,
+            height: size.height,
+          },
+        }
+      : {
+          style: { display: 'block', textAlign: 'center' as const },
+          'data-ad-format': 'fluid',
+          'data-ad-layout': size.layout,
+        }
 
   return (
-    <div className="ad-slot" data-fill={fill}>
+    <div className="ad-slot" data-fill={fill} data-placement={placement}>
       {/* Hidden with the unit when nothing was served. Labelling the house
           promo below "Advertisement" would be both wrong and, since it is our
           own content, a claim we should not be making. */}
@@ -153,9 +212,9 @@ export function AdUnit({
       <ins
         ref={ref}
         className="adsbygoogle"
-        style={{ display: 'inline-block', width, height }}
         data-ad-client={client}
         data-ad-slot={AD_SLOTS[placement]}
+        {...insProps}
       />
       {children && <div className="ad-slot__fallback">{children}</div>}
     </div>

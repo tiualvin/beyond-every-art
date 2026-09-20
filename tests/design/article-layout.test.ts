@@ -17,6 +17,13 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
+import {
+  INLINE_FIRST_WORDS,
+  INLINE_GAP_WORDS,
+  INLINE_MAX,
+} from '@/lib/ads/inline'
+import { minViewportWidth } from '@/lib/ads/placements'
+
 const css = readFileSync(
   resolve(import.meta.dirname, '../../app/globals.css'),
   'utf8',
@@ -228,6 +235,22 @@ describe('the rail', () => {
     )
   })
 
+  // The width above, in the one other place that has to know it. Hiding the
+  // track does nothing to the effect inside it, so `AdUnit` asks `matchMedia`
+  // before it asks Google — and it asks for the width the placement carries.
+  // Move the breakpoint in the stylesheet alone and every phone goes back to
+  // requesting an ad for a box it will never show.
+  it('tells the ad unit the same width it hides the track at', () => {
+    // The gap must not cross another `@media`, or this reads the width of an
+    // earlier query and passes against a number nothing uses.
+    const query =
+      /@media \(min-width: ([\d.]+)rem\)(?:(?!@media)[\s\S])*?\.article__rail \{\s*display: block;/.exec(
+        css,
+      )
+    expect(query, 'no min-width query shows .article__rail').toBeTruthy()
+    expect(minViewportWidth('rail-1')).toBe(Number(query![1]) * REM)
+  })
+
   it('reserves the square unit above the card', () => {
     expect(css).toMatch(/\.rail__slot \{\s*min-height: 250px;/)
   })
@@ -373,9 +396,20 @@ describe('the ad box when nothing is served', () => {
   })
 
   // Losing that argument with an inline style is silent, so do not start it.
-  it('never tries to hide the unit itself', () => {
-    expect(css).not.toMatch(/\.adsbygoogle \{[^}]*display: none/)
-    expect(css).not.toMatch(/\.ad-slot\[[^\]]*\] \.adsbygoogle/)
+  //
+  // Specifically about `display`, not about touching the element at all: the
+  // in-article unit takes a `min-height` from here, which the inline style
+  // does not set and so does not fight. It is `display` that Google writes
+  // inline and `display` that a rule here would silently lose.
+  it('never tries to set display on the unit itself', () => {
+    const rules = [...css.matchAll(/([^{}]*\.adsbygoogle[^{}]*)\{([^}]*)\}/g)]
+    expect(rules.length, 'no .adsbygoogle rules found at all').toBeGreaterThan(
+      0,
+    )
+
+    for (const [, selector, body] of rules) {
+      expect(body, `${selector.trim()} sets display`).not.toMatch(/display:/)
+    }
   })
 
   // "Advertisement" over our own promo is a claim that is not true, but
@@ -593,6 +627,77 @@ describe('the body', () => {
     expect(rule![1]).toMatch(/text-align: justify/)
     // Justified text with no hyphenation rivers at this measure.
     expect(rule![1]).toMatch(/hyphens: auto/)
+  })
+})
+
+// How far apart the in-article units are, in pixels rather than in words.
+//
+// `lib/ads/inline.ts` spaces them by word count, which is the only unit a
+// server-side splitter has. What `docs/ADVERTISING.md` §8 actually rules on is
+// screens — "two units can share a screen, and only two" — and the exchange
+// rate between the two is the type in `.prose`. Shrink the body copy and every
+// gap shrinks with it, silently, until a reader has the rail unit and two
+// inline units in one window and the page reads as an ad break.
+//
+// So the gap is recomputed here from the stylesheet. The arithmetic is
+// deliberately the optimistic one — the tightest lines, no headings, no
+// figures, no paragraph gaps — because that is the densest the body can get,
+// and a rule that holds at the densest holds everywhere.
+describe('the space between in-article units', () => {
+  /**
+   * Words a line of the measure holds.
+   *
+   * `POST_PAGE_LAYOUT.md` measures 73 characters at the 704px measure, in
+   * Chromium against real body copy. At a five-letter mean plus its space that
+   * is 12.2 words, and this rounds *up*: a line that holds more words is a
+   * shorter gap, so 13 is the assumption that makes every test below stricter
+   * than the page it describes.
+   */
+  const WORDS_PER_LINE = 13
+
+  /** The tallest desktop window the rail is designed against. */
+  const SCREEN = 900
+
+  /** The height of one line box of body copy, from the stylesheet. */
+  function lineBox(): number {
+    const rule = /\.prose \{([^}]*)\}/.exec(css)
+    expect(rule, '.prose is missing from globals.css').toBeTruthy()
+
+    const size = /font-size: ([\d.]+)rem/.exec(rule![1])
+    const leading = /line-height: ([\d.]+)/.exec(rule![1])
+    expect(size, '.prose sets no font-size').toBeTruthy()
+    expect(leading, '.prose sets no line-height').toBeTruthy()
+
+    return Number(size![1]) * REM * Number(leading![1])
+  }
+
+  /** The least height a run of body copy can occupy. */
+  function atLeastTall(words: number): number {
+    return (words / WORDS_PER_LINE) * lineBox()
+  }
+
+  it('keeps a whole screen between the opening and the first unit', () => {
+    // The first unit is the one that could land beside the rail unit while the
+    // hero is still on screen, which would be three impressions in the window
+    // a reader forms their first impression of the page in.
+    expect(atLeastTall(INLINE_FIRST_WORDS)).toBeGreaterThan(SCREEN)
+  })
+
+  it('never lets two inline units share a screen', () => {
+    // Two screens rather than one: the rail unit is sticky and is therefore
+    // the second unit on every screen of the article by design, so an inline
+    // unit arriving while another is still in view is the third.
+    expect(atLeastTall(INLINE_GAP_WORDS)).toBeGreaterThan(SCREEN * 2)
+  })
+
+  it('caps a long article below one unit per two screens', () => {
+    // The whole run, against the longest article in the archive at the time
+    // the cap was chosen (7,899 words). This is the density a reader who
+    // finishes that piece actually meets, and it is the number to look at
+    // before raising INLINE_MAX.
+    const longest = 7899
+    const screens = atLeastTall(longest) / SCREEN
+    expect(screens / INLINE_MAX).toBeGreaterThan(2)
   })
 })
 

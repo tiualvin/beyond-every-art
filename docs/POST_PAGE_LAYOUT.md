@@ -264,13 +264,50 @@ staging, a teaser, ads switched off — rather than reserving 279px of blank
 paper above the card. Nothing shifts either way, because the reservation exists
 to stop a unit collapsing mid-view rather than to stand in for one.
 
+**Below 1280 it does not ask for an ad at all.** `.article__rail` is
+`display: none` there, which hides the box and does nothing to the effect
+inside it — so the unit used to request an ad on every phone that opened an
+article. `AdUnit` now reads the breakpoint from the placement and waits on
+`matchMedia`, and the design test checks that number against the rule above, so
+moving the breakpoint here without moving it there fails rather than quietly
+costing requests.
+
+## The units in the column
+
+`article-inline` is the other built placement, and unlike the rail unit it is
+not one box: `lib/ads/inline.ts` plans the breaks from a running word count —
+the first at 400 words, one every 800, at most six — so a long piece carries
+more of them than a short one. [`ADVERTISING.md`](ADVERTISING.md) §8 has the
+measurement behind those numbers.
+
+Three things about it that touch this document:
+
+**It does not change any width.** The unit is a child of the reading column and
+sized by it, so the 704px measure, the block, and the rail's arithmetic above
+are all untouched. Nothing here had to move to make room.
+
+**Its reservation is a floor, not a promise.** It is one of Google's in-article
+units, whose height comes from the creative. `SLOT_SIZES` marks it `fluid` and
+reserves 280px as a floor — which is the one place in this template where
+"reserve the maximum" cannot be taken literally, and §8 says why.
+
+**The drop cap only belongs to the first chunk.** The two body branches split
+differently, and the HTML one is where this bites. Rich text hands each part to
+its own `RichText` inside a single `.prose`, which renders exactly the children
+one part would have — nothing in the stylesheet can tell. Preserved Ghost
+markup cannot do that, because `dangerouslySetInnerHTML` needs an element to
+hang on, so each chunk is its own `.prose`. That keeps `.prose > *` meaning
+"a top-level block of the body", and breaks one rule:
+`.prose > p:first-of-type::first-letter` would put a 3.6em burgundy letter
+after every ad. `prose--continued` turns it off for every chunk after the
+first.
+
 ## Not built, deliberately
 
-- **The other four placements.** [`ADVERTISING.md`](ADVERTISING.md) §8 has five
-  and only `rail-1` is rendered. `article-inline-1` needs the server-side body
-  split in §4 before it can exist on migrated Ghost posts at all, and
-  `lib/ads/placements.ts` deliberately does not name a placement that nothing
-  renders.
+- **The other three placements.** [`ADVERTISING.md`](ADVERTISING.md) §8 has
+  five and two are rendered: `rail-1` and `article-inline`. `article-end`,
+  `archive-inline` and `home-mid` are not, and `lib/ads/placements.ts`
+  deliberately does not name a placement that nothing renders.
 - **A contents list on every article.** `extractHeadings` stops at the first
   block node. Anchors come from a stateful allocator the renderer shares
   between the body's headings and any block that emits one, so past a block

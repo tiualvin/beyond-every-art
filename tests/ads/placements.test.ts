@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest'
 
 import {
   AD_SLOTS,
+  minViewportWidth,
+  reservedHeight,
   SLOT_SIZES,
   slotIdsAreWellFormed,
   type Placement,
@@ -23,11 +25,12 @@ describe('the placement inventory', () => {
     expect(slotIdsAreWellFormed()).toBe(true)
   })
 
-  it('gives every placement a size to reserve', () => {
+  // Every placement reserves something before anything fills it, whichever
+  // shape it is. Zero would be a unit that pushes the page down when it lands.
+  it('gives every placement a height to reserve', () => {
     for (const placement of Object.keys(AD_SLOTS) as Placement[]) {
       expect(SLOT_SIZES[placement]).toBeTruthy()
-      expect(SLOT_SIZES[placement].width).toBeGreaterThan(0)
-      expect(SLOT_SIZES[placement].height).toBeGreaterThan(0)
+      expect(reservedHeight(placement)).toBeGreaterThan(0)
     }
   })
 
@@ -35,14 +38,66 @@ describe('the placement inventory', () => {
   // 300px track. A wider unit would overflow it and a responsive one would
   // reintroduce the layout shift the reservation exists to prevent.
   it('sizes the rail unit to the rail', () => {
-    expect(SLOT_SIZES['rail-1']).toEqual({ width: 300, height: 250 })
+    expect(SLOT_SIZES['rail-1']).toEqual({
+      kind: 'fixed',
+      width: 300,
+      height: 250,
+    })
+  })
+
+  // A fluid unit has no maximum, so §8's "reserve the maximum" cannot be
+  // honoured literally; the floor is what there is. Saying which shape a slot
+  // is, in the type, is what stops a renderer guessing.
+  it('marks the in-article unit as the one with no fixed height', () => {
+    const size = SLOT_SIZES['article-inline']
+    expect(size.kind).toBe('fluid')
+    expect(reservedHeight('article-inline')).toBeGreaterThanOrEqual(250)
   })
 
   // Only placements with a call site. §8 has five and four are unbuilt; a name
   // with nothing rendering it is a name nobody has had to make work.
   it('lists only the placements something renders', () => {
-    expect(Object.keys(AD_SLOTS)).toEqual(['rail-1'])
+    expect(Object.keys(AD_SLOTS)).toEqual(['rail-1', 'article-inline'])
     expect(rail).toContain('placement="rail-1"')
+
+    const body = readFileSync(
+      join(process.cwd(), 'app/(frontend)/components/body.tsx'),
+      'utf8',
+    )
+    expect(body).toContain('placement="article-inline"')
+  })
+})
+
+describe('a placement its track has hidden', () => {
+  // The bug this exists to stop: `.article__rail` is `display: none` below
+  // 1280px, the component mounts anyway, and every phone that opens an article
+  // asks Google to fill a box nobody can see. CSS cannot prevent that, so the
+  // breakpoint has to be readable from the code that does the asking.
+  it('gives the rail unit the viewport its track needs', () => {
+    expect(minViewportWidth('rail-1')).toBe(1280)
+  })
+
+  // The reading column exists at every width, so the in-article unit has no
+  // requirement. A number here would stop it filling on phones, which is where
+  // most of the reading happens.
+  it('puts no requirement on a unit in the reading column', () => {
+    expect(minViewportWidth('article-inline')).toBeNull()
+  })
+
+  it('asks the browser before pushing, and keeps listening', () => {
+    const unit = readFileSync(
+      join(process.cwd(), 'app/(frontend)/components/ad-unit.tsx'),
+      'utf8',
+    )
+
+    // Read from the placement rather than written into the component, so the
+    // stylesheet, the placement and the push cannot disagree.
+    expect(unit).toMatch(/minViewportWidth\(placement\)/)
+    expect(unit).toMatch(/matchMedia\(`\(min-width: \$\{min\}px\)`\)/)
+
+    // Watched, not read once: a window dragged wider brings the track back.
+    expect(unit).toMatch(/addEventListener\('change'/)
+    expect(unit).toMatch(/removeEventListener\('change'/)
   })
 })
 
