@@ -43,7 +43,7 @@ export default async function HomePage() {
     getSiteSettings(),
     getRecentPosts(RECENT_QUERY_SIZE),
     getFeaturedPosts(FEATURED_SLOTS),
-    getTagsWithCounts(6),
+    getTagsWithCounts(),
   ])
 
   // The newest piece carries the band; the picks are what is left, in tier
@@ -156,8 +156,8 @@ export default async function HomePage() {
                   <h2>What we cover</h2>
                 </div>
                 <p className="section__note">
-                  Fill height shows how much of the archive each subject
-                  accounts for.
+                  Fill height is each subject&rsquo;s size against the largest
+                  one.
                 </p>
               </div>
             </Reveal>

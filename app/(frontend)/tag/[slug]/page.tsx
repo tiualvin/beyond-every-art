@@ -64,7 +64,7 @@ export default async function TagPage({ params }: { params: Promise<Params> }) {
     notFound()
   }
 
-  const siblings = (await getTagsWithCounts(SIBLING_TOPICS + 1))
+  const siblings = (await getTagsWithCounts())
     .filter((topic) => topic.slug !== archive.slug)
     .slice(0, SIBLING_TOPICS)
 
