@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   AD_SLOTS,
+  minViewportWidth,
   reservedHeight,
   SLOT_SIZES,
   slotIdsAreWellFormed,
@@ -64,6 +65,39 @@ describe('the placement inventory', () => {
       'utf8',
     )
     expect(body).toContain('placement="article-inline"')
+  })
+})
+
+describe('a placement its track has hidden', () => {
+  // The bug this exists to stop: `.article__rail` is `display: none` below
+  // 1280px, the component mounts anyway, and every phone that opens an article
+  // asks Google to fill a box nobody can see. CSS cannot prevent that, so the
+  // breakpoint has to be readable from the code that does the asking.
+  it('gives the rail unit the viewport its track needs', () => {
+    expect(minViewportWidth('rail-1')).toBe(1280)
+  })
+
+  // The reading column exists at every width, so the in-article unit has no
+  // requirement. A number here would stop it filling on phones, which is where
+  // most of the reading happens.
+  it('puts no requirement on a unit in the reading column', () => {
+    expect(minViewportWidth('article-inline')).toBeNull()
+  })
+
+  it('asks the browser before pushing, and keeps listening', () => {
+    const unit = readFileSync(
+      join(process.cwd(), 'app/(frontend)/components/ad-unit.tsx'),
+      'utf8',
+    )
+
+    // Read from the placement rather than written into the component, so the
+    // stylesheet, the placement and the push cannot disagree.
+    expect(unit).toMatch(/minViewportWidth\(placement\)/)
+    expect(unit).toMatch(/matchMedia\(`\(min-width: \$\{min\}px\)`\)/)
+
+    // Watched, not read once: a window dragged wider brings the track back.
+    expect(unit).toMatch(/addEventListener\('change'/)
+    expect(unit).toMatch(/removeEventListener\('change'/)
   })
 })
 

@@ -22,6 +22,7 @@ import {
   INLINE_GAP_WORDS,
   INLINE_MAX,
 } from '@/lib/ads/inline'
+import { minViewportWidth } from '@/lib/ads/placements'
 
 const css = readFileSync(
   resolve(import.meta.dirname, '../../app/globals.css'),
@@ -232,6 +233,22 @@ describe('the rail', () => {
     expect(css).toMatch(
       /@media \(min-width: 80rem\)[\s\S]*?\.article__rail \{\s*display: block;/,
     )
+  })
+
+  // The width above, in the one other place that has to know it. Hiding the
+  // track does nothing to the effect inside it, so `AdUnit` asks `matchMedia`
+  // before it asks Google — and it asks for the width the placement carries.
+  // Move the breakpoint in the stylesheet alone and every phone goes back to
+  // requesting an ad for a box it will never show.
+  it('tells the ad unit the same width it hides the track at', () => {
+    // The gap must not cross another `@media`, or this reads the width of an
+    // earlier query and passes against a number nothing uses.
+    const query =
+      /@media \(min-width: ([\d.]+)rem\)(?:(?!@media)[\s\S])*?\.article__rail \{\s*display: block;/.exec(
+        css,
+      )
+    expect(query, 'no min-width query shows .article__rail').toBeTruthy()
+    expect(minViewportWidth('rail-1')).toBe(Number(query![1]) * REM)
   })
 
   it('reserves the square unit above the card', () => {

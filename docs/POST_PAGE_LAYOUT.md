@@ -264,6 +264,14 @@ staging, a teaser, ads switched off — rather than reserving 279px of blank
 paper above the card. Nothing shifts either way, because the reservation exists
 to stop a unit collapsing mid-view rather than to stand in for one.
 
+**Below 1280 it does not ask for an ad at all.** `.article__rail` is
+`display: none` there, which hides the box and does nothing to the effect
+inside it — so the unit used to request an ad on every phone that opened an
+article. `AdUnit` now reads the breakpoint from the placement and waits on
+`matchMedia`, and the design test checks that number against the rule above, so
+moving the breakpoint here without moving it there fails rather than quietly
+costing requests.
+
 ## The units in the column
 
 `article-inline` is the other built placement, and unlike the rail unit it is

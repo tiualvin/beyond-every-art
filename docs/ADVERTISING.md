@@ -618,6 +618,27 @@ The general point, for the four units still to come: a placement is not
 finished when the unit renders. Decide what the space says when the network
 says nothing, because that is what a large share of readers will actually see.
 
+**A hidden slot does not ask for an ad.** `rail-1`'s track is `display: none`
+below 1280px, and hiding a box does nothing whatever to the effect inside it —
+so until this was guarded, every phone that opened an article requested an ad
+for a unit no reader would ever see. That is most of the traffic, and it is
+wrong three times over: the requests are wasted, the fill rate they come back
+with is a number about nothing, and serving into a hidden container is not
+something to do to an ad network on purpose.
+
+CSS cannot fix it, because the push is JavaScript. So the breakpoint is a
+property of the placement (`minViewportWidth` in
+[`../lib/ads/placements.ts`](../lib/ads/placements.ts)), the unit asks
+`matchMedia` before it asks Google, and it keeps listening so a window dragged
+wider still fills. The design test checks that number against the stylesheet
+that hides the track, because the failure mode of moving one without the other
+is silent.
+
+The general form, for the three units still to come: **a placement that any
+breakpoint can hide needs its breakpoint written down where the request can
+read it.** `archive-inline` and `home-mid` are in tracks that exist at every
+width; if that stops being true for one of them, it needs an entry here.
+
 **The sticky unit is not refreshed.** A unit that stays in view for a whole
 article is the classic case for refresh, and refresh is the classic way to turn
 a rail into a nuisance. One impression, high viewability, no reload.

@@ -62,6 +62,35 @@ export const SLOT_SIZES: Record<Placement, SlotSize> = {
   'article-inline': { kind: 'fluid', layout: 'in-article', reserve: 280 },
 }
 
+/**
+ * The viewport a placement needs before it is on the page at all, in px.
+ *
+ * `rail-1` lives in `.article__rail`, which `app/globals.css` sets to
+ * `display: none` below 80rem — so below 1280px the unit mounts, is invisible,
+ * and asks Google to fill a box no one can see. That is most of the traffic on
+ * a publication like this one, and it is wrong three times over: the requests
+ * are wasted, the fill rate they come back with is a number about nothing, and
+ * serving into a hidden container is not something to be doing to an ad
+ * network on purpose.
+ *
+ * CSS cannot prevent it, because the push is JavaScript and `display: none`
+ * does not stop an effect running. So the breakpoint has to be a fact the
+ * component can read, and it belongs here next to the slot's other properties
+ * rather than as a number copied into a component. The design test checks it
+ * against the stylesheet that makes it true.
+ *
+ * A placement with no entry has no requirement and fills everywhere —
+ * `article-inline` is in the reading column, which exists at every width.
+ */
+export const SLOT_MIN_WIDTH: Partial<Record<Placement, number>> = {
+  'rail-1': 1280,
+}
+
+/** The viewport a placement needs, or null where it has no requirement. */
+export function minViewportWidth(placement: Placement): number | null {
+  return SLOT_MIN_WIDTH[placement] ?? null
+}
+
 /** Google's slot id shape: digits, and nothing else that reaches an attribute. */
 const SLOT_ID = /^[0-9]{10}$/
 
