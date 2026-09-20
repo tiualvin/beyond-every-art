@@ -34,12 +34,16 @@ describe('related posts on a post page', () => {
   })
 
   // The page asked for six while the rail took a second helping of the same
-  // query for its own list. That module is gone, and a limit left at six would
-  // be three rows read on every post render that nothing renders — the kind of
-  // cost that survives a deletion because nothing fails when it does.
+  // query for its own list, and for three once that module went. Nine now,
+  // because it renders nine: three in "Read next" and up to six in the house
+  // boxes down the body. The invariant is the one it always was — ask for
+  // exactly what you render — and the number is derived here rather than
+  // typed into the route, so raising the unit cap carries the query with it.
   it('asks the database for exactly what it renders', () => {
     expect(RELATED_QUERY_LIMIT).toBe(READ_NEXT_COUNT + INLINE_PROMO_MAX)
-    expect(page).toContain('READ_NEXT_COUNT,')
+    expect(page).toContain('RELATED_QUERY_LIMIT,')
+    expect(page).toContain('splitRelated(related)')
+    expect(page).not.toMatch(/getRelatedPosts\([^)]*READ_NEXT_COUNT/s)
   })
 
   // The two surfaces are disjoint because one takes the head and the other the

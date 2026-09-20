@@ -6,6 +6,7 @@ import { attributionHref } from '@/lib/content/attribution'
 import { thumbnailSrc, type MediaImage } from '@/lib/content/media'
 import type {
   AuthorSummary,
+  PostCard,
   PostDetail,
   RailFallback,
 } from '@/lib/content/queries'
@@ -50,6 +51,7 @@ export function Article({
   post,
   newsletterImage = null,
   railFallback = null,
+  inlinePromos = [],
   preview = false,
 }: {
   post: PostDetail
@@ -57,6 +59,15 @@ export function Article({
   newsletterImage?: MediaImage | null
   /** What the rail's ad box holds when no ad is served. */
   railFallback?: RailFallback
+  /**
+   * What the in-body ad boxes hold when no ad is served: one piece each.
+   *
+   * Unlike the rail's, these are not an editor's choice. They are the tail of
+   * the related-posts pool this page already reads for "Read next", which
+   * makes them contextual to the piece for free and different in every slot —
+   * and leaves nothing for an editor to keep up to date on every article.
+   */
+  inlinePromos?: PostCard[]
   preview?: boolean
 }) {
   const primaryTag = post.tags[0]
@@ -125,6 +136,7 @@ export function Article({
               className={post.restricted ? 'prose prose--teaser' : 'prose'}
               preview={preview}
               adClient={adClient}
+              inlinePromos={inlinePromos}
               emptyMessage={
                 post.restricted
                   ? undefined

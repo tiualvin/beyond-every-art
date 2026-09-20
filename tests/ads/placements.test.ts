@@ -16,6 +16,10 @@ const rail = readFileSync(
   join(process.cwd(), 'app/(frontend)/components/article-rail.tsx'),
   'utf8',
 )
+const body = readFileSync(
+  join(process.cwd(), 'app/(frontend)/components/body.tsx'),
+  'utf8',
+)
 
 describe('the placement inventory', () => {
   // A slot id is interpolated into a `data-ad-slot` attribute. A malformed one
@@ -59,12 +63,34 @@ describe('the placement inventory', () => {
   it('lists only the placements something renders', () => {
     expect(Object.keys(AD_SLOTS)).toEqual(['rail-1', 'article-inline'])
     expect(rail).toContain('placement="rail-1"')
-
-    const body = readFileSync(
-      join(process.cwd(), 'app/(frontend)/components/body.tsx'),
-      'utf8',
-    )
     expect(body).toContain('placement="article-inline"')
+  })
+})
+
+// §8's rule for every placement: decide what the space says when the network
+// says nothing, because that is what a large share of readers actually see.
+// Both built units now answer it, and the in-body one went a release without
+// answering it while a test asserted only that the placement was named — which
+// is why these check what is passed rather than that something renders.
+describe('an unfilled slot', () => {
+  it('gives the rail box something to hold', () => {
+    expect(rail).toContain('<RailFallback')
+  })
+
+  // The defect: `<AdUnit placement="article-inline" client={adClient!} />`,
+  // self-closing, in both body branches. It renders a labelled empty box on
+  // every article a blocker or an unsold impression touches, and nothing about
+  // it looks wrong at the call site.
+  it('gives every in-body box something to hold', () => {
+    expect(body).toContain('<InlinePromo post={promo} />')
+    expect(body).not.toMatch(/<AdUnit[^>]*\/>/)
+  })
+
+  // House content is not the ad and is never handed to the network as though
+  // it were: it is passed as children, which `AdUnit` renders beside the
+  // `<ins>` and reveals only once Google has declined the slot.
+  it('keeps the house content out of the unit', () => {
+    expect(body).toMatch(/<AdUnit[^>]*>\s*\{promo && <InlinePromo/)
   })
 })
 
