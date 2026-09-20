@@ -478,6 +478,38 @@ export const getRecentPosts = cachedRead('recent-posts', readRecentPosts, [
 ])
 
 /**
+ * Published posts an editor has flagged `featured`, newest first.
+ *
+ * The flag came across from Ghost and until now nothing read it — see
+ * `lib/content/homepage.ts` for what the homepage does with it, and why the
+ * tier it feeds is capped rather than allowed to fill the section.
+ */
+async function readFeaturedPosts(limit: number): Promise<PostCard[]> {
+  try {
+    const payload = await getPayloadClient()
+    const result = await payload.find({
+      collection: 'posts',
+      overrideAccess: true,
+      depth: 1,
+      limit,
+      sort: '-publishedAt',
+      where: { and: [{ featured: { equals: true } }, published] },
+    })
+    return (result.docs as RawPost[])
+      .map(toPostCard)
+      .filter((p): p is PostCard => p !== null)
+  } catch {
+    return []
+  }
+}
+
+export const getFeaturedPosts = cachedRead(
+  'featured-posts',
+  readFeaturedPosts,
+  [CONTENT_TAGS.posts, CONTENT_TAGS.tags, CONTENT_TAGS.media],
+)
+
+/**
  * The longest search term that will ever reach the database.
  *
  * `contains` compiles to `ILIKE '%term%'`, which no index can serve — every
