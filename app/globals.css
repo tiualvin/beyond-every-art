@@ -1180,7 +1180,10 @@ img {
   aspect-ratio: 4 / 3;
   overflow: hidden;
   border-radius: var(--radius);
-  background: var(--color-paper);
+  /* `background-color`, not the shorthand: the shorthand resets
+     `background-image`, which is the only property `.plate-wash` sets,
+     and both of these rules come later in the sheet than it does. */
+  background-color: var(--color-paper);
 }
 
 .latest__title {
@@ -1283,7 +1286,10 @@ img {
   margin-top: 0.2rem;
   overflow: hidden;
   border-radius: var(--radius);
-  background: var(--color-paper);
+  /* `background-color`, not the shorthand: the shorthand resets
+     `background-image`, which is the only property `.plate-wash` sets,
+     and both of these rules come later in the sheet than it does. */
+  background-color: var(--color-paper);
 }
 
 .entry__title {
