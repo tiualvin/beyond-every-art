@@ -46,8 +46,10 @@ Recorded with both candidate fixes in
 
 Still to do after the flip: submit the sitemap in Search Console, confirm GA4
 Realtime, run the production crawl comparison (which will now answer the
-`/about/` image question), the Stripe handover **before** cancelling Ghost, PRs
-#150 and #154, and the box reboot.
+`/about/` image question), the Stripe handover **before** cancelling Ghost, and
+the box reboot. (PRs #150 and #154, both listed here originally, merged later
+the same day — the js-yaml override bump and a Dependabot payload-group
+update.)
 
 ---
 
@@ -777,7 +779,7 @@ below.
      arrived from Ghost that way, so the old site has the same dead links.
      Repaired in the same pass.
   4. **Media id 4 has no bytes in R2 — still open.** The orphan question left
-     in item 0.4.1 below is answered: it is an Unsplash URL that was linked
+     in item 0.4 below is answered: it is an Unsplash URL that was linked
      rather than stored, it _is_ used (feature image of a published post), and
      the 22 Aug restore never recovered it. Its source URL still returns 200
      with 222497 bytes, matching the row's `filesize` exactly, so it is
@@ -1046,32 +1048,15 @@ errors`, and `/swapfile` is `-rw-------`. Its one warning — "non-bind mount
 
 ## Not done yet
 
-0.1. **Edge protection — five of six steps done; closing the origin is the one
-left (operator action).** Cloudflare held every record as "DNS only" with the
-VPS address public and no DDoS mitigation or edge cache; that is now mostly
-closed. The procedure, the prepared Caddy image (`docker/caddy/Dockerfile`),
-and the warning about why the proxy cannot simply be toggled on — it breaks
-HTTP-01 certificate renewal — are in
-[`EDGE_PROTECTION.md`](EDGE_PROTECTION.md).
-
-Steps 1–5 are done (29 Aug): the Cloudflare API token exists and DNS-01 issues
-certificates through it, proven end to end rather than inferred; the `caddy`
-service builds from the prepared image with the `caddy-dns/cloudflare` module
-(#103); `staging` is proxied behind Full (strict), with `cms` deliberately left
-unproxied so the MCP endpoint keeps answering non-browser clients; and
-`TRUST_CLOUDFLARE_IP=1` is set and confirmed reaching the container.
-
-What is left is step 6, **closing the origin** — see
-[`EDGE_PROTECTION.md#closing-the-origin`](EDGE_PROTECTION.md#closing-the-origin).
-A Hetzner Cloud Firewall already fronts the server (24 Aug) with three inbound
-rules — TCP 22, 80 and 443 — each sourced from `Any` for now; pass two narrows
-the port 80/443 rules to Cloudflare's published ranges, once the proxy is
-confirmed live. Proxying hides the origin from DNS but does not stop anyone who
-already recorded the address, and this one has been public since July, so until
-this step lands an attacker with the old IP bypasses every protection above.
-This is the step where a wrong rule locks the operator out too, so it wants a
-fresh sitting rather than being tacked onto another change — see "Close the
-origin" under Pick up here.
+0.1. **Edge protection — closed 18 Sep 2026. Retired from this list.** All six
+steps are done; see [`EDGE_PROTECTION.md`](EDGE_PROTECTION.md) and AGENTS.md's
+"Edge protection" section. Steps 1–5 were done 29 Aug (Cloudflare API token,
+DNS-01 certificates, `staging` proxied behind Full (strict) with `cms`
+deliberately left unproxied, `TRUST_CLOUDFLARE_IP=1`). Step 6, closing the
+origin, closed 18 Sep: the Hetzner firewall's port 80/443 rules were narrowed
+to Cloudflare's published ranges, and the origin IP was confirmed timing out
+on both ports from outside the VPS while every hostname still serves. See
+"The origin is closed" under Pick up here.
 
 0.4. **Media loss and R2 — recovered on 22 Aug. One small step left.**
 
@@ -1111,20 +1096,14 @@ running it: 0 B transferred.
 
 Setting `BACKUP_ENCRYPTION_KEY`, proving a restore, and deleting the unencrypted
 backups are all done — see "Backups are encrypted and a restore is proven" and
-"The plaintext archives are gone" above. One item is still open, and the 30 Aug
-content audit (see "The content audit" above) answered the question this used
-to pose:
+"The plaintext archives are gone" above.
 
-1. **Media id 4** (`photo-1689659721022-3aa475803e19`) has no bytes in R2.
-   Briefly retired on 18 Sep by a decision to delete the post carrying it; that
-   decision was reversed the same day, so this is open. It
-   is an Unsplash URL that was linked rather than stored in Ghost, it **is**
-   used — the feature image of a published post — and its source URL still
-   returns 200 with the exact byte count the row expects, so it is
-   recoverable. It also has no file extension, which makes it permanently
-   unreachable through the app's routing on its own (`trailingSlash: true`
-   appends a slash to any extensionless path). Re-uploading it through the
-   admin under `photo-1689659721022-3aa475803e19.jpeg` fixes both at once.
+**Media id 4 — closed for real on 18 Sep.** It was briefly retired that day by
+a decision to delete the post carrying it, which was reversed hours later, and
+then closed properly: an operator re-uploaded it through the admin as
+`photo-1689659721022-3aa475803e19.jpeg`, fixing both the missing bytes and the
+extensionless filename that `trailingSlash` made unreachable. See "Media id 4,
+closed for real this time" under Done. Nothing left in 0.4.
 
 **Two commands worth knowing before touching any of this.** Every SSH session
 needs the environment loaded first, or `$S3_*` are empty and tools fail in
@@ -1169,9 +1148,13 @@ Two things are still operator work, and neither can be done from a repository:
 
 See [`MCP_SERVER.md`](MCP_SERVER.md).
 
-1. **Members CSV.** Not included in the site archive already checked. Export
-   separately from Ghost Admin (Members → Settings → Export all members)
-   before migrating member records and Stripe IDs.
+1. **Members CSV — export done 18 Sep; the rest is decided, not merely
+   pending.** The export (Members → Settings → Export all members) is taken
+   and held off-server — see "Closed on 18 Sep" above. The Payload import
+   stays skipped by decision: Klaviyo is the ESP for anything list-shaped, not
+   Payload, so what remains is loading the held file into Klaviyo when the
+   newsletter is built (operator action, off the critical path to cancelling
+   Ghost since there are zero paying members). See [`EMAIL.md`](EMAIL.md).
 2. **Stripe webhook takeover (operator action).** Required before Ghost is
    cancelled — see `CUTOVER_RUNBOOK.md`'s "Paid subscriptions in Stripe"
    checklist and `SUBSCRIPTION_WEBHOOKS.md`. The code side is in place: the
