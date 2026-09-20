@@ -1,0 +1,150 @@
+/*
+ * The admin panel, wearing the publication's own colours.
+ *
+ * The CMS looked like a stock install of anything: the browser tab said
+ * "Payload" and the first screen after login was a grid of collection names in
+ * default grey. The site it publishes has a considered paper/ink/burgundy
+ * identity and a Playfair/Inter pairing, and none of it reached the place the
+ * work is actually done.
+ *
+ * Deliberately shallow. This sets Payload's own theme variables and styles one
+ * component of this project's own; it does not restyle Payload's controls,
+ * because every selector reaching into vendor internals is a thing that breaks
+ * on an upgrade for no reader-visible gain. The tokens are the same values as
+ * `app/globals.css` — copied rather than imported, because that file is the
+ * public site's stylesheet and pulling it in here would bring a whole design
+ * system into a page that wants eight colours.
+ */
+
+:root {
+  --bea-paper: #f6f2eb;
+  --bea-surface: #fffdf9;
+  --bea-ink: #1b1714;
+  --bea-muted: #6f665c;
+  --bea-burgundy: #6d1f2c;
+  --bea-burgundy-deep: #4c1420;
+  --bea-line: #e4ddd2;
+
+  /* Payload's own theme hooks, so the chrome follows without being overridden
+   * rule by rule. */
+  --theme-elevation-0: var(--bea-surface);
+  --theme-bg: var(--bea-paper);
+  --theme-text: var(--bea-ink);
+}
+
+/* Dark mode is left entirely to Payload. Inverting a paper-and-ink palette by
+ * hand produces a muddy near-black that matches neither the site nor the
+ * vendor's dark theme, and an editor who has chosen dark has chosen it for
+ * contrast reasons this file cannot second-guess. */
+
+/* --- The editorial dashboard panel ------------------------------------- */
+
+.bea-dash {
+  background: var(--bea-surface);
+  border: 1px solid var(--bea-line);
+  border-radius: 2px;
+  margin-block-end: 2rem;
+  padding: 1.75rem;
+}
+
+.bea-dash__head {
+  border-block-end: 1px solid var(--bea-line);
+  margin-block-end: 1.25rem;
+  padding-block-end: 1rem;
+}
+
+.bea-dash__title {
+  color: var(--bea-burgundy);
+  font-family: var(--font-playfair), Georgia, 'Times New Roman', serif;
+  font-size: 1.6rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  margin: 0;
+}
+
+.bea-dash__sub {
+  color: var(--bea-muted);
+  font-size: 0.875rem;
+  margin: 0.35rem 0 0;
+}
+
+.bea-dash__rows {
+  display: grid;
+  gap: 1.25rem 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.bea-dash__row {
+  margin: 0;
+}
+
+.bea-dash__link {
+  align-items: baseline;
+  color: inherit;
+  display: flex;
+  gap: 0.6rem;
+  text-decoration: none;
+}
+
+.bea-dash__link:hover .bea-dash__label,
+.bea-dash__link:focus-visible .bea-dash__label {
+  text-decoration: underline;
+}
+
+.bea-dash__count {
+  font-family: var(--font-playfair), Georgia, 'Times New Roman', serif;
+  font-size: 1.9rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* Colour carries emphasis, never meaning on its own: the hint below every row
+ * says what the number is, so this stays legible to a reader who cannot
+ * separate the two reds from the ink. */
+.bea-dash__link--wrong .bea-dash__count {
+  color: var(--bea-burgundy);
+}
+
+.bea-dash__link--waiting .bea-dash__count {
+  color: var(--bea-burgundy-deep);
+}
+
+.bea-dash__label {
+  color: var(--bea-ink);
+  font-size: 0.95rem;
+}
+
+.bea-dash__hint {
+  color: var(--bea-muted);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  margin: 0.3rem 0 0;
+  max-width: 34ch;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .bea-dash {
+    background: transparent;
+    border-color: color-mix(in srgb, var(--bea-line) 25%, transparent);
+  }
+
+  :root:not([data-theme='light']) .bea-dash__label,
+  :root:not([data-theme='light']) .bea-dash__title,
+  :root:not([data-theme='light']) .bea-dash__count {
+    color: inherit;
+  }
+}
+
+:root[data-theme='dark'] .bea-dash {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--bea-line) 25%, transparent);
+}
+
+:root[data-theme='dark'] .bea-dash__label,
+:root[data-theme='dark'] .bea-dash__title,
+:root[data-theme='dark'] .bea-dash__count {
+  color: inherit;
+}

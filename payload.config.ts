@@ -42,6 +42,24 @@ export default buildConfig({
   admin: {
     user: Users.slug,
     importMap: { baseDir: path.resolve(dirname) },
+    // The browser tab said "Payload", which is the name of the tool rather
+    // than of anything an editor is working on. Someone with the site, the
+    // admin and a preview open had three tabs and no way to tell two of them
+    // apart.
+    meta: {
+      titleSuffix: ' · Beyond Every Art',
+      description:
+        'Editorial CMS for Beyond Every Art — art, colour, materials and creative practice.',
+    },
+    // The publication's own palette lives in `app/(payload)/custom.css`, which
+    // the admin layout imports. Payload 3 has no `admin.css` key — a stylesheet
+    // is an import in the layout, not configuration.
+    components: {
+      // What needs an editor today, above the stock grid of collection names.
+      beforeDashboard: [
+        '/components/admin/EditorialDashboard#EditorialDashboard',
+      ],
+    },
     // Live Preview renders the real frontend in an iframe beside the editor.
     // Breakpoints match the widths the visual direction and the Playwright
     // projects already use, so what an editor checks is what is tested.
