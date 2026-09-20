@@ -1,6 +1,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 
+import { adClientFor } from '@/lib/ads/eligibility'
 import { attributionHref } from '@/lib/content/attribution'
 import { thumbnailSrc, type MediaImage } from '@/lib/content/media'
 import type {
@@ -71,6 +72,11 @@ export function Article({
   // this component already holds, and no other caller needs it.
   const headings = extractHeadings(post.body)
 
+  // One answer, used by the body and the rail, so the two can never disagree
+  // about whether this page carries ads. A restricted teaser carries none —
+  // docs/ADVERTISING.md §4.
+  const adClient = adClientFor({ restricted: post.restricted })
+
   return (
     <main>
       <article className="article">
@@ -118,6 +124,7 @@ export function Article({
               body={post.body}
               className={post.restricted ? 'prose prose--teaser' : 'prose'}
               preview={preview}
+              adClient={adClient}
               emptyMessage={
                 post.restricted
                   ? undefined

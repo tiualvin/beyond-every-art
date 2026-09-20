@@ -142,10 +142,26 @@ export function AdUnit({
     }
   }, [children])
 
-  const { width, height } = SLOT_SIZES[placement]
+  const size = SLOT_SIZES[placement]
+  // Google's two shapes. A fixed unit is sized by its own inline style; a
+  // fluid one is sized by the creative, and is told which layout to use.
+  const insProps =
+    size.kind === 'fixed'
+      ? {
+          style: {
+            display: 'inline-block',
+            width: size.width,
+            height: size.height,
+          },
+        }
+      : {
+          style: { display: 'block', textAlign: 'center' as const },
+          'data-ad-format': 'fluid',
+          'data-ad-layout': size.layout,
+        }
 
   return (
-    <div className="ad-slot" data-fill={fill}>
+    <div className="ad-slot" data-fill={fill} data-placement={placement}>
       {/* Hidden with the unit when nothing was served. Labelling the house
           promo below "Advertisement" would be both wrong and, since it is our
           own content, a claim we should not be making. */}
@@ -153,9 +169,9 @@ export function AdUnit({
       <ins
         ref={ref}
         className="adsbygoogle"
-        style={{ display: 'inline-block', width, height }}
         data-ad-client={client}
         data-ad-slot={AD_SLOTS[placement]}
+        {...insProps}
       />
       {children && <div className="ad-slot__fallback">{children}</div>}
     </div>

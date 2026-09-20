@@ -3391,6 +3391,47 @@ ol.feature-list__items .feature-list__title::before {
   vertical-align: top;
 }
 
+/* In-article units, repeated down the body — `lib/ads/inline.ts` decides how
+   many and where. The count follows the length of the piece: this archive
+   averages 4,800 words and reaches 7,899, which at the reading measure is
+   27,000px of scrolling, and one unit in thirty screens is a token rather
+   than a placement.
+
+   `min-height` before anything fills it, as everywhere else. It is a floor
+   rather than a promise here — Google's in-article format sizes itself to the
+   creative, so there is no maximum to reserve. A creative taller than this
+   still pushes the rest of the article down, which is the one place on the
+   site that trade is accepted, and it is accepted because the alternative is
+   a fixed unit that earns less. docs/ADVERTISING.md §8 records it. */
+.ad-slot[data-placement='article-inline'] {
+  min-height: 280px;
+  margin: 2.5rem 0;
+  /* The same rhythm a `.module` gets, because that is what this is from the
+     reader's point of view: something that is not the article, in the middle
+     of the article. */
+}
+
+.ad-slot[data-placement='article-inline'] .adsbygoogle {
+  min-height: 280px;
+}
+
+/* Every chunk of a split HTML body after the first.
+   
+   The drop cap targets `.prose > p:first-of-type`, and an HTML body has to be
+   split into one `.prose` per chunk because `dangerouslySetInnerHTML` needs an
+   element to hang on. Without this, every ad in a migrated article would be
+   followed by a 3.6em burgundy letter. Same property list as the rule that
+   does this for a body opening with a module, for the same reason. */
+.prose--continued > p:first-of-type::first-letter {
+  float: none;
+  font-size: inherit;
+  line-height: inherit;
+  font-weight: inherit;
+  color: inherit;
+  padding-right: 0;
+  margin-top: 0;
+}
+
 /* The ad box: the unit, its cap, and whatever goes there when no ad is served.
    `data-fill` is set by `AdUnit` once it knows — `pending` until then, so the
    fallback is never flashed over an ad that is still arriving.
