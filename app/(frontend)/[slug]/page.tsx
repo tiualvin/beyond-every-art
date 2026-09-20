@@ -12,7 +12,7 @@ import {
   type PostDetail,
 } from '@/lib/content/queries'
 import { shareImageSrc } from '@/lib/content/media'
-import { READ_NEXT_COUNT } from '@/lib/content/related'
+import { RELATED_QUERY_LIMIT, splitRelated } from '@/lib/content/related'
 import { logMissingRoute } from '@/lib/observability/missing-route'
 import { getPreviewMode } from '@/lib/preview/mode'
 import {
@@ -214,17 +214,18 @@ export default async function SlugPage({
   }
 
   const { post } = resolved
-  const [settings, readNext] = await Promise.all([
+  const [settings, related] = await Promise.all([
     getSiteSettings(),
-    // Three, which is what "Read next" shows. It was six while the rail took a
-    // second helping of the same query for its own list; that module is gone
-    // and every piece it showed already closed the article below it.
+    // Nine: three for "Read next" and up to six for the house boxes in the
+    // in-body ad slots. One query for both, divided below, so the two surfaces
+    // cannot show a reader the same piece twice — `lib/content/related.ts`.
     getRelatedPosts(
       post.slug,
       post.tags.map((tag) => tag.slug),
-      READ_NEXT_COUNT,
+      RELATED_QUERY_LIMIT,
     ),
   ])
+  const { readNext, inline: inlinePromos } = splitRelated(related)
   const siteUrl = getSiteUrl()
   const url = post.canonicalURL || absoluteUrl(postPath(post.slug), siteUrl)
 
@@ -262,6 +263,7 @@ export default async function SlugPage({
         post={post}
         newsletterImage={settings.newsletterImage}
         railFallback={settings.railFallback}
+        inlinePromos={inlinePromos}
         preview={draft}
       />
       <ReadNext posts={readNext} topic={post.tags[0]?.name} />
