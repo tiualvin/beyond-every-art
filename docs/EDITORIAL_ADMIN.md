@@ -14,6 +14,9 @@ made.
 Read this before changing the shape of an edit screen, adding a custom admin
 component, or touching anything under `components/admin/`.
 
+See [`assets/editorial-admin/`](assets/editorial-admin/README.md) for what each
+piece looks like, captured against a seeded instance.
+
 ## The rule that governs the layout
 
 **Presentation must not become schema.**
