@@ -8,7 +8,7 @@ import {
   getSiteSettings,
   getTagsWithCounts,
 } from '@/lib/content/queries'
-import { pigmentFor } from '@/lib/design/pigments'
+import { assignPigments, pigmentFor } from '@/lib/design/pigments'
 import { logMissingRoute } from '@/lib/observability/missing-route'
 import {
   recordSlugMiss,
@@ -64,11 +64,19 @@ export default async function TagPage({ params }: { params: Promise<Params> }) {
     notFound()
   }
 
-  const siblings = (await getTagsWithCounts())
+  const subjects = await getTagsWithCounts()
+  const siblings = subjects
     .filter((topic) => topic.slug !== archive.slug)
     .slice(0, SIBLING_TOPICS)
 
-  const pigment = pigmentFor(archive.slug)
+  // Assigned over every subject, not over the handful this page shows, so a
+  // topic is the same colour here as it is in the homepage chart. A tag with
+  // no published posts is not in that list at all — it still gets a colour,
+  // just an unreserved one, and it has no swatch to clash with.
+  const pigments = assignPigments(subjects.map((topic) => topic.slug))
+  const pigmentOf = (slug: string) => pigments.get(slug) ?? pigmentFor(slug)
+
+  const pigment = pigmentOf(archive.slug)
 
   // Ghost emitted `Series` on these; this emits `CollectionPage`, which is what
   // a tag archive actually is. See `lib/seo/jsonld.ts`.
@@ -143,7 +151,7 @@ export default async function TagPage({ params }: { params: Promise<Params> }) {
                   href={tagPath(topic.slug)}
                   className="chip"
                 >
-                  <i style={{ background: pigmentFor(topic.slug).hex }} />
+                  <i style={{ background: pigmentOf(topic.slug).hex }} />
                   {topic.name}
                   <span className="chip__count">{topic.postCount}</span>
                 </Link>

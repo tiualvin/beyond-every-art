@@ -2,7 +2,6 @@ import Image from 'next/image'
 import Link from 'next/link'
 
 import type { PostCard } from '@/lib/content/queries'
-import { plateFor } from '@/lib/design/pigments'
 import { formatDate } from '@/lib/format'
 import { visibilityLabel } from '@/lib/membership'
 import { postPath } from '@/lib/seo/site'
@@ -15,8 +14,8 @@ const THUMB_SIZES = '(max-width: 51rem) 4rem, 5.5rem'
  *
  * The image identifies a piece faster than an ordinal or a bare title does, and
  * unlike a hover preview it works the same on touch as it does with a cursor.
- * A piece with no featured image gets a wash of its subject's pigment rather
- * than an empty box — see `plateFor`.
+ * A piece with no featured image gets the burgundy placeholder wash rather than
+ * an empty box — `--plate-wash` in `app/globals.css`.
  */
 export function EntryRow({ post }: { post: PostCard }) {
   const primaryTag = post.tags[0]
@@ -41,14 +40,7 @@ export function EntryRow({ post }: { post: PostCard }) {
           />
         </span>
       ) : (
-        <span
-          className="entry__thumb plate-wash"
-          style={
-            {
-              '--plate': plateFor(primaryTag?.slug, post.slug).hex,
-            } as React.CSSProperties
-          }
-        />
+        <span className="entry__thumb plate-wash" />
       )}
 
       <div className="entry__body">

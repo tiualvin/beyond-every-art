@@ -22,6 +22,7 @@ import { OAuthClients } from './collections/OAuthClients'
 import { OAuthGrants } from './collections/OAuthGrants'
 import { Users } from './collections/Users'
 import { Footer } from './globals/Footer'
+import { Homepage } from './globals/Homepage'
 import { Header } from './globals/Header'
 import { SiteSettings } from './globals/SiteSettings'
 import { resendAdapter } from './lib/email/resend'
@@ -170,7 +171,7 @@ export default buildConfig({
   // Transactional email (admin password reset, verification). Omitted when
   // RESEND_API_KEY / EMAIL_FROM_ADDRESS are unset so local dev and CI still boot.
   ...(email ? { email } : {}),
-  globals: [SiteSettings, Header, Footer],
+  globals: [SiteSettings, Header, Footer, Homepage],
   plugins: [
     // Always registered: the plugin keeps its API-key collection when disabled,
     // so the database schema does not change with MCP_ENABLED. Whether the

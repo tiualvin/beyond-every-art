@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 
 import type { TopicCard } from '@/lib/content/queries'
-import { pigmentFor, textOn } from '@/lib/design/pigments'
+import { assignPigments, pigmentFor, textOn } from '@/lib/design/pigments'
 import { tagPath } from '@/lib/seo/site'
 
 /** Floor, so the smallest subject still reads as a field of paint. */
@@ -110,6 +110,10 @@ function useDrawnOnScroll(
 export function TopicSwatches({ topics }: { topics: TopicCard[] }) {
   const gridRef = useRef<HTMLDivElement>(null)
   const max = Math.max(...topics.map((topic) => topic.postCount), 1)
+  // Assigned across the whole row rather than per swatch: hashing each slug on
+  // its own gave four of the eight live subjects the same cream. See
+  // `assignPigments`.
+  const pigments = assignPigments(topics.map((topic) => topic.slug))
 
   useLabelFloor(gridRef)
   const { drawn, staggering } = useDrawnOnScroll(gridRef, topics.length)
@@ -121,7 +125,7 @@ export function TopicSwatches({ topics }: { topics: TopicCard[] }) {
       data-drawing={staggering || undefined}
     >
       {topics.map((topic, index) => {
-        const pigment = pigmentFor(topic.slug)
+        const pigment = pigments.get(topic.slug) ?? pigmentFor(topic.slug)
         const fill = MIN_FILL + (topic.postCount / max) * FILL_RANGE
 
         return (

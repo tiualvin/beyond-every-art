@@ -18,7 +18,12 @@ export const PREVIEW_COLLECTIONS = ['posts', 'pages', 'apps'] as const
  * nav you just saved, in place, without leaving the panel, is the part that was
  * missing and the part this gives.
  */
-export const PREVIEW_GLOBALS = ['header', 'footer', 'site-settings'] as const
+export const PREVIEW_GLOBALS = [
+  'header',
+  'footer',
+  'site-settings',
+  'homepage',
+] as const
 
 export type PreviewGlobal = (typeof PREVIEW_GLOBALS)[number]
 
