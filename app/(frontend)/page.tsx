@@ -29,6 +29,7 @@ import {
 } from '@/lib/seo/site'
 
 import { CoverField } from './components/cover-field'
+import { HomepageNewsletter } from './components/homepage-newsletter'
 import { Opening } from './components/opening'
 import { Pairing } from './components/pairing'
 import { EntryRow } from './components/entry-row'
@@ -202,6 +203,11 @@ export default async function HomePage() {
           </div>
         </section>
       )}
+
+      {/* ── Subscribe ──
+          Replaces the site-wide band here; `NewsletterBand` stands down on
+          this path so the page carries one email field, not two. */}
+      <HomepageNewsletter />
     </main>
   )
 }

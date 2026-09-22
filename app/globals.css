@@ -1890,6 +1890,117 @@ img {
   }
 }
 
+/* --- Homepage signup ---------------------------------------------------- */
+
+/* The homepage's own close. The shared band is right for an article foot and
+   wrong for the front door — see `HomepageNewsletter`. Same burgundy ground so
+   the page still ends where it always did, more room because this one is the
+   page's second job rather than a footer ornament. */
+.home-signup {
+  background: var(--color-burgundy);
+  color: var(--color-on-dark);
+  padding: 4rem 0;
+}
+
+.home-signup__inner {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 4rem;
+  align-items: center;
+}
+
+.home-signup__title {
+  font-size: clamp(1.6rem, 3.2vw, 2.4rem);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  color: var(--color-on-dark);
+  margin: 0.85rem 0 0.9rem;
+}
+
+.home-signup__body {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.55;
+  color: color-mix(in srgb, var(--color-on-dark) 84%, transparent);
+  max-width: 46ch;
+}
+
+.home-signup__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.home-signup__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: color-mix(in srgb, var(--color-on-dark) 90%, transparent);
+}
+
+.home-signup__row {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.home-signup__input {
+  flex-grow: 1;
+  min-width: 0;
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--color-on-dark) 45%, transparent);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--color-dark) 28%, transparent);
+  color: var(--color-on-dark);
+}
+
+.home-signup__input::placeholder {
+  color: color-mix(in srgb, var(--color-on-dark) 55%, transparent);
+}
+
+.home-signup__btn {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 0.8rem 1.4rem;
+  border: 1px solid var(--color-on-dark);
+  border-radius: var(--radius);
+  background: var(--color-on-dark);
+  color: var(--color-burgundy-deep);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.home-signup__btn:hover {
+  background: transparent;
+  color: var(--color-on-dark);
+}
+
+.home-signup__small {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--color-on-dark) 74%, transparent);
+}
+
+@media (max-width: 51rem) {
+  .home-signup__inner {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .home-signup__btn {
+    transition:
+      background-color 0.2s ease,
+      color 0.2s ease;
+  }
+}
+
 /* --- Footer ------------------------------------------------------------- */
 
 .site-footer {
