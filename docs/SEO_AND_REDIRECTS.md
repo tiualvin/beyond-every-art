@@ -229,6 +229,74 @@ one the server is bound to. That is the assertion the old test could not make �
 under Playwright the bind address is the address the test dialled, so a redirect
 built the wrong way still pointed somewhere that worked.
 
+### Retiring or merging a tag
+
+A tag archive is a migrated URL like any other. `/tag/<slug>/` came from Ghost,
+it is in the sitemap whenever the tag has a published post (`listableTags` in
+`lib/seo/sitemap.ts`), and it may carry inbound links — so retiring a tag means
+a permanent redirect for its archive, never a URL that starts answering 404.
+Which tags go is therefore a decision about live URLs, and per `AGENTS.md` it is
+the owner's; no plan is committed until one is made.
+
+A retirement is three changes that have to land in order: the archive
+redirects, the posts filed under it move, and only then does the tag row go.
+`pnpm tags:apply` does them in that order from a committed plan:
+
+```json
+{
+  "$comment": "Why, for the reviewer.",
+  "merge": [{ "from": "old-slug", "into": "surviving-slug" }],
+  "retire": [{ "slug": "gone", "redirectTo": "/journal/", "ghostPages": 3 }],
+  "assign": { "a-post-slug": ["subject", "second-subject"] }
+}
+```
+
+`merge` moves a tag's posts to another and redirects its archive there.
+`retire` drops a tag from its posts and redirects its archive to `redirectTo`,
+which must be a site path ending in a slash. `ghostPages` is the highest
+`/tag/<slug>/page/N/` Ghost served — read it from the rehearsal's source crawl —
+and gets a row per page, because otherwise the built-in pagination rule sends
+those to the retired archive and they take two hops. `assign` gives a post its
+whole ordered tag list; the first is the card label.
+
+```bash
+docker compose run --rm \
+  -v "$PWD/.migration-reports:/app/.migration-reports" \
+  migrate pnpm tags:apply --plan <plan.json> --dry-run
+docker compose run --rm \
+  -v "$PWD/.migration-reports:/app/.migration-reports" \
+  migrate pnpm tags:apply --plan <plan.json> \
+    --site https://www.beyondeveryart.com --delete-retired
+```
+
+What it will not do, each decided in `lib/content/tag-plan.ts`:
+
+- **Retire half a tag.** Any post it cannot move safely blocks the whole tag:
+  no redirect, no post edits, no deletion.
+- **Leave a post without a subject.** A post that would end with no subject tag
+  — `featured` does not count — blocks the tag until the plan gives it one
+  under `assign`.
+- **Write a published post that has unpublished changes.** An update carries
+  one `_status`, and for that post it would be the draft's: the article would
+  come off the site. It is listed for an editor instead.
+- **Overwrite a redirect.** A row that already sends a retired archive
+  somewhere else blocks the tag. A row pointing _at_ a retired archive is
+  re-aimed at the new destination, so no chain forms.
+- **Move posts before the redirects are served.** Rows written from a script do
+  not purge the app's caches, so a new one can take about eleven minutes to be
+  served; the script asks `--site` until every retired archive answers `301`,
+  and stops without touching a post if it never does. A rerun picks up where it
+  stopped — every step plans to nothing once done.
+
+The dry run reports each post's tags before and after, the conflicts, the
+redirect rows, published posts left without a subject, and which topic swatches
+change colour: `assignPigments` assigns over the whole subject list, so a
+changed subject set repaints the swatches that collided with what was removed.
+Take a backup first, and do not run `migrate:ghost` afterwards — it would file
+the posts back under the retired tags. After a retirement, pass only surviving
+slugs to `validate:redirects --tag`: a retired archive now redirects, and its
+pagination probe would report a chain.
+
 ## URL structure
 
 ### The host
