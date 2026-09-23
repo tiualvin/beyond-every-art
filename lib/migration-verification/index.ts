@@ -7,5 +7,6 @@ export {
   targetDiscoveryPageBudget,
 } from './crawl'
 export { extractHtmlEvidence } from './html'
+export { parseStoredCrawl } from './replay'
 export { renderHumanReport } from './report'
 export type * from './types'

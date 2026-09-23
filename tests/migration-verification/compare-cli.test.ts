@@ -32,4 +32,54 @@ describe('migration comparator CLI', () => {
     expect(options.crawl.maxPages).toBe(400)
     expect(options.targetMaxPages).toBe(900)
   })
+
+  it('replays a stored source crawl in place of crawling a source origin', () => {
+    const options = parseArgs([
+      '--source-crawl',
+      'rehearsal/site-comparison.json',
+      '--target',
+      'https://target.example',
+    ])
+
+    expect(options.sourceCrawlPath).toBe('rehearsal/site-comparison.json')
+    expect(options.source).toBeUndefined()
+  })
+
+  it('refuses a source origin and a stored crawl together', () => {
+    expect(() =>
+      parseArgs([
+        '--source',
+        'https://source.example',
+        '--source-crawl',
+        'rehearsal/site-comparison.json',
+        '--target',
+        'https://target.example',
+      ]),
+    ).toThrow('not both')
+  })
+
+  it('refuses source-crawl settings that a replay would silently ignore', () => {
+    for (const [flag, value] of [
+      ['--seed', '/about/'],
+      ['--max-pages', '400'],
+      ['--source-basic-auth-env', 'SOURCE_AUTH'],
+    ]) {
+      expect(() =>
+        parseArgs([
+          '--source-crawl',
+          'rehearsal/site-comparison.json',
+          '--target',
+          'https://target.example',
+          flag,
+          value,
+        ]),
+      ).toThrow(`${flag} configures a source crawl`)
+    }
+  })
+
+  it('still requires one kind of source', () => {
+    expect(() => parseArgs(['--target', 'https://target.example'])).toThrow(
+      '--source-crawl <file>',
+    )
+  })
 })
