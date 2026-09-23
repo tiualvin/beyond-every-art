@@ -47,4 +47,29 @@ describe('renderHumanReport', () => {
     expect(renderHumanReport(report, 1)).toContain('... 1 more issues')
     expect(renderHumanReport(report, 1)).not.toContain('Second issue')
   })
+
+  it('says when the source was replayed rather than crawled', () => {
+    const report = {
+      ok: true,
+      sourceOrigin: 'https://www.example.com',
+      targetOrigin: 'https://www.example.com',
+      summary: {
+        sourcePages: 1,
+        targetPages: 1,
+        comparedPages: 1,
+        errors: 0,
+        warnings: 0,
+        sourceLimitReached: false,
+        targetLimitReached: false,
+      },
+      issues: [],
+      sourceReplayedFrom: 'rehearsal/site-comparison.json',
+      source: {} as ComparisonReport['source'],
+      target: {} as ComparisonReport['target'],
+    } satisfies ComparisonReport
+
+    expect(renderHumanReport(report)).toContain(
+      'Source: https://www.example.com (replayed from rehearsal/site-comparison.json, not crawled)',
+    )
+  })
 })

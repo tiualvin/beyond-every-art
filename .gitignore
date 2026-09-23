@@ -44,7 +44,14 @@ complete-site-archive*.zip
 !migrations/*.sql
 migration-report*.json
 /.migration-reports/
+# The 18 Sep crawl comparison was written here on the VPS, following an
+# example in the comparator docs, and nothing ignored it.
+/rehearsal/
 validation-report*.json
+redirect-validation*.json
+redirects-report*.json
+ghost-url-fix-report*.json
+content-repair-report*.json
 members-report*.json
 reconciliation-report*.json
 media-backfill-report*.json

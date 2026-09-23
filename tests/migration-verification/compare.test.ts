@@ -409,3 +409,75 @@ describe('content images beneath the chrome', () => {
     )
   })
 })
+
+describe('after cutover, when both sides share an origin', () => {
+  const ORIGIN = 'https://www.example.com'
+
+  function shared(overrides: Partial<PageEvidence>): CrawlResult {
+    return crawl(ORIGIN, [
+      page('/post/', {
+        requestedUrl: `${ORIGIN}/post/`,
+        finalUrl: `${ORIGIN}/post/`,
+        canonical: `${ORIGIN}/post/`,
+        ...overrides,
+      }),
+    ])
+  }
+
+  it('does not read every link and image on the site as legacy', () => {
+    const target = shared({
+      links: [
+        {
+          href: `${ORIGIN}/about/`,
+          internal: true,
+          path: '/about/',
+          rel: [],
+        },
+      ],
+      images: [
+        {
+          src: `${ORIGIN}/_next/image/?url=%2Fapi%2Fmedia%2Ffile%2Fa.jpg&w=3840&q=75`,
+          internal: true,
+          alt: '',
+        },
+      ],
+    })
+
+    const codes = compareCrawls(shared({}), target).issues.map(
+      (issue) => issue.code,
+    )
+    expect(codes).not.toContain('legacy_image_hotlink')
+    expect(codes).not.toContain('legacy_origin_link')
+  })
+
+  it("still catches an image requested from Ghost's media path", () => {
+    const direct = `${ORIGIN}/content/images/2026/02/a.jpg`
+    const optimised = `${ORIGIN}/_next/image/?url=%2Fcontent%2Fimages%2F2026%2F02%2Fb.jpg&w=3840&q=75`
+    const target = shared({
+      images: [
+        { src: direct, internal: true, alt: '' },
+        { src: optimised, internal: true, alt: '' },
+      ],
+    })
+
+    expect(compareCrawls(shared({}), target).issues).toContainEqual(
+      expect.objectContaining({
+        severity: 'error',
+        code: 'legacy_image_hotlink',
+        path: '/post/',
+        actual: [optimised, direct].sort(),
+      }),
+    )
+  })
+
+  it('records a replayed source in the report', () => {
+    const report = compareCrawls(shared({}), shared({}), {
+      sourceReplayedFrom: 'rehearsal/site-comparison.json',
+    })
+
+    expect(report.sourceReplayedFrom).toBe('rehearsal/site-comparison.json')
+    expect(compareCrawls(shared({}), shared({}))).not.toHaveProperty(
+      'sourceReplayedFrom',
+    )
+  })
+})

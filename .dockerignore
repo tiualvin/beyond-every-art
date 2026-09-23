@@ -10,6 +10,22 @@ ghost-export
 *.dump
 *.sql
 
+# The rest of what `.gitignore` keeps out of the repository as private, and the
+# run output operators write into the checkout on the VPS. The `migrate` stage
+# is `COPY . .`, so anything in the checkout that is not listed here is baked
+# into an image layer — where deleting the file from disk, or copying it off
+# the server and removing it, does not reach it. `ghost-archive/` alone is the
+# whole Ghost site archive, some 1,400 media files among it.
+ghost-archive
+ghost-content*.json
+ghost-members*.csv
+complete-site-archive*.zip
+rehearsal
+.migration-reports
+seo-baseline
+*-report*.json
+redirect-validation*.json
+
 # Payload's generated import map, which must never reach a build.
 #
 # `layout.tsx` and the admin page import `./admin/importMap` with no extension,

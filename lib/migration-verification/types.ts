@@ -83,6 +83,8 @@ export interface ComparisonReport {
     targetLimitReached: boolean
   }
   issues: ComparisonIssue[]
+  /** Set when the source was read from an earlier report rather than crawled. */
+  sourceReplayedFrom?: string
   source: CrawlResult
   target: CrawlResult
 }
@@ -94,4 +96,9 @@ export interface ComparisonOptions {
    * only this intentional indexing/crawl polarity on both sides.
    */
   allowTargetNoindex?: boolean
+  /**
+   * Where a replayed source crawl came from, recorded in the report so a replay
+   * is never read as a live crawl of the old site. See `parseStoredCrawl`.
+   */
+  sourceReplayedFrom?: string
 }
