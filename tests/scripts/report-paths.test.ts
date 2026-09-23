@@ -63,3 +63,37 @@ describe('default report paths', () => {
     expect(isIgnored('rehearsal/site-comparison.json')).toBe(true)
   })
 })
+
+describe('the migrate image', () => {
+  // `.dockerignore` patterns are relative to the build context and match from
+  // its root; a directory entry excludes everything beneath it.
+  const patterns = readFileSync(join(process.cwd(), '.dockerignore'), 'utf8')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'))
+  const excluded = (path: string) =>
+    patterns.some((pattern) => {
+      const regex = new RegExp(
+        `^${pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*')}(/.*)?$`,
+      )
+      return regex.test(path)
+    })
+
+  it('still copies the source it needs', () => {
+    // The positive control: a matcher that excluded everything would pass the
+    // test below.
+    expect(excluded('lib/content/tag-plan.ts')).toBe(false)
+    expect(excluded('scripts/apply-tag-plan.ts')).toBe(false)
+  })
+
+  it.each([
+    ...defaultReportPaths().map(({ path }) => path),
+    'rehearsal/site-comparison.json',
+    'ghost-archive/content/images/2026/02/a.jpg',
+    'ghost-content.json',
+    'ghost-members.csv',
+    'seo-baseline/search-console-pages-20260901.csv',
+  ])('does not bake %s into an image layer', (path) => {
+    expect(excluded(path)).toBe(true)
+  })
+})
