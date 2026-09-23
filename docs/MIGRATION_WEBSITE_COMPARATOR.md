@@ -127,6 +127,44 @@ themes, so a difference of one is ordinary and only an eye can judge the rest.
 Read it as a list of pages to look at, not as a gate. A crawl too small to tell
 a template from a coincidence subtracts nothing rather than guessing.
 
+## After cutover: replaying the source
+
+Once DNS moves, the old site is no longer anywhere a crawler can reach. The
+domain answers from the new site, and Ghost(Pro) answers its own hostname with a
+redirect back to the domain for every public path — a crawl of it records one
+out-of-scope redirect per seed, discovers nothing, and fails without having
+compared a single page.
+
+So the source is read back from the last crawl that could see it. Every JSON
+report keeps the whole source crawl under `.source`, and `--source-crawl`
+compares that against a fresh target crawl instead of crawling a source:
+
+```bash
+pnpm migration:compare \
+  --source-crawl rehearsal/site-comparison.json \
+  --target https://www.example.com
+```
+
+The target is seeded with every source path exactly as in a live run, and the
+report states that the source was replayed so it is never taken for a live
+crawl. `parseStoredCrawl` (`lib/migration-verification/replay.ts`) refuses a
+file with no pages, a source origin that is not a bare origin, or a crawl that
+hit its page cap — live, that last one is an error, and a replay must not turn
+it into evidence. `--seed`, `--max-pages` and `--source-basic-auth-env` only
+shape a source crawl, so they are refused alongside `--source-crawl` rather than
+quietly ignored; `--target-max-pages` still sets the target's budget.
+
+**Two checks change meaning when both sides share an origin**, which after
+cutover they do. `legacy_origin_link` is skipped: every link on the new site
+points at the old site's origin, because it is the same one. `legacy_image_hotlink`
+keeps its purpose by becoming a path — an image still requested from Ghost's
+`/content/images/`, directly or through `next/image`, which nothing on this site
+serves.
+
+The production run itself — what to check first, the exact command, and the
+findings to expect — is in
+[`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md) §6, "The production run".
+
 This comparator complements rather than replaces manual rendering checks,
 Payload admin/draft checks, sitemap/RSS validation, backup restoration, or
 post-cutover monitoring described in `docs/MIGRATION_REHEARSAL.md`.

@@ -51,6 +51,17 @@ the box reboot. (PRs #150 and #154, both listed here originally, merged later
 the same day — the js-yaml override bump and a Dependabot payload-group
 update.)
 
+**The crawl comparison cannot crawl Ghost any more** (found 22 Sep). Its own
+hostname redirects every public path back to this site, so the run replays the
+18 Sep crawl of Ghost kept in `rehearsal/site-comparison.json` on the VPS —
+procedure and expected findings in
+[`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md) §6, "The production run".
+**Copy that file off the server first**: it is now the only record of what the
+old site served, and it must be in hand before Ghost is cancelled. The same
+finding corrects [`CUTOVER_DAY.md`](CUTOVER_DAY.md)'s rollback note, which
+said Ghost serves at its own hostname; whether it still answers for the domain
+has not been checked since the flip, and that section has the one-line check.
+
 ---
 
 Previously, last worked on **18 Sep 2026**, and it was a long day: four merges (#156, #157,
