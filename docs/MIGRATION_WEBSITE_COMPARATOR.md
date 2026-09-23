@@ -19,8 +19,8 @@ pnpm migration:compare \
   --source https://legacy.example.com \
   --target https://staging.example.com \
   --allow-target-noindex \
-  --json rehearsal/site-comparison.json \
-  --report rehearsal/site-comparison.txt
+  --json .migration-reports/staging-comparison.json \
+  --report .migration-reports/staging-comparison.txt
 ```
 
 The default limits are four concurrent requests, 500 source pages, 1,000 target
