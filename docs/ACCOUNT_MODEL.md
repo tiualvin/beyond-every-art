@@ -10,7 +10,8 @@ the Phase 1 data model stays compatible with it.
 
 The one item with a real deadline is
 [taking over Stripe's webhooks](#stripe-webhooks-at-ghost-shutdown), which must
-happen before Ghost is switched off. Implementation guidance for all three
+happen before the website takes its first subscription — and before Ghost is
+switched off, if any exists by then. Implementation guidance for all three
 billing sources is in [`SUBSCRIPTION_WEBHOOKS.md`](SUBSCRIPTION_WEBHOOKS.md).
 
 ## The goal
@@ -157,10 +158,12 @@ archived member (see `collections/Members.ts`), which is what makes the handover
 possible: existing subscriptions can be matched to accounts by those IDs rather
 than re-derived.
 
-The steps, including the backfill and the reconciliation check that must happen
-before Ghost is cancelled, are in
+The steps, including the backfill and the reconciliation check, are in
 [`SUBSCRIPTION_WEBHOOKS.md`](SUBSCRIPTION_WEBHOOKS.md#taking-over-from-ghost),
-and the deadline is tracked in the [cutover runbook](CUTOVER_RUNBOOK.md).
+and the deadline is tracked in the
+[cutover runbook](CUTOVER_RUNBOOK.md#when-it-is-due): the first subscription
+sets it, not Ghost. The Stripe account has never held one, so while it stays
+empty Ghost can be cancelled with only its endpoint and its connection removed.
 
 ## What Phase 1 must not do
 
@@ -170,8 +173,8 @@ and the deadline is tracked in the [cutover runbook](CUTOVER_RUNBOOK.md).
   is actually scheduled.
 
 The Stripe webhook handover is the exception: it is billing continuity for
-subscribers who already exist, not app work, and it is due before Ghost is
-switched off.
+subscribers, not app work, and it is due before the first one — see the
+[cutover runbook](CUTOVER_RUNBOOK.md#when-it-is-due).
 
 Phase 1's obligations are already met: member records, their Stripe
 identifiers, and each post's `visibility` (`public`, `members`, `paid`) are all

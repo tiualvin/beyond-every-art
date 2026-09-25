@@ -204,9 +204,43 @@ payments. Nothing takes over automatically, so subscription state silently stops
 tracking reality from the moment Ghost is switched off.
 
 The endpoint and the reconciliation script exist (`POST /webhooks/stripe` and
-`pnpm reconcile:billing`); what follows is the operational handover. Work
-through it **before** cancelling Ghost — a difference found afterwards cannot be
-explained without a manual Stripe audit.
+`pnpm reconcile:billing`); what follows is the operational handover.
+
+#### When it is due
+
+The handover protects subscriptions, so the first subscription sets its
+deadline, not Ghost. Whichever of these comes first:
+
+- **Cancelling Ghost, if the Stripe account holds any subscription by then.**
+  Work through the whole checklist below before cancelling — a difference found
+  afterwards cannot be explained without a manual Stripe audit.
+- **Setting `NEXT_PUBLIC_CHECKOUT_URL_MONTHLY` or `_YEARLY`**, whether or not
+  Ghost is still running. Those links are what let this site take a
+  subscription, and since the flip they are the only way one can start: Ghost's
+  portal went with the domain on 19 Sep. That is why they are the checklist's
+  last item rather than a step of their own.
+
+The account has never held one — zero customers, subscriptions and charges when
+last checked ([`SUBSCRIPTION_WEBHOOKS.md`](SUBSCRIPTION_WEBHOOKS.md#taking-over-from-ghost)).
+**If it is still empty when Ghost is cancelled, cancelling needs these three
+things and not the checklist:**
+
+1. Confirm it in the Stripe dashboard: customers, subscriptions and payments all
+   empty. Anything there, and the first case above applies instead.
+2. Delete Ghost's webhook endpoint
+   (`https://www.beyondeveryart.com/members/webhooks/stripe/`). Since the flip
+   it answers 404 from this site, which is harmless only while nothing fires.
+3. Disconnect Stripe in Ghost Admin, so the account stops carrying a connection
+   to a service that is about to be gone.
+
+The checklist then waits for paid membership to open.
+
+Reconciled 25 Sep. Until then this section required the whole checklist before
+cancelling Ghost, while `DEPLOYMENT_STATUS.md` had called it off that critical
+path since 27 Aug. Both were reasoning from the same empty account; the rule
+above is the one each was reaching for.
+
+#### The handover
 
 - [ ] `STRIPE_WEBHOOK_SECRET` and `STRIPE_SECRET_KEY` set in the production
       environment file. Without the first, the endpoint refuses every request;
@@ -218,8 +252,9 @@ explained without a manual Stripe audit.
       [`SUBSCRIPTION_WEBHOOKS.md`](SUBSCRIPTION_WEBHOOKS.md#stripe-website).
       Without it the endpoint answers 308, and that is a silent billing
       failure: see the note in that document.
-- [ ] Ghost's own endpoint deleted from the Stripe account — **last**, once
-      ours is verified. Since the flip its URL
+- [ ] Ghost's own endpoint deleted from the Stripe account, once ours is
+      verified — unless the three steps above already removed it at
+      cancellation. Since the flip its URL
       (`https://www.beyondeveryart.com/members/webhooks/stripe/`) resolves to
       this site rather than to Ghost, and answers 404. Confirmed 19 Sep.
 - [ ] Endpoint subscribed to `invoice.paid` — **not** `invoice.payment_succeeded`,
@@ -237,13 +272,6 @@ explained without a manual Stripe audit.
       is the reason to be careful rather than relaxed: point a live endpoint at
       staging and live billing events land in the rehearsal database. Verify
       against a sandbox endpoint, or after cutover, not against live-on-staging.
-- [ ] Checkout links present **at image build time**, not merely in `.env`.
-      `NEXT_PUBLIC_CHECKOUT_URL_MONTHLY` / `_YEARLY` are substituted into the
-      client bundle by `pnpm build`; docker-compose.yml passes them as build
-      arguments, so the deploy must run `docker compose up -d --build`. Setting
-      them and only restarting leaves the subscribe modal saying "paid
-      membership is not open yet" on a correctly configured host, with nothing
-      in the logs to say why.
 - [ ] Backfill dry run, via the `migrate` service:
       `docker compose run --rm migrate pnpm reconcile:billing --dry-run`.
       It lists Stripe's active, trialing, and past-due subscriptions and matches
@@ -272,7 +300,15 @@ explained without a manual Stripe audit.
       the container log; something has to be watching for it. This is the one
       part of the reconciliation the repository cannot ship for you, because it
       depends on where this deployment sends its alerts.
-- [ ] Only then: remove Ghost's Stripe connection.
+- [ ] Only then: remove Ghost's Stripe connection, if it is still there.
+- [ ] **Last:** checkout links present **at image build time**, not merely in
+      `.env`. These open paid membership, so nothing above may still be
+      outstanding when they go in. `NEXT_PUBLIC_CHECKOUT_URL_MONTHLY` /
+      `_YEARLY` are substituted into the client bundle by `pnpm build`;
+      docker-compose.yml passes them as build arguments, so the deploy must run
+      `docker compose up -d --build`. Setting them and only restarting leaves
+      the subscribe modal saying "paid membership is not open yet" on a
+      correctly configured host, with nothing in the logs to say why.
 
 Watch the app logs for `webhook_rejected` and `webhook_unresolved` JSON lines in
 the days around the switch:

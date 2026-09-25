@@ -46,10 +46,11 @@ Recorded with both candidate fixes in
 
 Still to do after the flip: submit the sitemap in Search Console, confirm GA4
 Realtime, run the production crawl comparison (which will now answer the
-`/about/` image question), the Stripe handover **before** cancelling Ghost, and
-the box reboot. (PRs #150 and #154, both listed here originally, merged later
-the same day — the js-yaml override bump and a Dependabot payload-group
-update.)
+`/about/` image question), Stripe **before** cancelling Ghost — only the
+three-step minimum while the account is empty, see
+[`CUTOVER_RUNBOOK.md`](CUTOVER_RUNBOOK.md#when-it-is-due) — and the box reboot.
+(PRs #150 and #154, both listed here originally, merged later the same day —
+the js-yaml override bump and a Dependabot payload-group update.)
 
 **The crawl comparison cannot crawl Ghost any more** (found 22 Sep). Its own
 hostname redirects every public path back to this site, so the run replays the
@@ -1166,9 +1167,15 @@ See [`MCP_SERVER.md`](MCP_SERVER.md).
    Payload, so what remains is loading the held file into Klaviyo when the
    newsletter is built (operator action, off the critical path to cancelling
    Ghost since there are zero paying members). See [`EMAIL.md`](EMAIL.md).
-2. **Stripe webhook takeover (operator action).** Required before Ghost is
-   cancelled — see `CUTOVER_RUNBOOK.md`'s "Paid subscriptions in Stripe"
-   checklist and `SUBSCRIPTION_WEBHOOKS.md`. The code side is in place: the
+2. **Stripe webhook takeover (operator action).** Due before the first
+   subscription, which means before the checkout links are set — and before
+   Ghost is cancelled only if the account holds a subscription by then. While it
+   is empty, cancelling Ghost needs the three-step minimum instead. This item
+   used to say "required before Ghost is cancelled" while the 27 Aug entry above
+   called it off that critical path; reconciled 25 Sep in
+   [`CUTOVER_RUNBOOK.md`](CUTOVER_RUNBOOK.md#when-it-is-due), alongside the
+   "Paid subscriptions in Stripe" checklist, and in `SUBSCRIPTION_WEBHOOKS.md`.
+   The code side is in place: the
    endpoint, the reconciliation script, and now the `reconcile` service that
    runs the sweep nightly and emits `reconcile_ok` / `reconcile_failed` log
    lines. It stays inert until `STRIPE_SECRET_KEY` is set, so restart it after

@@ -361,9 +361,12 @@ If something later makes an import necessary, it is `migrate:ghost` **and**
   wordmark shipped on 18 Sep; the comparator now counts beneath the chrome and
   warns as `images_reduced`, so the production comparison after the flip will
   answer it. See [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md) §6.
-- Stripe handover, before **cancelling** Ghost rather than before the flip.
-  Re-check the account is still zero customers and zero subscriptions, and use
-  `invoice.paid` rather than `invoice.payment_succeeded`.
+- Stripe, before **cancelling** Ghost rather than before the flip. While the
+  account is still zero customers and zero subscriptions, that is only
+  confirming so, deleting Ghost's endpoint and disconnecting Stripe in Ghost
+  Admin; the full handover is due before the checkout links are set. See
+  [`CUTOVER_RUNBOOK.md`](CUTOVER_RUNBOOK.md#when-it-is-due), and use
+  `invoice.paid` rather than `invoice.payment_succeeded` when it comes.
 - Administrator password reset does not send mail, by decision. Recovery is
   `docker compose run --rm migrate pnpm bootstrap:admin` over SSH. See
   [`EMAIL.md`](EMAIL.md).

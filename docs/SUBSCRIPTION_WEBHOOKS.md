@@ -6,13 +6,14 @@ was refunded — from Stripe (website), the App Store, and Google Play.
 The account model this feeds is in [`ACCOUNT_MODEL.md`](ACCOUNT_MODEL.md): every
 source below resolves to one `subscriptionStatus` on one account record.
 
-**Stripe is the urgent one.** Ghost currently receives Stripe's webhooks, and
-when Ghost is switched off, nothing does — see
+**Stripe is the nearest one.** Ghost's endpoint is the only one on the account,
+and since the flip on 19 Sep its URL answers 404 from this site, so nothing
+receives Stripe's webhooks — see
 [Taking over from Ghost](#taking-over-from-ghost), which also records what the
 live Stripe account actually contained when last checked (as of 2026-08-18: no
 subscribers, so the handover is about not losing _future_ events rather than
-rescuing existing ones). The App Store and Play
-sections apply when the apps ship.
+rescuing existing ones, and it is due before the first of them). The App Store
+and Play sections apply when the apps ship.
 
 External specifics below (retry schedules, deadlines, free-tier limits) were
 accurate when written and are exactly the kind of detail providers change.
@@ -234,7 +235,16 @@ handling too. Select the events from the table above, not from Ghost's endpoint.
 > stops being harmless at the first subscription, so delete it as part of the
 > handover rather than leaving it pointed at a site that cannot serve it.
 
-Ghost owns this integration today. Before Ghost is cancelled:
+**When this is due** is set by the first subscription rather than by Ghost:
+before Ghost is cancelled if the account holds any subscription by then, and in
+every case before `NEXT_PUBLIC_CHECKOUT_URL_MONTHLY` or `_YEARLY` lets this site
+take one. While the account is still empty, cancelling Ghost needs only a
+confirmation that it is empty, the deletion of Ghost's endpoint, and
+disconnecting Stripe in Ghost Admin. The rule and its reasons are in
+[`CUTOVER_RUNBOOK.md`](CUTOVER_RUNBOOK.md#when-it-is-due), with the operational
+checklist.
+
+The handover itself:
 
 1. Create your own webhook endpoint in **your** Stripe account (the
    subscriptions live there already — Ghost connected to it, it did not own it).
