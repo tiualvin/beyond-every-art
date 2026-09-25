@@ -45,6 +45,11 @@ type Id = string | number
 
 /** A tag decision, as committed to the repository. */
 export type TagPlan = {
+  /**
+   * New subjects, created just before posts are filed under them. Each must be
+   * used by `assign`, or it would be an archive with nothing in it.
+   */
+  create?: { slug: string; name: string }[]
   /** Fold `from` into `into`: its posts move, its archive redirects there. */
   merge?: { from: string; into: string; ghostPages?: number }[]
   /** Retire a tag: its posts lose it, its archive redirects to `redirectTo`. */
@@ -115,6 +120,11 @@ export type TagPlanResult = {
   errors: string[]
   conflicts: Conflict[]
   /**
+   * Tags to create before posts move. Until they exist, posts refer to them by
+   * a placeholder id (`isPendingTagId`), so a run creates them and plans again.
+   */
+  creates: { slug: string; name: string }[]
+  /**
    * Retiring tags that will actually be retired this run, with every archive
    * path that must redirect before any post is touched.
    */
@@ -143,6 +153,16 @@ export type TagPlanResult = {
 
 /** 301, as the built-in Ghost rules and the importer both use. */
 export const RETIRED_TAG_STATUS = '301'
+
+const PENDING_TAG_ID = 'new:'
+
+/** Whether an id stands for a tag the plan creates but that does not exist yet. */
+export function isPendingTagId(id: Id): boolean {
+  return String(id).startsWith(PENDING_TAG_ID)
+}
+
+/** A slug as `slugField` makes them: lowercase words joined by hyphens. */
+const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
 function unique<T>(values: readonly T[]): T[] {
   return [...new Set(values)]
@@ -177,15 +197,46 @@ export function planTagChanges(input: {
   posts: readonly PlanPost[]
   redirects: readonly PlanRedirect[]
 }): TagPlanResult {
-  const { plan, tags, posts, redirects } = input
-  const bySlug = new Map(tags.map((tag) => [tag.slug, tag]))
-  const byId = new Map(tags.map((tag) => [String(tag.id), tag]))
-  const slugOf = (id: Id) => byId.get(String(id))?.slug ?? `#${String(id)}`
-
+  const { plan, posts, redirects } = input
   const errors: string[] = []
   const merges = plan.merge ?? []
   const retirements = plan.retire ?? []
   const assign = plan.assign ?? {}
+
+  // Tags the plan creates stand in under a placeholder id until they exist, so
+  // everything below can treat them as tags. One that already exists under the
+  // same name is simply there — which is what a rerun sees.
+  const existingBySlug = new Map(input.tags.map((tag) => [tag.slug, tag]))
+  const creates: { slug: string; name: string }[] = []
+  for (const entry of plan.create ?? []) {
+    const existing = existingBySlug.get(entry.slug)
+    if (!SLUG.test(entry.slug)) {
+      errors.push(
+        `"${entry.slug}" is not a slug: lowercase words joined by hyphens`,
+      )
+    } else if (existing && existing.name !== entry.name) {
+      errors.push(
+        `"${entry.slug}" already exists, named "${existing.name}" rather than "${entry.name}"`,
+      )
+    } else if (!existing && !creates.some((c) => c.slug === entry.slug)) {
+      creates.push({ slug: entry.slug, name: entry.name })
+    }
+    if (!Object.values(assign).some((list) => list.includes(entry.slug))) {
+      errors.push(
+        `"${entry.slug}" is created but no post is assigned to it, which would publish an empty archive`,
+      )
+    }
+  }
+  const tags: readonly PlanTag[] = [
+    ...input.tags,
+    ...creates.map((entry) => ({
+      id: `${PENDING_TAG_ID}${entry.slug}`,
+      ...entry,
+    })),
+  ]
+  const bySlug = new Map(tags.map((tag) => [tag.slug, tag]))
+  const byId = new Map(tags.map((tag) => [String(tag.id), tag]))
+  const slugOf = (id: Id) => byId.get(String(id))?.slug ?? `#${String(id)}`
 
   // --- The plan on its own terms --------------------------------------------
 
@@ -199,6 +250,11 @@ export function planTagChanges(input: {
     errors.push(`"${slug}" is retired or merged more than once`)
   }
   const retiringSet = new Set(retiringSlugs)
+  for (const entry of plan.create ?? []) {
+    if (retiringSet.has(entry.slug)) {
+      errors.push(`"${entry.slug}" cannot be both created and retired`)
+    }
+  }
 
   for (const merge of merges) {
     if (merge.from === merge.into) {
@@ -273,6 +329,7 @@ export function planTagChanges(input: {
   const empty = (): TagPlanResult => ({
     errors,
     conflicts: [],
+    creates: [],
     retiring: [],
     blocked: [],
     redirects: [],
@@ -473,6 +530,7 @@ export function planTagChanges(input: {
   return {
     errors,
     conflicts,
+    creates,
     retiring: [...going].sort().map((slug) => ({
       slug,
       destination: destinationOf.get(slug)!,
@@ -514,13 +572,13 @@ export function parseTagPlan(value: unknown): TagPlan {
   }
   const record = value as Record<string, unknown>
   for (const key of Object.keys(record)) {
-    if (!['merge', 'retire', 'assign', '$comment'].includes(key)) {
+    if (!['create', 'merge', 'retire', 'assign', '$comment'].includes(key)) {
       fail(`unknown key "${key}"`)
     }
   }
   const isString = (item: unknown): item is string =>
     typeof item === 'string' && item.length > 0
-  const entries = (key: 'merge' | 'retire', fields: string[]) => {
+  const entries = (key: 'create' | 'merge' | 'retire', fields: string[]) => {
     const list = record[key]
     if (list === undefined) return
     if (!Array.isArray(list)) fail(`"${key}" must be a list`)
@@ -539,6 +597,7 @@ export function parseTagPlan(value: unknown): TagPlan {
       }
     }
   }
+  entries('create', ['slug', 'name'])
   entries('merge', ['from', 'into'])
   entries('retire', ['slug', 'redirectTo'])
   const assign = record.assign

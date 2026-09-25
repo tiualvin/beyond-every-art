@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  isPendingTagId,
   parseTagPlan,
   planTagChanges,
   remainingReferences,
@@ -467,5 +468,89 @@ describe('parseTagPlan', () => {
       'lists of tag slugs',
     )
     expect(() => parseTagPlan([])).toThrow('JSON object')
+  })
+})
+
+describe('creating a subject', () => {
+  const CREATE: TagPlan = {
+    create: [{ slug: 'ways-of-seeing', name: 'Ways of Seeing' }],
+    retire: [{ slug: 'art', redirectTo: '/journal/' }],
+    assign: { 'art-only': ['ways-of-seeing'] },
+  }
+
+  it('files posts under it before it exists, by a placeholder the run replaces', () => {
+    const result = plan(CREATE, [post(54, 'art-only', [7])])
+
+    expect(result.creates).toEqual([
+      { slug: 'ways-of-seeing', name: 'Ways of Seeing' },
+    ])
+    expect(result.posts[0]?.after).toEqual(['ways-of-seeing'])
+    expect(result.posts[0]?.afterIds.every(isPendingTagId)).toBe(true)
+    expect(result.pigments).toContainEqual(
+      expect.objectContaining({ slug: 'ways-of-seeing', from: null }),
+    )
+  })
+
+  it('creates nothing on a rerun, once the tag is there', () => {
+    const made: PlanTag = {
+      id: 11,
+      slug: 'ways-of-seeing',
+      name: 'Ways of Seeing',
+    }
+    const result = plan(
+      CREATE,
+      [post(54, 'art-only', [11])],
+      [],
+      [...TAGS, made],
+    )
+
+    expect(result.creates).toEqual([])
+    expect(result.posts).toEqual([])
+  })
+
+  it.each([
+    [
+      'a subject no post is filed under',
+      { create: [{ slug: 'collecting', name: 'Collecting' }] },
+      'empty archive',
+    ],
+    [
+      'a slug that is not one',
+      {
+        create: [{ slug: 'Ways of Seeing', name: 'Ways of Seeing' }],
+        assign: { red: ['palette'] },
+      },
+      'is not a slug',
+    ],
+    [
+      'an existing tag under another name',
+      {
+        create: [{ slug: 'palette', name: 'Colour' }],
+        assign: { red: ['palette'] },
+      },
+      'already exists',
+    ],
+    [
+      'a tag both created and retired',
+      {
+        create: [{ slug: 'collecting', name: 'Collecting' }],
+        retire: [{ slug: 'collecting', redirectTo: '/journal/' }],
+        assign: { red: ['collecting'] },
+      },
+      'both created and retired',
+    ],
+  ] as [string, TagPlan, string][])('refuses %s', (_, shape, message) => {
+    expect(plan(shape, [post(85, 'red', [7, 3])]).errors.join('\n')).toContain(
+      message,
+    )
+  })
+
+  it('is accepted in a plan file', () => {
+    expect(
+      parseTagPlan({ create: [{ slug: 'collecting', name: 'Collecting' }] }),
+    ).toEqual({ create: [{ slug: 'collecting', name: 'Collecting' }] })
+    expect(() => parseTagPlan({ create: [{ slug: 'collecting' }] })).toThrow(
+      '"name"',
+    )
   })
 })
