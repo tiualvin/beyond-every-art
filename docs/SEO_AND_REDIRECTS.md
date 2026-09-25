@@ -245,6 +245,7 @@ redirects, the posts filed under it move, and only then does the tag row go.
 ```json
 {
   "$comment": "Why, for the reviewer.",
+  "create": [{ "slug": "new-subject", "name": "New Subject" }],
   "merge": [{ "from": "old-slug", "into": "surviving-slug" }],
   "retire": [{ "slug": "gone", "redirectTo": "/journal/", "ghostPages": 3 }],
   "assign": { "a-post-slug": ["subject", "second-subject"] }
@@ -257,7 +258,11 @@ which must be a site path ending in a slash. `ghostPages` is the highest
 `/tag/<slug>/page/N/` Ghost served — read it from the rehearsal's source crawl —
 and gets a row per page, because otherwise the built-in pagination rule sends
 those to the retired archive and they take two hops. `assign` gives a post its
-whole ordered tag list; the first is the card label.
+whole ordered tag list; the first is the card label. `create` adds a subject
+for `assign` to use, and must be used by it — an unused one would be an empty
+archive. New tags are created after the redirects are served and just before
+posts move, so the empty archive is public for seconds; the dry run plans
+against placeholders until then.
 
 ```bash
 docker compose run --rm \

@@ -25,7 +25,9 @@
 // to it. Redirect rows written from here do not purge the application's caches
 // (`revalidateTag` only works inside the Next process), so a new row can take
 // up to the cached read's ten minutes plus the middleware's one to be served.
-// Rather than guess, the script asks the live site and waits.
+// Rather than guess, the script asks the live site and waits. Subjects the
+// plan creates are made only after that, then everything is planned again so
+// posts are written with the new tags' real ids.
 //
 // Writes go through `payload.update`, not SQL, so each post's version history
 // moves with it — the same reasoning as `fix-ghost-url-placeholders.ts` — and
@@ -215,6 +217,7 @@ async function load(payload: Payload): Promise<{
 
 function summarise(result: TagPlanResult): string {
   const lines = [
+    `Creating: ${result.creates.map((tag) => `${tag.slug} ("${tag.name}")`).join(', ') || '(none)'}`,
     `Retiring: ${result.retiring.map((tag) => `${tag.slug} -> ${tag.destination}`).join(', ') || '(none)'}`,
     `Blocked: ${result.blocked.join(', ') || '(none)'}`,
     `Redirects to create or re-aim: ${result.redirects.length} (already in place: ${result.redirectsInPlace.length})`,
@@ -331,11 +334,53 @@ async function main(): Promise<void> {
     report.redirectsConfirmedLive = true
   }
 
-  // 3. Posts, each re-read first so a post edited since the plan is skipped
+  // 3. The new subjects, created only now, so an archive with nothing in it is
+  //    public for seconds rather than for the redirect wait — then planned
+  //    again, so posts are filed under the real ids rather than placeholders.
+  let posts = result.posts
+  let baseline = loaded
+  if (result.creates.length > 0) {
+    const created: string[] = []
+    for (const entry of result.creates) {
+      try {
+        await payload.create({
+          collection: 'tags',
+          data: { name: entry.name, slug: entry.slug },
+          overrideAccess: true,
+        })
+        created.push(entry.slug)
+      } catch (error) {
+        errors.push(
+          `tag ${entry.slug}: ${error instanceof Error ? error.message : String(error)}`,
+        )
+      }
+    }
+    report.tagsCreated = created
+    if (errors.length > 0) return finish()
+
+    baseline = await load(payload)
+    const replanned = planTagChanges({ plan, ...baseline })
+    const slugs = (changes: typeof posts) =>
+      changes.map((change) => change.slug).join(',')
+    if (
+      replanned.errors.length > 0 ||
+      replanned.creates.length > 0 ||
+      slugs(replanned.posts) !== slugs(result.posts)
+    ) {
+      errors.push(
+        'The plan changed once the new tags existed, so no post was moved. Rerun: the tags are in place and it will plan from them.',
+      )
+      report.replanned = replanned
+      return finish()
+    }
+    posts = replanned.posts
+  }
+
+  // 4. Posts, each re-read first so a post edited since the plan is skipped
   //    rather than overwritten.
   const updated: string[] = []
   const skipped: { post: string; reason: string }[] = []
-  for (const change of result.posts) {
+  for (const change of posts) {
     try {
       const [latest, published] = (await Promise.all([
         payload.findByID({
@@ -353,7 +398,7 @@ async function main(): Promise<void> {
           overrideAccess: true,
         }),
       ])) as unknown as [RawDoc, RawDoc]
-      const planned = loaded.posts.find((post) => post.id === change.id)!
+      const planned = baseline.posts.find((post) => post.id === change.id)!
       const current = tagIds(latest).map(String).join(',')
       if (
         current !== planned.latest.tagIds.map(String).join(',') ||
@@ -386,12 +431,12 @@ async function main(): Promise<void> {
   report.postsUpdated = updated
   report.postsSkipped = skipped
 
-  // 4. Re-read everything rather than trusting the writes.
+  // 5. Re-read everything rather than trusting the writes.
   const after = await load(payload)
   const going = new Set(result.retiring.map((tag) => tag.slug))
   const remaining = remainingReferences(after.posts, after.tags, going)
   report.remainingReferences = remaining
-  for (const change of result.posts.filter((c) => updated.includes(c.slug))) {
+  for (const change of posts.filter((c) => updated.includes(c.slug))) {
     const post = after.posts.find((p) => p.id === change.id)
     const want = change.afterIds.map(String).join(',')
     for (const view of [post?.latest, post?.published]) {
@@ -407,7 +452,7 @@ async function main(): Promise<void> {
     )
   }
 
-  // 5. Only now, and only when asked, the tag rows themselves.
+  // 6. Only now, and only when asked, the tag rows themselves.
   if (cli.deleteRetired && errors.length === 0 && skipped.length === 0) {
     const deleted: string[] = []
     for (const tag of result.deletable) {
