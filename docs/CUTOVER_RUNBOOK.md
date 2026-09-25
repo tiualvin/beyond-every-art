@@ -196,6 +196,10 @@ Only after the new site has run cleanly in production, the crawl comparison is
 verified, backups have been tested, and the acceptance criteria in the handoff
 doc are met. Retain a final Ghost export and database backup off-site first.
 
+For this cutover, those conditions are a checklist with each item's state in
+[`DEPLOYMENT_STATUS.md`](DEPLOYMENT_STATUS.md#before-cancelling-ghost), split
+into what cannot be done once Ghost is gone and what is a judgement call.
+
 ### Paid subscriptions in Stripe
 
 Existing website subscriptions keep billing in Stripe after Ghost is gone, but

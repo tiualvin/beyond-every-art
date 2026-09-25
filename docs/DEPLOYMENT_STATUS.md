@@ -13,7 +13,8 @@ of the flip — [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md),
 ## Pick up here
 
 **The cutover happened on 19 Sep 2026. The site is live on Payload.** Ghost is
-still running and is still the rollback; do not cancel it yet.
+still running and is still the rollback; do not cancel it until
+[Before cancelling Ghost](#before-cancelling-ghost), below, is worked through.
 
 Verified on the day: `migrate:validate` green on a fresh export; both
 certificates issued over DNS-01 _before_ DNS moved, which is what made the
@@ -50,7 +51,8 @@ Realtime, run the production crawl comparison (which will now answer the
 three-step minimum while the account is empty, see
 [`CUTOVER_RUNBOOK.md`](CUTOVER_RUNBOOK.md#when-it-is-due) — and the box reboot.
 (PRs #150 and #154, both listed here originally, merged later the same day —
-the js-yaml override bump and a Dependabot payload-group update.)
+the js-yaml override bump and a Dependabot payload-group update.) All of these
+but the reboot are now on the checklist below.
 
 **The crawl comparison cannot crawl Ghost any more** (found 22 Sep). Its own
 hostname redirects every public path back to this site, so the run replays the
@@ -62,6 +64,65 @@ old site served, and it must be in hand before Ghost is cancelled. The same
 finding corrects [`CUTOVER_DAY.md`](CUTOVER_DAY.md)'s rollback note, which
 said Ghost serves at its own hostname; whether it still answers for the domain
 has not been checked since the flip, and that section has the one-line check.
+
+### Before cancelling Ghost
+
+Written 25 Sep, six days after the flip. **Nothing a reader sees changes when
+Ghost is cancelled.** DNS moved on 19 Sep, so everything that needed Ghost to
+serve the domain stopped then: its portal and member sign-ups, the Stripe
+webhook URL it registered, and any verification by `<meta>` tag — which is why
+Search Console and Meta were moved to DNS beforehand. Cancelling takes away
+three things: the rollback, Ghost Admin as the last place an export can come
+from, and Ghost's connection to Stripe.
+
+**Cannot be done once Ghost is gone:**
+
+- [ ] **`rehearsal/site-comparison.{json,txt}` copied off the VPS**, next to the
+      held members export and not under the backup bucket's pruned prefix. It
+      is the only record of what the old site rendered — see above.
+- [ ] **The production crawl comparison run and read.**
+      [`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md) §6, "The production
+      run", has the command and the findings to expect. It replays the 18 Sep
+      crawl rather than asking Ghost, so it would run just as well afterwards.
+      It belongs in this group because a regression it finds is one the
+      rollback can still answer, and because it settles the `/about/` image
+      question while Ghost Admin can still export anything the archive lacks.
+- [ ] **A final members export.** The held one is from 18 Sep, and Ghost served
+      the domain, portal included, until the flip on 19 Sep — so anyone who
+      joined in between is in no file you hold. Nobody can have joined Ghost
+      since (sign-ups on this site land in Payload's `newsletter-signups`), so
+      this is the last export needed. Keep it off-server with the first.
+- [ ] **Anything wanted from Ghost's own dashboards** — member growth,
+      newsletter open rates, per-post stats. Optional, but only now:
+      [`SEO_BASELINE_CAPTURE.md`](SEO_BASELINE_CAPTURE.md) is plain that what
+      is visible only in Ghost Admin cannot be recovered after cancelling.
+- [ ] **Stripe, the three-step minimum**: confirm the account is still empty,
+      delete Ghost's webhook endpoint, disconnect Stripe in Ghost Admin —
+      [`CUTOVER_RUNBOOK.md`](CUTOVER_RUNBOOK.md#when-it-is-due). If the account
+      holds anything at all, stop: the full handover comes first.
+
+**Judgement, not blockers:**
+
+- [ ] **The rollback checked.** The one-line `curl` in
+      [`CUTOVER_DAY.md`](CUTOVER_DAY.md) §3 has not been run since the flip.
+      Keeping Ghost is paying for that rollback, so find out whether it exists;
+      if it fails, fix it or accept that the wait below is not buying one.
+- [ ] **Search rankings settled.**
+      [`SEO_CUTOVER_RISK.md`](SEO_CUTOVER_RISK.md#reading-the-aftermath)
+      expects a few weeks of recrawl movement, and Ghost is the only rollback
+      that restores the old rankings rather than merely a site. Broad, shallow
+      and recovering is the signal to stop waiting; a drop concentrated on one
+      URL pattern is a reason to keep Ghost while it is diagnosed. Ghost's next
+      renewal date is the natural point to decide by.
+- [ ] **Sitemap submitted in Search Console, and GA4 Realtime confirmed** —
+      [`CUTOVER_DAY.md`](CUTOVER_DAY.md) §C, with no record here that either
+      was done. Neither needs Ghost; both are how the item above gets read.
+
+**After cancelling:** remove any records Ghost used to send mail from this
+domain — a domain has one SPF record, see [`EMAIL.md`](EMAIL.md#dns) — and the
+rollback lines above, which will then describe a site that no longer exists.
+With nothing left on this list, this file has done its job: its header says to
+update or delete it once cutover is complete.
 
 ---
 
