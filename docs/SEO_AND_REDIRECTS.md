@@ -160,7 +160,7 @@ docker compose run --rm \
   scripts/validate-redirects.ts \
   --target https://staging.beyondeveryart.com \
   --redirects-map https://cms.beyondeveryart.com/redirects-map/ \
-  --tag art --author alvin
+  --tag palette --author alvin
 ```
 
 Two details that cost a round each the first time:
@@ -236,7 +236,8 @@ it is in the sitemap whenever the tag has a published post (`listableTags` in
 `lib/seo/sitemap.ts`), and it may carry inbound links — so retiring a tag means
 a permanent redirect for its archive, never a URL that starts answering 404.
 Which tags go is therefore a decision about live URLs, and per `AGENTS.md` it is
-the owner's; no plan is committed until one is made.
+the owner's. The first plan, approved on 25 Sep, is
+`scripts/tag-plans/2026-09-taxonomy.json`; it has not been run yet.
 
 A retirement is three changes that have to land in order: the archive
 redirects, the posts filed under it move, and only then does the tag row go.
