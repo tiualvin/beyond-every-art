@@ -69,6 +69,11 @@ thing that may build a credit `href`: it refuses anything but https and adds
 referral parameters for Unsplash alone. Read that document before adding any
 image source, credit field, or agent-facing image search.
 
+[`docs/LLMS_TXT.md`](docs/LLMS_TXT.md) plans `/llms.txt` and the edge and Bing
+settings that decide AI-assistant visibility more than that file does. None of
+it is built. Read it before adding an AI-crawler rule to `robots.ts` or
+Cloudflare, or any machine-readable summary of the site's content.
+
 [`docs/AUTONOMOUS_WORKSTREAMS.md`](docs/AUTONOMOUS_WORKSTREAMS.md) defines the
 sequencing, shared invariants, ownership boundaries, and verification gates for
 the repository's launch-readiness automation workstreams.
