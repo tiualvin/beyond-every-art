@@ -150,6 +150,13 @@ describe('documentation file references', () => {
     // vendor. Nothing is built; the decisions in that document's last section
     // come first.
     'lib/stock/unsplash.ts',
+    // docs/AD_MANAGER.md §5: the files the switch from AdSense's tag to Google
+    // Ad Manager's would add — the network resolver, the key-value builder and
+    // the GPT loader. Planned; the console work in that document's §4 comes
+    // first, because it waits on Google.
+    'lib/ads/gam.ts',
+    'lib/ads/targeting.ts',
+    'app/(frontend)/components/gpt.tsx',
     // docs/ANALYTICS.md names this precisely because it does not exist. Next
     // reserves `next/script`'s `beforeInteractive` for the literal root
     // `app/layout.tsx`, and this application's roots are the two route-group
