@@ -1069,7 +1069,7 @@ to Cloudflare's published ranges, and the origin IP was confirmed timing out
 on both ports from outside the VPS while every hostname still serves. See
 "The origin is closed" under Pick up here.
 
-0.4. **Media loss and R2 — recovered on 22 Aug. One small step left.**
+0.4. **Media loss and R2 — recovered on 22 Aug, closed 18 Sep.**
 
 Recorded in full because the failure was invisible for three weeks and the
 recovery this note originally prescribed would not have worked.
