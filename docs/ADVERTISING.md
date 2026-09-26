@@ -24,6 +24,10 @@ now governs both — which is what §2 asked for and what §9's seam argument is
 built on. [`ANALYTICS.md`](ANALYTICS.md) has the placement, which took
 measuring.
 
+**Moving the built units to Google Ad Manager** — the traps specific to this
+site, the console setup, and the naming conventions for ad units, key-values
+and line items — is planned in [`AD_MANAGER.md`](AD_MANAGER.md). Not built.
+
 Related: [`CONTENT_SECURITY_POLICY.md`](CONTENT_SECURITY_POLICY.md),
 [`DEPLOYMENT_STATUS.md`](DEPLOYMENT_STATUS.md),
 [`ACCOUNT_MODEL.md`](ACCOUNT_MODEL.md),
