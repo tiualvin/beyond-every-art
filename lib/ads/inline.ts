@@ -105,6 +105,128 @@ export function planInlineBreaks(blocks: InlineBlock[]): number[] {
   return breaks
 }
 
+// --- Phones ----------------------------------------------------------------
+//
+// The gap above is sized for the desktop, where it is ~3 screens, and it is
+// the desktop that binds: the sticky rail unit is the second unit on every
+// desktop screen. A phone has neither constraint. It holds ~128 words a screen
+// rather than ~270, so the same 800 words is ~6 screens there, and it has no
+// rail unit at all. Phones were carrying half the density the rule allows, on
+// the device that brings close to half the traffic.
+//
+// So a phone gets a second tier of units, halfway between the desktop ones.
+// Everything a desktop or tablet renders is unchanged — the desktop plan is
+// computed first, by the function above, and never moved — and the phone-only
+// units are hidden from and never requested by anything wider.
+
+/**
+ * Words a phone-only unit aims to follow the unit before it by. Half the
+ * desktop gap, so on evenly written copy it lands exactly halfway — ~3 phone
+ * screens, the number a desktop reader scrolls between units.
+ */
+export const INLINE_MOBILE_GAP_WORDS = INLINE_GAP_WORDS / 2
+
+/**
+ * The least a phone-only unit may leave before the desktop unit after it.
+ *
+ * Less than the gap on purpose. The desktop units are fixed, so the window a
+ * phone unit can land in is only as wide as the desktop gap less two phone
+ * gaps — which on evenly written copy is a single boundary, and a heading or a
+ * figure there would drop the unit. Figure-heavy articles are the ones this
+ * archive has most of. So the unit may defer until this close to the next one.
+ *
+ * This, not the gap, is the phone's real minimum spacing, and it is the number
+ * `tests/design/article-layout.test.ts` holds to a phone screen at the widest
+ * column the tier allows, and to the 30% mobile density limit in the Better Ads
+ * Standards.
+ */
+export const INLINE_MOBILE_MIN_WORDS = 300
+
+/**
+ * The most units a phone reader meets in one article, both tiers together.
+ *
+ * Twelve at 400 words is the same statement six is at 800: it covers the mean
+ * article (4,800 words) exactly and caps the outlier.
+ */
+export const INLINE_MOBILE_MAX = 12
+
+/** `all` renders everywhere; `mobile` only where `MOBILE_MAX_WIDTH` allows. */
+export type InlineTier = 'all' | 'mobile'
+
+export type InlineSlotPlan = {
+  /** Index of the block the unit goes after. */
+  at: number
+  tier: InlineTier
+  /**
+   * Which house promo the slot shows if no ad is served.
+   *
+   * Desktop slots take the list from the top, in order, exactly as they did
+   * when they were the only slots, and the phone-only ones take what follows.
+   * So every slot a reader can see holds a different piece on every device.
+   */
+  promo: number
+}
+
+/**
+ * Every in-article slot, both tiers, in reading order.
+ *
+ * The `all` slots are `planInlineBreaks` verbatim. A `mobile` slot follows the
+ * same never-split rules, lands no sooner than `INLINE_MOBILE_GAP_WORDS` after
+ * the unit before it, and is dropped when the next desktop unit is closer than
+ * `INLINE_MOBILE_MIN_WORDS` — it gives way to the desktop plan rather than
+ * bunching against it.
+ */
+export function planInlineSlots(blocks: InlineBlock[]): InlineSlotPlan[] {
+  const desktop = planInlineBreaks(blocks)
+  const desktopAt = new Set(desktop)
+  const extraRoom = INLINE_MOBILE_MAX - desktop.length
+
+  const through: number[] = []
+  let running = 0
+  for (const block of blocks) {
+    running += block.words
+    through.push(running)
+  }
+
+  const slots: InlineSlotPlan[] = []
+  let due = INLINE_FIRST_WORDS
+  let desktopSeen = 0
+  let extras = 0
+
+  for (const [index, block] of blocks.entries()) {
+    const words = through[index]!
+
+    if (desktopAt.has(index)) {
+      slots.push({ at: index, tier: 'all', promo: desktopSeen })
+      desktopSeen += 1
+      due = words + INLINE_MOBILE_GAP_WORDS
+      continue
+    }
+
+    if (extras >= extraRoom) continue
+    if (words < due) continue
+    if (index === blocks.length - 1) continue
+    if (block.kind === 'heading' || block.kind === 'figure') continue
+
+    const next = desktop[desktopSeen]
+    if (next !== undefined && through[next]! - words < INLINE_MOBILE_MIN_WORDS)
+      continue
+
+    slots.push({ at: index, tier: 'mobile', promo: desktop.length + extras })
+    extras += 1
+    due = words + INLINE_MOBILE_GAP_WORDS
+  }
+
+  return slots
+}
+
+/**
+ * A body cut at its slots: `parts[i]`, then `slots[i]`, then `parts[i + 1]`.
+ *
+ * One more part than slots, always. No slots means the body came back whole.
+ */
+export type AdSplit<T> = { parts: T[]; slots: InlineSlotPlan[] }
+
 /** Tags that are a picture, or wrap one, for the never-split rule above. */
 const FIGURE_TAGS = new Set([
   'figure',
@@ -243,21 +365,21 @@ export function topLevelBlocks(html: string): HtmlBlock[] {
 }
 
 /**
- * A body split into the chunks an ad goes between.
+ * A body split into the chunks an ad goes between, and the slot at each cut.
  *
  * One chunk means no units: either the body is too short, or every legal
- * boundary was refused. Callers render chunk zero and then a unit before each
- * chunk after it.
+ * boundary was refused. Callers render chunk zero and then, before each chunk
+ * after it, the slot at the same index less one.
  */
-export function splitHtmlForAds(html: string): string[] {
+export function splitHtmlForAds(html: string): AdSplit<string> {
   const blocks = topLevelBlocks(html)
-  const breaks = planInlineBreaks(blocks)
-  if (breaks.length === 0) return [html]
+  const slots = planInlineSlots(blocks)
+  if (slots.length === 0) return { parts: [html], slots }
 
-  const chunks: string[] = []
+  const parts: string[] = []
   let from = 0
-  for (const at of breaks) {
-    chunks.push(
+  for (const { at } of slots) {
+    parts.push(
       blocks
         .slice(from, at + 1)
         .map((block) => block.html)
@@ -265,14 +387,14 @@ export function splitHtmlForAds(html: string): string[] {
     )
     from = at + 1
   }
-  chunks.push(
+  parts.push(
     blocks
       .slice(from)
       .map((block) => block.html)
       .join(''),
   )
 
-  return chunks
+  return { parts, slots }
 }
 
 // --- Lexical bodies --------------------------------------------------------
@@ -324,19 +446,21 @@ function nodeKind(node: BodyNode): InlineBlockKind {
  * to `RichText` unchanged — the root's own properties are carried across, since
  * a converter may read them.
  */
-export function splitLexicalForAds(body: BodyRoot): BodyRoot[] {
+export function splitLexicalForAds(body: BodyRoot): AdSplit<BodyRoot> {
   const nodes = body.root.children ?? []
-  const breaks = planInlineBreaks(
+  const slots = planInlineSlots(
     nodes.map((node) => ({ words: nodeWords(node), kind: nodeKind(node) })),
   )
-  if (breaks.length === 0) return [body]
+  if (slots.length === 0) return { parts: [body], slots }
 
+  // Never empty: the planner refuses the last node, so every cut has at least
+  // one node on each side of it.
   const parts: BodyRoot[] = []
   let from = 0
-  for (const at of [...breaks, nodes.length - 1]) {
+  for (const at of [...slots.map((slot) => slot.at), nodes.length - 1]) {
     parts.push({ root: { ...body.root, children: nodes.slice(from, at + 1) } })
     from = at + 1
   }
 
-  return parts.filter((part) => (part.root.children ?? []).length > 0)
+  return { parts, slots }
 }

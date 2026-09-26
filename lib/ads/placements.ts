@@ -91,6 +91,42 @@ export function minViewportWidth(placement: Placement): number | null {
   return SLOT_MIN_WIDTH[placement] ?? null
 }
 
+/**
+ * The widest viewport that still counts as a phone, in px, for the phone-only
+ * in-article tier (`planInlineSlots` in `lib/ads/inline.ts`).
+ *
+ * 30rem, the width `app/globals.css` hides `.ad-slot[data-tier='mobile']`
+ * above. Every phone in portrait is narrower — the widest is 440px. It is this
+ * narrow because the column widens with the viewport while the phone tier's
+ * spacing is fixed in words, so a wider limit is a denser page: at 35rem the
+ * widest column could fit two units in one tall phone screen, and at 48rem a
+ * small tablet in portrait (744 × 1133) would. The design test checks the
+ * number against the stylesheet, and the spacing at the widest column it
+ * allows.
+ */
+export const MOBILE_MAX_WIDTH = 480
+
+/**
+ * The media query a slot must match before it asks for an ad, or null for none.
+ *
+ * Two independent limits, because they come from two different things. The
+ * minimum is the placement's — the track it lives in (`rail-1`). The maximum is
+ * the tier's — a phone-only in-article unit is hidden above `MOBILE_MAX_WIDTH`,
+ * and hiding a box stops nothing in JavaScript.
+ */
+export function slotMediaQuery(
+  placement: Placement,
+  tier: 'all' | 'mobile' = 'all',
+): string | null {
+  const min = minViewportWidth(placement)
+  const parts = [
+    min === null ? null : `(min-width: ${min}px)`,
+    tier === 'mobile' ? `(max-width: ${MOBILE_MAX_WIDTH}px)` : null,
+  ].filter((part): part is string => part !== null)
+
+  return parts.length === 0 ? null : parts.join(' and ')
+}
+
 /** Google's slot id shape: digits, and nothing else that reaches an attribute. */
 const SLOT_ID = /^[0-9]{10}$/
 

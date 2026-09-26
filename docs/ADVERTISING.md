@@ -489,13 +489,13 @@ that slot's request is deferred to idle.
 
 ### Inventory
 
-| ID                         | Track / template     | Position                                          | Desktop | Mobile  | Reserved |
-| -------------------------- | -------------------- | ------------------------------------------------- | ------- | ------- | -------- |
-| `rail-1` **built**         | Rail, `/[slug]`      | Above the newsletter card, inside the sticky pair | 300×250 | —       | 250px    |
-| `article-inline` **built** | Text, `/[slug]`      | Repeated down the body, by length — see below     | fluid   | fluid   | 280px    |
-| `article-end`              | Block, `/[slug]`     | Below the author card, above Read Next            | 970×250 | 300×250 | 250px    |
-| `archive-inline`           | journal, tag, author | After every 6th entry row                         | 970×250 | 300×250 | 250px    |
-| `home-mid`                 | `/`                  | Between Featured and Topics                       | 970×250 | 300×250 | 250px    |
+| ID                         | Track / template     | Position                                          | Desktop | Mobile   | Reserved |
+| -------------------------- | -------------------- | ------------------------------------------------- | ------- | -------- | -------- |
+| `rail-1` **built**         | Rail, `/[slug]`      | Above the newsletter card, inside the sticky pair | 300×250 | —        | 250px    |
+| `article-inline` **built** | Text, `/[slug]`      | Repeated down the body, by length — see below     | fluid   | fluid ×2 | 280px    |
+| `article-end`              | Block, `/[slug]`     | Below the author card, above Read Next            | 970×250 | 300×250  | 250px    |
+| `archive-inline`           | journal, tag, author | After every 6th entry row                         | 970×250 | 300×250  | 250px    |
+| `home-mid`                 | `/`                  | Between Featured and Topics                       | 970×250 | 300×250  | 250px    |
 
 Five identified placements, of which **four should be live at launch**: all but
 `home-mid`. Two are, both with house content behind them, and `rail-1`'s
@@ -568,6 +568,57 @@ would put a third unit on a screen.
 `article-inline-2` and `-3` are retired as _names_: there is one placement
 inside the reading column, rendered as many times as the article is long,
 rather than three hand-placed slots.
+
+### Phones take a second tier
+
+The 800-word gap is right for the desktop and half as dense as it needs to be
+on a phone. A phone screen holds ~128 words of body copy against the desktop's
+~270, so 800 words is ~6 screens there rather than ~3 — and a phone has no rail
+unit, so the "two units per screen" rule has a whole unit of headroom it was
+not using. With phones near half the traffic, that was the largest piece of
+inventory the site was leaving on the table.
+
+So `planInlineSlots` in [`../lib/ads/inline.ts`](../lib/ads/inline.ts) adds a
+**phone-only unit halfway between each pair of desktop ones**: the same
+placement, the same AdSense slot, tagged `data-tier="mobile"`. Three decisions
+hold it together.
+
+- **The desktop plan does not move.** It is computed first, by the unchanged
+  `planInlineBreaks`, and the phone units are fitted around it. A desktop or
+  tablet renders byte for byte the body it rendered before; its house promos
+  are the same pieces in the same slots.
+- **Phone means 30rem and narrower.** `MOBILE_MAX_WIDTH` in
+  [`../lib/ads/placements.ts`](../lib/ads/placements.ts), mirrored by the
+  stylesheet, which hides the tier above it. The spacing is fixed in words and
+  the column widens with the viewport, so the limit _is_ the density: at 35rem
+  the widest column could fit two units in one tall phone screen, and at 48rem
+  so could a small tablet in portrait. Every phone in portrait is narrower than
+  480px. Above it the unit is hidden and, because `display: none` stops nothing
+  in JavaScript, never requested — the same guard `rail-1` has, pointed the
+  other way.
+- **It aims for the midpoint and settles for 300 words.** The desktop units are
+  fixed, so on evenly written copy the only boundary exactly 400 words from both
+  is one block. A heading or figure there would drop the unit, and this archive
+  is figure-heavy. So the unit lands 400 words after the one before it, may
+  defer until 300 words before the next, and is dropped only closer than that.
+
+**Twelve at most**, both tiers together, which covers the mean article at 400
+words exactly as six does at 800. The house-promo pool grew with it
+(`INLINE_PROMO_MAX` in [`../lib/content/related.ts`](../lib/content/related.ts)
+follows `INLINE_MOBILE_MAX`); desktop slots take the head of the list and phone
+slots the rest, so the phone slots are the ones that run short on a thin archive.
+
+[`../tests/design/article-layout.test.ts`](../tests/design/article-layout.test.ts)
+holds the tier to three numbers at the densest page it can produce — the widest
+column, the least spacing, the tallest phone: 300 words stand taller than a
+956px screen (about 1,150px of copy), the unit's whole footprint stays under the
+Better Ads Standards' 30% mobile density limit (about 25%), and the longest
+article keeps more than two phone screens per unit.
+
+**Measure it per tier.** The phone units share the AdSense slot, so AdSense
+reports them together with the desktop ones. Compare mobile RPM and mobile
+viewability before and after; under Ad Manager
+([`AD_MANAGER.md`](AD_MANAGER.md)) the `tier` key separates them properly.
 
 ### Rules that go with it
 

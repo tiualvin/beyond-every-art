@@ -5,8 +5,13 @@ import {
   INLINE_FIRST_WORDS,
   INLINE_GAP_WORDS,
   INLINE_MAX,
+  INLINE_MOBILE_GAP_WORDS,
+  INLINE_MOBILE_MAX,
+  INLINE_MOBILE_MIN_WORDS,
   planInlineBreaks,
+  planInlineSlots,
   splitHtmlForAds,
+  splitLexicalForAds,
   topLevelBlocks,
   type InlineBlock,
 } from '@/lib/ads/inline'
@@ -162,6 +167,107 @@ describe('topLevelBlocks', () => {
   })
 })
 
+describe('planInlineSlots', () => {
+  /** Running word count at the end of each block. */
+  const through = (blocks: InlineBlock[]) => {
+    let total = 0
+    return blocks.map((block) => (total += block.words))
+  }
+
+  // The promise that makes the phone tier safe to ship: nothing a desktop or
+  // tablet renders moves. Their slots are the old plan, verbatim.
+  it('keeps the desktop plan exactly as it was', () => {
+    for (const blocks of [text(20, 100), text(60, 100), text(400, 100)]) {
+      const all = planInlineSlots(blocks)
+        .filter((slot) => slot.tier === 'all')
+        .map((slot) => slot.at)
+      expect(all).toEqual(planInlineBreaks(blocks))
+    }
+  })
+
+  it('puts a phone-only unit halfway between each pair of desktop ones', () => {
+    const slots = planInlineSlots(text(60, 100))
+    const words = through(text(60, 100))
+    const at = slots.map((slot) => words[slot.at]!)
+    expect(at[0]).toBe(INLINE_FIRST_WORDS)
+    for (let i = 1; i < at.length; i++) {
+      expect(at[i]! - at[i - 1]!).toBe(INLINE_MOBILE_GAP_WORDS)
+    }
+    expect(slots.map((slot) => slot.tier)).toEqual([
+      'all',
+      'mobile',
+      'all',
+      'mobile',
+      'all',
+      'mobile',
+      'all',
+      'mobile',
+      'all',
+      'mobile',
+      'all',
+      'mobile',
+    ])
+  })
+
+  it('never lets two units on a phone come closer than the phone minimum', () => {
+    const blocks: InlineBlock[] = Array.from({ length: 120 }, (_, i) => ({
+      words: 40 + ((i * 37) % 90),
+      kind: i % 7 === 3 ? 'figure' : i % 11 === 5 ? 'heading' : 'text',
+    }))
+    const words = through(blocks)
+    const at = planInlineSlots(blocks).map((slot) => words[slot.at]!)
+
+    for (let i = 1; i < at.length; i++) {
+      expect(at[i]! - at[i - 1]!).toBeGreaterThanOrEqual(
+        INLINE_MOBILE_MIN_WORDS,
+      )
+    }
+  })
+
+  it('never exceeds the phone cap, however long the article', () => {
+    expect(planInlineSlots(text(400, 100))).toHaveLength(INLINE_MOBILE_MAX)
+  })
+
+  it('gives a phone-only unit the same never-split rules', () => {
+    // Desktop units at blocks 3 and 11; the phone unit is due at block 7,
+    // which is a heading, so it waits for block 8 — 300 words before the next
+    // desktop unit, which is still enough room.
+    const blocks = text(20, 100)
+    blocks[7] = { words: 100, kind: 'heading' }
+    const mobile = planInlineSlots(blocks).filter(
+      (slot) => slot.tier === 'mobile',
+    )
+    expect(mobile[0]!.at).toBe(8)
+  })
+
+  it('skips a phone unit rather than crowd the desktop unit after it', () => {
+    // Figures from 7 to 9 push the phone unit to block 10, one block before
+    // the desktop unit at 11 — 100 words, under the minimum. It is dropped.
+    const blocks = text(20, 100)
+    for (const i of [7, 8, 9]) blocks[i] = { words: 100, kind: 'figure' }
+    const slots = planInlineSlots(blocks)
+    expect(slots.slice(0, 2).map((slot) => slot.tier)).toEqual(['all', 'all'])
+  })
+
+  it('never puts a phone unit after the last block', () => {
+    const blocks = text(10, 100)
+    const slots = planInlineSlots(blocks)
+    expect(slots.every((slot) => slot.at < blocks.length - 1)).toBe(true)
+  })
+
+  // Desktop slots take the promos they always took, so the desktop page is
+  // unchanged here too; phone-only slots take what follows. Every slot a
+  // reader can see holds a different piece, on either device.
+  it('gives desktop slots the head of the promo list and phones the rest', () => {
+    const slots = planInlineSlots(text(60, 100))
+    const desktop = slots.filter((slot) => slot.tier === 'all')
+    const mobile = slots.filter((slot) => slot.tier === 'mobile')
+
+    expect(desktop.map((slot) => slot.promo)).toEqual([0, 1, 2, 3, 4, 5])
+    expect(mobile.map((slot) => slot.promo)).toEqual([6, 7, 8, 9, 10, 11])
+  })
+})
+
 describe('splitHtmlForAds', () => {
   const body = Array.from(
     { length: 60 },
@@ -172,23 +278,52 @@ describe('splitHtmlForAds', () => {
   // has to come out the other side unchanged. A split through the middle of a
   // tag is a broken page, and it is the failure this function is prone to.
   it('is lossless — the chunks rejoined are the original', () => {
-    expect(splitHtmlForAds(body).join('')).toBe(body)
+    expect(splitHtmlForAds(body).parts.join('')).toBe(body)
   })
 
   it('returns one chunk, unchanged, when nothing qualifies', () => {
-    expect(splitHtmlForAds('<p>short</p>')).toEqual(['<p>short</p>'])
+    expect(splitHtmlForAds('<p>short</p>')).toEqual({
+      parts: ['<p>short</p>'],
+      slots: [],
+    })
   })
 
   it('produces one more chunk than it does units', () => {
-    const chunks = splitHtmlForAds(body)
-    expect(chunks).toHaveLength(INLINE_MAX + 1)
+    const { parts, slots } = splitHtmlForAds(body)
+    expect(slots).toHaveLength(INLINE_MOBILE_MAX)
+    expect(parts).toHaveLength(slots.length + 1)
+    expect(slots.filter((slot) => slot.tier === 'all')).toHaveLength(INLINE_MAX)
   })
 
   it('never opens a chunk mid-element', () => {
-    for (const chunk of splitHtmlForAds(body)) {
+    for (const chunk of splitHtmlForAds(body).parts) {
       expect(chunk.startsWith('<p>')).toBe(true)
       expect(chunk.endsWith('</p>')).toBe(true)
     }
+  })
+})
+
+describe('splitLexicalForAds', () => {
+  const paragraph = (i: number) => ({
+    type: 'paragraph',
+    children: [{ type: 'text', text: `word${i} `.repeat(100) }],
+  })
+  const body = {
+    root: {
+      type: 'root',
+      children: Array.from({ length: 60 }, (_, i) => paragraph(i)),
+    },
+  }
+
+  it('cuts the node list at the same slots, losing nothing', () => {
+    const { parts, slots } = splitLexicalForAds(body as never)
+    expect(parts).toHaveLength(slots.length + 1)
+    expect(parts.flatMap((part) => part.root.children)).toEqual(
+      body.root.children,
+    )
+    expect(parts.every((part) => (part.root.children ?? []).length > 0)).toBe(
+      true,
+    )
   })
 })
 

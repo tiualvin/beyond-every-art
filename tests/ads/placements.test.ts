@@ -6,6 +6,8 @@ import { describe, expect, it } from 'vitest'
 import {
   AD_SLOTS,
   minViewportWidth,
+  MOBILE_MAX_WIDTH,
+  slotMediaQuery,
   reservedHeight,
   SLOT_SIZES,
   slotIdsAreWellFormed,
@@ -118,12 +120,30 @@ describe('a placement its track has hidden', () => {
 
     // Read from the placement rather than written into the component, so the
     // stylesheet, the placement and the push cannot disagree.
-    expect(unit).toMatch(/minViewportWidth\(placement\)/)
-    expect(unit).toMatch(/matchMedia\(`\(min-width: \$\{min\}px\)`\)/)
+    expect(unit).toMatch(/slotMediaQuery\(placement, tier\)/)
+    expect(unit).toMatch(/window\.matchMedia\(media\)/)
 
     // Watched, not read once: a window dragged wider brings the track back.
     expect(unit).toMatch(/addEventListener\('change'/)
     expect(unit).toMatch(/removeEventListener\('change'/)
+  })
+})
+
+describe('the phone-only tier', () => {
+  // The same bug the other way up: a phone-only unit is `display: none` above
+  // the phone breakpoint, and hiding it stops nothing in JavaScript.
+  it('asks for an ad only at phone width', () => {
+    expect(slotMediaQuery('article-inline', 'mobile')).toBe(
+      `(max-width: ${MOBILE_MAX_WIDTH}px)`,
+    )
+  })
+
+  it('leaves the ordinary in-article unit free to fill everywhere', () => {
+    expect(slotMediaQuery('article-inline')).toBeNull()
+  })
+
+  it('keeps the rail unit to the width its track needs', () => {
+    expect(slotMediaQuery('rail-1')).toBe('(min-width: 1280px)')
   })
 })
 

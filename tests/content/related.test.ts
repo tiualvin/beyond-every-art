@@ -3,7 +3,7 @@ import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { INLINE_MAX } from '../../lib/ads/inline'
+import { INLINE_MOBILE_MAX } from '../../lib/ads/inline'
 import {
   INLINE_PROMO_MAX,
   READ_NEXT_COUNT,
@@ -26,17 +26,18 @@ describe('related posts on a post page', () => {
   })
 
   // The same fact written once. Every in-body unit an article can carry is a
-  // unit that needs something to show when Google declines it, so a raised
-  // `INLINE_MAX` must raise the supply with it — otherwise the last slots on
+  // unit that needs something to show when Google declines it — and a phone
+  // carries the most, both tiers together — so a raised `INLINE_MOBILE_MAX`
+  // must raise the supply with it — otherwise the last slots on
   // the longest articles get a labelled empty box, silently.
   it('supplies one piece per in-body unit the body can carry', () => {
-    expect(INLINE_PROMO_MAX).toBe(INLINE_MAX)
+    expect(INLINE_PROMO_MAX).toBe(INLINE_MOBILE_MAX)
   })
 
   // The page asked for six while the rail took a second helping of the same
-  // query for its own list, and for three once that module went. Nine now,
-  // because it renders nine: three in "Read next" and up to six in the house
-  // boxes down the body. The invariant is the one it always was — ask for
+  // query for its own list, and for three once that module went. Fifteen now,
+  // because a phone renders fifteen: three in "Read next" and up to twelve in
+  // the house boxes down the body. The invariant is the one it always was — ask for
   // exactly what you render — and the number is derived here rather than
   // typed into the route, so raising the unit cap carries the query with it.
   it('asks the database for exactly what it renders', () => {
@@ -55,7 +56,7 @@ describe('related posts on a post page', () => {
     const { readNext, inline } = splitRelated(pool)
 
     expect(readNext).toEqual([0, 1, 2])
-    expect(inline).toEqual([3, 4, 5, 6, 7, 8])
+    expect(inline).toEqual([3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
     expect(readNext.concat(inline)).toEqual(pool)
     expect(inline.filter((item) => readNext.includes(item))).toEqual([])
   })

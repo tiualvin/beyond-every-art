@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react'
 
+import type { InlineTier } from '@/lib/ads/inline'
 import {
   AD_SLOTS,
-  minViewportWidth,
   SLOT_SIZES,
+  slotMediaQuery,
   type Placement,
 } from '@/lib/ads/placements'
 
@@ -48,7 +49,9 @@ declare global {
  * at all to this effect — so without a guard every phone that loads an article
  * requests an ad for a slot no reader will ever see. The placement carries the
  * breakpoint (`minViewportWidth`) and the push waits on a `matchMedia` that
- * keeps listening, so a window dragged wider still fills.
+ * keeps listening, so a window dragged wider still fills. A phone-only
+ * in-article unit (`tier="mobile"`) is the same problem the other way up: it is
+ * `display: none` above 480px, so it waits on a maximum instead.
  *
  * **It is not refreshed.** The rail unit sits in a sticky group and is in view
  * for most of an article, which is the classic case for refresh and the
@@ -76,10 +79,13 @@ const SETTLE_MS = 3000
 export function AdUnit({
   placement,
   client,
+  tier = 'all',
   children,
 }: {
   placement: Placement
   client: string
+  /** `mobile` renders and requests only on a phone. */
+  tier?: InlineTier
   /** Shown in the reserved box when no ad is served. */
   children?: React.ReactNode
 }) {
@@ -114,18 +120,19 @@ export function AdUnit({
       }
     }
 
-    // A placement its track has hidden must not ask for an ad. `display: none`
-    // stops nothing here — the component still mounts and this effect still
-    // runs — so the breakpoint the stylesheet uses is read back from
-    // `lib/ads/placements.ts` and asked directly.
-    const min = minViewportWidth(placement)
-    const query =
-      min === null ? null : window.matchMedia(`(min-width: ${min}px)`)
+    // A placement its track has hidden must not ask for an ad, and nor must a
+    // phone-only unit on anything wider. `display: none` stops nothing here —
+    // the component still mounts and this effect still runs — so the limits
+    // the stylesheet uses are read back from `lib/ads/placements.ts` and asked
+    // directly.
+    const media = slotMediaQuery(placement, tier)
+    const query = media === null ? null : window.matchMedia(media)
 
     // Watched rather than read once: a window dragged wider, or a tablet
-    // turned landscape, brings the track back, and the unit inside it should
-    // then fill like any other. The listener is dropped on the way past so
-    // nothing can push twice.
+    // turned landscape, brings the rail's track back — and a window narrowed
+    // to phone width brings the phone tier — and the unit inside should then
+    // fill like any other. The listener is dropped on the way past so nothing
+    // can push twice.
     const onChange = () => {
       if (!query?.matches) return
       query.removeEventListener('change', onChange)
@@ -141,7 +148,7 @@ export function AdUnit({
       if (idle !== undefined) window.cancelIdleCallback?.(idle)
       if (timer !== undefined) window.clearTimeout(timer)
     }
-  }, [placement])
+  }, [placement, tier])
 
   // Whether anything arrived. Separate from the push above because it has to
   // survive the push failing: a blocked loader throws, or never runs, and that
@@ -204,7 +211,12 @@ export function AdUnit({
         }
 
   return (
-    <div className="ad-slot" data-fill={fill} data-placement={placement}>
+    <div
+      className="ad-slot"
+      data-fill={fill}
+      data-placement={placement}
+      data-tier={tier}
+    >
       {/* Hidden with the unit when nothing was served. Labelling the house
           promo below "Advertisement" would be both wrong and, since it is our
           own content, a claim we should not be making. */}

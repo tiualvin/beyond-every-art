@@ -3753,6 +3753,23 @@ ol.feature-list__items .feature-list__title::before {
   min-height: 280px;
 }
 
+/* The phone-only in-article tier: a unit halfway between each pair of desktop
+   ones, where the same 800 words are ~6 screens rather than ~3 and there is no
+   rail unit. Hidden, reservation and all, on anything wider — so a tablet or a
+   desktop renders exactly the body it did before the tier existed. `AdUnit`
+   reads the same 30rem from `MOBILE_MAX_WIDTH` in lib/ads/placements.ts, because
+   `display: none` stops nothing in JavaScript; the design test holds the two
+   together. */
+.ad-slot[data-tier='mobile'] {
+  display: none;
+}
+
+@media (max-width: 30rem) {
+  .ad-slot[data-tier='mobile'] {
+    display: block;
+  }
+}
+
 /* Every chunk of a split HTML body after the first.
    
    The drop cap targets `.prose > p:first-of-type`, and an HTML body has to be

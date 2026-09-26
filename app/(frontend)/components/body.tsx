@@ -1,6 +1,10 @@
 import { RichText } from '@payloadcms/richtext-lexical/react'
 
-import { splitHtmlForAds, splitLexicalForAds } from '@/lib/ads/inline'
+import {
+  splitHtmlForAds,
+  splitLexicalForAds,
+  type InlineSlotPlan,
+} from '@/lib/ads/inline'
 import type { ArticleBody as ArticleBodyValue } from '@/lib/content/body'
 import type { PostCard } from '@/lib/content/queries'
 
@@ -29,6 +33,11 @@ import { buildConverters } from './blocks/registry'
  * rail's box. One piece per slot, in order, and a slot past the end of the list
  * gets none: `AdUnit` leaves a childless slot alone entirely, so a short list
  * costs nothing rather than repeating itself. `docs/ADVERTISING.md` §8.
+ *
+ * **Phones carry a second tier of slots**, halfway between the desktop ones
+ * (`planInlineSlots`). Which slot is which, and which promo each takes, is
+ * decided in `lib/ads/inline.ts` rather than here: the desktop slots take the
+ * promos they always took, and the phone-only ones take the rest.
  *
  * The two branches need different shapes and it is worth knowing why, because
  * the HTML one looks like the odd one out and is not arbitrary:
@@ -73,14 +82,20 @@ export function ArticleBody({
   }
 
   if (body.kind === 'html') {
-    const chunks = adClient ? splitHtmlForAds(body.html) : [body.html]
+    const { parts, slots } = adClient
+      ? splitHtmlForAds(body.html)
+      : { parts: [body.html], slots: [] }
 
     return (
       <>
-        {chunks.map((chunk, index) => (
+        {parts.map((chunk, index) => (
           <ArticleBodyChunk key={index}>
             {index > 0 && (
-              <InlineSlot client={adClient!} promo={inlinePromos[index - 1]} />
+              <InlineSlot
+                client={adClient!}
+                slot={slots[index - 1]!}
+                promos={inlinePromos}
+              />
             )}
             <div
               className={
@@ -94,14 +109,20 @@ export function ArticleBody({
     )
   }
 
-  const parts = adClient ? splitLexicalForAds(body.content) : [body.content]
+  const { parts, slots } = adClient
+    ? splitLexicalForAds(body.content)
+    : { parts: [body.content], slots: [] }
 
   return (
     <div className={className}>
       {parts.map((part, index) => (
         <ArticleBodyChunk key={index}>
           {index > 0 && (
-            <InlineSlot client={adClient!} promo={inlinePromos[index - 1]} />
+            <InlineSlot
+              client={adClient!}
+              slot={slots[index - 1]!}
+              promos={inlinePromos}
+            />
           )}
           <RichText
             data={part as never}
@@ -122,9 +143,18 @@ export function ArticleBody({
  * given children for, so a slot with nothing to show stays exactly the box it
  * was before any of this existed rather than becoming an emptier one.
  */
-function InlineSlot({ client, promo }: { client: string; promo?: PostCard }) {
+function InlineSlot({
+  client,
+  slot,
+  promos,
+}: {
+  client: string
+  slot: InlineSlotPlan
+  promos: PostCard[]
+}) {
+  const promo = promos[slot.promo]
   return (
-    <AdUnit placement="article-inline" client={client}>
+    <AdUnit placement="article-inline" client={client} tier={slot.tier}>
       {promo && <InlinePromo post={promo} />}
     </AdUnit>
   )

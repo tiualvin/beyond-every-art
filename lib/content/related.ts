@@ -12,13 +12,13 @@
 //
 // A split is back, for a surface that is not a second copy of the list. The
 // in-body ad slots hold house content when no ad is served
-// (`docs/ADVERTISING.md` §8), and unlike the rail's one box there are up to six
-// of them down a long article. They take the *tail* of the pool, after the
+// (`docs/ADVERTISING.md` §8), and unlike the rail’s one box there are up to
+// twelve of them down a long article on a phone. They take the *tail* of the pool, after the
 // three "Read next" shows, so the two surfaces are disjoint by construction
 // rather than by a dedupe pass — a reader never meets the same piece twice on
 // one page, and no query knows about the other.
 
-import { INLINE_MAX } from '@/lib/ads/inline'
+import { INLINE_MOBILE_MAX } from '@/lib/ads/inline'
 
 /** What "Read next" shows, and therefore the head of the pool. */
 export const READ_NEXT_COUNT = 3
@@ -26,22 +26,25 @@ export const READ_NEXT_COUNT = 3
 /**
  * How many pieces the in-body house slots can consume.
  *
- * Derived from `INLINE_MAX` rather than written down, because the two numbers
- * are the same fact: every slot an article can carry is a slot that needs
+ * Derived from `INLINE_MOBILE_MAX` rather than written down, because the two
+ * numbers are the same fact: every slot an article can carry — and a phone
+ * carries the most, both tiers together — is a slot that needs
  * something to show when Google declines it. Raising the unit cap without
  * raising this would leave the last units with a labelled empty box, which is
  * the defect the fallback exists to remove — and it would do it silently,
  * on the longest articles only.
  */
-export const INLINE_PROMO_MAX = INLINE_MAX
+export const INLINE_PROMO_MAX = INLINE_MOBILE_MAX
 
 /**
  * What the post page asks the database for: exactly what it renders.
  *
- * Nine rather than three. `readRelatedPosts` tops a thin tag match up with
- * recent posts, so this is what it returns on any archive with ten published
- * pieces; below that the tail runs short and the slots past it fall back to
- * showing nothing, which is what they did before this existed.
+ * Fifteen: three for "Read next" and one for each of the twelve slots a phone
+ * can carry. `readRelatedPosts` tops a thin tag match up with recent posts, so
+ * this is what it returns on any archive with sixteen published pieces. Below
+ * that the tail runs short and the slots past it show nothing, which is what
+ * they did before the house boxes existed — and since desktop slots take the
+ * head of the tail, it is the phone-only ones that run short first.
  */
 export const RELATED_QUERY_LIMIT = READ_NEXT_COUNT + INLINE_PROMO_MAX
 

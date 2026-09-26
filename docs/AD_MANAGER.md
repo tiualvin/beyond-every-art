@@ -59,7 +59,7 @@ get right first, because ad unit codes cannot be renamed.
 | ---------------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
 | **Network** (network code)   | The account. A number that begins every tag path.                                        | Takes the place of `ADSENSE_CLIENT` in [`../lib/ads/adsense.ts`](../lib/ads/adsense.ts) |
 | **Ad unit**                  | A named piece of inventory, addressed by path: `/<network>/bea-web/rail-1`.              | A **placement** in [`../lib/ads/placements.ts`](../lib/ads/placements.ts)               |
-| **Slot** (GPT)               | One instance of an ad unit on one page, bound to one `div`.                              | One rendered `AdUnit`. `article-inline` is one ad unit and up to six slots.             |
+| **Slot** (GPT)               | One instance of an ad unit on one page, bound to one `div`.                              | One rendered `AdUnit`. `article-inline` is one ad unit and up to twelve slots.          |
 | **Placement** (Ad Manager's) | A _group_ of ad units, for selling or targeting them together.                           | Nothing — and a name clash. See below.                                                  |
 | **Key-value**                | Context sent with each request, for targeting and reporting: `topic=palette`.            | Derived from the post: template, position, subject tags, id. §3.                        |
 | **Order**                    | One campaign for one advertiser.                                                         | None until something is sold.                                                           |
@@ -82,7 +82,7 @@ a `pkg_` prefix precisely so the two cannot be confused in a report.
 `-3` as names — one placement, rendered as many times as the article is long.
 Ad Manager agrees: GPT allows the same ad unit path on several slots on one
 page, each with its own `div`. Which instance is which travels as the `pos`
-key-value, not as six ad units that would each need creating, sizing and
+key-value, not as twelve ad units that would each need creating, sizing and
 declaring.
 
 **Priority, in one paragraph.** Every line item has a type that sets its
@@ -268,7 +268,7 @@ Two levels under the network: the property, then the placement.
 /<network>/
 └── bea-web/                   Beyond Every Art — website
     ├── rail-1                 post rail · 300×250 · ≥1280px only
-    └── article-inline         reading column · fluid · repeated by length (pos 1–6)
+    └── article-inline         reading column · fluid · repeated by length (pos 1–12)
 ```
 
 The leaf **is** the placement name from
@@ -296,16 +296,17 @@ so whoever opens the console finds the reasoning.
 
 ### Key-values
 
-| Key     | Kind       | Values                                        | Set on | For                                                                                                                                      |
-| ------- | ---------- | --------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `pt`    | predefined | `article`, `journal`, `tag`, `author`, `home` | slot   | Roll-ups across units, and telling `archive-inline`'s three templates apart. Only `article` is sent until another template has a unit.   |
-| `pos`   | predefined | `1`–`6`                                       | slot   | Which instance of a repeated unit. `rail-1` sends `1`, so a report grouped by position has no empty row.                                 |
-| `topic` | predefined | subject tag slugs, multi-valued               | slot   | Selling and reporting by subject. The article's tags that pass `isSubjectTag` in [`../lib/content/topics.ts`](../lib/content/topics.ts). |
-| `pid`   | dynamic    | the Payload post id                           | slot   | Single-article sponsorship. The id, not the slug: slugs can exceed 40 characters, ids cannot, and ids never change.                      |
-| `qa`    | predefined | `1`                                           | slot   | Forces the QA line items (§4). Read from `?adqa=1` in the browser.                                                                       |
+| Key     | Kind       | Values                                        | Set on | For                                                                                                                                                                          |
+| ------- | ---------- | --------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pt`    | predefined | `article`, `journal`, `tag`, `author`, `home` | slot   | Roll-ups across units, and telling `archive-inline`'s three templates apart. Only `article` is sent until another template has a unit.                                       |
+| `pos`   | predefined | `1`–`12`                                      | slot   | Which instance of a repeated unit, in reading order across both tiers. `rail-1` sends `1`, so a report grouped by position has no empty row.                                 |
+| `tier`  | predefined | `all`, `mobile`                               | slot   | Whether an in-article slot is one every device renders or the phone-only one between them (`planInlineSlots`). Device category cannot tell them apart: a phone renders both. |
+| `topic` | predefined | subject tag slugs, multi-valued               | slot   | Selling and reporting by subject. The article's tags that pass `isSubjectTag` in [`../lib/content/topics.ts`](../lib/content/topics.ts).                                     |
+| `pid`   | dynamic    | the Payload post id                           | slot   | Single-article sponsorship. The id, not the slug: slugs can exceed 40 characters, ids cannot, and ids never change.                                                          |
+| `qa`    | predefined | `1`                                           | slot   | Forces the QA line items (§4). Read from `?adqa=1` in the browser.                                                                                                           |
 
-**Predefined where the code owns the set, dynamic where it cannot.** `pt` and
-`pos` are closed sets the code decides. `topic` is predefined because the
+**Predefined where the code owns the set, dynamic where it cannot.** `pt`,
+`pos` and `tier` are closed sets the code decides. `topic` is predefined because the
 subject tags are few and change deliberately, which makes "add the value in Ad
 Manager" a step in the tag-plan routine rather than a surprise. `pid` is
 unbounded and needed only for a one-off deal, so it is dynamic.

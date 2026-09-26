@@ -21,8 +21,14 @@ import {
   INLINE_FIRST_WORDS,
   INLINE_GAP_WORDS,
   INLINE_MAX,
+  INLINE_MOBILE_MAX,
+  INLINE_MOBILE_MIN_WORDS,
 } from '@/lib/ads/inline'
-import { minViewportWidth } from '@/lib/ads/placements'
+import {
+  MOBILE_MAX_WIDTH,
+  minViewportWidth,
+  reservedHeight,
+} from '@/lib/ads/placements'
 
 const css = readFileSync(
   resolve(import.meta.dirname, '../../app/globals.css'),
@@ -764,8 +770,8 @@ describe('the space between in-article units', () => {
   }
 
   /** The least height a run of body copy can occupy. */
-  function atLeastTall(words: number): number {
-    return (words / WORDS_PER_LINE) * lineBox()
+  function atLeastTall(words: number, perLine = WORDS_PER_LINE): number {
+    return (words / perLine) * lineBox()
   }
 
   it('keeps a whole screen between the opening and the first unit', () => {
@@ -790,6 +796,90 @@ describe('the space between in-article units', () => {
     const longest = 7899
     const screens = atLeastTall(longest) / SCREEN
     expect(screens / INLINE_MAX).toBeGreaterThan(2)
+  })
+})
+
+// The phone tier, which is the same arithmetic at a different width. A phone
+// has no rail unit, so the rule is one screen between units rather than two —
+// and the column is narrower, so the same words stand taller. What makes it
+// safe is the width limit: the phone tier's spacing is fixed in words, so the
+// widest column it can land in is the densest page it can produce.
+describe('the space between in-article units on a phone', () => {
+  const WORDS_PER_LINE_AT_MEASURE = 13
+  const MEASURE = 704
+
+  /**
+   * The tallest phone viewport in portrait, in CSS px: a 440 × 956 screen with
+   * the browser's bars scrolled away. Taller is a tablet, and a tablet is wider
+   * than the tier allows.
+   */
+  const PHONE_SCREEN = 956
+
+  function lineBox(): number {
+    const rule = /\.prose \{([^}]*)\}/.exec(css)!
+    const size = Number(/font-size: ([\d.]+)rem/.exec(rule[1])![1])
+    const leading = Number(/line-height: ([\d.]+)/.exec(rule[1])![1])
+    return size * REM * leading
+  }
+
+  /** The widest column the tier can render into: the limit, less the gutters. */
+  function widestColumn(): number {
+    const container = /\.container \{([^}]*)\}/.exec(css)!
+    const pad = Number(/padding: 0 ([\d.]+)rem/.exec(container[1])![1])
+    return MOBILE_MAX_WIDTH - 2 * pad * REM
+  }
+
+  /** Words a line holds at that width, rounded up as the desktop test does. */
+  function wordsPerLine(): number {
+    return Math.ceil((WORDS_PER_LINE_AT_MEASURE * widestColumn()) / MEASURE)
+  }
+
+  function atLeastTall(words: number): number {
+    return (words / wordsPerLine()) * lineBox()
+  }
+
+  it('hides the tier above the width the component asks for', () => {
+    // Two copies of one number, one in CSS and one in the component, and the
+    // failure of moving one without the other is silent in both directions:
+    // phone units requested into a hidden box, or shown and never filled.
+    expect(css).toMatch(/\.ad-slot\[data-tier='mobile'\] \{\s*display: none;/)
+    const query =
+      /@media \(max-width: ([\d.]+)rem\) \{\s*\.ad-slot\[data-tier='mobile'\] \{\s*display: block;/.exec(
+        css,
+      )
+    expect(query, 'the phone tier is never shown').toBeTruthy()
+    expect(Number(query![1]) * REM).toBe(MOBILE_MAX_WIDTH)
+  })
+
+  it('never lets two inline units share a phone screen', () => {
+    // The tightest spacing the planner allows, not the target: a phone unit
+    // may defer until this close to the desktop unit after it.
+    expect(atLeastTall(INLINE_MOBILE_MIN_WORDS)).toBeGreaterThan(PHONE_SCREEN)
+  })
+
+  it('stays under the 30% mobile ad density limit', () => {
+    // The Better Ads Standards count ad height against the content's on
+    // mobile. The unit is counted at its whole footprint — reservation, label
+    // and margins — against the least copy that can separate two of them.
+    const slot =
+      /\.ad-slot\[data-placement='article-inline'\] \{([^}]*)\}/.exec(css)!
+    const margin = Number(/margin: ([\d.]+)rem 0/.exec(slot[1])![1]) * REM
+    const label = /^\.ad-slot__label \{([^}]*)\}/m.exec(css)!
+    const labelHeight =
+      Number(/font-size: ([\d.]+)rem/.exec(label[1])![1]) *
+        REM *
+        Number(/line-height: ([\d.]+)/.exec(label[1])![1]) +
+      Number(/margin: 0 0 ([\d.]+)rem/.exec(label[1])![1]) * REM
+
+    const unit = reservedHeight('article-inline') + labelHeight + 2 * margin
+    const copy = atLeastTall(INLINE_MOBILE_MIN_WORDS)
+    expect(unit / (unit + copy)).toBeLessThan(0.3)
+  })
+
+  it('caps a long article below one unit per two phone screens', () => {
+    const longest = 7899
+    const screens = atLeastTall(longest) / PHONE_SCREEN
+    expect(screens / INLINE_MOBILE_MAX).toBeGreaterThan(2)
   })
 })
 
