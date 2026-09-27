@@ -37,7 +37,8 @@ in order of how much they could be costing it today:
 
 1. **Whether Cloudflare lets the citing crawlers through** (§1). This is the one
    that could be at zero right now without anybody knowing.
-2. **Bing** (§2), which is not set up at all.
+2. **Bing** (§2). The owner confirmed on 27 Sep that Bing is reading the
+   sitemap; IndexNow now tells it about a publish as it happens.
 3. **Measuring** (§7), so any of this can be judged afterwards.
 
 `llms.txt` itself is §3–§6.
@@ -99,21 +100,20 @@ file every crawler caches, and it waits for the owner.
 
 ## 2. Bing
 
-Neither this repository nor the cutover notes mention Bing Webmaster Tools;
-[`DEPLOYMENT_STATUS.md`](DEPLOYMENT_STATUS.md) lists Search Console only. Bing's
-index is what Copilot and DuckDuckGo answer from, and it has been one of the
-sources ChatGPT search draws on — so a site that only Google has been told about
-is under-represented in exactly the assistants this plan is about.
+Bing's index is what Copilot and DuckDuckGo answer from, and it has been one of
+the sources ChatGPT search draws on — so a site that only Google has been told
+about is under-represented in exactly the assistants this plan is about.
 
-**Action — owner, ten minutes.** Sign in to Bing Webmaster Tools, import the
-site from Search Console (which verifies it without a new meta tag or DNS
-record), and submit `https://www.beyondeveryart.com/sitemap.xml`.
+**Done, per the owner on 27 Sep:** the sitemap is submitted in Search Console
+and Bing is crawling it.
 
-**IndexNow later, not now.** It tells Bing about a URL the moment it is
-published, but it needs a key file served at a dotted root path — the same class
-of path that `/ads.txt` had to be moved to Caddy for — and a publish hook that
-calls a third party. Worth it only if Bing's crawl turns out to lag publishing
-noticeably, which §7 will show.
+**IndexNow is built.** The sitemap tells Bing eventually; IndexNow tells it the
+moment a post is published. It turned out not to need Caddy after all: the key
+file is served by a route handler at `/indexnow.txt`, and the end-to-end suite
+proves the dotted path answers without a trailing-slash redirect. It is off
+until the owner sets `INDEXNOW_KEY` in production's `.env` — the procedure, and
+what is and is not announced, are in
+[`SEO_AND_REDIRECTS.md`](SEO_AND_REDIRECTS.md) under "IndexNow".
 
 ## 3. What `/llms.txt` says
 
@@ -293,7 +293,7 @@ attributed to anything.
 | ---- | ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
 | 1    | Owner | §1: read AI Crawl Control, record it here                                                                                                                | 5 minutes  |
 | 2    | Owner | §1: the training-crawler decision                                                                                                                        | a decision |
-| 3    | Owner | §2: Bing Webmaster Tools and the sitemap                                                                                                                 | 10 minutes |
+| 3    | Owner | §2: done 27 Sep; set `INDEXNOW_KEY` in production's `.env`                                                                                               | 5 minutes  |
 | 4    | Owner | §7: the GA4 channel group and the baseline                                                                                                               | 15 minutes |
 | 5    | Owner | §3: the free text; optionally tag and missing meta descriptions                                                                                          | —          |
 | 6    | —     | the tag clean-up already in hand lands                                                                                                                   | —          |
