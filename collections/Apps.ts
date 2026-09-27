@@ -1,6 +1,10 @@
 import type { CollectionConfig } from 'payload'
 
-import { editorsAndAdmins, publishedOrEditors } from '../access/roles'
+import {
+  editorsAndAdmins,
+  publishedOrEditors,
+  versionsOf,
+} from '../access/roles'
 import { seoFields } from '../fields/seo'
 import { slugField } from '../fields/slug'
 import { CONTENT_TAGS } from '../lib/cache/content'
@@ -35,6 +39,7 @@ export const Apps: CollectionConfig = {
   access: {
     create: editorsAndAdmins,
     read: publishedOrEditors,
+    readVersions: versionsOf(publishedOrEditors),
     update: editorsAndAdmins,
     delete: editorsAndAdmins,
   },

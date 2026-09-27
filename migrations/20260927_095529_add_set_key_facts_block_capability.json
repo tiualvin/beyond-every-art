@@ -5267,6 +5267,27 @@
           "notNull": false,
           "default": true
         },
+        "payload_mcp_tool_list_article_versions": {
+          "name": "payload_mcp_tool_list_article_versions",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": true
+        },
+        "payload_mcp_tool_read_article_version": {
+          "name": "payload_mcp_tool_read_article_version",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": true
+        },
+        "payload_mcp_tool_restore_article_version": {
+          "name": "payload_mcp_tool_restore_article_version",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": true
+        },
         "payload_mcp_tool_update_article_markdown": {
           "name": "payload_mcp_tool_update_article_markdown",
           "type": "boolean",
@@ -7497,6 +7518,6 @@
     "tables": {},
     "columns": {}
   },
-  "id": "1aa385df-5342-4e26-8c50-a291ab3b3630",
+  "id": "af7d2fda-8f2e-42e2-9e57-63859d66474a",
   "prevId": "00000000-0000-0000-0000-000000000000"
 }

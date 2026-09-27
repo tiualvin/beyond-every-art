@@ -60,8 +60,14 @@ test('the denied default names regions rather than denying everywhere', async ({
 }) => {
   await page.goto('/')
 
-  const script = await page.locator('script#consent-mode').textContent()
-  test.skip(!script, 'no Google tag on this deployment')
+  // Read the presence before the text: `textContent()` auto-waits for the
+  // element, so a deployment that renders no tag would time out here instead
+  // of taking the skip below.
+  const consent = page.locator('script#consent-mode')
+  if ((await consent.count()) === 0) {
+    test.skip(true, 'no Google tag on this deployment')
+  }
+  const script = await consent.textContent()
 
   // Denying globally would be denying forever outside Europe: Google's CMP
   // shows no banner there, so nothing would ever update the signal, and

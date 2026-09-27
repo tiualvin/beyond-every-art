@@ -39,7 +39,7 @@ import type {
 // Payload CLI loads these too, outside Next's resolver.
 import { isScheduled } from '../content/schedule'
 import { isNoindex } from './indexing'
-import { absoluteUrl, getSiteUrl } from './site'
+import { absoluteUrl, getSiteUrl, isPublicSiteUrl } from './site'
 
 type Env = Record<string, string | undefined>
 
@@ -94,22 +94,16 @@ export function indexNowConfig(
   const key = indexNowKey(env)
   if (!key) return null
 
-  let url: URL
-  try {
-    url = new URL(siteUrl)
-  } catch {
-    return null
-  }
   // Only a public https origin. A submission for localhost or a bare IP is
   // refused by the endpoint anyway, and making it would mean a development
-  // machine with a copied `.env` announcing URLs nobody can fetch.
-  if (url.protocol !== 'https:') return null
-  if (url.hostname === 'localhost' || !url.hostname.includes('.')) return null
-  if (/^[\d.]+$/.test(url.hostname) || url.hostname.includes(':')) return null
+  // machine with a copied `.env` announcing URLs nobody can fetch. The rule
+  // itself is `isPublicSiteUrl` (`lib/seo/site.ts`), shared with the AdSense
+  // loader so the two cannot drift.
+  if (!isPublicSiteUrl(siteUrl)) return null
 
   return {
     key,
-    host: url.host,
+    host: new URL(siteUrl).host,
     keyLocation: absoluteUrl(INDEXNOW_KEY_PATH, siteUrl),
   }
 }

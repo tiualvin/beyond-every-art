@@ -17,8 +17,9 @@
   [Turning it on](#turning-it-on) step 3.
 - **What it does:** drafts and revises articles from Claude Code, Codex, or the
   Claude mobile app, writing bodies in Markdown, through the same role-based
-  access control the admin panel uses. It never publishes unless the key belongs
-  to an administrator.
+  access control the admin panel uses. It reads an article's version history
+  and reverts to it, always as a draft. It never publishes unless the key
+  belongs to an administrator.
 - **What it deliberately cannot reach:** `members`, `billing-events`,
   `newsletter-signups`, `users`, and every global. Deleting articles is off.
 - **How to turn it on:** [What is built](#what-is-built).
@@ -45,7 +46,8 @@
 ## What is built
 
 Configuration lives in [`lib/mcp/`](../lib/mcp): `plugin.ts` (allowlist, rate
-limit, request logging), `tools.ts` (the drafting tools), `markdown.ts`
+limit, request logging), `tools.ts` (the drafting and version-history tools),
+`markdown.ts`
 (Markdown ⇄ Lexical), `response.ts` (keeping bodies out of find responses),
 `api-keys.ts` (who may issue and revoke a key), `errors.ts` (the shape of a
 refusal), `publish-guard.ts`, `rate-limit.ts`, and `audit.ts`.
@@ -107,13 +109,18 @@ table below is enabled on a new key unless you untick it, while every collection
 capability starts unticked. That is the plugin's default, not this project's
 choice.
 
-It reaches existing keys too. Each custom tool is a column on
-`payload-mcp-api-keys` — which is why adding one needs a schema migration — and
-the plugin declares that column `DEFAULT true`, so every key already issued
-gains a new tool the moment its migration runs. `setKeyFactsBlock` arrived that
-way. It writes drafts only and passes the same publish guard as
-`updateArticleMarkdown`, so it adds no authority a key did not already have;
-untick it on any key that should not have it.
+A tool added later reaches keys that already exist the same way — its column
+arrives with the plugin's `DEFAULT true` — unless its migration says otherwise.
+`listArticleVersions` and `readArticleVersion` do: an existing key or OAuth grant
+gets them exactly when it already had `readArticleMarkdown`, because they read
+the same text, and a grant whose approver unticked that tool should not gain a
+second way to it by deploy. `restoreArticleVersion` writes, so an existing key
+gets it only where it already had both `updateArticleMarkdown` and
+`posts.update` — the two capabilities a restore can already be done with, by
+hand.
+`setKeyFactsBlock` writes the draft body and nothing else — what
+`updateArticleMarkdown` already does — so an existing key gets it exactly where
+it already had `updateArticleMarkdown`.
 
 ### Tools
 
@@ -128,6 +135,9 @@ Written for this project, because the generated ones cannot do the job:
 | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `draftArticle`          | Creates a post from Markdown, always as a draft. Resolves tag and author slugs, refuses unknown ones. The `ghostID` is autofilled by the collection.                      |
 | `readArticleMarkdown`   | Reads a post back as Markdown, including the draft body, with each module as a marker line and its contents in `blocks`. Says so when the page renders from `legacyHTML`. |
+| `listArticleVersions`   | Lists a post's saved versions, newest first — id, time, title, status and a 100-character snippet each, never a body.                                                     |
+| `readArticleVersion`    | Reads one saved version in exactly the shape `readArticleMarkdown` returns the draft. Read-only.                                                                          |
+| `restoreArticleVersion` | Reverts a post's body, or its whole article, to a saved version — as a draft, overwriting rather than merging. Has a dry run and an undo.                                 |
 | `updateArticleMarkdown` | Replaces a body from Markdown, saved as a draft. Puts each marked module back as it was; reports which were kept and which removed.                                       |
 | `setKeyFactsBlock`      | Sets an article's key facts card — label and value pairs — in place, or under a named body heading. Saved as a draft; the rest of the body is untouched.                  |
 | `uploadMedia`           | Adds an image to the Media library from base64 and returns its id, for `updatePosts` to set as a `featuredImage`.                                                         |
@@ -152,7 +162,8 @@ a line of its own:
 ```
 
 The read tool returns the module's contents beside the Markdown, in `blocks`,
-with the heading it sits under. The update tool swaps each marker back for the
+with the heading it sits under — and so does `readArticleVersion`, which shares
+its format, so an old version's modules can be reviewed the same way. The update tool swaps each marker back for the
 module it names, exactly as stored: moving a marker moves the module, and
 leaving one out removes it, which the response always reports. A marker naming
 nothing in the current draft, used twice, or run into a paragraph is refused
@@ -173,7 +184,9 @@ would replace the whole article.
 Two details keep this lossless. Articles are read at depth 0: populated, an
 inline image exports as a Markdown image pointing at its URL, which the
 converter does not read back, so a revision used to turn every image into its
-own Markdown source; unpopulated it exports as `![media:7]()`, which it does. And whether an article renders from
+own Markdown source; unpopulated it exports as `![media:7]()`, which it does.
+`readArticleVersion` reads at the same depth, so a version and the draft still
+come back identical where the article is. And whether an article renders from
 `legacyHTML` is asked of the renderer (`toArticleBody`) rather than read off the
 field, because the rich-text body wins whenever it holds anything.
 
@@ -271,6 +284,90 @@ key that publishes a post whose draft was written by `updateArticleMarkdown`
 will publish the older body and leave the revision sitting in the versions
 table. Publish from the admin panel, where the draft is promoted and Live
 Preview shows what is going out.
+
+### Version history
+
+Payload keeps a version of a post on every save — autosave included, up to
+`maxPerDoc` (fifty) per document. `listArticleVersions` finds a point in that
+history and `readArticleVersion` reads it. From there, two ways back:
+
+- **Merge by hand**, to keep what has been added since: read the version, read
+  the current draft with `readArticleMarkdown`, reconcile them, and save the
+  result with `updateArticleMarkdown`. Only text survives this route — see
+  [the Markdown round trip](#the-markdown-round-trip-loses-blocks-and-images).
+- **Revert with `restoreArticleVersion`**, which overwrites. `scope: "body"`
+  replaces the body; `scope: "article"` also replaces the title, excerpt,
+  featured image, SEO title and description, authors, and tags. Whatever is in
+  scope is replaced wholesale — anything added to those fields since the
+  version was saved is gone from the draft — and the tool's description says
+  so in capitals, because a caller told to "restore Tuesday's version" could
+  reasonably assume a merge. `dryRun: true` lists the fields that would change
+  and writes nothing.
+
+What a revert **never** touches, whatever the scope, is everything that decides
+where, when, and to whom the post is served: the slug, visibility, canonical
+URL, `noindex`, the homepage `featured` flag, `publishedAt`, owners, review
+state, and the Ghost migration fields. Each would change a URL, a paywall, or
+what crawlers are told the next time somebody pressed publish, with nothing on
+the edit screen to say it had moved. `RESTORED_FIELDS` and `KEPT_ON_RESTORE` in
+[`lib/mcp/tools.ts`](../lib/mcp/tools.ts) are allowlists, and
+`tests/mcp/tools.test.ts` fails when a field on Posts is in neither — so a new
+field is left alone by a revert until somebody decides otherwise.
+
+A revert is always a **draft**. The published page does not change until a
+person publishes from the admin panel. The draft it replaced stays in history,
+and the response names it as `undo`: reverting to that version reverts the
+revert. The body is copied exactly as stored, so a revert brings back blocks
+and images that the Markdown route cannot carry.
+
+**It is built on an ordinary draft update, not on Payload's `restoreVersion`.**
+That operation does two things this tool must not. Without `draft: true` it
+writes the snapshot over the live document, so reverting a published post to
+an older draft would unpublish it. And with `draft: true` it still hands the
+collection hooks the snapshot's own `_status`, so reverting to a _published_
+version trips `refuseMcpPublish` for every editor key although nothing is being
+published — checked by swapping it in: the e2e revert fails with the publish
+guard's refusal. The update path runs the same access rules, publish guard,
+audit line, and authorship stamp as `updateArticleMarkdown`.
+
+#### The Markdown round trip loses blocks and images
+
+Measured against the real editor config, and true of `readArticleMarkdown` →
+`updateArticleMarkdown` as much as of a merge from history:
+
+- **Blocks are destroyed.** A callout exports as the literal words "Block
+  Field", which imports back as a paragraph reading "Block Field". No block in
+  [`blocks/schema.ts`](../blocks/schema.ts) defines a Markdown converter, so
+  this holds for every insertable module.
+- **Inline images become text.** Read at the default depth, an image exports
+  as a Markdown image with its address, which imports back as that literal text
+  in a paragraph, not as an image. Read at depth 0 it exports as a `media:12`
+  placeholder, which does import back as an image.
+
+So an agent revising a post that holds a block or an inline image through
+Markdown damages it. `restoreArticleVersion` is the way back from that.
+
+Three things the tools do that are easy to break:
+
+- **A version reads back byte-identical to the draft**, because both go through
+  one function (`articleView` in [`lib/mcp/tools.ts`](../lib/mcp/tools.ts)) at
+  the same population depth. The depth matters more than it looks: an image in
+  the body converts to a Markdown image carrying its alt text and address only
+  when its upload is populated, and to a bare `media:12` placeholder when it is
+  not, so a shallower read of the version would show a difference the article
+  does not have.
+- **A slug means the same document as in `readArticleMarkdown`**, because
+  `listArticleVersions` resolves it through the same `findArticle` — which is
+  also what refuses a document the key cannot read before any history is
+  looked at.
+- **History is readable under the same rule as the document.** Payload does not
+  derive `readVersions` from `read`, and left unset it lets any signed-in user
+  read every version of every post — so an author whom `postsRead` keeps out of
+  a colleague's draft could read it from the version table, over MCP or at
+  `/api/posts/versions`. `versionsOf` in [`access/roles.ts`](../access/roles.ts)
+  applies the document rule to each version's stored fields, on every versioned
+  collection. Without it, `readArticleVersion` hands an author key an editor's
+  draft; `e2e/mcp.spec.ts` checks that it does not.
 
 ### What gets logged
 
