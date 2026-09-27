@@ -17,9 +17,11 @@ import { z } from 'zod'
 
 import { toArticleBody } from '../content/body'
 import { buildPreviewUrl } from '../preview/live-preview'
+import { listBlocks, markBlocks } from './blocks'
 import {
   lexicalToMarkdown,
   markdownToLexical,
+  type EditorState,
   type MarkdownCollection,
 } from './markdown'
 import { decodeImageUpload, vetImageBytes } from './upload'
@@ -245,7 +247,11 @@ export const mcpTools: McpTool[] = [
   {
     description:
       'Read an article back as Markdown, including its draft body. ' +
-      'Use this before revising, so edits are made against the current text.',
+      'Use this before revising, so edits are made against the current text. ' +
+      'Modules inserted into the body (key facts, FAQs, galleries, callouts) ' +
+      'have no Markdown form: each appears as a line like ' +
+      '`<!-- block:keyFacts:<key> -->` where it sits, and its contents are ' +
+      'listed in `blocks`.',
     handler: async (args: Record<string, unknown>, req: PayloadRequest) => {
       const target = args as { id?: string; slug?: string }
 
@@ -254,8 +260,12 @@ export const mcpTools: McpTool[] = [
         COLLECTION,
         target,
       )) as unknown as Record<string, unknown>
+      const content = doc.content as EditorState | null | undefined
 
       return text({
+        // Beside the Markdown rather than in it, so reviewing a draft shows
+        // what each module says as well as where it is.
+        blocks: listBlocks(content),
         excerpt: doc.excerpt ?? null,
         id: doc.id,
         // Migrated bodies live in `legacyHTML` and are not Lexical; say so
@@ -266,7 +276,7 @@ export const mcpTools: McpTool[] = [
           : lexicalToMarkdown(
               req.payload,
               COLLECTION,
-              doc.content as Parameters<typeof lexicalToMarkdown>[2],
+              content && markBlocks(content),
             ),
         slug: doc.slug,
         status: doc._status ?? null,

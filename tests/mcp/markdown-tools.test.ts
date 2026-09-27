@@ -29,6 +29,34 @@ const paragraph = (value: string): Node => ({
   children: [text(value)],
 })
 
+const heading = (value: string, tag = 'h2'): Node => ({
+  type: 'heading',
+  tag,
+  version: 1,
+  format: '',
+  indent: 0,
+  direction: 'ltr',
+  children: [text(value)],
+})
+
+const block = (
+  blockType: string,
+  fields: Record<string, unknown> = {},
+  id: string | null = '65f0c0ffee0000000000abcd',
+): Node => ({
+  type: 'block',
+  version: 2,
+  format: '',
+  fields: { ...(id ? { id } : {}), blockName: '', blockType, ...fields },
+})
+
+const facts = {
+  items: [
+    { id: 'row1', label: 'Insect', value: 'Dactylopius coccus' },
+    { id: 'row2', label: 'Yield', value: '~70,000 insects per lb' },
+  ],
+}
+
 const upload = (value: number): Node => ({
   type: 'upload',
   version: 3,
@@ -145,5 +173,110 @@ describe('an article migrated from Ghost', () => {
     const { markdown } = await call('readArticleMarkdown', { id: '1' }, req)
 
     expect(markdown).toBe('Rewritten in the editor.')
+  })
+})
+
+describe('modules in a body read as Markdown', () => {
+  it('stands a marker in for each block, where it sits', async () => {
+    // Without one, Payload writes every block as the words "Block Field".
+    const { req } = await mcpRequest({
+      id: 1,
+      content: body(
+        heading('The short answer'),
+        block('keyFacts', facts),
+        paragraph('After.'),
+      ),
+    })
+
+    const { markdown } = await call('readArticleMarkdown', { id: '1' }, req)
+
+    expect(markdown).toBe(
+      '## The short answer\n\n' +
+        '<!-- block:keyFacts:65f0c0ffee0000000000abcd -->\n\n' +
+        'After.',
+    )
+    expect(markdown).not.toContain('Block Field')
+  })
+
+  it('lists what each block holds, and where', async () => {
+    const { req } = await mcpRequest({
+      id: 1,
+      content: body(
+        block('pullQuote', { quote: 'Before any heading.' }, 'aa11'),
+        heading('The short answer'),
+        paragraph('Intro.'),
+        block('keyFacts', facts),
+      ),
+    })
+
+    const { blocks } = await call('readArticleMarkdown', { id: '1' }, req)
+
+    expect(blocks).toEqual([
+      {
+        key: 'aa11',
+        blockType: 'pullQuote',
+        marker: '<!-- block:pullQuote:aa11 -->',
+        afterHeading: null,
+        fields: {
+          id: 'aa11',
+          blockType: 'pullQuote',
+          quote: 'Before any heading.',
+        },
+      },
+      {
+        key: '65f0c0ffee0000000000abcd',
+        blockType: 'keyFacts',
+        marker: '<!-- block:keyFacts:65f0c0ffee0000000000abcd -->',
+        afterHeading: 'The short answer',
+        fields: {
+          id: '65f0c0ffee0000000000abcd',
+          blockType: 'keyFacts',
+          ...facts,
+        },
+      },
+    ])
+  })
+
+  it('keys a block by position when its id cannot be a marker', async () => {
+    // No id at all, or one the Markdown converter would escape.
+    const { req } = await mcpRequest({
+      id: 1,
+      content: body(
+        block('callout', {}, null),
+        block('callout', {}, 'has_underscore'),
+      ),
+    })
+
+    const { blocks, markdown } = await call(
+      'readArticleMarkdown',
+      { id: '1' },
+      req,
+    )
+
+    expect((blocks as Array<{ key: string }>).map((b) => b.key)).toEqual([
+      'n0',
+      'n1',
+    ])
+    expect(markdown).toBe(
+      '<!-- block:callout:n0 -->\n\n<!-- block:callout:n1 -->',
+    )
+  })
+
+  it('reads without writing', async () => {
+    const content = body(block('keyFacts', facts))
+    const { req, payload, current } = await mcpRequest({ id: 1, content })
+
+    await call('readArticleMarkdown', { id: '1' }, req)
+
+    expect(payload.update).not.toHaveBeenCalled()
+    expect(current().content).toEqual(body(block('keyFacts', facts)))
+  })
+
+  it('reports no blocks for a body without any', async () => {
+    const { req } = await mcpRequest({ id: 1, content: body(paragraph('x')) })
+
+    const { blocks } = await call('readArticleMarkdown', { id: '1' }, req)
+
+    expect(blocks).toEqual([])
   })
 })
