@@ -57,13 +57,18 @@ campaigns around it. No transactional provider is configured, deliberately, and
 that document says what makes the decision expire — read it before adding any
 send path, and do not reach for the ESP to send a token.
 
-[`docs/STOCK_IMAGERY.md`](docs/STOCK_IMAGERY.md) evaluates the Unsplash API as
-a replacement for the Ghost editor's image picker, which every feature image on
-this site came through and which the cutover removed. The API is not built and
-two of its findings are decisions rather than code: whether to store bytes or
-hotlink, and where a stock photograph is allowed on a publication that writes
-about specific works. The attribution its guidelines require *is* built —
-`media.creditURL`, rendered through
+[`docs/STOCK_IMAGERY.md`](docs/STOCK_IMAGERY.md) covers the Unsplash API as a
+replacement for the Ghost editor's image picker, which every feature image on
+this site came through and which the cutover removed. It is built as two MCP
+tools, `findStockPhoto` and `importStockPhoto`, over
+[`lib/stock/unsplash.ts`](lib/stock/unsplash.ts) — the only file that talks to
+Unsplash — and is off until `UNSPLASH_ACCESS_KEY` is set on the server. The
+owner decided to store bytes and report downloads rather than hotlink, and that
+stock photographs are for mood only, never for anything a reader could take as
+a picture of the work, place, or person an article names. Adding a custom MCP
+tool now needs a hand-edited migration so OAuth grants do not gain it silently;
+the stock tools' migration is the pattern. The attribution Unsplash's
+guidelines require is `media.creditURL`, rendered through
 [`lib/content/attribution.ts`](lib/content/attribution.ts), which is the only
 thing that may build a credit `href`: it refuses anything but https and adds
 referral parameters for Unsplash alone. Read that document before adding any

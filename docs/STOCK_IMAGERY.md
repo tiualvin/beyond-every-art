@@ -2,15 +2,18 @@
 
 ## Summary
 
-- **Status:** evaluated, and planned — see
-  [Implementation plan](#implementation-plan). No Unsplash dependency added and
-  no key issued — the API itself is not built and the decisions below gate it.
-  What _is_ built is the attribution the guidelines require, because it repays
-  the credits already on the site regardless: see
+- **Status:** built, and off until `UNSPLASH_ACCESS_KEY` is set on the server.
+  Two MCP tools, `findStockPhoto` and `importStockPhoto`, over one module,
+  [`lib/stock/unsplash.ts`](../lib/stock/unsplash.ts) — see
+  [Implementation plan](#implementation-plan), which is what was built. The
+  owner took the three decisions it needed on 27 Sep 2026: store the bytes and
+  report the download, stock for mood only, and existing API keys get the tools
+  while OAuth grants do not — see [Decisions](#decisions). No key is issued yet;
+  that, and the credit backfill, are
+  [what the owner still does](#what-the-owner-still-does). The attribution the
+  guidelines require was built first, because it repays the credits already on
+  the site regardless: see
   [Finding 2](#finding-2-attribution-is-required-by-the-api-and-mediacredit-could-not-carry-it--built).
-  The rest records what adopting the API would cost and what it would oblige,
-  because two of the obligations are not obvious and one of them is a decision
-  for the repository owner rather than for whoever writes the code.
 - **The question is narrower than it looks.** This publication already runs on
   Unsplash photographs — every feature image it has, 110 credits and 102
   distinct photographers, all of the form `Photo by <name> / Unsplash`. They
@@ -129,6 +132,9 @@ are as close to that as makes no difference. The options, stated plainly:
 
 Option 3 is the recommendation. It is not the letter of the guideline, and it
 should be adopted as a deliberate position rather than as an oversight.
+
+**Taken, as a deliberate position:** option 3 is what `importStockPhoto` does —
+see [Decision 1](#decisions).
 
 ### Finding 2: attribution is required by the API, and `media.credit` could not carry it — built
 
@@ -336,12 +342,12 @@ than `uploadMediaFromUrl`. Why is in
 
 ## Implementation plan
 
-Drawn up on 27 Sep 2026 against the code as it stands: `uploadMediaFromUrl` and
+Drawn up on 27 Sep 2026 against the code as it stood: `uploadMediaFromUrl` and
 its outbound guard, the per-tool capability columns the plugin adds to
 `payload-mcp-api-keys`, the consent screen that derives its grid from
-`mcpTools`, and the attribution Finding 2 built. **Nothing below is built.** It
-assumes Decision 1 is taken as recommended — store, fire the download trigger,
-attribute with a working link — and says where it would change if it is not.
+`mcpTools`, and the attribution Finding 2 built. **Built the same day**, after
+the owner took Decisions 1, 3 and 4, and kept here as the record of why it is
+this shape. Where the build departed from the plan, the section says so.
 
 ### What the plan revises
 
@@ -372,11 +378,9 @@ nothing the agent needs to hand back but an id, and an import that takes the id
 and derives everything else — bytes, credit, link, provenance,
 `aiGenerated: false` — from Unsplash's own record, on the server.
 
-### Before any code: what the owner does
+### What the owner still does
 
-- **Decisions 1, 3 and 4** in [Decisions needed](#decisions-needed). Decision 1
-  shapes the whole plan; Decision 3 is the text the tool descriptions will
-  carry; Decision 4 is who gets the tools on the day they ship.
+- ~~**Decisions 1, 3 and 4.**~~ Taken — see [Decisions](#decisions).
 - **Register an Unsplash application, and keep its access key out of every
   agent session.** It goes into `.env` on the VPS, set by the owner — a secret
   must never pass through an agent ([`AGENTS.md`](../AGENTS.md)). Only the
@@ -487,10 +491,10 @@ because the record says what the picture is. Its steps, in order:
    as a download. A trigger that fails does not undo the import; it is logged,
    and the tool's result says so.
 
-**The descriptions carry the editorial rule.** Until Decision 3 is taken they
-use Finding 5's wording: atmosphere, texture, abstraction, an essay about an
-idea — never anything a reader could take as documentation of the work, place,
-or person the article names. `findStockPhoto`'s also says to show the
+**The descriptions carry the editorial rule.** Decision 3 took Finding 5's
+wording: atmosphere, texture, abstraction, an essay about an idea — never
+anything a reader could take as documentation of the work, place, or person the
+article names. `findStockPhoto`'s also says to show the
 candidates to the person and let them choose.
 
 **A budget of its own.** The MCP limit is 120 requests per key per minute;
@@ -521,20 +525,31 @@ documented behaviour. On existing rows it is a silent grant: every key, and
 **every OAuth grant**, would gain two tools nobody ticked, and a grant's
 approver was shown a consent screen that did not list them — the exact thing
 `capabilityDocument` in [`lib/oauth/capabilities.ts`](../lib/oauth/capabilities.ts)
-writes explicit `false`s to prevent. So the generated migration gets an
-`UPDATE "payload_mcp_api_keys" SET … = false` after each `ADD COLUMN`, and an
-existing key gets the tools when an administrator ticks them. This is the first
-custom tool added since OAuth landed — `uploadMediaFromUrl` predates the consent
-screen — which is why nothing has tripped on it yet. Grants have to be unticked;
-whether plain API keys are too is Decision 4, and the recommendation is yes.
+writes explicit `false`s to prevent. So the generated migration gets a
+hand-written `UPDATE "payload_mcp_api_keys" SET … = false` after the
+`ADD COLUMN`s. This is the first custom tool added since OAuth landed —
+`uploadMediaFromUrl` predates the consent screen — which is why nothing had
+tripped on it.
+
+**As built** (Decision 4): existing API keys keep the tools, as they kept
+`uploadMediaFromUrl`, and the `UPDATE` unticks every row reachable only through
+OAuth — the rows a grant points at, and any row with no bearer key enabled,
+which is what a grant's record is and what one left behind by a deleted grant
+still looks like. Checked against a local database holding one of each: the key
+kept both tools, the grant lost both, and the migration rolls back and forward
+cleanly. A connector gets the tools by being authorised again, on a consent
+screen that now lists them.
 
 ### Logging
 
-**Media writes over MCP leave no `mcp_write` line today.** `recordMcpWrite` is on
-Posts and Pages and not on Media, so for every image `uploadMedia` and
-`uploadMediaFromUrl` have ever added, the log says which key called the tool
-but not which document it made. Adding it to Media closes that for all three
-upload paths, and is worth doing whether or not the rest of this is.
+**Media writes over MCP left no `mcp_write` line — fixed.** `recordMcpWrite`
+was on Posts and Pages and not on Media, so for every image `uploadMedia` and
+`uploadMediaFromUrl` had added, the log said which key called the tool but not
+which document it made. The build found Tags in the same state — `updateTags`
+is in the allowlist — and fixed both. A test in
+[`tests/mcp/audit.test.ts`](../tests/mcp/audit.test.ts) now derives every
+collection MCP can write, from the allowlist and the custom tools, and fails
+if one lacks the hook.
 
 The import writes one line of its own, `mcp_stock`: the photo id, the Media id,
 whether it was reused, and whether the download event landed — the one side
@@ -545,11 +560,11 @@ call is logged, for the reason `mcp_request` records only the tool name.
 
 **The Content Security Policy and `next/image`.** Bytes are stored, so the site
 never loads anything from Unsplash; the previews in step 2 are shown by the
-agent's client, not by this site. If Decision 1 goes to hotlinking, this is the
-paragraph that changes: `images.unsplash.com` joins `img-src` in
-[`lib/security/csp.ts`](../lib/security/csp.ts) and the remote patterns in
-[`lib/security/images.ts`](../lib/security/images.ts), and the import writes an
-address instead of a file.
+agent's client, not by this site. Had Decision 1 gone to hotlinking, this is
+the paragraph that would have changed: `images.unsplash.com` joining `img-src`
+in [`lib/security/csp.ts`](../lib/security/csp.ts) and the remote patterns in
+[`lib/security/images.ts`](../lib/security/images.ts), and the import writing
+an address instead of a file.
 
 ### What the tests hold
 
@@ -558,20 +573,26 @@ silently not holding.
 
 | Invariant                                                                                                        | Held by                                                                                                                          |
 | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| The key is sent to `https://api.unsplash.com` and nowhere else — including a `download_location` on another host | Unit tests on the module, with `fetch` stubbed                                                                                   |
+| The key is sent to `https://api.unsplash.com` and nowhere else — including a `download_location` on another host | [`tests/stock/unsplash.test.ts`](../tests/stock/unsplash.test.ts), with `fetch` stubbed                                          |
 | Unsplash+ never reaches Media, by flag or by host                                                                | The same                                                                                                                         |
 | No error message contains the key                                                                                | The same                                                                                                                         |
 | An unset key is a clear refusal and no network call                                                              | The same, and over the wire in [`e2e/mcp.spec.ts`](../e2e/mcp.spec.ts), where CI has no key — which is also production's default |
-| `importStockPhoto` has no `credit`, `creditURL` or `aiGenerated` parameter, and writes `aiGenerated: false`      | [`tests/mcp/tools.test.ts`](../tests/mcp/tools.test.ts)                                                                          |
-| `findStockPhoto` returns no `download_location` and no full-size address                                         | The same                                                                                                                         |
+| `importStockPhoto` has no `credit`, `creditURL` or `aiGenerated` parameter, and writes `aiGenerated: false`      | [`tests/mcp/stock-tools.test.ts`](../tests/mcp/stock-tools.test.ts), driving the handler                                         |
+| An earlier import is returned, not stored twice, and costs nothing at Unsplash                                   | The same                                                                                                                         |
+| The download is reported only after the Media document exists, and never when storing fails                      | The same                                                                                                                         |
+| Both descriptions carry the house rule, and the search tells the agent to let the person choose                  | The same                                                                                                                         |
+| One user cannot spend more than their share of the hourly quota                                                  | The same                                                                                                                         |
+| `findStockPhoto` returns no `download_location` and no full-size address                                         | [`tests/stock/unsplash.test.ts`](../tests/stock/unsplash.test.ts)                                                                |
 | The tool list, the e2e `tools/list` expectation and the seeded key's capabilities agree                          | The existing tool-list test, [`e2e/mcp.spec.ts`](../e2e/mcp.spec.ts), [`e2e/seed.ts`](../e2e/seed.ts)                            |
 | `UNSPLASH_ACCESS_KEY` and the limit are in `.env.example` exactly when something reads them                      | [`tests/docs/drift.test.ts`](../tests/docs/drift.test.ts), unchanged                                                             |
+| Every collection MCP can write records `mcp_write`                                                               | [`tests/mcp/audit.test.ts`](../tests/mcp/audit.test.ts)                                                                          |
 
 ### One pull request, one commit per change
 
-In this order, each independently revertible:
+In this order, each independently revertible — which is how it landed:
 
-1. **Record MCP media writes** — `recordMcpWrite` on Media. Stands on its own.
+1. **Record MCP media writes** — `recordMcpWrite` on Media, and on Tags, which
+   the build found in the same state. Stands on its own.
 2. **`media.sourceURL`**, with its migration and regenerated types.
 3. **The Unsplash module** and its tests, with `UNSPLASH_ACCESS_KEY` in
    `.env.example` — added here and not earlier, because the drift test fails a
@@ -582,16 +603,19 @@ In this order, each independently revertible:
    [`MCP_SERVER.md`](MCP_SERVER.md), this document's status, and the drift
    test's `NOT_FILES` entry for the module, removed once the file exists.
 
-Before pushing: `pnpm lint`, `pnpm typecheck`, `pnpm test`,
-`pnpm format:check`, and `pnpm migrate:db` locally against a database holding
-at least one existing key and one OAuth grant, to watch the `UPDATE` leave both
-unticked.
+Before pushing: `pnpm lint`, `pnpm typecheck` (with and without the generated
+types), `pnpm test`, `pnpm format:check`, the migration drift check CI runs,
+and `pnpm migrate:db` locally against a database holding one existing key and
+one OAuth grant. Plus `e2e/mcp.spec.ts` against a seeded database and a dev
+server, which is where the capability columns and the unconfigured refusal meet
+a real request.
 
 ### After merge
 
 The deploy applies both migrations. Then, in order: set `UNSPLASH_ACCESS_KEY`
-on the VPS and restart the app; tick the two tools on the key the owner drafts
-with; import one photograph into a draft and read its credit in Live Preview —
+on the VPS and restart the app; check the key the owner drafts with shows both
+tools ticked (it should, per Decision 4) and re-authorise any connector that
+should have them; import one photograph into a draft and read its credit in Live Preview —
 linked, referral parameters present, Unsplash named. After a few real articles,
 apply for production access with a screenshot of that credit. Nothing here
 needs production access to work; the review is how Unsplash confirms the
@@ -614,25 +638,33 @@ attribution is right.
   and it is not this work.
 - **Caching search responses.** At Finding 4's volume there is nothing to save.
 
-## Decisions needed
+## Decisions
 
-1. **Store or hotlink** — [Finding 1](#finding-1-the-hotlinking-guideline-runs-against-the-media-pipeline).
-   The recommendation is store, trigger the download endpoint, and attribute
-   with a working link, adopted as a stated position.
+All four are taken. 1, 3 and 4 were put to the owner on 27 Sep 2026 and each
+went the way this document recommended, except 4, which went to its stated
+alternative.
+
+1. ~~**Store or hotlink**~~ — [Finding 1](#finding-1-the-hotlinking-guideline-runs-against-the-media-pipeline).
+   Taken: **store the bytes, report the download, attribute with a working
+   link**, adopted as a stated position. It is not the letter of the hotlinking
+   guideline, and it is not an oversight either.
 2. ~~**Whether the attribution change is worth making on its own.**~~ Taken: it
    is built, because it repays 110 existing credits regardless of whether the
    API is adopted. What remains is running the backfill against production.
-3. **Where stock imagery is allowed at all** —
-   [Finding 5](#finding-5-the-editorial-risk-is-the-one-that-matters). This one
-   is editorial policy, and no amount of code substitutes for it.
-4. **Who gets the new tools on the day they ship** —
+3. ~~**Where stock imagery is allowed at all**~~ —
+   [Finding 5](#finding-5-the-editorial-risk-is-the-one-that-matters). Taken:
+   **mood only** — atmosphere, texture, abstraction, the header for an essay
+   about an idea; never anything a reader could take as a picture of the work,
+   place or person the article names. Both tool descriptions carry it as
+   `STOCK_RULE` in [`lib/mcp/tools.ts`](../lib/mcp/tools.ts), which is the
+   only place an agent reads it. Code cannot enforce it; the person choosing
+   and the person publishing do.
+4. ~~**Who gets the new tools on the day they ship**~~ —
    [the capability columns](#schema-one-field-two-capability-columns-two-migrations).
-   OAuth grants must not gain them silently: their approvers were never shown
-   them. The recommendation is that existing API keys do not either, so the
-   first key to search Unsplash is one an administrator chose; the alternative
-   is to leave keys ticked, as `uploadMediaFromUrl` was, and untick only grants.
-   It touches credentials, so it is the owner's call rather than the migration
-   author's.
+   Taken: **existing API keys get them, OAuth grants do not.** Keys keep the
+   plugin's default, as they did for `uploadMediaFromUrl`; grants are unticked
+   by the migration, because their approvers were never shown the tools. (The
+   recommendation had been to untick keys too.)
 
 ## References
 
