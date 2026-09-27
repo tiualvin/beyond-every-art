@@ -259,6 +259,15 @@ group is the same height in both states and none of the ladder's arithmetic
 above changes. [`ADVERTISING.md`](ADVERTISING.md) §8 has the reasoning,
 including the ten minutes it spent getting this wrong.
 
+It fills the reservation rather than the unit, and those are different boxes
+once a blocker has hidden the `<ins>` — which is the commonest empty slot of
+all. `.ad-slot` then has only its label in it, so a promo laid over it had 9px
+to spread three items across: they stacked at their content height, rules
+touching the meta lines, over 66px of empty reservation. `.rail__slot` is a
+flex column and `.ad-slot` grows into it, so the list gets 250px either way.
+Every harness here renders the `<ins>`, which is how it shipped; the design
+test now checks the rule instead.
+
 The slot renders nothing where there is no publisher to render it for —
 staging, a teaser, ads switched off — rather than reserving 279px of blank
 paper above the card. Nothing shifts either way, because the reservation exists

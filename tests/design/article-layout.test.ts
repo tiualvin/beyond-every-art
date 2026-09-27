@@ -451,6 +451,19 @@ describe('the ad box when nothing is served', () => {
     expect(item).toMatch(/min-height: 0/)
   })
 
+  // Which box, though. The promo fills `.ad-slot`, and the reservation is on
+  // `.rail__slot` around it — so `.ad-slot` had only the height of the `<ins>`
+  // inside it. A blocker hides that element, `.ad-slot` fell to the 9px label,
+  // and the three items stacked at their content height with the rules
+  // touching the meta lines, above 66px of empty reservation. It shipped,
+  // because every harness renders the `<ins>`.
+  it('fills the reservation even when a blocker has hidden the unit', () => {
+    const slot = /\.rail__slot \{([^}]*)\}/.exec(css)![1]
+    expect(slot).toMatch(/display: flex/)
+    expect(slot).toMatch(/flex-direction: column/)
+    expect(rule('.rail__slot > .ad-slot')).toMatch(/flex-grow: 1/)
+  })
+
   // Three items centre inside their own third, which is what spaces them
   // evenly. One item centring inside the whole box put a 60px hole between the
   // eyebrow and the headline it belonged to.
