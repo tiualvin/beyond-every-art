@@ -63,6 +63,28 @@ finding corrects [`CUTOVER_DAY.md`](CUTOVER_DAY.md)'s rollback note, which
 said Ghost serves at its own hostname; whether it still answers for the domain
 has not been checked since the flip, and that section has the one-line check.
 
+**The tag clean-up is approved and planned, not run** (25 Sep). Art is split
+across real subjects and retired, `materials-science` merges into Science of
+Art Materials, Featured and News retire, every untagged published post gets a
+subject, and two subjects are added: Ways of Seeing and Collecting. The plan is
+`scripts/tag-plans/2026-09-taxonomy.json` and the procedure is in
+[`SEO_AND_REDIRECTS.md`](SEO_AND_REDIRECTS.md), "Retiring or merging a tag".
+Dry-run against the 25 Sep data it changes 108 posts (24 of them drafts),
+creates 15 redirects and leaves no published post without a subject. Before
+running it:
+
+- **Run the production crawl comparison first**, so a regression cannot hide
+  among the tag URLs this changes on purpose.
+- **Delete the draft `test-component-support-check`.** Its only tag is Art, so
+  the plan will not retire Art while it exists.
+- **Whatever created the 24 Sep batch of drafts** filed them under Art and
+  `materials-science`. The run deletes both tags, so they cannot be picked
+  again, but the drafting instructions should name the new subjects.
+- **Consider waiting** until tag-page traffic in Search Console has settled
+  after the cutover ([`SEO_CUTOVER_RISK.md`](SEO_CUTOVER_RISK.md), "Reading the
+  aftermath"): a drop across tag pages is the signal of a cutover problem, and
+  this deliberately changes tag pages.
+
 ---
 
 Previously, last worked on **18 Sep 2026**, and it was a long day: four merges (#156, #157,
@@ -1038,7 +1060,7 @@ errors`, and `/swapfile` is `-rw-------`. Its one warning — "non-bind mount
 - **R2 configured and the lost media recovered (22 Aug).** Two buckets, media
   and backups deliberately separate; 109 of 110 images restored from the site
   archive with filenames and document ids intact; first database backup
-  uploaded. Full account, and the one step still outstanding, in item 0.4.
+  uploaded. Full account in item 0.4, closed 18 Sep.
 - **Fixed three bugs found while getting the above working**, all merged to
   `main`:
   - The `app` container had been reporting `unhealthy` since it was created
@@ -1070,7 +1092,7 @@ to Cloudflare's published ranges, and the origin IP was confirmed timing out
 on both ports from outside the VPS while every hostname still serves. See
 "The origin is closed" under Pick up here.
 
-0.4. **Media loss and R2 — recovered on 22 Aug. One small step left.**
+0.4. **Media loss and R2 — recovered on 22 Aug, closed 18 Sep.**
 
 Recorded in full because the failure was invisible for three weeks and the
 recovery this note originally prescribed would not have worked.

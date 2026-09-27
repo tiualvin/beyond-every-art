@@ -14,6 +14,12 @@
 // `Done.`, whether or not there was anything pending. Requiring both markers
 // turns the silent no-op into a failure we can retry.
 //
+// The stall was later traced to Lexical's top-level-await shims, and is now
+// prevented rather than retried: every attempt below runs with the resolution
+// condition `payload-cli.mjs` explains, which is what moved Payload 3.90.1
+// from 3 runs in 8 to 12 in 12 on Node 20. The markers and the retries stay as
+// the check that it keeps being true.
+//
 // This wraps the `migrate:db` script rather than living in the CI workflow so
 // the deploy path is covered too — the release migrator container runs the same
 // command, with no sentinel behind it, against the production database.
@@ -23,8 +29,9 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { PAYLOAD_CLI as CLI, payloadCliEnv } from './payload-cli.mjs'
+
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const CLI = path.join(ROOT, 'node_modules', '.bin', 'payload')
 const BIN = path.join(ROOT, 'node_modules', 'payload', 'bin.js')
 
 const ATTEMPTS = 3
@@ -44,6 +51,7 @@ function runOnce(command, argv) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, argv, {
       cwd: ROOT,
+      env: payloadCliEnv(),
       stdio: ['inherit', 'pipe', 'pipe'],
     })
 

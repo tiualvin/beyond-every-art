@@ -14,7 +14,8 @@ import * as migration_20260919_141233_add_newsletter_card_image from './20260919
 import * as migration_20260920_010521_add_rail_fallback from './20260920_010521_add_rail_fallback';
 import * as migration_20260920_071458_add_review_state_and_authorship from './20260920_071458_add_review_state_and_authorship';
 import * as migration_20260920_165520_add_homepage_global from './20260920_165520_add_homepage_global';
-import * as migration_20260927_073529_add_article_version_capabilities from './20260927_073529_add_article_version_capabilities';
+import * as migration_20260927_070848_add_password_reset_requested_at from './20260927_070848_add_password_reset_requested_at';
+import * as migration_20260927_073635_add_media_object_key from './20260927_073635_add_media_object_key';
 
 export const migrations = [
   {
@@ -98,8 +99,13 @@ export const migrations = [
     name: '20260920_165520_add_homepage_global',
   },
   {
-    up: migration_20260927_073529_add_article_version_capabilities.up,
-    down: migration_20260927_073529_add_article_version_capabilities.down,
-    name: '20260927_073529_add_article_version_capabilities'
+    up: migration_20260927_070848_add_password_reset_requested_at.up,
+    down: migration_20260927_070848_add_password_reset_requested_at.down,
+    name: '20260927_070848_add_password_reset_requested_at',
+  },
+  {
+    up: migration_20260927_073635_add_media_object_key.up,
+    down: migration_20260927_073635_add_media_object_key.down,
+    name: '20260927_073635_add_media_object_key'
   },
 ];

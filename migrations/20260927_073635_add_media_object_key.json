@@ -176,6 +176,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "reset_password_requested_at": {
+          "name": "reset_password_requested_at",
+          "type": "timestamp(3) with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "login_attempts": {
           "name": "login_attempts",
           "type": "numeric",
@@ -668,6 +674,12 @@
           "name": "migration_status",
           "type": "enum_media_migration_status",
           "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "_objectkey": {
+          "name": "_objectkey",
+          "type": "varchar",
           "primaryKey": false,
           "notNull": false
         },
@@ -5255,20 +5267,6 @@
           "notNull": false,
           "default": true
         },
-        "payload_mcp_tool_list_article_versions": {
-          "name": "payload_mcp_tool_list_article_versions",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false,
-          "default": true
-        },
-        "payload_mcp_tool_read_article_version": {
-          "name": "payload_mcp_tool_read_article_version",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false,
-          "default": true
-        },
         "payload_mcp_tool_update_article_markdown": {
           "name": "payload_mcp_tool_update_article_markdown",
           "type": "boolean",
@@ -7492,6 +7490,6 @@
     "tables": {},
     "columns": {}
   },
-  "id": "bc9bc544-e2d9-420a-be06-7ae03eadd6fd",
+  "id": "4600f806-4415-462c-a909-a3520e124026",
   "prevId": "00000000-0000-0000-0000-000000000000"
 }
