@@ -16,6 +16,11 @@ test('article metadata, canonical URL, and structured data agree', async ({
     'content',
     'article',
   )
+  // What Discover's large image cards require. `lib/seo/indexing.ts`.
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
+    'content',
+    'max-image-preview:large',
+  )
 
   const jsonLd = JSON.parse(
     (await page.locator('script[type="application/ld+json"]').textContent()) ||
@@ -61,6 +66,17 @@ test('the homepage, a page, a tag and an author archive each describe themselves
   // work published in parts. Reasoning in lib/seo/jsonld.ts.
   expect(tag['@type']).toBe('CollectionPage')
   expect(tag.name).toBe(fixtures.tag.title)
+  // A topic page describes itself and has a picture to share: the seeded tag's
+  // description, and the newest of its articles' images since the tag has
+  // none of its own. `lib/seo/topic-meta.ts`.
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute(
+    'content',
+    'The science and history behind the materials artists use.',
+  )
+  await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
+    'content',
+    /\/api\/media\/file\//,
+  )
 
   await page.goto(`/author/${fixtures.author.slug}/`)
   const author = await firstNode()
@@ -111,12 +127,31 @@ test('the routes that are not pages answer on the address their callers use', as
   }
 })
 
+test('the IndexNow key file answers on its own name', async ({ request }) => {
+  // The key is set only on the suite's own server (playwright.config.ts), so a
+  // run against a deployed host has nothing to find here.
+  test.skip(
+    Boolean(process.env.PLAYWRIGHT_BASE_URL),
+    'INDEXNOW_KEY is set only for the local test server',
+  )
+  // A dotted root path, served by a route handler. This is what proves that
+  // `trailingSlash: true` leaves it where IndexNow will look — the same class
+  // of path `/ads.txt` had to be moved to Caddy for.
+  const response = await request.get('/indexnow.txt', { maxRedirects: 0 })
+  expect(response.status()).toBe(200)
+  expect(await response.text()).toBe('e2e-indexnow-key-0000')
+})
+
 test('robots, sitemap, and RSS expose the public launch surface', async ({
   request,
 }) => {
   const robots = await request.get('/robots.txt')
   expect(robots.ok()).toBeTruthy()
-  expect(await robots.text()).toMatch(/Sitemap: .*\/sitemap\.xml/)
+  const robotsTxt = await robots.text()
+  expect(robotsTxt).toMatch(/Sitemap: .*\/sitemap\.xml/)
+  // Uploads are served under `/api`, which is otherwise disallowed; without
+  // this line no crawler may fetch an article's image. See `app/robots.ts`.
+  expect(robotsTxt).toContain('Allow: /api/media/file/')
 
   const sitemap = await request.get('/sitemap.xml')
   expect(sitemap.ok()).toBeTruthy()

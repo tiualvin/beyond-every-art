@@ -12,6 +12,8 @@ import { purgeOnChange, purgeOnDelete } from '../lib/cache/purge'
 import { recordMcpWrite } from '../lib/mcp/audit'
 import { refuseMcpPublish } from '../lib/mcp/publish-guard'
 import { buildPreviewUrl } from '../lib/preview/live-preview'
+import { indexNowOnChange, indexNowOnDelete } from '../lib/seo/indexnow'
+import { pagePath } from '../lib/seo/site'
 
 export const Pages: CollectionConfig = {
   slug: 'pages',
@@ -33,8 +35,17 @@ export const Pages: CollectionConfig = {
   trash: true,
   hooks: {
     beforeChange: [refuseMcpPublish, stampLastEditedBy, stampPublishedAt],
-    afterChange: [recordMcpWrite, purgeOnChange(CONTENT_TAGS.pages)],
-    afterDelete: [purgeOnDelete(CONTENT_TAGS.pages)],
+    afterChange: [
+      recordMcpWrite,
+      purgeOnChange(CONTENT_TAGS.pages),
+      // Tells Bing a published URL changed. Off unless INDEXNOW_KEY is set;
+      // see lib/seo/indexnow.ts.
+      indexNowOnChange(pagePath),
+    ],
+    afterDelete: [
+      purgeOnDelete(CONTENT_TAGS.pages),
+      indexNowOnDelete(pagePath),
+    ],
   },
   // See the note in Posts.ts: autosave drives Live Preview, maxPerDoc keeps the
   // version table it fills from growing without bound.
