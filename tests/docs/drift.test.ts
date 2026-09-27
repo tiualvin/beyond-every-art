@@ -145,11 +145,6 @@ describe('documentation file references', () => {
     // is shared by the index and the detail page. The spec records the design,
     // and carries a note pointing at where it actually landed.
     'app/(frontend)/apps/[slug]/actions.ts',
-    // docs/STOCK_IMAGERY.md: the one module a stock-photo search would live
-    // in, named so the evaluation can say what does and does not import the
-    // vendor. Nothing is built; the decisions in that document's last section
-    // come first.
-    'lib/stock/unsplash.ts',
     // docs/AD_MANAGER.md §5: the files the switch from AdSense's tag to Google
     // Ad Manager's would add — the network resolver, the key-value builder and
     // the GPT loader. Planned; the console work in that document's §4 comes
