@@ -4,6 +4,7 @@ import {
   absoluteUrl,
   authorPath,
   getSiteUrl,
+  isPublicSiteUrl,
   pagePath,
   postPath,
   PUBLICATION_PATH,
@@ -38,6 +39,28 @@ describe('getSiteUrl', () => {
 
   it('falls back to localhost when nothing is configured', () => {
     expect(getSiteUrl()).toBe('http://localhost:3000')
+  })
+})
+
+describe('isPublicSiteUrl', () => {
+  it('accepts an https origin on a named host', () => {
+    expect(isPublicSiteUrl('https://www.beyondeveryart.com')).toBe(true)
+    expect(isPublicSiteUrl('https://beyondeveryart.com/')).toBe(true)
+  })
+
+  it('refuses loopback, bare addresses and unqualified names', () => {
+    expect(isPublicSiteUrl('http://localhost:3000')).toBe(false)
+    expect(isPublicSiteUrl('https://localhost')).toBe(false)
+    expect(isPublicSiteUrl('http://127.0.0.1:3000')).toBe(false)
+    expect(isPublicSiteUrl('https://127.0.0.1')).toBe(false)
+    expect(isPublicSiteUrl('http://[::1]:3000')).toBe(false)
+    expect(isPublicSiteUrl('http://cms:3000')).toBe(false)
+  })
+
+  it('refuses plain http and anything that is not a URL', () => {
+    expect(isPublicSiteUrl('http://www.beyondeveryart.com')).toBe(false)
+    expect(isPublicSiteUrl('not a url')).toBe(false)
+    expect(isPublicSiteUrl('')).toBe(false)
   })
 })
 

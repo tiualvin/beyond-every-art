@@ -15,6 +15,7 @@
 // reachable from `next.config.ts`, which Next compiles before the path aliases
 // exist. See the note there.
 import { isNoindex } from '../seo/indexing'
+import { getSiteUrl, isPublicSiteUrl } from '../seo/site'
 
 type Env = Record<string, string | undefined>
 
@@ -48,7 +49,7 @@ const CLIENT_ID = /^ca-pub-[0-9]{16}$/
 /**
  * The publisher id to load the tag for, or `null` to load nothing.
  *
- * Three rules, in order:
+ * Four rules, in order:
  *
  * 1. **A non-indexable deployment loads nothing.** `NEXT_PUBLIC_NOINDEX` is
  *    the marker for "this is not the real site", and the same switch already
@@ -56,12 +57,22 @@ const CLIENT_ID = /^ca-pub-[0-9]{16}$/
  *    not merely untidy: AdSense policy is about what is served to real
  *    visitors, and a crawler that cannot reach the page it is asked to
  *    monetise is how an application gets declined.
- * 2. **`off` disables the tag** without a code change, for the day a policy
+ * 2. **A deployment whose own origin is not public loads nothing.** The tag
+ *    reports the page it ran on, so loading it from a laptop on
+ *    `localhost:3000` or `127.0.0.1:3000` is how AdSense comes to record
+ *    `127.0.0.1` as the property and sees ad requests against an address
+ *    nobody can fetch. Same clause and the same reason as `indexNowConfig`,
+ *    through `isPublicSiteUrl` (`lib/seo/site.ts`).
+ * 3. **`off` disables the tag** without a code change, for the day a policy
  *    complaint needs ads gone in the time it takes to restart the container.
- * 3. **A malformed id loads nothing**, per the note on the pattern above.
+ * 4. **A malformed id loads nothing**, per the note on the pattern above.
  */
-export function resolveAdsenseClient(env: Env = process.env): string | null {
+export function resolveAdsenseClient(
+  env: Env = process.env,
+  siteUrl: string = getSiteUrl(),
+): string | null {
   if (isNoindex(env)) return null
+  if (!isPublicSiteUrl(siteUrl)) return null
 
   const configured = (env.NEXT_PUBLIC_ADSENSE_CLIENT ?? '').trim()
   if (configured.toLowerCase() === 'off') return null

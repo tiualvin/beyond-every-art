@@ -14,6 +14,34 @@ export function getSiteUrl(): string {
   return raw.replace(/\/+$/, '')
 }
 
+/**
+ * Whether a site URL is one the public internet can actually fetch: https, on
+ * a named host, and neither loopback nor a bare address.
+ *
+ * Named once because independent features have to agree on it and they fail
+ * the same way when they do not. A development machine with a copied `.env`
+ * otherwise announces URLs nobody can fetch (IndexNow, `indexNowConfig`) and
+ * loads real ad code against a page Google logs as `127.0.0.1` (AdSense,
+ * `resolveAdsenseClient`) — the tag reports the page it ran on, so the address
+ * AdSense records as the property is the one the page was served from.
+ *
+ * The clauses reject, in order: plain http, `localhost`, an unqualified name
+ * (`cms`, `postgres`), a bare IPv4 literal, and anything carrying a colon —
+ * which is what an IPv6 literal (`[::1]`) looks like once `URL` has parsed it.
+ */
+export function isPublicSiteUrl(siteUrl: string): boolean {
+  let url: URL
+  try {
+    url = new URL(siteUrl)
+  } catch {
+    return false
+  }
+  if (url.protocol !== 'https:') return false
+  if (url.hostname === 'localhost' || !url.hostname.includes('.')) return false
+  if (/^[\d.]+$/.test(url.hostname) || url.hostname.includes(':')) return false
+  return true
+}
+
 /** Joins a path onto the site origin, passing absolute URLs through untouched. */
 export function absoluteUrl(
   pathname: string,
