@@ -3914,8 +3914,14 @@ ol.feature-list__items .feature-list__title::before {
    claim about our own content that is not true, and the sort of thing an ad
    network is entitled to take a dim view of — but removing the label from the
    flow would shorten the box by 22px at the moment the fallback appears, which
-   is a layout shift under the reader for the sake of a word. */
-.ad-slot[data-fill='unfilled'] .ad-slot__label {
+   is a layout shift under the reader for the sake of a word.
+
+   Gated on `data-has-fallback`, because the label goes only where house
+   content replaced it. A slot with nothing to show keeps its cap: an empty box
+   that says it is an advertisement is the honest minimum, and the alternative
+   is an unlabelled blank. `AdUnit` observes every slot for coverage now, so
+   `data-fill` can be `unfilled` on one with no children. */
+.ad-slot[data-fill='unfilled'][data-has-fallback='true'] .ad-slot__label {
   visibility: hidden;
 }
 

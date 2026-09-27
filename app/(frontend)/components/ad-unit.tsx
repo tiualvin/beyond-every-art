@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 
+import { reportAdSlot } from '@/lib/analytics/events'
 import {
   AD_SLOTS,
   minViewportWidth,
@@ -85,7 +86,12 @@ export function AdUnit({
 }) {
   const ref = useRef<HTMLModElement>(null)
   const pushed = useRef(false)
+  const reported = useRef(false)
   const [fill, setFill] = useState<Fill>('pending')
+  // Whether this slot has content to show in the empty state. Drives the label
+  // rather than the fill state: an unfilled slot with nothing to show keeps its
+  // "Advertisement" cap, where one with house content replaces it.
+  const hasFallback = Boolean(children)
 
   useEffect(() => {
     const unit = ref.current
@@ -143,12 +149,21 @@ export function AdUnit({
     }
   }, [placement])
 
-  // Whether anything arrived. Separate from the push above because it has to
-  // survive the push failing: a blocked loader throws, or never runs, and that
-  // is exactly when the fallback is needed.
+  // Whether anything arrived, and what to tell analytics about it. It runs for
+  // every slot, not only the ones with a fallback, because the coverage this
+  // feeds is about all of them — a slot with nothing to show is exactly the one
+  // the ad layer most needs counted. `data-fill` still drives the label and the
+  // fallback; `reported` keeps the event to one per slot.
   useEffect(() => {
     const unit = ref.current
-    if (!unit || !children) return
+    if (!unit) return
+
+    const settle = (next: Exclude<Fill, 'pending'>) => {
+      setFill(next)
+      if (reported.current) return
+      reported.current = true
+      reportAdSlot(placement, next)
+    }
 
     // Deliberately not latched. The timeout below guesses `unfilled` when the
     // tag has said nothing, and a tag that was merely slow can still answer
@@ -158,7 +173,7 @@ export function AdUnit({
     const read = () => {
       const status = unit.getAttribute('data-ad-status')
       if (status === 'filled' || status === 'unfilled') {
-        setFill(status)
+        settle(status)
         return true
       }
       return false
@@ -177,13 +192,13 @@ export function AdUnit({
     // often, which is the commonest reason of all for an empty slot.
     const timer = window.setTimeout(() => {
       if (read()) return
-      setFill(unit.querySelector('iframe') ? 'filled' : 'unfilled')
+      settle(unit.querySelector('iframe') ? 'filled' : 'unfilled')
     }, SETTLE_MS)
     return () => {
       observer.disconnect()
       window.clearTimeout(timer)
     }
-  }, [children])
+  }, [placement])
 
   const size = SLOT_SIZES[placement]
   // Google's shapes. A fixed unit is sized by its own inline style; a fluid
@@ -213,7 +228,12 @@ export function AdUnit({
           }
 
   return (
-    <div className="ad-slot" data-fill={fill} data-placement={placement}>
+    <div
+      className="ad-slot"
+      data-fill={fill}
+      data-placement={placement}
+      data-has-fallback={hasFallback ? 'true' : 'false'}
+    >
       {/* Hidden with the unit when nothing was served. Labelling the house
           promo below "Advertisement" would be both wrong and, since it is our
           own content, a claim we should not be making. */}

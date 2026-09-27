@@ -205,3 +205,21 @@ describe('the rail unit', () => {
     expect(unit).not.toMatch(/setInterval/)
   })
 })
+
+describe('ad coverage instrumentation', () => {
+  const unit = readFileSync(
+    join(process.cwd(), 'app/(frontend)/components/ad-unit.tsx'),
+    'utf8',
+  )
+
+  // Coverage is per placement and per country, and only GA4 can join the two —
+  // AdSense reports per ad unit but not against the reader's country. The
+  // observation has to run for every slot, not only the ones with a fallback:
+  // a slot with nothing to show is the one most worth counting, and it used to
+  // skip every measurement.
+  it('observes every slot, fallback or not, and reports once', () => {
+    expect(unit).toMatch(/reportAdSlot\(placement, next\)/)
+    expect(unit).toMatch(/reported\.current/)
+    expect(unit).not.toMatch(/if \(!unit \|\| !children\) return/)
+  })
+})
