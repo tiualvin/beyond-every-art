@@ -53,7 +53,12 @@ export default buildConfig({
       description:
         'Editorial CMS for Beyond Every Art — art, colour, materials and creative practice.',
     },
-    // The publication's own palette lives in `app/(payload)/custom.css`, which
+    // Payload's dark theme, always. The owner works in it and asked for it
+    // outright after a light palette leaked into dark mode and turned the
+    // admin beige; this also removes the per-user theme toggle, so nobody
+    // lands on a light screen by accident. See docs/EDITORIAL_ADMIN.md.
+    theme: 'dark',
+    // The publication's own accents live in `app/(payload)/custom.css`, which
     // the admin layout imports. Payload 3 has no `admin.css` key — a stylesheet
     // is an import in the layout, not configuration.
     components: {

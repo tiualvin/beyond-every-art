@@ -2,14 +2,15 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
+import config from '../../payload.config'
+
 /**
- * The admin's palette may only touch Payload's theme variables in light mode.
+ * The admin is always in Payload's dark theme, and nothing repaints it.
  *
  * Payload wraps all of its CSS in `@layer payload-default`. Unlayered rules
- * beat layered ones regardless of specificity, so a `--theme-*` declaration on
- * a bare `:root` in `custom.css` overrides Payload's dark theme too — which is
- * how the dark admin once turned paper-beige. Every rule that sets one must be
- * scoped to `[data-theme='light']`.
+ * beat layered ones regardless of specificity, so any `--theme-*` declaration
+ * in `custom.css` overrides Payload's dark theme — which is how the admin once
+ * turned paper-beige.
  */
 
 const CSS = readFileSync(
@@ -17,28 +18,12 @@ const CSS = readFileSync(
   'utf8',
 ).replace(/\/\*[\s\S]*?\*\//g, '')
 
-/** Top-level-enough rules: selector plus body, ignoring @media wrappers. */
-function rules(css: string): Array<{ selector: string; body: string }> {
-  const found: Array<{ selector: string; body: string }> = []
-  const re = /([^{}]+)\{([^{}]*)\}/g
-  for (const match of css.matchAll(re)) {
-    found.push({ selector: match[1].trim(), body: match[2] })
-  }
-  return found
-}
-
-describe('admin custom.css', () => {
-  const themed = rules(CSS).filter((rule) => /--theme-[\w-]+\s*:/.test(rule.body))
-
-  it('sets Payload theme variables somewhere', () => {
-    expect(themed.length).toBeGreaterThan(0)
+describe('admin theme', () => {
+  it("is forced to Payload's dark theme", async () => {
+    expect((await config).admin.theme).toBe('dark')
   })
 
-  it("sets them only under [data-theme='light']", () => {
-    for (const rule of themed) {
-      for (const selector of rule.selector.split(',')) {
-        expect(selector.trim()).toMatch(/\[data-theme=['"]?light['"]?\]/)
-      }
-    }
+  it('custom.css sets none of Payload’s theme variables', () => {
+    expect(CSS).not.toMatch(/--theme-[\w-]+\s*:/)
   })
 })
