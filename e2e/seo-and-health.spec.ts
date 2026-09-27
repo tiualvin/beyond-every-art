@@ -127,6 +127,21 @@ test('the routes that are not pages answer on the address their callers use', as
   }
 })
 
+test('the IndexNow key file answers on its own name', async ({ request }) => {
+  // The key is set only on the suite's own server (playwright.config.ts), so a
+  // run against a deployed host has nothing to find here.
+  test.skip(
+    Boolean(process.env.PLAYWRIGHT_BASE_URL),
+    'INDEXNOW_KEY is set only for the local test server',
+  )
+  // A dotted root path, served by a route handler. This is what proves that
+  // `trailingSlash: true` leaves it where IndexNow will look — the same class
+  // of path `/ads.txt` had to be moved to Caddy for.
+  const response = await request.get('/indexnow.txt', { maxRedirects: 0 })
+  expect(response.status()).toBe(200)
+  expect(await response.text()).toBe('e2e-indexnow-key-0000')
+})
+
 test('robots, sitemap, and RSS expose the public launch surface', async ({
   request,
 }) => {
