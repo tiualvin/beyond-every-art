@@ -5,6 +5,7 @@ import { toCreditURL } from '../lib/content/attribution'
 import { ghostUrlField, migrationStatusField } from '../fields/ghost'
 import { CONTENT_TAGS } from '../lib/cache/content'
 import { purgeOnChange, purgeOnDelete } from '../lib/cache/purge'
+import { recordMcpWrite } from '../lib/mcp/audit'
 import { refuseOversizedUpload } from '../lib/security/uploads'
 
 export const Media: CollectionConfig = {
@@ -27,7 +28,9 @@ export const Media: CollectionConfig = {
   trash: true,
   hooks: {
     beforeOperation: [refuseOversizedUpload],
-    afterChange: [purgeOnChange(CONTENT_TAGS.media)],
+    // The upload tools write here, so without this an MCP upload logged which
+    // key called the tool but never which document it made.
+    afterChange: [recordMcpWrite, purgeOnChange(CONTENT_TAGS.media)],
     afterDelete: [purgeOnDelete(CONTENT_TAGS.media)],
   },
   upload: {

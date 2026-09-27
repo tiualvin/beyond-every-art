@@ -6,6 +6,7 @@ import { seoFields } from '../fields/seo'
 import { slugField } from '../fields/slug'
 import { CONTENT_TAGS } from '../lib/cache/content'
 import { purgeOnChange, purgeOnDelete } from '../lib/cache/purge'
+import { recordMcpWrite } from '../lib/mcp/audit'
 
 export const Tags: CollectionConfig = {
   slug: 'tags',
@@ -21,7 +22,8 @@ export const Tags: CollectionConfig = {
     delete: editorsAndAdmins,
   },
   hooks: {
-    afterChange: [purgeOnChange(CONTENT_TAGS.tags)],
+    // `updateTags` is in the MCP allowlist, so an agent can rename a tag.
+    afterChange: [recordMcpWrite, purgeOnChange(CONTENT_TAGS.tags)],
     afterDelete: [purgeOnDelete(CONTENT_TAGS.tags)],
   },
   fields: [

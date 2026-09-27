@@ -1,11 +1,19 @@
+import type { CollectionConfig } from 'payload'
 import { describe, expect, it } from 'vitest'
 
+import { Authors } from '../../collections/Authors'
+import { Media } from '../../collections/Media'
+import { Pages } from '../../collections/Pages'
+import { Posts } from '../../collections/Posts'
+import { Tags } from '../../collections/Tags'
 import {
   mcpAuthLogEntry,
   mcpEventLogEntry,
   mcpRefusedLogEntry,
   mcpWriteLogEntry,
+  recordMcpWrite,
 } from '../../lib/mcp/audit'
+import { mcpPluginConfig } from '../../lib/mcp/plugin'
 
 describe('mcpAuthLogEntry', () => {
   it('records which key acted, and as whom', () => {
@@ -203,4 +211,45 @@ describe('mcpWriteLogEntry', () => {
       userId: '1',
     })
   })
+})
+
+describe('recordMcpWrite coverage', () => {
+  // The plugin's generated tools write to whatever the allowlist enables, and
+  // the custom tools write where their handlers say. Both lists are here so a
+  // collection cannot become writable over MCP without leaving a trail: Media
+  // and Tags were, for as long as the upload tools and `updateTags` existed,
+  // and the log said which key called but never which document changed.
+  const COLLECTIONS: Record<string, CollectionConfig> = {
+    authors: Authors,
+    media: Media,
+    pages: Pages,
+    posts: Posts,
+    tags: Tags,
+  }
+
+  /** Where the custom tools in `lib/mcp/tools.ts` create or update documents. */
+  const CUSTOM_TOOL_WRITES = ['media', 'posts']
+
+  const generatedWrites = Object.entries(mcpPluginConfig.collections ?? {})
+    .filter(([, entry]) => {
+      const enabled = (entry as { enabled?: unknown } | undefined)?.enabled
+      if (enabled === true) return true
+      if (typeof enabled !== 'object' || enabled === null) return false
+      const operations = enabled as Record<string, unknown>
+      return (
+        operations.create === true ||
+        operations.update === true ||
+        operations.delete === true
+      )
+    })
+    .map(([slug]) => slug)
+
+  it.each([...new Set([...generatedWrites, ...CUSTOM_TOOL_WRITES])])(
+    '%s records MCP writes',
+    (slug) => {
+      const collection = COLLECTIONS[slug]
+      expect(collection, `no collection config for ${slug}`).toBeDefined()
+      expect(collection!.hooks?.afterChange ?? []).toContain(recordMcpWrite)
+    },
+  )
 })
