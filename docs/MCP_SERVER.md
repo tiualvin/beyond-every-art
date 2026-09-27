@@ -102,10 +102,18 @@ both access rules — no field moves, so the schema is untouched:
   visible.
 
 One more thing about that screen, because it runs the other way from the
-collection checkboxes: **custom tools default to ticked.** `draftArticle`,
-`readArticleMarkdown`, `updateArticleMarkdown`, and `uploadMedia` are all
-enabled on a new key unless you untick them, while every collection capability
-starts unticked. That is the plugin's default, not this project's choice.
+collection checkboxes: **custom tools default to ticked.** Every tool in the
+table below is enabled on a new key unless you untick it, while every collection
+capability starts unticked. That is the plugin's default, not this project's
+choice.
+
+It reaches existing keys too. Each custom tool is a column on
+`payload-mcp-api-keys` — which is why adding one needs a schema migration — and
+the plugin declares that column `DEFAULT true`, so every key already issued
+gains a new tool the moment its migration runs. `setKeyFactsBlock` arrived that
+way. It writes drafts only and passes the same publish guard as
+`updateArticleMarkdown`, so it adds no authority a key did not already have;
+untick it on any key that should not have it.
 
 ### Tools
 
@@ -116,13 +124,62 @@ all.
 
 Written for this project, because the generated ones cannot do the job:
 
-| Tool                    | Does                                                                                                                                                 |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `draftArticle`          | Creates a post from Markdown, always as a draft. Resolves tag and author slugs, refuses unknown ones. The `ghostID` is autofilled by the collection. |
-| `readArticleMarkdown`   | Reads a post back as Markdown, including the draft body. Says so plainly when the document renders from migrated `legacyHTML` instead.               |
-| `updateArticleMarkdown` | Replaces a body from Markdown, saved as a draft.                                                                                                     |
-| `uploadMedia`           | Adds an image to the Media library from base64 and returns its id, for `updatePosts` to set as a `featuredImage`.                                    |
-| `uploadMediaFromUrl`    | The same, from an https address the server fetches itself. The only one of the two that works from a phone or a scheduled run.                       |
+| Tool                    | Does                                                                                                                                                                      |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `draftArticle`          | Creates a post from Markdown, always as a draft. Resolves tag and author slugs, refuses unknown ones. The `ghostID` is autofilled by the collection.                      |
+| `readArticleMarkdown`   | Reads a post back as Markdown, including the draft body, with each module as a marker line and its contents in `blocks`. Says so when the page renders from `legacyHTML`. |
+| `updateArticleMarkdown` | Replaces a body from Markdown, saved as a draft. Puts each marked module back as it was; reports which were kept and which removed.                                       |
+| `setKeyFactsBlock`      | Sets an article's key facts card — label and value pairs — in place, or under a named body heading. Saved as a draft; the rest of the body is untouched.                  |
+| `uploadMedia`           | Adds an image to the Media library from base64 and returns its id, for `updatePosts` to set as a `featuredImage`.                                                         |
+| `uploadMediaFromUrl`    | The same, from an https address the server fetches itself. The only one of the two that works from a phone or a scheduled run.                                            |
+
+### Modules in a body
+
+The modules an editor inserts into a body — key facts, FAQs, galleries,
+callouts, and the rest of [`blocks/schema.ts`](../blocks/schema.ts) — are
+Lexical block nodes inside `content`, not fields beside it, and none of them has
+a Markdown form. Until the tools accounted for that, Payload's converter wrote
+each as the words "Block Field": a read could not show what a module said, and a
+revision replaced every module in the body with that line of text, which would
+have published. That was true of modules an editor added in the admin panel, not
+only of anything an agent wrote.
+
+[`lib/mcp/blocks.ts`](../lib/mcp/blocks.ts) stands a marker in for each one, on
+a line of its own:
+
+```
+<!-- block:keyFacts:65f0c0ffee0000000000abcd -->
+```
+
+The read tool returns the module's contents beside the Markdown, in `blocks`,
+with the heading it sits under. The update tool swaps each marker back for the
+module it names, exactly as stored: moving a marker moves the module, and
+leaving one out removes it, which the response always reports. A marker naming
+nothing in the current draft, used twice, or run into a paragraph is refused
+before anything is saved, since saving it would print a literal comment on the
+page.
+
+`setKeyFactsBlock` writes the one module there is a tool for. It replaces an
+article's key facts where they stand, or, if there are none, inserts them
+directly under the body heading the call names — headings being the one address
+in a body that an agent and an editor both see and that survives a revision.
+`replacePipeTable` removes the Markdown table under that heading at the same
+time: the editor has no table feature, so a table drafted in Markdown is stored
+as a paragraph of literal pipes and printed as one. It refuses an article with
+two sets of key facts, a heading that is missing or heads two sections, and any
+article whose page renders from `legacyHTML`, where a body holding only the card
+would replace the whole article.
+
+Two details keep this lossless. Articles are read at depth 0: populated, an
+inline image exports as a Markdown image pointing at its URL, which the
+converter does not read back, so a revision used to turn every image into its
+own Markdown source; unpopulated it exports as `![media:7]()`, which it does. And whether an article renders from
+`legacyHTML` is asked of the renderer (`toArticleBody`) rather than read off the
+field, because the rich-text body wins whenever it holds anything.
+
+Relationship nodes — a link card to another document, inserted from the editor's
+toolbar — have the same problem modules had, and are not covered: one still
+comes back from a revision as a line of text.
 
 ### Images
 
@@ -492,10 +549,11 @@ to close that. At `3.88.0` the plugin assigns it too, immediately after
 than load-bearing. It is kept: it costs nothing, it holds if that changes again,
 and the audit line needs the user in hand anyway.
 
-Note that migrated posts render from `legacyHTML`, not `content`, so a
-markdown-drafted body only appears on the public site for documents that have no
-`legacyHTML` — which is exactly the newly authored ones. `readArticleMarkdown`
-says so rather than returning an empty string.
+Note that migrated posts render from `legacyHTML` only while `content` is empty:
+the rich-text body wins whenever it holds anything, so the first edit to a
+migrated article in the editor — or over MCP — becomes what the page shows.
+`readArticleMarkdown` asks the renderer which body applies, and says so rather
+than returning an empty string when it is the migrated HTML.
 
 ### Finding 4: the endpoint is not behind the staging gate
 
