@@ -16,6 +16,11 @@ test('article metadata, canonical URL, and structured data agree', async ({
     'content',
     'article',
   )
+  // What Discover's large image cards require. `lib/seo/indexing.ts`.
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
+    'content',
+    'max-image-preview:large',
+  )
 
   const jsonLd = JSON.parse(
     (await page.locator('script[type="application/ld+json"]').textContent()) ||
