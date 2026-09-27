@@ -125,8 +125,15 @@ and commit the result.**
 Payload's own stylesheet. Payload 3 has no `admin.css` config key; a stylesheet
 is an import in the layout.
 
-It is deliberately shallow: it sets Payload's own theme variables and styles
-this project's four components. It reaches into no vendor internals, because a
+The admin is always in Payload's dark theme: `admin.theme: 'dark'` in
+`payload.config.ts`, which also removes the per-user toggle. The stylesheet
+sets none of Payload's `--theme-*` variables. Payload wraps its CSS in
+`@layer payload-default`, so any unlayered override here wins over _every_
+theme regardless of specificity — that is how a light palette once turned the
+dark admin beige — and `tests/design/admin-theme.test.ts` fails if one comes
+back.
+
+It is deliberately shallow: it styles this project's four components. It reaches into no vendor internals, because a
 selector aimed at Payload's markup is a thing that breaks on an upgrade for no
 reader-visible gain. The palette tokens are copied from `app/globals.css` rather
 than imported — that file is the public site's stylesheet and pulling it in here
