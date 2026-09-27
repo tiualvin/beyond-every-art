@@ -62,6 +62,28 @@ async function rpc(
   return parseRpc(await response.text())
 }
 
+/**
+ * Calls a tool that is expected to succeed and returns its parsed JSON reply.
+ *
+ * The custom tools answer with one text block holding JSON, so a failure here
+ * names the tool's own error rather than a parse error three lines later.
+ */
+async function callToolJson(
+  request: APIRequestContext,
+  key: string,
+  name: string,
+  args: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const message = await rpc(request, key, 'tools/call', {
+    arguments: args,
+    name,
+  })
+  const result = message.result as
+    { content?: Array<{ text?: string }>; isError?: boolean } | undefined
+  expect(result?.isError, JSON.stringify(message)).toBeFalsy()
+  return JSON.parse(result!.content![0].text!)
+}
+
 /** Calls a tool and returns its text content, whether it succeeded or not. */
 async function callTool(
   request: APIRequestContext,
@@ -137,11 +159,17 @@ test.describe('MCP endpoint', () => {
       expect.arrayContaining([
         'draftArticle',
         'readArticleMarkdown',
+        'listArticleVersions',
+        'readArticleVersion',
         'updateArticleMarkdown',
         'uploadMedia',
         'findPosts',
       ]),
     )
+
+    // Restoring a version overwrites the whole document, and nothing should
+    // offer that until it is decided separately. See `lib/mcp/tools.ts`.
+    expect(tools.filter((name) => /restore/i.test(name))).toEqual([])
 
     // The allowlist is the whole security story for reach, so assert the
     // absence rather than trusting the config to have been read correctly.
@@ -195,6 +223,116 @@ test.describe('MCP endpoint', () => {
     // the markdown tools exist to avoid.
     expect(read).toContain('Ground layers')
     expect(read).toContain('emphasis')
+  })
+
+  // Version history, over the wire: a real Lexical round trip against a real
+  // versions table, which is the part a unit test with a stub cannot show.
+  test("lists an article's versions and reads an old one without changing the draft", async ({
+    request,
+  }) => {
+    const key = fixtures.mcp.editorKey
+    const slug = `e2e-mcp-versions-${Date.now()}-${Math.floor(Math.random() * 1e6)}`
+    const first =
+      '## Ground layers\n\nThe first draft talks about *chalk* grounds.\n'
+    const second =
+      '## Ground layers\n\nThe revision talks about *lead white* instead.\n'
+
+    await callToolJson(request, key, 'draftArticle', {
+      markdown: first,
+      slug,
+      title: 'E2E MCP Versioned Article',
+    })
+    await callToolJson(request, key, 'updateArticleMarkdown', {
+      markdown: second,
+      slug,
+    })
+
+    const listed = await callToolJson(request, key, 'listArticleVersions', {
+      slug,
+    })
+    const versions = listed.versions as Array<{
+      latest: boolean
+      snippet: string
+      versionId: string
+    }>
+
+    // Newest first, bodies summarised rather than returned.
+    expect(versions.length).toBeGreaterThanOrEqual(2)
+    expect(versions[0].latest).toBe(true)
+    expect(versions[0].snippet).toContain('lead white')
+    expect(JSON.stringify(listed)).not.toContain('"markdown"')
+
+    const older = versions.find((version) => version.snippet.includes('chalk'))
+    expect(older, JSON.stringify(versions)).toBeDefined()
+
+    const old = await callToolJson(request, key, 'readArticleVersion', {
+      versionId: older!.versionId,
+    })
+    expect(old.markdown).toContain('chalk')
+    expect(old.markdown).not.toContain('lead white')
+    expect(old).toMatchObject({
+      slug,
+      status: 'draft',
+      versionId: older!.versionId,
+    })
+
+    // The same conversion as the live read: the newest version and the draft
+    // must come back byte for byte identical, or a comparison between them
+    // would show differences that are not in the article.
+    const latest = await callToolJson(request, key, 'readArticleVersion', {
+      versionId: versions[0].versionId,
+    })
+    const current = await callToolJson(request, key, 'readArticleMarkdown', {
+      slug,
+    })
+    expect(latest.markdown).toBe(current.markdown)
+
+    // And reading history wrote nothing: the draft is still the revision.
+    expect(current.markdown).toContain('lead white')
+    const after = await callToolJson(request, key, 'listArticleVersions', {
+      slug,
+    })
+    expect(after.totalVersions).toBe(listed.totalVersions)
+  })
+
+  // An author may read their own drafts and published articles, and not a
+  // colleague's draft — `postsRead` says so for the document, and the rule on
+  // its versions has to say the same, or history becomes the way around it.
+  test("keeps an author key out of a colleague's draft history", async ({
+    request,
+  }) => {
+    const slug = `e2e-mcp-versions-private-${Date.now()}-${Math.floor(Math.random() * 1e6)}`
+
+    await callToolJson(request, fixtures.mcp.editorKey, 'draftArticle', {
+      markdown: 'An editor draft no author should read, now or in history.',
+      slug,
+      title: 'E2E MCP Private Draft',
+    })
+    const listed = await callToolJson(
+      request,
+      fixtures.mcp.editorKey,
+      'listArticleVersions',
+      { slug },
+    )
+    const [{ versionId }] = listed.versions as Array<{ versionId: string }>
+
+    const byList = await callTool(
+      request,
+      fixtures.mcp.authorKey,
+      'listArticleVersions',
+      { slug },
+    )
+    expect(byList).toContain('"isError":true')
+    expect(byList).not.toContain('no author should read')
+
+    const byId = await callTool(
+      request,
+      fixtures.mcp.authorKey,
+      'readArticleVersion',
+      { versionId },
+    )
+    expect(byId).toContain('"isError":true')
+    expect(byId).not.toContain('no author should read')
   })
 
   // The guard on `uploadMediaFromUrl`, over the wire rather than in isolation.

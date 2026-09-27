@@ -192,6 +192,8 @@ async function upsertKeyedUser(
     'payload-mcp-tool': {
       draftArticle: true,
       readArticleMarkdown: true,
+      listArticleVersions: true,
+      readArticleVersion: true,
       updateArticleMarkdown: true,
       uploadMedia: true,
       uploadMediaFromUrl: true,
@@ -288,6 +290,11 @@ async function seed(): Promise<void> {
     email: fixtures.mcp.adminEmail,
     key: fixtures.mcp.adminKey,
     role: 'admin',
+  })
+  await upsertKeyedUser(payload, {
+    email: fixtures.mcp.authorEmail,
+    key: fixtures.mcp.authorKey,
+    role: 'author',
   })
 
   payload.logger.info(

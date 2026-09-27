@@ -1,9 +1,11 @@
-// Custom MCP tools for drafting and illustrating.
+// Custom MCP tools for drafting, illustrating, and looking back.
 //
 // The plugin's generated CRUD tools are enough to read and edit documents, but
 // not to write one: they expose `content` as raw Lexical editor state (see
 // `markdown.ts`). Nor can they carry a file, so an image has no way in at all. These tools close both gaps, so an agent's
 // job is to write and illustrate the article rather than to satisfy the schema.
+// Nor do they reach version history, which Payload keeps for every save; the
+// two version tools read it, and deliberately cannot write it back.
 //
 // `@payloadcms/plugin-mcp` still has no `defineTool` helper at `3.88.0`, the
 // release this project pins — it is documented on Payload's main branch but has
@@ -15,6 +17,7 @@ import type { MCPPluginConfig } from '@payloadcms/plugin-mcp'
 import type { PayloadRequest, TypedUser } from 'payload'
 import { z } from 'zod'
 
+import { htmlToPlainText, richTextToPlainText } from '../content/plain-text'
 import { buildPreviewUrl } from '../preview/live-preview'
 import {
   lexicalToMarkdown,
@@ -124,6 +127,68 @@ const targetShape = {
   slug: z.string().optional().describe('Document slug. Provide this or `id`.'),
 }
 
+/**
+ * What `readArticleMarkdown` says about a document, and `readArticleVersion`
+ * about a revision of one.
+ *
+ * One function for both, so that a version reads back in exactly the format
+ * the current draft does and the two can be compared line for line. Two copies
+ * of this would drift the first time either was touched, and the drift would
+ * show up as a spurious difference in somebody's merge.
+ */
+function articleView(req: PayloadRequest, doc: Record<string, unknown>) {
+  return {
+    excerpt: doc.excerpt ?? null,
+    // Migrated bodies live in `legacyHTML` and are not Lexical; say so
+    // rather than returning an empty string that reads like an empty post.
+    markdown: doc.legacyHTML
+      ? '(This document renders from migrated Ghost HTML (`legacyHTML`), not from the ' +
+        'rich-text body. Editing it as Markdown would not change the published page.)'
+      : lexicalToMarkdown(
+          req.payload,
+          COLLECTION,
+          doc.content as Parameters<typeof lexicalToMarkdown>[2],
+        ),
+    slug: doc.slug,
+    status: doc._status ?? null,
+    title: doc.title,
+  }
+}
+
+/**
+ * How many versions `listArticleVersions` may return at once.
+ *
+ * `maxPerDoc` on Posts, which is every version a post keeps — so the ceiling
+ * never hides history that exists. `tests/mcp/tools.test.ts` holds the two
+ * numbers together.
+ */
+const MAX_VERSIONS = 50
+
+/** Enough of a body to tell neighbouring revisions apart, and no more. */
+const SNIPPET_CHARS = 100
+
+/** The opening words of a revision's body, whichever way it is stored. */
+function snippet(doc: Record<string, unknown>): string {
+  const words = (
+    typeof doc.legacyHTML === 'string' && doc.legacyHTML
+      ? htmlToPlainText(doc.legacyHTML)
+      : richTextToPlainText(doc.content)
+  )
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  return words.length > SNIPPET_CHARS
+    ? `${words.slice(0, SNIPPET_CHARS).trimEnd()}…`
+    : words
+}
+
+/** A version's parent id, whether or not the relationship was populated. */
+function parentID(parent: unknown): unknown {
+  return typeof parent === 'object' && parent !== null
+    ? (parent as { id?: unknown }).id
+    : parent
+}
+
 export const mcpTools: McpTool[] = [
   {
     description:
@@ -217,26 +282,122 @@ export const mcpTools: McpTool[] = [
         target,
       )) as unknown as Record<string, unknown>
 
-      return text({
-        excerpt: doc.excerpt ?? null,
-        id: doc.id,
-        // Migrated bodies live in `legacyHTML` and are not Lexical; say so
-        // rather than returning an empty string that reads like an empty post.
-        markdown: doc.legacyHTML
-          ? '(This document renders from migrated Ghost HTML (`legacyHTML`), not from the ' +
-            'rich-text body. Editing it as Markdown would not change the published page.)'
-          : lexicalToMarkdown(
-              req.payload,
-              COLLECTION,
-              doc.content as Parameters<typeof lexicalToMarkdown>[2],
-            ),
-        slug: doc.slug,
-        status: doc._status ?? null,
-        title: doc.title,
-      })
+      return text({ ...articleView(req, doc), id: doc.id })
     },
     name: 'readArticleMarkdown',
     parameters: targetShape,
+  },
+  {
+    description:
+      "List an article's saved versions, newest first, without their bodies. " +
+      'Each entry has a `versionId` for `readArticleVersion`, when it was ' +
+      'saved, its title and status then, and the opening words of its body, so ' +
+      'the right point in history can be found without reading every version. ' +
+      'Autosave records a version at each pause in typing, so neighbouring ' +
+      'entries often differ by a few words. `latest` marks the current draft. ' +
+      'Read-only.',
+    handler: async (args: Record<string, unknown>, req: PayloadRequest) => {
+      const { limit = 20, ...target } = args as {
+        id?: string
+        limit?: number
+        slug?: string
+      }
+
+      // The same resolution `readArticleMarkdown` uses, so a slug means the
+      // same document here as there — and a document the key cannot read is
+      // refused here, before any history is looked at.
+      const doc = await findArticle(req, COLLECTION, target)
+
+      const { docs, totalDocs } = await req.payload.findVersions({
+        collection: COLLECTION,
+        // Snippets need no populated relationships. At the default depth each
+        // version would populate its authors, tags and images only to have
+        // them thrown away.
+        depth: 0,
+        limit,
+        overrideAccess: false,
+        req,
+        sort: '-updatedAt',
+        user: req.user as TypedUser,
+        where: { parent: { equals: doc.id } },
+      })
+
+      return text({
+        id: doc.id,
+        slug: doc.slug,
+        totalVersions: totalDocs,
+        versions: docs.map((entry) => {
+          const version = entry.version as unknown as Record<string, unknown>
+          return {
+            autosave: (entry as { autosave?: unknown }).autosave === true,
+            latest: entry.latest === true,
+            snippet: snippet(version),
+            status: version._status ?? null,
+            title: version.title,
+            updatedAt: entry.updatedAt,
+            // A string, because that is what `readArticleVersion` takes.
+            versionId: String(entry.id),
+          }
+        }),
+      })
+    },
+    name: 'listArticleVersions',
+    parameters: {
+      ...targetShape,
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(MAX_VERSIONS)
+        .optional()
+        .describe(
+          `How many versions to list, newest first. Defaults to 20; at most ${MAX_VERSIONS}, which is every version a post keeps.`,
+        ),
+    },
+  },
+  {
+    description:
+      'Read one saved version of an article, from `listArticleVersions`, as ' +
+      'Markdown — in exactly the format `readArticleMarkdown` returns the ' +
+      'current draft, so the two can be compared. Returns the title, slug, ' +
+      'excerpt and status as they were in that version. Read-only: it changes ' +
+      'nothing, and there is no tool that restores a version. To bring old ' +
+      'text back, merge the parts you want into the current body and save it ' +
+      'with `updateArticleMarkdown`. Restoring a whole version would overwrite ' +
+      'every field, including images, tags and metadata added since.',
+    handler: async (args: Record<string, unknown>, req: PayloadRequest) => {
+      const { versionId } = args as { versionId: string }
+
+      // Default depth, as `findArticle` reads the live draft. An image in the
+      // body converts to `![alt](url)` only when its upload is populated, and
+      // to a bare `![media:id]()` placeholder when it is not — so reading a
+      // version any shallower would make the two outputs differ where the
+      // article did not.
+      const entry = await req.payload.findVersionByID({
+        collection: COLLECTION,
+        id: versionId,
+        overrideAccess: false,
+        req,
+        user: req.user as TypedUser,
+      })
+      const version = entry.version as unknown as Record<string, unknown>
+
+      return text({
+        ...articleView(req, version),
+        autosave: (entry as { autosave?: unknown }).autosave === true,
+        id: parentID(entry.parent),
+        latest: entry.latest === true,
+        updatedAt: entry.updatedAt,
+        versionId: String(entry.id),
+      })
+    },
+    name: 'readArticleVersion',
+    parameters: {
+      versionId: z
+        .string()
+        .min(1)
+        .describe('The `versionId` of an entry from `listArticleVersions`.'),
+    },
   },
   {
     description:

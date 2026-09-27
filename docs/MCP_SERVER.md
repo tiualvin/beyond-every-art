@@ -17,8 +17,9 @@
   [Turning it on](#turning-it-on) step 3.
 - **What it does:** drafts and revises articles from Claude Code, Codex, or the
   Claude mobile app, writing bodies in Markdown, through the same role-based
-  access control the admin panel uses. It never publishes unless the key belongs
-  to an administrator.
+  access control the admin panel uses. It reads an article's version history,
+  and cannot restore it. It never publishes unless the key belongs to an
+  administrator.
 - **What it deliberately cannot reach:** `members`, `billing-events`,
   `newsletter-signups`, `users`, and every global. Deleting articles is off.
 - **How to turn it on:** [What is built](#what-is-built).
@@ -45,7 +46,8 @@
 ## What is built
 
 Configuration lives in [`lib/mcp/`](../lib/mcp): `plugin.ts` (allowlist, rate
-limit, request logging), `tools.ts` (the drafting tools), `markdown.ts`
+limit, request logging), `tools.ts` (the drafting and version-history tools),
+`markdown.ts`
 (Markdown ⇄ Lexical), `response.ts` (keeping bodies out of find responses),
 `api-keys.ts` (who may issue and revoke a key), `errors.ts` (the shape of a
 refusal), `publish-guard.ts`, `rate-limit.ts`, and `audit.ts`.
@@ -102,10 +104,17 @@ both access rules — no field moves, so the schema is untouched:
   visible.
 
 One more thing about that screen, because it runs the other way from the
-collection checkboxes: **custom tools default to ticked.** `draftArticle`,
-`readArticleMarkdown`, `updateArticleMarkdown`, and `uploadMedia` are all
-enabled on a new key unless you untick them, while every collection capability
-starts unticked. That is the plugin's default, not this project's choice.
+collection checkboxes: **custom tools default to ticked.** Every tool in the
+table below is enabled on a new key unless you untick it, while every collection
+capability starts unticked. That is the plugin's default, not this project's
+choice.
+
+A tool added later reaches keys that already exist the same way — its column
+arrives with the plugin's `DEFAULT true` — unless its migration says otherwise.
+`listArticleVersions` and `readArticleVersion` do: an existing key or OAuth grant
+gets them exactly when it already had `readArticleMarkdown`, because they read
+the same text, and a grant whose approver unticked that tool should not gain a
+second way to it by deploy.
 
 ### Tools
 
@@ -120,6 +129,8 @@ Written for this project, because the generated ones cannot do the job:
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `draftArticle`          | Creates a post from Markdown, always as a draft. Resolves tag and author slugs, refuses unknown ones. The `ghostID` is autofilled by the collection. |
 | `readArticleMarkdown`   | Reads a post back as Markdown, including the draft body. Says so plainly when the document renders from migrated `legacyHTML` instead.               |
+| `listArticleVersions`   | Lists a post's saved versions, newest first — id, time, title, status and a 100-character snippet each, never a body.                                |
+| `readArticleVersion`    | Reads one saved version in exactly the shape `readArticleMarkdown` returns the draft. Read-only; there is no restore tool.                           |
 | `updateArticleMarkdown` | Replaces a body from Markdown, saved as a draft.                                                                                                     |
 | `uploadMedia`           | Adds an image to the Media library from base64 and returns its id, for `updatePosts` to set as a `featuredImage`.                                    |
 | `uploadMediaFromUrl`    | The same, from an https address the server fetches itself. The only one of the two that works from a phone or a scheduled run.                       |
@@ -214,6 +225,47 @@ key that publishes a post whose draft was written by `updateArticleMarkdown`
 will publish the older body and leave the revision sitting in the versions
 table. Publish from the admin panel, where the draft is promoted and Live
 Preview shows what is going out.
+
+### Version history
+
+Payload keeps a version of a post on every save — autosave included, up to
+`maxPerDoc` (fifty) per document. `listArticleVersions` finds a point in that
+history and `readArticleVersion` reads it. Getting old text back is then a
+merge the caller does on purpose: read the version, read the current draft
+with `readArticleMarkdown`, reconcile the two, and save the result with
+`updateArticleMarkdown`.
+
+**There is no restore tool, and adding one is a separate decision.** Restoring
+a Payload version is a whole-document snapshot swap, not a merge: it overwrites
+every field, so the images, tags, and metadata added since that version was
+saved are lost along with the text somebody meant to replace. An agent told
+"restore the second paragraph from Tuesday" would reasonably assume the
+opposite. The merge workflow above touches only the body. If a restore tool is
+ever added, its description has to say that it overwrites rather than merges —
+`tests/mcp/tools.test.ts` fails on any tool named for restoring until someone
+changes that test deliberately.
+
+Three things the tools do that are easy to break:
+
+- **A version reads back byte-identical to the draft**, because both go through
+  one function (`articleView` in [`lib/mcp/tools.ts`](../lib/mcp/tools.ts)) at
+  the same population depth. The depth matters more than it looks: an image in
+  the body converts to a Markdown image carrying its alt text and address only
+  when its upload is populated, and to a bare `media:12` placeholder when it is
+  not, so a shallower read of the version would show a difference the article
+  does not have.
+- **A slug means the same document as in `readArticleMarkdown`**, because
+  `listArticleVersions` resolves it through the same `findArticle` — which is
+  also what refuses a document the key cannot read before any history is
+  looked at.
+- **History is readable under the same rule as the document.** Payload does not
+  derive `readVersions` from `read`, and left unset it lets any signed-in user
+  read every version of every post — so an author whom `postsRead` keeps out of
+  a colleague's draft could read it from the version table, over MCP or at
+  `/api/posts/versions`. `versionsOf` in [`access/roles.ts`](../access/roles.ts)
+  applies the document rule to each version's stored fields, on every versioned
+  collection. Without it, `readArticleVersion` hands an author key an editor's
+  draft; `e2e/mcp.spec.ts` checks that it does not.
 
 ### What gets logged
 
