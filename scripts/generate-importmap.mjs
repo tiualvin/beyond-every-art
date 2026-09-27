@@ -22,11 +22,17 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, renameSync, unlinkSync } from 'node:fs'
 import path from 'node:path'
 
+import { payloadCliEnv } from './payload-cli.mjs'
+
 const dir = path.resolve(process.cwd(), 'app/(payload)/admin')
 const generated = path.join(dir, 'importMap.js')
 const tracked = path.join(dir, 'importMap.ts')
 
+// With the resolution condition `payload-cli.mjs` explains. Without it the CLI
+// can exit 0 having generated nothing, which the branch below would report as
+// success whenever the tracked map already exists.
 const result = spawnSync('payload', ['generate:importmap'], {
+  env: payloadCliEnv(),
   stdio: 'inherit',
   shell: true,
 })

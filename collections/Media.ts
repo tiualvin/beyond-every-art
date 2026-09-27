@@ -150,5 +150,19 @@ export const Media: CollectionConfig = {
     },
     ghostUrlField({ unique: true }),
     migrationStatusField(['pending', 'migrated', 'failed']),
+    {
+      // The storage plugin's per-upload object key, declared here so the
+      // column exists whether or not R2 is configured. From Payload 3.90 the S3
+      // plugin adds `_objectKey` to the collections it manages — but only when
+      // it is enabled, so CI's drift check and any machine without R2 saw a
+      // schema without it, while production and browser-smoke selected it on
+      // every media query and no migration had created it. Enabled, the plugin
+      // replaces this with its own identical definition; disabled, this keeps
+      // the shape. `tests/collections/storage-shape.test.ts` fails if the two
+      // configurations ever disagree about a column again.
+      name: '_objectKey',
+      type: 'text',
+      admin: { hidden: true, readOnly: true },
+    },
   ],
 }
