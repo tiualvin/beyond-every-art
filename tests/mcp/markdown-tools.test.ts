@@ -280,3 +280,107 @@ describe('modules in a body read as Markdown', () => {
     expect(blocks).toEqual([])
   })
 })
+
+describe('revising a body that holds modules', () => {
+  const KEY = '65f0c0ffee0000000000abcd'
+  const MARKER = `<!-- block:keyFacts:${KEY} -->`
+
+  const article = () =>
+    mcpRequest({
+      id: 1,
+      content: body(
+        heading('The short answer'),
+        block('keyFacts', facts),
+        paragraph('After.'),
+      ),
+    })
+
+  const stored = (content: unknown) => (content as Body).root.children
+
+  it('puts each module back exactly as it was after a read and a revision', async () => {
+    // Before, a module came back as a paragraph reading "Block Field", which
+    // would have published.
+    const { req, current } = await article()
+    const before = structuredClone(stored(current().content)[1])
+
+    const { markdown } = await call('readArticleMarkdown', { id: '1' }, req)
+    const result = await call(
+      'updateArticleMarkdown',
+      { id: '1', markdown: String(markdown).replace('After.', 'Revised.') },
+      req,
+    )
+
+    expect(types(current().content)).toEqual(['heading', 'block', 'paragraph'])
+    expect(stored(current().content)[1]).toEqual(before)
+    expect(result.blocks).toEqual({
+      kept: [{ key: KEY, blockType: 'keyFacts' }],
+      removed: [],
+    })
+  })
+
+  it('moves a module when its marker moves', async () => {
+    const { req, current } = await article()
+
+    await call(
+      'updateArticleMarkdown',
+      { id: '1', markdown: `## The short answer\n\nAfter.\n\n${MARKER}` },
+      req,
+    )
+
+    expect(types(current().content)).toEqual(['heading', 'paragraph', 'block'])
+  })
+
+  it('removes a module whose marker is left out, and says so', async () => {
+    const { req, current } = await article()
+
+    const result = await call(
+      'updateArticleMarkdown',
+      { id: '1', markdown: '## The short answer\n\nAfter.' },
+      req,
+    )
+
+    expect(types(current().content)).toEqual(['heading', 'paragraph'])
+    expect(result.blocks).toEqual({
+      kept: [],
+      removed: [{ key: KEY, blockType: 'keyFacts' }],
+    })
+  })
+
+  it.each([
+    [
+      'a marker naming no module in this draft',
+      '<!-- block:keyFacts:ffffffffffffffffffffffff -->',
+      /names no module/,
+    ],
+    [
+      'a marker naming the wrong type',
+      `<!-- block:faq:${KEY} -->`,
+      /says faq, but .* is a keyFacts/,
+    ],
+    ['the same marker twice', `${MARKER}\n\n${MARKER}`, /more than once/],
+    [
+      'a marker run into a sentence',
+      `Some text ${MARKER} and more.`,
+      /on a line of its own/,
+    ],
+    [
+      'a marker with no blank line before it',
+      `Some text\n${MARKER}`,
+      /on a line of its own/,
+    ],
+    [
+      'a marker with its key missing',
+      '<!-- block:keyFacts -->',
+      /copied exactly/,
+    ],
+  ])('refuses %s, and saves nothing', async (_case, markdown, message) => {
+    // Each can only be a mistake, and saving it would print a literal
+    // `<!-- block:… -->` on the page.
+    const { req, payload } = await article()
+
+    await expect(
+      call('updateArticleMarkdown', { id: '1', markdown }, req),
+    ).rejects.toThrow(message)
+    expect(payload.update).not.toHaveBeenCalled()
+  })
+})

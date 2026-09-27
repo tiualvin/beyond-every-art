@@ -14,6 +14,13 @@
 // contents travel beside the Markdown rather than inside it, as plain JSON, so
 // nothing about a block depends on its fields surviving a trip through
 // Markdown escaping.
+//
+// On the way back in, each marker is swapped for the block it names, exactly
+// as stored. Moving a marker moves its block. Leaving one out removes the
+// block, and the update says so. Anything else — a marker naming no block in
+// this draft, one used twice, one run into a paragraph — is refused before
+// anything is saved, because each of those can only be a mistake, and saving
+// it would put a literal `<!-- block:… -->` on the page.
 
 import { headingText } from '../content/headings'
 import type { EditorState } from './markdown'
@@ -60,6 +67,15 @@ export type BlockSummary = {
  * position instead.
  */
 const MARKER_PART = /^[A-Za-z0-9]+$/
+
+/** A paragraph that is one marker and nothing else. */
+const WHOLE_MARKER = /^<!--\s*block:([A-Za-z0-9]+):([A-Za-z0-9]+)\s*-->$/
+
+/**
+ * Anything that starts like a marker. Deliberately looser than the real thing,
+ * so a marker with a typo in it is caught rather than saved as text.
+ */
+const MARKER_LIKE = /<!--\s*block:/
 
 export function isBlockNode(node: unknown): node is BlockNode {
   const candidate = node as Partial<BlockNode> | null | undefined
@@ -174,5 +190,93 @@ export function markBlocks(state: EditorState): EditorState {
         return marker ? markerParagraph(marker) : node
       }) as EditorState['root']['children'],
     },
+  }
+}
+
+/** A module named by its key and type, as the update reports it. */
+export type BlockRef = { key: string; blockType: string }
+
+/** Every word under a node, however it is split into text nodes. */
+function textOf(node: LexicalNode): string {
+  return `${node.text ?? ''}${(node.children ?? []).map(textOf).join('')}`
+}
+
+function quoted(text: string): string {
+  const flat = text.replace(/\s+/g, ' ').trim()
+  return flat.length > 120 ? `${flat.slice(0, 117)}...` : flat
+}
+
+/**
+ * `converted` with each marker replaced by the block it names from `current`.
+ *
+ * `converted` is the revision, fresh from Markdown; `current` is the draft it
+ * replaces, which is the only place a marker's block can come from. Throws,
+ * with a message written for the agent to act on, rather than save anything
+ * it cannot place.
+ */
+export function restoreBlocks(
+  converted: EditorState,
+  current: EditorState | null | undefined,
+): { state: EditorState; kept: BlockRef[]; removed: BlockRef[] } {
+  const existing = new Map(
+    indexBlocks(current).map(({ key, node }) => [key, node]),
+  )
+  const kept: BlockRef[] = []
+
+  const children = converted.root.children.map((node) => {
+    if (node.type !== 'paragraph') return node
+    const match = textOf(node as LexicalNode)
+      .trim()
+      .match(WHOLE_MARKER)
+    if (!match) return node
+
+    const [marker, blockType, key] = match
+    const block = existing.get(key)
+    if (!block) {
+      throw new Error(
+        `\`${marker}\` names no module in this article's current draft. A ` +
+          'marker can only keep or move a module that is already there. ' +
+          'Copy markers exactly as readArticleMarkdown gave them; to add key ' +
+          'facts, use setKeyFactsBlock.',
+      )
+    }
+    if (block.fields.blockType !== blockType) {
+      throw new Error(
+        `\`${marker}\` says ${blockType}, but ${key} is a ` +
+          `${block.fields.blockType}. Copy markers exactly as ` +
+          'readArticleMarkdown gave them.',
+      )
+    }
+    if (kept.some((ref) => ref.key === key)) {
+      throw new Error(
+        `\`${marker}\` appears more than once. A module can only be in one ` +
+          'place; remove the extra line.',
+      )
+    }
+
+    kept.push({ key, blockType })
+    return block
+  }) as EditorState['root']['children']
+
+  for (const node of children) {
+    if (isBlockNode(node)) continue
+    const text = textOf(node as LexicalNode)
+    if (MARKER_LIKE.test(text)) {
+      throw new Error(
+        'A block marker must be copied exactly as readArticleMarkdown gave it, ' +
+          'on a line of its own with a blank line before and after. Found ' +
+          `one that is not, in: "${quoted(text)}"`,
+      )
+    }
+  }
+
+  const removed = [...existing]
+    .filter(([key]) => !kept.some((ref) => ref.key === key))
+    .map(([key, node]) => ({ key, blockType: node.fields.blockType }))
+
+  return {
+    state: { ...converted, root: { ...converted.root, children } },
+    kept,
+    removed,
   }
 }

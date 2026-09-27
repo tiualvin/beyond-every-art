@@ -17,7 +17,7 @@ import { z } from 'zod'
 
 import { toArticleBody } from '../content/body'
 import { buildPreviewUrl } from '../preview/live-preview'
-import { listBlocks, markBlocks } from './blocks'
+import { listBlocks, markBlocks, restoreBlocks } from './blocks'
 import {
   lexicalToMarkdown,
   markdownToLexical,
@@ -289,7 +289,11 @@ export const mcpTools: McpTool[] = [
   {
     description:
       'Replace the body of an existing article with Markdown, saved as a draft. ' +
-      'Does not publish, and does not touch the published version of the document.',
+      'Does not publish, and does not touch the published version of the document. ' +
+      'Keep each `<!-- block:... -->` line from readArticleMarkdown where its ' +
+      'module should sit, on a line of its own: the module is put back exactly ' +
+      'as it was. Leaving a line out removes that module; the response lists ' +
+      'which were kept and which removed.',
     handler: async (args: Record<string, unknown>, req: PayloadRequest) => {
       const { markdown, ...target } = args as {
         id?: string
@@ -299,12 +303,19 @@ export const mcpTools: McpTool[] = [
 
       const doc = await findArticle(req, COLLECTION, target)
 
+      // Before this, every module in the body was lost on a revision: Markdown
+      // has no form for one, so it came back as a line of text. See `blocks.ts`.
+      const { state, kept, removed } = restoreBlocks(
+        markdownToLexical(req.payload, COLLECTION, markdown),
+        (doc as unknown as { content?: EditorState | null }).content,
+      )
+
       const updated = await req.payload.update({
         collection: COLLECTION,
         id: doc.id,
         data: {
           _status: 'draft',
-          content: markdownToLexical(req.payload, COLLECTION, markdown),
+          content: state,
         },
         draft: true,
         overrideAccess: false,
@@ -313,6 +324,7 @@ export const mcpTools: McpTool[] = [
       })
 
       return text({
+        blocks: { kept, removed },
         id: updated.id,
         preview: buildPreviewUrl({
           collection: COLLECTION,
