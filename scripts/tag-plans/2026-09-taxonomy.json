@@ -1,0 +1,132 @@
+{
+  "$comment": "Tag clean-up approved by the owner on 25 Sep 2026: split Art across real subjects and retire it; merge materials-science into Science of Art Materials; retire Featured and News; give every untagged published post a subject; add Ways of Seeing and Collecting. Assignments are by title and editable here before the run. ghostPages 12 on art is an upper bound: Ghost's page count for /tag/art/ was not readable when this was written, and a row for a page Ghost never served is harmless. Check it against the rehearsal crawl with: jq '[.source.pages[].path | select(startswith(\"/tag/art/page/\"))]' rehearsal/site-comparison.json",
+  "create": [
+    { "slug": "ways-of-seeing", "name": "Ways of Seeing" },
+    { "slug": "collecting", "name": "Collecting" }
+  ],
+  "merge": [
+    { "from": "materials-science", "into": "science-of-art-materials" }
+  ],
+  "retire": [
+    { "slug": "art", "redirectTo": "/journal/", "ghostPages": 12 },
+    { "slug": "featured", "redirectTo": "/journal/" },
+    { "slug": "news", "redirectTo": "/journal/" }
+  ],
+  "assign": {
+    "outdoor-sculpture-material-durability": ["science-of-art-materials"],
+    "found-objects-sculpture-beyond-readymade": ["science-of-art-materials"],
+    "ice-wax-melting-materials-sculpture": ["science-of-art-materials"],
+    "using-explosives-fire-and-destruction-to-create-art": [
+      "science-of-art-materials"
+    ],
+    "rust-patina-and-controlled-corrosion-as-artistic-process": [
+      "science-of-art-materials"
+    ],
+    "clay-body-composition-warping-large-ceramic-sculpture": [
+      "science-of-art-materials"
+    ],
+    "pueblo-pottery-techniques-that-predate-european-ceramic-technology": [
+      "science-of-art-materials"
+    ],
+    "interference-patterns-wave-physics-optical-art": [
+      "science-of-art-materials"
+    ],
+    "marble-carving-crystal-structure-sculpture": ["science-of-art-materials"],
+    "calder-mobiles-kinetic-sculpture-angular-momentum": [
+      "science-of-art-materials"
+    ],
+    "glaze-recipes-fail-different-kiln-temperatures": [
+      "science-of-art-materials"
+    ],
+    "why-gold-leaf-adheres-to-surfaces-without-glue-in-gilding": [
+      "science-of-art-materials"
+    ],
+    "how-bioluminescent-bacteria-create-living-paintings": [
+      "science-of-art-materials"
+    ],
+    "varnishing-oil-paintings-without-yellowing-or-blooming": [
+      "science-of-art-materials"
+    ],
+
+    "color-bias-and-mixing": ["palette"],
+    "the-only-color-theory-guide-you-actually-need": ["palette"],
+    "pointillism-optical-mixing-vs-pigment-mixing": ["palette"],
+
+    "research-methods-for-artists-who-want-more-than-visual-inspiration": [
+      "studio-notes"
+    ],
+    "reading-art-history-as-a-practicing-artist": ["studio-notes"],
+
+    "warhol-banana-pop-art-album-cover-design": ["music"],
+
+    "subject-matter-vs-concept": ["ways-of-seeing"],
+    "size-matters-in-sculpture": ["ways-of-seeing"],
+    "why-ceramics-struggles-for-respect-in-contemporary-art-and-why-thats-changing": [
+      "ways-of-seeing"
+    ],
+    "immaterial-sculpture-light-sound": ["ways-of-seeing"],
+    "street-arts-awkward-journey-from-illegal-walls-to-white-cube-galleries": [
+      "ways-of-seeing"
+    ],
+    "phenomenology-for-artists-merleau-pontys-ideas-applied-to-studio-practice": [
+      "ways-of-seeing"
+    ],
+    "machine-learning-generative-art-without-hype": ["ways-of-seeing"],
+    "why-some-lines-feel-alive-and-others-feel-dead": ["ways-of-seeing"],
+    "how-light-creates-form-space-and-meaning": ["ways-of-seeing"],
+    "whats-the-point-of-abstraction-when-photography-exists": [
+      "ways-of-seeing"
+    ],
+
+    "fine-art-home-guide": ["collecting"],
+    "how-to-frame-and-display-fine-art-prints-to-enhance-your-space": [
+      "collecting"
+    ],
+    "limited-edition-vs-open-edition-prints-which-is-right-for-you": [
+      "collecting"
+    ],
+    "the-ultimate-guide-to-understanding-different-types-of-art-prints-giclee-lithographs-and-more": [
+      "collecting"
+    ],
+    "fine-art-print-value-guide": ["collecting"],
+    "psychology-of-art-collecting": ["collecting"],
+    "giclee-vs-lithograph-what-actually-differs": [
+      "collecting",
+      "studio-notes"
+    ],
+    "what-is-an-artists-proof": ["collecting", "studio-notes"],
+
+    "how-to-understand-contemporary-art": ["ways-of-seeing"],
+    "how-to-develop-visual-literacy-reading-art-like-a-critical-thinker": [
+      "ways-of-seeing"
+    ],
+    "why-beauty-isnt-enough-arts-purpose-in-modern-life": ["ways-of-seeing"],
+    "understanding-art-symbolism": ["ways-of-seeing"],
+    "understanding-abstract-art": ["ways-of-seeing"],
+    "conceptual-depth-beyond-technical-skill": ["ways-of-seeing"],
+
+    "artist-time-management": ["studio-notes"],
+    "creative-journaling": ["studio-notes"],
+    "creative-problem-solving": ["studio-notes"],
+    "maintaining-artist-motivation": ["studio-notes"],
+    "experimental-art-techniques": ["studio-notes"],
+    "place-based-art": ["studio-notes"],
+    "sustainable-art-practice-avoid-burnout": ["studio-notes"],
+    "breaking-creative-block-twelve-exercises": ["studio-notes"],
+
+    "unconventional-art-materials": ["science-of-art-materials"],
+    "watercolor-colored-pencil-mixed-media-techniques": [
+      "science-of-art-materials"
+    ],
+    "the-alchemical-canvas-unveiling-the-deep-chemistry-of-oil-paints": [
+      "science-of-art-materials"
+    ],
+    "ultramarine-science": ["science-of-art-materials"],
+
+    "the-rothko-effect-and-how-large-color-fields-create-emotional-response": [
+      "palette"
+    ],
+    "how-to-experience-art-exhibitions": ["exhibitions"],
+    "artist-statement-writing-clarity-conviction": ["studio-insider"]
+  }
+}

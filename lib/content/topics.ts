@@ -10,9 +10,11 @@
 // A denylist rather than a field on `Tags`: the distinction is about three tags
 // imported from Ghost, an editor gains nothing by maintaining a boolean on
 // every tag they create, and a schema change needs a migration. The tag archive
-// itself is untouched — `/tag/featured/` is a URL Ghost served, it stays in the
-// sitemap (`app/sitemap.ts` counts independently), and it remains reachable
-// from the posts that carry it. This governs the homepage chart only.
+// is not this file's business — `/tag/featured/` is a URL Ghost served, and the
+// sitemap counts independently (`app/sitemap.ts`). Retiring the tag is a
+// redirect, planned in `scripts/tag-plans/2026-09-taxonomy.json`; the slug
+// stays listed here so a tag re-created under it is still kept off the chart.
+// This governs the homepage chart only.
 
 /** Tag slugs that name a placement or a state rather than a subject. */
 export const WORKFLOW_TAG_SLUGS: readonly string[] = ['featured']
