@@ -24,18 +24,28 @@
   --bea-burgundy: #6d1f2c;
   --bea-burgundy-deep: #4c1420;
   --bea-line: #e4ddd2;
+}
 
-  /* Payload's own theme hooks, so the chrome follows without being overridden
-   * rule by rule. */
+/* Payload's own theme hooks, so the chrome follows without being overridden
+ * rule by rule — in the light theme only.
+ *
+ * Dark mode is left entirely to Payload. Inverting a paper-and-ink palette by
+ * hand produces a muddy near-black that matches neither the site nor the
+ * vendor's dark theme, and an editor who has chosen dark has chosen it for
+ * contrast reasons this file cannot second-guess.
+ *
+ * These once sat on a bare `:root`, which painted the dark admin beige.
+ * Payload ships every rule inside `@layer payload-default`, and an unlayered
+ * declaration beats a layered one whatever its specificity — so a bare
+ * `:root` here outranks Payload's `html[data-theme=dark]`, not the other way
+ * round. Payload always sets `data-theme` on `<html>`, so scoping to the light
+ * value is enough. `tests/design/admin-theme.test.ts` fails if a `--theme-*`
+ * variable is set anywhere else. */
+:root[data-theme='light'] {
   --theme-elevation-0: var(--bea-surface);
   --theme-bg: var(--bea-paper);
   --theme-text: var(--bea-ink);
 }
-
-/* Dark mode is left entirely to Payload. Inverting a paper-and-ink palette by
- * hand produces a muddy near-black that matches neither the site nor the
- * vendor's dark theme, and an editor who has chosen dark has chosen it for
- * contrast reasons this file cannot second-guess. */
 
 /* --- The editorial dashboard panel ------------------------------------- */
 
