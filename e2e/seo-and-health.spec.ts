@@ -116,7 +116,11 @@ test('robots, sitemap, and RSS expose the public launch surface', async ({
 }) => {
   const robots = await request.get('/robots.txt')
   expect(robots.ok()).toBeTruthy()
-  expect(await robots.text()).toMatch(/Sitemap: .*\/sitemap\.xml/)
+  const robotsTxt = await robots.text()
+  expect(robotsTxt).toMatch(/Sitemap: .*\/sitemap\.xml/)
+  // Uploads are served under `/api`, which is otherwise disallowed; without
+  // this line no crawler may fetch an article's image. See `app/robots.ts`.
+  expect(robotsTxt).toContain('Allow: /api/media/file/')
 
   const sitemap = await request.get('/sitemap.xml')
   expect(sitemap.ok()).toBeTruthy()
