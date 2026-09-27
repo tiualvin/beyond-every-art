@@ -1038,7 +1038,7 @@ errors`, and `/swapfile` is `-rw-------`. Its one warning — "non-bind mount
 - **R2 configured and the lost media recovered (22 Aug).** Two buckets, media
   and backups deliberately separate; 109 of 110 images restored from the site
   archive with filenames and document ids intact; first database backup
-  uploaded. Full account, and the one step still outstanding, in item 0.4.
+  uploaded. Full account in item 0.4, closed 18 Sep.
 - **Fixed three bugs found while getting the above working**, all merged to
   `main`:
   - The `app` container had been reporting `unhealthy` since it was created
