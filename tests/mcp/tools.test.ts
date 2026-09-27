@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { Posts } from '../../collections/Posts'
 import { mcpPluginConfig } from '../../lib/mcp/plugin'
-import { mcpTools } from '../../lib/mcp/tools'
+import { KEPT_ON_RESTORE, mcpTools, RESTORED_FIELDS } from '../../lib/mcp/tools'
+import { flattenFields } from '../support/fields'
 import { nativeGhostID } from '../../lib/migration/native-id'
 
 describe('nativeGhostID', () => {
@@ -29,6 +30,7 @@ describe('mcpTools', () => {
       'readArticleMarkdown',
       'listArticleVersions',
       'readArticleVersion',
+      'restoreArticleVersion',
       'updateArticleMarkdown',
       'uploadMedia',
       'uploadMediaFromUrl',
@@ -111,22 +113,74 @@ const migrated = {
 }
 
 describe('version history tools', () => {
-  // Restoring a Payload version swaps in the whole snapshot — images, tags and
-  // metadata added since included — and a caller could easily take "restore"
-  // to mean "merge". Adding one is a separate decision, and its description
-  // must say it overwrites. Until then, none exists.
-  it('offers no way to restore a version', () => {
-    for (const { name } of mcpTools) {
-      expect(name).not.toMatch(/restore|revert|rollback/i)
-    }
+  // A caller — a model, usually — could easily take "restore" to mean "merge",
+  // and a merge is what it would want if the article has gained images or
+  // tags since. The restore overwrites, and the one place that can tell the
+  // caller so before it acts is the description it selects the tool by.
+  it('says in so many words that restoring overwrites rather than merges', () => {
+    const { description, parameters } = tool('restoreArticleVersion')
+    expect(description).toMatch(/OVERWRITES; it does not merge/)
+    expect(description).toMatch(/images, tags/)
+    expect(description).toMatch(/always a draft/)
+    expect(description).toContain('dryRun')
+    expect(parameters.scope.description).toMatch(/overwritten, not merged/)
+  })
+
+  // There is exactly one tool that writes history back, and it is the one
+  // whose description and tests say what it overwrites.
+  it('offers no other way to restore a version', () => {
+    const restoring = mcpTools
+      .map(({ name }) => name)
+      .filter((name) => /restore|revert|rollback/i.test(name))
+    expect(restoring).toEqual(['restoreArticleVersion'])
   })
 
   it('tells the caller how to bring old text back without losing newer fields', () => {
     const { description } = tool('readArticleVersion')
     expect(description).toMatch(/read-only/i)
     expect(description).toContain('updateArticleMarkdown')
-    expect(description).toMatch(/overwrite/i)
-    expect(description).toMatch(/images, tags/)
+    expect(description).toContain('restoreArticleVersion')
+    expect(description).toMatch(/overwrites rather than merges/)
+  })
+
+  // A field added to Posts is left alone by a restore until someone decides
+  // otherwise — but that decision has to be made, not defaulted. Each field is
+  // either put back or kept, never both and never neither.
+  it('decides, for every field on Posts, whether a restore puts it back', () => {
+    const system = new Set(['_status', 'createdAt', 'deletedAt', 'updatedAt'])
+    const named = flattenFields(Posts.fields)
+      // `ui` fields draw something on the edit screen and store nothing.
+      .filter(
+        (field) =>
+          'name' in field && field.type !== 'ui' && !system.has(field.name),
+      )
+      .map((field) => (field as { name: string }).name)
+
+    const restored = new Set<string>(RESTORED_FIELDS.article)
+    const kept = new Set<string>(KEPT_ON_RESTORE)
+
+    expect([...restored].filter((name) => kept.has(name))).toEqual([])
+    expect(
+      named.filter((name) => !restored.has(name) && !kept.has(name)),
+    ).toEqual([])
+    expect(
+      [...restored, ...kept].filter((name) => !named.includes(name)),
+    ).toEqual([])
+    for (const name of RESTORED_FIELDS.body) expect(restored).toContain(name)
+  })
+
+  // What decides where, when and to whom a post is served. Restoring any of
+  // these would change a URL, a paywall or what crawlers are told the next
+  // time somebody presses publish, with nothing on the edit screen saying so.
+  it.each([
+    'slug',
+    'visibility',
+    'canonicalURL',
+    'noindex',
+    'publishedAt',
+    'owners',
+  ])('never restores %s', (field) => {
+    expect(KEPT_ON_RESTORE as readonly string[]).toContain(field)
   })
 
   // Posts keep `maxPerDoc` versions and no more, so a lower ceiling would hide
@@ -286,6 +340,141 @@ describe('version history tools', () => {
     for (const [field, value] of Object.entries(current)) {
       expect(version[field], field).toEqual(value)
     }
+  })
+})
+
+describe('restoreArticleVersion', () => {
+  const oldBody = {
+    root: { children: [{ type: 'block', fields: { blockType: 'callout' } }] },
+  }
+  const newBody = { root: { children: [{ type: 'paragraph' }] } }
+
+  // The version as it was saved: an older body and tags, and — deliberately —
+  // a different slug and visibility, which a restore must never carry back.
+  const saved = {
+    _status: 'published',
+    authors: [3],
+    content: oldBody,
+    slug: 'old-address',
+    tags: [1],
+    title: 'Ground Layers, earlier',
+    visibility: 'paid',
+  }
+  const current = {
+    _status: 'draft',
+    authors: [3],
+    content: newBody,
+    id: 42,
+    slug: 'ground-layers',
+    tags: [1, 2],
+    title: 'Ground Layers',
+    visibility: 'public',
+  }
+
+  const request = (update?: (options: { data: object }) => object) =>
+    stubRequest({
+      findByID: () => current,
+      findVersionByID: () => ({
+        id: 900,
+        parent: 42,
+        updatedAt: '2026-09-26T10:00:00.000Z',
+        version: saved,
+      }),
+      findVersions: () => ({ docs: [{ id: 950 }], totalDocs: 3 }),
+      ...(update ? { update } : {}),
+    })
+
+  it('writes nothing on a dry run, and says what would change', async () => {
+    // No `update` on the stub: reaching for it would throw.
+    const { req, spies, user } = request()
+
+    const result = await call(
+      'restoreArticleVersion',
+      { dryRun: true, scope: 'article', versionId: '900' },
+      req,
+    )
+
+    expect(result).toMatchObject({
+      changes: ['content', 'title', 'tags'],
+      dryRun: true,
+      id: 42,
+      scope: 'article',
+      slug: 'ground-layers',
+      versionId: '900',
+    })
+    // Ids, not populated documents: the form a write takes, and the form two
+    // values must share to be compared.
+    expect(spies.findVersionByID).toHaveBeenCalledWith(
+      expect.objectContaining({ depth: 0, overrideAccess: false, user }),
+    )
+    expect(spies.findByID).toHaveBeenCalledWith(
+      expect.objectContaining({ depth: 0, draft: true, id: 42, user }),
+    )
+  })
+
+  it('restores the scope as a draft, and nothing outside it', async () => {
+    const { req, spies, user } = request(({ data }) => ({
+      ...current,
+      ...data,
+    }))
+
+    const result = await call(
+      'restoreArticleVersion',
+      { scope: 'body', versionId: '900' },
+      req,
+    )
+
+    const options = spies.update.mock.calls[0][0] as {
+      data: Record<string, unknown>
+    }
+    expect(options).toMatchObject({
+      collection: 'posts',
+      draft: true,
+      id: 42,
+      overrideAccess: false,
+      user,
+    })
+    // The body as stored — the block included — and a draft status, whatever
+    // status the version had: publishing stays a person's act.
+    expect(options.data).toEqual({ _status: 'draft', content: oldBody })
+
+    expect(result).toMatchObject({
+      changed: ['content'],
+      dryRun: false,
+      status: 'draft',
+      // The draft this replaced, which restores the restore.
+      undo: '950',
+    })
+  })
+
+  it('never carries the URL, the paywall or ownership back, even for the whole article', async () => {
+    const { req, spies } = request(({ data }) => ({ ...current, ...data }))
+
+    await call(
+      'restoreArticleVersion',
+      { scope: 'article', versionId: '900' },
+      req,
+    )
+
+    const { data } = spies.update.mock.calls[0][0] as {
+      data: Record<string, unknown>
+    }
+    for (const field of KEPT_ON_RESTORE) expect(data).not.toHaveProperty(field)
+    expect(data).toMatchObject({ tags: [1], title: 'Ground Layers, earlier' })
+  })
+
+  // Payload keeps a field the key may not update and says nothing, so the
+  // report is taken from what landed rather than from what was sent.
+  it('reports what landed, not what was asked for', async () => {
+    const { req } = request(() => current)
+
+    const result = await call(
+      'restoreArticleVersion',
+      { scope: 'body', versionId: '900' },
+      req,
+    )
+
+    expect(result.changed).toEqual([])
   })
 })
 

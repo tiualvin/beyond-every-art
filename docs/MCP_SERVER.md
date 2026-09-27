@@ -17,9 +17,9 @@
   [Turning it on](#turning-it-on) step 3.
 - **What it does:** drafts and revises articles from Claude Code, Codex, or the
   Claude mobile app, writing bodies in Markdown, through the same role-based
-  access control the admin panel uses. It reads an article's version history,
-  and cannot restore it. It never publishes unless the key belongs to an
-  administrator.
+  access control the admin panel uses. It reads an article's version history
+  and reverts to it, always as a draft. It never publishes unless the key
+  belongs to an administrator.
 - **What it deliberately cannot reach:** `members`, `billing-events`,
   `newsletter-signups`, `users`, and every global. Deleting articles is off.
 - **How to turn it on:** [What is built](#what-is-built).
@@ -114,7 +114,10 @@ arrives with the plugin's `DEFAULT true` — unless its migration says otherwise
 `listArticleVersions` and `readArticleVersion` do: an existing key or OAuth grant
 gets them exactly when it already had `readArticleMarkdown`, because they read
 the same text, and a grant whose approver unticked that tool should not gain a
-second way to it by deploy.
+second way to it by deploy. `restoreArticleVersion` writes, so an existing key
+gets it only where it already had both `updateArticleMarkdown` and
+`posts.update` — the two capabilities a restore can already be done with, by
+hand.
 
 ### Tools
 
@@ -130,7 +133,8 @@ Written for this project, because the generated ones cannot do the job:
 | `draftArticle`          | Creates a post from Markdown, always as a draft. Resolves tag and author slugs, refuses unknown ones. The `ghostID` is autofilled by the collection. |
 | `readArticleMarkdown`   | Reads a post back as Markdown, including the draft body. Says so plainly when the document renders from migrated `legacyHTML` instead.               |
 | `listArticleVersions`   | Lists a post's saved versions, newest first — id, time, title, status and a 100-character snippet each, never a body.                                |
-| `readArticleVersion`    | Reads one saved version in exactly the shape `readArticleMarkdown` returns the draft. Read-only; there is no restore tool.                           |
+| `readArticleVersion`    | Reads one saved version in exactly the shape `readArticleMarkdown` returns the draft. Read-only.                                                     |
+| `restoreArticleVersion` | Reverts a post's body, or its whole article, to a saved version — as a draft, overwriting rather than merging. Has a dry run and an undo.            |
 | `updateArticleMarkdown` | Replaces a body from Markdown, saved as a draft.                                                                                                     |
 | `uploadMedia`           | Adds an image to the Media library from base64 and returns its id, for `updatePosts` to set as a `featuredImage`.                                    |
 | `uploadMediaFromUrl`    | The same, from an https address the server fetches itself. The only one of the two that works from a phone or a scheduled run.                       |
@@ -230,20 +234,63 @@ Preview shows what is going out.
 
 Payload keeps a version of a post on every save — autosave included, up to
 `maxPerDoc` (fifty) per document. `listArticleVersions` finds a point in that
-history and `readArticleVersion` reads it. Getting old text back is then a
-merge the caller does on purpose: read the version, read the current draft
-with `readArticleMarkdown`, reconcile the two, and save the result with
-`updateArticleMarkdown`.
+history and `readArticleVersion` reads it. From there, two ways back:
 
-**There is no restore tool, and adding one is a separate decision.** Restoring
-a Payload version is a whole-document snapshot swap, not a merge: it overwrites
-every field, so the images, tags, and metadata added since that version was
-saved are lost along with the text somebody meant to replace. An agent told
-"restore the second paragraph from Tuesday" would reasonably assume the
-opposite. The merge workflow above touches only the body. If a restore tool is
-ever added, its description has to say that it overwrites rather than merges —
-`tests/mcp/tools.test.ts` fails on any tool named for restoring until someone
-changes that test deliberately.
+- **Merge by hand**, to keep what has been added since: read the version, read
+  the current draft with `readArticleMarkdown`, reconcile them, and save the
+  result with `updateArticleMarkdown`. Only text survives this route — see
+  [the Markdown round trip](#the-markdown-round-trip-loses-blocks-and-images).
+- **Revert with `restoreArticleVersion`**, which overwrites. `scope: "body"`
+  replaces the body; `scope: "article"` also replaces the title, excerpt,
+  featured image, SEO title and description, authors, and tags. Whatever is in
+  scope is replaced wholesale — anything added to those fields since the
+  version was saved is gone from the draft — and the tool's description says
+  so in capitals, because a caller told to "restore Tuesday's version" could
+  reasonably assume a merge. `dryRun: true` lists the fields that would change
+  and writes nothing.
+
+What a revert **never** touches, whatever the scope, is everything that decides
+where, when, and to whom the post is served: the slug, visibility, canonical
+URL, `noindex`, the homepage `featured` flag, `publishedAt`, owners, review
+state, and the Ghost migration fields. Each would change a URL, a paywall, or
+what crawlers are told the next time somebody pressed publish, with nothing on
+the edit screen to say it had moved. `RESTORED_FIELDS` and `KEPT_ON_RESTORE` in
+[`lib/mcp/tools.ts`](../lib/mcp/tools.ts) are allowlists, and
+`tests/mcp/tools.test.ts` fails when a field on Posts is in neither — so a new
+field is left alone by a revert until somebody decides otherwise.
+
+A revert is always a **draft**. The published page does not change until a
+person publishes from the admin panel. The draft it replaced stays in history,
+and the response names it as `undo`: reverting to that version reverts the
+revert. The body is copied exactly as stored, so a revert brings back blocks
+and images that the Markdown route cannot carry.
+
+**It is built on an ordinary draft update, not on Payload's `restoreVersion`.**
+That operation does two things this tool must not. Without `draft: true` it
+writes the snapshot over the live document, so reverting a published post to
+an older draft would unpublish it. And with `draft: true` it still hands the
+collection hooks the snapshot's own `_status`, so reverting to a _published_
+version trips `refuseMcpPublish` for every editor key although nothing is being
+published — checked by swapping it in: the e2e revert fails with the publish
+guard's refusal. The update path runs the same access rules, publish guard,
+audit line, and authorship stamp as `updateArticleMarkdown`.
+
+#### The Markdown round trip loses blocks and images
+
+Measured against the real editor config, and true of `readArticleMarkdown` →
+`updateArticleMarkdown` as much as of a merge from history:
+
+- **Blocks are destroyed.** A callout exports as the literal words "Block
+  Field", which imports back as a paragraph reading "Block Field". No block in
+  [`blocks/schema.ts`](../blocks/schema.ts) defines a Markdown converter, so
+  this holds for every insertable module.
+- **Inline images become text.** Read at the default depth, an image exports
+  as a Markdown image with its address, which imports back as that literal text
+  in a paragraph, not as an image. Read at depth 0 it exports as a `media:12`
+  placeholder, which does import back as an image.
+
+So an agent revising a post that holds a block or an inline image through
+Markdown damages it. `restoreArticleVersion` is the way back from that.
 
 Three things the tools do that are easy to break:
 

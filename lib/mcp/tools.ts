@@ -5,7 +5,8 @@
 // `markdown.ts`). Nor can they carry a file, so an image has no way in at all. These tools close both gaps, so an agent's
 // job is to write and illustrate the article rather than to satisfy the schema.
 // Nor do they reach version history, which Payload keeps for every save; the
-// two version tools read it, and deliberately cannot write it back.
+// version tools read it, and `restoreArticleVersion` reverts to it — as a
+// draft, and never touching what decides where and to whom a post is served.
 //
 // `@payloadcms/plugin-mcp` still has no `defineTool` helper at `3.88.0`, the
 // release this project pins — it is documented on Payload's main branch but has
@@ -181,6 +182,67 @@ function snippet(doc: Record<string, unknown>): string {
     ? `${words.slice(0, SNIPPET_CHARS).trimEnd()}…`
     : words
 }
+
+/**
+ * What `restoreArticleVersion` puts back, by scope. An allowlist, so a field
+ * added to Posts later is left alone until someone decides otherwise —
+ * `tests/mcp/tools.test.ts` fails until every field is in this or in
+ * `KEPT_ON_RESTORE`.
+ */
+export const RESTORED_FIELDS = {
+  body: ['content', 'legacyHTML'],
+  article: [
+    'content',
+    'legacyHTML',
+    'title',
+    'excerpt',
+    'featuredImage',
+    'metaTitle',
+    'metaDescription',
+    'authors',
+    'tags',
+  ],
+} as const satisfies Record<string, readonly string[]>
+
+/**
+ * Never reverted, whatever the scope: what decides where, when, and to whom a
+ * post is served, and who may edit it. Each would change something a reader, a
+ * crawler, or a member sees the next time a person presses publish — without
+ * anything on the edit screen saying it had moved — and none of them is what
+ * "go back to Tuesday's version of this article" means.
+ *
+ * - `slug` is the URL. An older one would move a live address on publish.
+ * - `visibility` is the paywall. An older one could gate a free article, or
+ *   hand a paid one to everybody.
+ * - `canonicalURL` and `noindex` are what search engines are told.
+ * - `featured` places the article on the homepage.
+ * - `publishedAt` is the date readers and feeds see; `stampPublishedAt` owns it.
+ * - `owners` is who may edit; `lastEditedBy` is stamped by the write itself.
+ * - `reviewState` is where the draft stands in review now, not then.
+ * - the `ghost*` and `migrationStatus` fields are the Ghost import's identity
+ *   and bookkeeping, which a rerun matches on.
+ */
+export const KEPT_ON_RESTORE = [
+  'slug',
+  'visibility',
+  'canonicalURL',
+  'noindex',
+  'featured',
+  'publishedAt',
+  'owners',
+  'lastEditedBy',
+  'reviewState',
+  'ghostID',
+  'ghostUpdatedAt',
+  'ghostURL',
+  'migrationStatus',
+] as const
+
+type RestoreScope = keyof typeof RESTORED_FIELDS
+
+/** Whether two stored values differ, as stored. */
+const differs = (a: unknown, b: unknown): boolean =>
+  JSON.stringify(a ?? null) !== JSON.stringify(b ?? null)
 
 /** A version's parent id, whether or not the relationship was populated. */
 function parentID(parent: unknown): unknown {
@@ -361,10 +423,10 @@ export const mcpTools: McpTool[] = [
       'Markdown — in exactly the format `readArticleMarkdown` returns the ' +
       'current draft, so the two can be compared. Returns the title, slug, ' +
       'excerpt and status as they were in that version. Read-only: it changes ' +
-      'nothing, and there is no tool that restores a version. To bring old ' +
-      'text back, merge the parts you want into the current body and save it ' +
-      'with `updateArticleMarkdown`. Restoring a whole version would overwrite ' +
-      'every field, including images, tags and metadata added since.',
+      'nothing. To bring back some of the old text while keeping what was ' +
+      'added since, merge the parts you want into the current body and save ' +
+      'it with `updateArticleMarkdown`. To revert wholesale, use ' +
+      '`restoreArticleVersion`, which overwrites rather than merges.',
     handler: async (args: Record<string, unknown>, req: PayloadRequest) => {
       const { versionId } = args as { versionId: string }
 
@@ -393,6 +455,158 @@ export const mcpTools: McpTool[] = [
     },
     name: 'readArticleVersion',
     parameters: {
+      versionId: z
+        .string()
+        .min(1)
+        .describe('The `versionId` of an entry from `listArticleVersions`.'),
+    },
+  },
+  {
+    description:
+      'Revert an article to a version from `listArticleVersions`. This ' +
+      'OVERWRITES; it does not merge. Every field in `scope` is replaced ' +
+      'wholesale with its value in that version, so anything added to those ' +
+      'fields since — paragraphs, images, tags, authors — is gone from the ' +
+      'draft. `scope: "body"` replaces only the body. `scope: "article"` also ' +
+      'replaces the title, excerpt, featured image, SEO title and ' +
+      'description, authors and tags. Never changed, whatever the scope: the ' +
+      'slug, visibility, canonical URL, noindex, featured flag, publication ' +
+      'date, owners, review state and Ghost migration fields. The body is ' +
+      'copied as stored, so blocks and images come back exactly — unlike ' +
+      'reading Markdown and writing it back. The result is always a draft: ' +
+      'the published page does not change until a person publishes it from ' +
+      'the admin panel. The draft it replaces stays in history, and the ' +
+      'response gives its `undo` versionId, which reverts the revert. Pass ' +
+      '`dryRun: true` first to see which fields would change. To keep newer ' +
+      'material, do not use this: merge by hand with `readArticleVersion` and ' +
+      '`updateArticleMarkdown`.',
+    handler: async (args: Record<string, unknown>, req: PayloadRequest) => {
+      const {
+        dryRun = false,
+        scope,
+        versionId,
+      } = args as { dryRun?: boolean; scope: RestoreScope; versionId: string }
+
+      const fields: readonly string[] = RESTORED_FIELDS[scope]
+      if (!fields) throw new Error('`scope` must be "body" or "article".')
+
+      // Depth 0 on every read here: relationships, and the images inside a
+      // body, come back as ids — the form a write takes, and the form two
+      // values have to be in to be compared.
+      const entry = await req.payload.findVersionByID({
+        collection: COLLECTION,
+        depth: 0,
+        id: versionId,
+        overrideAccess: false,
+        req,
+        user: req.user as TypedUser,
+      })
+      const version = entry.version as unknown as Record<string, unknown>
+      const id = parentID(entry.parent) as number | string
+
+      const current = (await req.payload.findByID({
+        collection: COLLECTION,
+        depth: 0,
+        draft: true,
+        id,
+        overrideAccess: false,
+        req,
+        user: req.user as TypedUser,
+      })) as unknown as Record<string, unknown>
+
+      // A field the version has no value for at all is left as it is, rather
+      // than cleared: absence in an old snapshot says nothing about intent.
+      const data = Object.fromEntries(
+        fields
+          .filter((field) => version[field] !== undefined)
+          .map((field) => [field, version[field]]),
+      )
+
+      const described = {
+        id,
+        kept: KEPT_ON_RESTORE,
+        scope,
+        slug: current.slug,
+        versionId: String(entry.id),
+        versionSavedAt: entry.updatedAt,
+      }
+
+      if (dryRun) {
+        return text({
+          ...described,
+          changes: Object.keys(data).filter((field) =>
+            differs(current[field], data[field]),
+          ),
+          dryRun: true,
+        })
+      }
+
+      // The current draft is the newest version. Captured before the write so
+      // the response can say how to undo it.
+      const {
+        docs: [replaced],
+      } = await req.payload.findVersions({
+        collection: COLLECTION,
+        depth: 0,
+        limit: 1,
+        overrideAccess: false,
+        req,
+        sort: '-updatedAt',
+        user: req.user as TypedUser,
+        where: { parent: { equals: id } },
+      })
+
+      // An ordinary draft update rather than Payload's `restoreVersion`, which
+      // does two things this tool must not. Without `draft` it writes the
+      // snapshot over the live document, so restoring a draft over a published
+      // post would unpublish it. And it hands its hooks the snapshot's own
+      // `_status`, so reverting to a published version trips
+      // `refuseMcpPublish` for every editor key, although nothing is being
+      // published. This path runs the same access, publish guard, audit line
+      // and authorship stamp as `updateArticleMarkdown`.
+      const updated = (await req.payload.update({
+        collection: COLLECTION,
+        data: { ...data, _status: 'draft' },
+        depth: 0,
+        draft: true,
+        id,
+        overrideAccess: false,
+        req,
+        user: req.user as TypedUser,
+      })) as unknown as Record<string, unknown>
+
+      return text({
+        ...described,
+        // What landed, compared after the write: a field the key may not
+        // update is silently kept by Payload, and should not be reported as
+        // restored.
+        changed: fields.filter((field) =>
+          differs(current[field], updated[field]),
+        ),
+        dryRun: false,
+        preview: buildPreviewUrl({
+          collection: COLLECTION,
+          slug: updated.slug as string,
+        }),
+        status: 'draft',
+        undo: replaced ? String(replaced.id) : null,
+      })
+    },
+    name: 'restoreArticleVersion',
+    parameters: {
+      dryRun: z
+        .boolean()
+        .optional()
+        .describe(
+          'Report which fields would change, and write nothing. Defaults to false.',
+        ),
+      scope: z
+        .enum(['body', 'article'])
+        .describe(
+          '"body" replaces only the body. "article" also replaces the title, ' +
+            'excerpt, featured image, SEO title and description, authors and ' +
+            'tags. Either way, everything in scope is overwritten, not merged.',
+        ),
       versionId: z
         .string()
         .min(1)

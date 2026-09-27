@@ -161,15 +161,18 @@ test.describe('MCP endpoint', () => {
         'readArticleMarkdown',
         'listArticleVersions',
         'readArticleVersion',
+        'restoreArticleVersion',
         'updateArticleMarkdown',
         'uploadMedia',
         'findPosts',
       ]),
     )
 
-    // Restoring a version overwrites the whole document, and nothing should
-    // offer that until it is decided separately. See `lib/mcp/tools.ts`.
-    expect(tools.filter((name) => /restore/i.test(name))).toEqual([])
+    // One tool writes history back, and its description says it overwrites.
+    // A second one would have to be decided, not merely added.
+    expect(tools.filter((name) => /restore/i.test(name))).toEqual([
+      'restoreArticleVersion',
+    ])
 
     // The allowlist is the whole security story for reach, so assert the
     // absence rather than trusting the config to have been read correctly.
@@ -293,6 +296,180 @@ test.describe('MCP endpoint', () => {
       slug,
     })
     expect(after.totalVersions).toBe(listed.totalVersions)
+  })
+
+  // The revert, over the wire and on the case it exists for: a body holding a
+  // block, which the Markdown route destroys. The version restored is a
+  // published one, which is the case Payload's own `restoreVersion` gets wrong
+  // for an editor key — it hands the publish guard the snapshot's status.
+  test('reverts to a published version exactly, as a draft, and can be undone', async ({
+    request,
+  }) => {
+    const slug = `e2e-mcp-restore-${Date.now()}-${Math.floor(Math.random() * 1e6)}`
+    const where = JSON.stringify({ slug: { equals: slug } })
+    const paragraph = (words: string) => ({
+      children: [
+        {
+          detail: 0,
+          format: 0,
+          mode: 'normal',
+          style: '',
+          text: words,
+          type: 'text',
+          version: 1,
+        },
+      ],
+      direction: 'ltr',
+      format: '',
+      indent: 0,
+      textFormat: 0,
+      type: 'paragraph',
+      version: 1,
+    })
+    const root = (children: unknown[]) => ({
+      root: {
+        children,
+        direction: 'ltr',
+        format: '',
+        indent: 0,
+        type: 'root',
+        version: 1,
+      },
+    })
+
+    await callToolJson(request, fixtures.mcp.editorKey, 'draftArticle', {
+      markdown: 'A first body.',
+      slug,
+      title: 'E2E MCP Restored Article',
+    })
+    // The generated tools answer in prose rather than JSON, so these two are
+    // checked for success rather than parsed.
+    const withBlock = await callTool(
+      request,
+      fixtures.mcp.editorKey,
+      'updatePosts',
+      {
+        content: root([
+          paragraph('Block survivor opens the article.'),
+          {
+            fields: {
+              blockName: '',
+              blockType: 'callout',
+              content: root([paragraph('A callout Markdown cannot carry.')]),
+              emoji: '',
+              id: '65f0c0ffee0000000000abcd',
+              tone: 'accent',
+            },
+            format: '',
+            type: 'block',
+            version: 2,
+          },
+        ]),
+        where,
+      },
+    )
+    expect(withBlock).not.toContain('"isError":true')
+    const publish = await callTool(
+      request,
+      fixtures.mcp.adminKey,
+      'updatePosts',
+      {
+        _status: 'published',
+        where,
+      },
+    )
+    expect(publish).not.toContain('"isError":true')
+
+    // An agent's revision through Markdown: the callout does not survive it.
+    await callToolJson(
+      request,
+      fixtures.mcp.editorKey,
+      'updateArticleMarkdown',
+      {
+        markdown: 'Rewritten body, with no callout.',
+        slug,
+      },
+    )
+
+    const { versions } = (await callToolJson(
+      request,
+      fixtures.mcp.editorKey,
+      'listArticleVersions',
+      { slug },
+    )) as { versions: Array<{ status: string; versionId: string }> }
+    const published = versions.find((version) => version.status === 'published')
+    expect(published, JSON.stringify(versions)).toBeDefined()
+
+    const preview = await callToolJson(
+      request,
+      fixtures.mcp.editorKey,
+      'restoreArticleVersion',
+      { dryRun: true, scope: 'body', versionId: published!.versionId },
+    )
+    expect(preview).toMatchObject({ changes: ['content'], dryRun: true })
+
+    // An editor key, reverting to a published version, and not refused.
+    const restored = await callToolJson(
+      request,
+      fixtures.mcp.editorKey,
+      'restoreArticleVersion',
+      { scope: 'body', versionId: published!.versionId },
+    )
+    expect(restored).toMatchObject({
+      changed: ['content'],
+      slug,
+      status: 'draft',
+    })
+    expect(restored.undo).toBeTruthy()
+
+    // The block came back as stored, which only an administrator's REST read
+    // can show: Markdown has no way to express it.
+    const login = await request.post('/api/users/login/', {
+      data: { email: fixtures.mcp.adminEmail, password: fixtures.mcp.password },
+    })
+    expect(login.status()).toBe(200)
+    const { token } = (await login.json()) as { token: string }
+    const draft = await request.get(
+      `/api/posts/${restored.id}/?draft=true&depth=0`,
+      { headers: { Authorization: `JWT ${token}` } },
+    )
+    const draftBody = JSON.stringify(
+      ((await draft.json()) as { content: unknown }).content,
+    )
+    expect(draftBody).toContain('"blockType":"callout"')
+    expect(draftBody).toContain('A callout Markdown cannot carry.')
+    expect(draftBody).not.toContain('Rewritten body')
+
+    // Undo: the draft it replaced comes back.
+    await callToolJson(
+      request,
+      fixtures.mcp.editorKey,
+      'restoreArticleVersion',
+      {
+        scope: 'body',
+        versionId: restored.undo,
+      },
+    )
+    const undone = await callToolJson(
+      request,
+      fixtures.mcp.editorKey,
+      'readArticleMarkdown',
+      { slug },
+    )
+    expect(undone.markdown).toContain('Rewritten body')
+
+    // And through all of it the live article neither changed nor went back to
+    // draft: two restores, one of them to a draft version, and the page a
+    // reader gets is still the one an administrator published.
+    const live = await request.get(
+      `/api/posts/?where[slug][equals]=${slug}&depth=0`,
+    )
+    const [liveDoc] = (
+      (await live.json()) as { docs: Array<Record<string, unknown>> }
+    ).docs
+    expect(liveDoc?._status).toBe('published')
+    expect(JSON.stringify(liveDoc.content)).toContain('"blockType":"callout"')
+    expect(JSON.stringify(liveDoc.content)).not.toContain('Rewritten body')
   })
 
   // An author may read their own drafts and published articles, and not a
