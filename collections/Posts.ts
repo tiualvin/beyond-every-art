@@ -24,6 +24,8 @@ import { purgeOnChange, purgeOnDelete } from '../lib/cache/purge'
 import { recordMcpWrite } from '../lib/mcp/audit'
 import { refuseMcpPublish } from '../lib/mcp/publish-guard'
 import { buildPreviewUrl } from '../lib/preview/live-preview'
+import { indexNowOnChange, indexNowOnDelete } from '../lib/seo/indexnow'
+import { postPath } from '../lib/seo/site'
 
 export const Posts: CollectionConfig = {
   slug: 'posts',
@@ -66,8 +68,17 @@ export const Posts: CollectionConfig = {
       // Last, so it sees the status this write actually lands on.
       stampPublishedAt,
     ],
-    afterChange: [recordMcpWrite, purgeOnChange(CONTENT_TAGS.posts)],
-    afterDelete: [purgeOnDelete(CONTENT_TAGS.posts)],
+    afterChange: [
+      recordMcpWrite,
+      purgeOnChange(CONTENT_TAGS.posts),
+      // Tells Bing a published URL changed. Off unless INDEXNOW_KEY is set;
+      // see lib/seo/indexnow.ts.
+      indexNowOnChange(postPath),
+    ],
+    afterDelete: [
+      purgeOnDelete(CONTENT_TAGS.posts),
+      indexNowOnDelete(postPath),
+    ],
   },
   // Autosave is what makes Live Preview live: the iframe re-renders on save,
   // so without it the preview only moves when an editor remembers to press a

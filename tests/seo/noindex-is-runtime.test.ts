@@ -70,6 +70,8 @@ describe('the noindex switch is evaluated at runtime, not baked into the build',
       index: false,
       follow: false,
     })
-    expect(robotsDirective(false, {})).toBeUndefined()
+    expect(robotsDirective(false, {})).toEqual({
+      'max-image-preview': 'large',
+    })
   })
 })

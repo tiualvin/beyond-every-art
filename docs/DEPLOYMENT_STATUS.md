@@ -44,7 +44,8 @@ report-only — but `CSP_MODE=enforce` would silently end analytics collection.
 Recorded with both candidate fixes in
 [`CONTENT_SECURITY_POLICY.md`](CONTENT_SECURITY_POLICY.md).
 
-Still to do after the flip: submit the sitemap in Search Console, confirm GA4
+Still to do after the flip: ~~submit the sitemap in Search Console~~ (done;
+the owner confirmed on 27 Sep, and that Bing is crawling it too), confirm GA4
 Realtime, run the production crawl comparison (which will now answer the
 `/about/` image question), the Stripe handover **before** cancelling Ghost, and
 the box reboot. (PRs #150 and #154, both listed here originally, merged later

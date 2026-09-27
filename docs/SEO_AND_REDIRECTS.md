@@ -14,6 +14,7 @@ complements the migration handoff in
 | RSS feed      | `/rss`           | `app/rss/route.ts`           |
 | Redirects     | (all paths)      | `middleware.ts`              |
 | Redirect data | `/redirects-map` | `app/redirects-map/route.ts` |
+| IndexNow key  | `/indexnow.txt`  | `app/indexnow.txt/route.ts`  |
 
 The pure, framework-free logic lives under `lib/seo/` and is unit tested:
 
@@ -26,6 +27,49 @@ The pure, framework-free logic lives under `lib/seo/` and is unit tested:
 - `lib/seo/redirect-audit.ts` — judging a redirect against what a live site did.
 - `lib/seo/rss.ts` — RSS 2.0 rendering with XML escaping.
 - `lib/seo/sitemap.ts` — sitemap entry construction.
+- `lib/seo/indexing.ts` — the robots meta directive every page carries.
+- `lib/seo/topic-meta.ts` — a tag archive's title, description and share image.
+- `lib/seo/indexnow.ts` — announcing publishes to Bing through IndexNow.
+
+### Robots, images, and previews
+
+`/robots.txt` disallows `/api`, and every upload is served from
+`/api/media/file/` — so until 27 Sep a crawler could fetch an article but not
+the image its `og:image` and Article JSON-LD pointed at. Ghost served the same
+files from `/content/images/`, which nothing disallowed, so this was lost in
+the migration. `Allow: /api/media/file/` now opens uploads and nothing else,
+because crawlers apply the longest matching rule. `tests/seo/robots.test.ts`
+evaluates the rules the way a crawler does and pins the prefix to the
+Caddyfile exception.
+
+Every indexable page carries `max-image-preview:large`, which Google requires
+before it will show an image at full width — the large card in Discover
+included. `robotsDirective` in `lib/seo/indexing.ts` is the only way a page
+sets `robots`, and it never returns undefined: Next's metadata merge treats a
+page's `robots: undefined` as a value that replaces the layout's, which is how
+the empty search page came to drop staging's noindex.
+
+### IndexNow
+
+A published post or page is announced to IndexNow (Bing, and the engines that
+share its submissions) a few seconds after the publish, instead of waiting for
+Bing's next read of the sitemap. Google does not take part. It is off until
+`INDEXNOW_KEY` is set in production's `.env`; generate one with
+`openssl rand -hex 16`. The key is served at `/indexnow.txt`, which is how an
+engine verifies a submission, so it is public by design rather than a secret.
+
+What is announced, and what is not, is decided in `lib/seo/indexnow.ts` and
+unit tested: a publish, and a live post's old address when its slug changes; a
+delete of something that was live. Not a draft or an autosave, not a scheduled
+post before its date, not an unpublish (indistinguishable from an autosave in
+the hook; the sitemap drops the URL). Submissions are batched over five
+seconds and a URL is not resent within ten minutes. The `migrate` service has
+the key blanked in `docker-compose.yml`, so bulk imports never submit.
+
+After setting the key, publish something and look for an `indexnow_submitted`
+line in `docker compose logs app`. The first submission usually answers `202`
+(key being verified); `403` means the key file did not match — fetch
+`https://www.beyondeveryart.com/indexnow.txt` and compare.
 
 ## Redirects
 
