@@ -13,6 +13,7 @@ import {
   FAQ_BLOCK,
   FEATURE_LIST_BLOCK,
   GALLERY_BLOCK,
+  KEY_FACTS_BLOCK,
   KEY_TAKEAWAYS_BLOCK,
   MEDIA_TEXT_BLOCK,
   PAYWALL_BLOCK,
@@ -28,6 +29,7 @@ import {
   type FaqData,
   type FeatureListData,
   type GalleryData,
+  type KeyFactsData,
   type KeyTakeawaysData,
   type MediaTextData,
   type PaywallData,
@@ -44,6 +46,7 @@ import { Embed } from './embed'
 import { Faq } from './faq'
 import { FeatureList } from './feature-list'
 import { Gallery } from './gallery'
+import { KeyFacts } from './key-facts'
 import { KeyTakeaways } from './key-takeaways'
 import { MediaText } from './media-text'
 import { PaywallMarker } from './paywall'
@@ -123,6 +126,13 @@ const renderers: BlockRenderers = {
         preview={preview}
       />
     )
+  },
+  // Allocated only when there is a heading, for the reason the feature list
+  // gives below: an unheaded module must not consume an anchor.
+  [KEY_FACTS_BLOCK]: (fields, { allocate }) => {
+    const data = fields as KeyFactsData
+    const heading = data.heading?.trim()
+    return <KeyFacts data={data} anchor={heading ? allocate(heading) : ''} />
   },
   // Nothing to allocate: a table's caption is a caption, not a heading.
   [COMPARISON_TABLE_BLOCK]: (fields) => (

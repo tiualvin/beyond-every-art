@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import { Faq } from '../../app/(frontend)/components/blocks/faq'
 import { FeatureList } from '../../app/(frontend)/components/blocks/feature-list'
+import { KeyFacts } from '../../app/(frontend)/components/blocks/key-facts'
 import { KeyTakeaways } from '../../app/(frontend)/components/blocks/key-takeaways'
 
 const render = (node: React.ReactNode) => renderToStaticMarkup(node)
@@ -79,6 +80,71 @@ describe('KeyTakeaways', () => {
 
     expect(
       render(<KeyTakeaways data={{ items: [{ text: '' }] }} anchor="a" />),
+    ).toBe('')
+  })
+})
+
+describe('KeyFacts', () => {
+  const items = [
+    { label: 'Insect', value: 'Dactylopius coccus' },
+    { label: 'Yield', value: '~70,000 insects per lb' },
+  ]
+
+  it('is a description list of term and value, not a table', () => {
+    // Name–value pairs, announced as such. A two-column table would be read
+    // as a grid to navigate, which is not what a reader looking up the
+    // species is doing.
+    const html = render(<KeyFacts data={{ items }} anchor="" />)
+
+    expect(html).toContain('<dl')
+    expect(html).not.toContain('<table')
+    expect(html).toContain(
+      '<div class="facts__item"><dt class="facts__label">Insect</dt>' +
+        '<dd class="facts__value">Dactylopius coccus</dd></div>',
+    )
+  })
+
+  it('labels the section by its heading when it has one', () => {
+    const html = render(
+      <KeyFacts
+        data={{ heading: 'At a glance', items }}
+        anchor="at-a-glance"
+      />,
+    )
+
+    expect(html).toContain('aria-labelledby="at-a-glance"')
+    expect(html).toContain(
+      '<h2 class="module__heading facts__heading" id="at-a-glance"',
+    )
+  })
+
+  it('has no heading and no dangling label when none is given', () => {
+    // Usually sits under a body heading that already introduces it. An
+    // `aria-labelledby` pointing at nothing would be worse than no name.
+    const html = render(<KeyFacts data={{ heading: '  ', items }} anchor="" />)
+
+    expect(html).not.toContain('<h2')
+    expect(html).not.toContain('aria-labelledby')
+  })
+
+  it('drops a half-filled fact and renders nothing when none are left', () => {
+    const html = render(
+      <KeyFacts
+        data={{
+          items: [
+            { label: 'Yield', value: ' ' },
+            { label: '', value: 'Orphan' },
+            { label: 'Kept', value: 'Yes' },
+          ],
+        }}
+        anchor=""
+      />,
+    )
+    expect(html.match(/<dt/g)).toHaveLength(1)
+    expect(html).not.toContain('Orphan')
+
+    expect(
+      render(<KeyFacts data={{ items: [{ label: 'Yield' }] }} anchor="" />),
     ).toBe('')
   })
 })

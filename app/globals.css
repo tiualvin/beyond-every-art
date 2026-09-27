@@ -2923,6 +2923,61 @@ img {
   font-weight: 600;
 }
 
+/* --- Key facts ------------------------------------------------------------ */
+
+/* Reference data about the subject: the specimen card from the redesign
+   prototype, brought into the body. A card, unlike the takeaways above,
+   because a reader consults it rather than reads it as part of the argument —
+   and the edge is what says "look things up here". */
+.facts {
+  border: 1px solid var(--color-line);
+  background: var(--color-surface);
+  border-radius: var(--radius);
+  padding: 1.1rem 1.25rem 1.25rem;
+}
+
+/* Same specificity reason as `.takeaways__heading` above, and deliberately the
+   same small label: both name a module rather than a section of the argument. */
+.prose .facts__heading {
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-weight: 600;
+  color: var(--color-burgundy);
+  margin: 0 0 0.9rem;
+}
+
+.facts__list {
+  margin: 0;
+  display: grid;
+  gap: 0.8rem 1.5rem;
+}
+
+/* Two pairs to a row once there is room. Each pair is one grid item, so a term
+   and its value can never land in different columns. */
+@media (min-width: 40rem) {
+  .facts__list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.facts__label {
+  font-family: var(--font-sans);
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.facts__value {
+  margin: 0.15rem 0 0;
+  font-size: 1rem;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+}
+
 /* --- FAQ ------------------------------------------------------------------ */
 
 /* Same disclosure mechanics as the dropdown, and deliberately the same look:

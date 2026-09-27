@@ -30,6 +30,7 @@ export const FAQ_BLOCK = 'faq'
 export const FEATURE_LIST_BLOCK = 'featureList'
 export const MEDIA_TEXT_BLOCK = 'mediaText'
 export const COMPARISON_TABLE_BLOCK = 'comparisonTable'
+export const KEY_FACTS_BLOCK = 'keyFacts'
 
 /** Every block slug this repository knows how to render. */
 export const BLOCK_SLUGS = [
@@ -47,6 +48,7 @@ export const BLOCK_SLUGS = [
   FEATURE_LIST_BLOCK,
   MEDIA_TEXT_BLOCK,
   COMPARISON_TABLE_BLOCK,
+  KEY_FACTS_BLOCK,
 ] as const
 
 export type BlockSlug = (typeof BLOCK_SLUGS)[number]
@@ -260,6 +262,26 @@ export type ComparisonTableData = {
   columns?: ComparisonColumn[] | null
   rows?: ComparisonRow[] | null
 }
+
+export type KeyFactItem = {
+  id?: string | null
+  label?: string | null
+  value?: string | null
+}
+
+export type KeyFactsData = {
+  heading?: string | null
+  items?: KeyFactItem[] | null
+}
+
+/**
+ * The most facts one module holds.
+ *
+ * Exported because the MCP tool that writes this block validates against it
+ * before saving: an agent told "at most 12" up front writes twelve, where one
+ * that learns it from a validation error has already spent a call.
+ */
+export const KEY_FACTS_MAX_ITEMS = 12
 
 // --- Block configs -------------------------------------------------------
 
@@ -916,6 +938,65 @@ export const ComparisonTableBlock: Block = {
   ],
 }
 
+/**
+ * Short facts about the subject, each a label and a value.
+ *
+ * "Insect: Dactylopius coccus. Yield: about 70,000 insects per pound." The
+ * specimen card in the redesign prototype, brought into the body rather than
+ * the rail, and the shape a Markdown draft reaches for with a two-column table
+ * — which the editor has no table feature to store, so it saves as a paragraph
+ * of literal pipes that the page then prints.
+ *
+ * Not a comparison table with one column. A table says the reader is meant to
+ * compare along its rows and columns; this is a list of name–value pairs, and
+ * `<dl>` is the element that says so. Nor a feature list: every item there is
+ * a heading, and six facts would put six entries in the document outline.
+ *
+ * Both halves of a fact are plain text, not rich text. A fact that needs a link
+ * or a paragraph is prose, and belongs in the body.
+ */
+export const KeyFactsBlock: Block = {
+  slug: KEY_FACTS_BLOCK,
+  interfaceName: 'KeyFactsBlock',
+  labels: { singular: 'Key facts', plural: 'Key facts' },
+  fields: [
+    {
+      name: 'heading',
+      type: 'text',
+      admin: {
+        description:
+          'Optional, e.g. At a glance. Leave empty when a heading in the body already introduces the facts.',
+      },
+    },
+    {
+      name: 'items',
+      type: 'array',
+      minRows: 1,
+      maxRows: KEY_FACTS_MAX_ITEMS,
+      required: true,
+      labels: { singular: 'Fact', plural: 'Facts' },
+      admin: {
+        description:
+          'A few words each side. A fact that needs a sentence to state belongs in the prose.',
+      },
+      fields: [
+        {
+          name: 'label',
+          type: 'text',
+          required: true,
+          admin: { description: 'What the fact is about, e.g. Insect.' },
+        },
+        {
+          name: 'value',
+          type: 'text',
+          required: true,
+          admin: { description: 'The fact, e.g. Dactylopius coccus.' },
+        },
+      ],
+    },
+  ],
+}
+
 /** The blocks offered inside a Post or Page body. */
 /**
  * Gives every block its drawing and its group in the picker.
@@ -953,6 +1034,7 @@ function presented(block: Block): Block {
 
 export const CONTENT_BLOCKS: Block[] = [
   KeyTakeawaysBlock,
+  KeyFactsBlock,
   FaqBlock,
   FeatureListBlock,
   MediaTextBlock,

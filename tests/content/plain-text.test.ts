@@ -10,6 +10,7 @@ import {
   FAQ_BLOCK,
   FEATURE_LIST_BLOCK,
   GALLERY_BLOCK,
+  KEY_FACTS_BLOCK,
   KEY_TAKEAWAYS_BLOCK,
   MEDIA_TEXT_BLOCK,
   PAYWALL_BLOCK,
@@ -314,6 +315,26 @@ describe('block serialization', () => {
     expect(plain).toContain('Excellent')
   })
 
+  it('keeps each key fact as a label and its value together', () => {
+    const plain = richTextToPlainText(
+      editorState(
+        block(KEY_FACTS_BLOCK, {
+          heading: 'At a glance',
+          items: [
+            { label: 'Insect', value: 'Dactylopius coccus' },
+            { label: 'Yield', value: '' },
+          ],
+        }),
+      ),
+    )
+
+    expect(plain).toContain('At a glance')
+    expect(plain).toContain('Insect: Dactylopius coccus')
+    // Dropped, as the page drops it: a feed must not carry what a reader
+    // cannot see.
+    expect(plain).not.toContain('Yield')
+  })
+
   it('survives a block with no fields at all', () => {
     // What a draft looks like the moment an editor inserts a module and has
     // not filled anything in. Live Preview renders exactly this.
@@ -327,6 +348,7 @@ describe('block serialization', () => {
           block(FEATURE_LIST_BLOCK),
           block(MEDIA_TEXT_BLOCK),
           block(COMPARISON_TABLE_BLOCK),
+          block(KEY_FACTS_BLOCK),
         ),
       ),
     ).not.toThrow()

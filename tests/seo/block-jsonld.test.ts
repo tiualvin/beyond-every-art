@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   FAQ_BLOCK,
   FEATURE_LIST_BLOCK,
+  KEY_FACTS_BLOCK,
   KEY_TAKEAWAYS_BLOCK,
   PULL_QUOTE_BLOCK,
 } from '../../blocks/schema'
@@ -179,6 +180,9 @@ describe('collectBlockJsonLd', () => {
         body([
           block(PULL_QUOTE_BLOCK, { quote: 'A sentence worth pulling.' }),
           block(KEY_TAKEAWAYS_BLOCK, { items: [{ text: 'A point.' }] }),
+          block(KEY_FACTS_BLOCK, {
+            items: [{ label: 'Insect', value: 'Dactylopius coccus' }],
+          }),
         ]),
       ),
     ).toEqual([])
