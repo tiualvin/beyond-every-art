@@ -6,6 +6,7 @@ import {
   editorsAndAdminsField,
   ownedPosts,
   postsRead,
+  versionsOf,
 } from '../access/roles'
 import {
   ghostIdField,
@@ -42,6 +43,9 @@ export const Posts: CollectionConfig = {
   access: {
     create: authenticated,
     read: postsRead,
+    // Without this, any signed-in user reads every revision of every post —
+    // drafts and gated bodies included. See `versionsOf`.
+    readVersions: versionsOf(postsRead),
     update: ownedPosts,
     delete: deleteOwnedDrafts,
   },

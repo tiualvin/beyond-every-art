@@ -74,6 +74,42 @@ export const deleteOwnedDrafts: Access = ({ req }) => {
   return where
 }
 
+/** A document-level `where`, rewritten onto the `version.` fields it has in history. */
+function onVersionFields(where: Where): Where {
+  return Object.fromEntries(
+    Object.entries(where).map(([key, value]) =>
+      key === 'and' || key === 'or'
+        ? [key, (value as Where[]).map(onVersionFields)]
+        : [`version.${key}`, value],
+    ),
+  ) as Where
+}
+
+/**
+ * Version history, readable under the same rule as the document it belongs to.
+ *
+ * Payload does not derive `readVersions` from `read`. Left unset, it lets any
+ * signed-in request read every saved version of every document — so an author
+ * whom `postsRead` keeps out of a colleague's draft could read that draft, and
+ * every earlier revision of it, from `/api/posts/versions`. Checked against a
+ * real database rather than assumed: `find` returned nothing, `findVersions`
+ * returned both revisions.
+ *
+ * The document rule's `where` is applied to the fields as each version stored
+ * them, which is how Payload itself reads a draft through `read`. Anonymous
+ * requests are refused outright rather than given the published-and-public
+ * filter, because that is what they got before this rule existed: past
+ * revisions are editorial history, not something the site publishes.
+ */
+export const versionsOf =
+  (read: Access): Access =>
+  async (args) => {
+    if (!args.req.user) return false
+
+    const result = await read(args)
+    return typeof result === 'object' ? onVersionFields(result) : result
+  }
+
 export const globalPublicReadAdminUpdate: GlobalConfig['access'] = {
   read: () => true,
   update: ({ req }) => isAdmin(req.user),
