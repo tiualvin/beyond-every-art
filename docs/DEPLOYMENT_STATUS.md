@@ -1060,7 +1060,7 @@ errors`, and `/swapfile` is `-rw-------`. Its one warning — "non-bind mount
 - **R2 configured and the lost media recovered (22 Aug).** Two buckets, media
   and backups deliberately separate; 109 of 110 images restored from the site
   archive with filenames and document ids intact; first database backup
-  uploaded. Full account, and the one step still outstanding, in item 0.4.
+  uploaded. Full account in item 0.4, closed 18 Sep.
 - **Fixed three bugs found while getting the above working**, all merged to
   `main`:
   - The `app` container had been reporting `unhealthy` since it was created
@@ -1092,7 +1092,7 @@ to Cloudflare's published ranges, and the origin IP was confirmed timing out
 on both ports from outside the VPS while every hostname still serves. See
 "The origin is closed" under Pick up here.
 
-0.4. **Media loss and R2 — recovered on 22 Aug. One small step left.**
+0.4. **Media loss and R2 — recovered on 22 Aug, closed 18 Sep.**
 
 Recorded in full because the failure was invisible for three weeks and the
 recovery this note originally prescribed would not have worked.
