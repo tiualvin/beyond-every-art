@@ -124,6 +124,13 @@ Written for this project, because the generated ones cannot do the job:
 | `uploadMedia`           | Adds an image to the Media library from base64 and returns its id, for `updatePosts` to set as a `featuredImage`.                                    |
 | `uploadMediaFromUrl`    | The same, from an https address the server fetches itself. The only one of the two that works from a phone or a scheduled run.                       |
 
+Planned, not built: `findStockPhoto` and `importStockPhoto`, which replace the
+Unsplash picker Ghost's editor had. They are the first custom tools since the
+OAuth consent screen, and adding one ticks it on every existing key and grant
+unless the migration says otherwise — see
+[`STOCK_IMAGERY.md`](STOCK_IMAGERY.md#implementation-plan) before adding any
+tool, not only those.
+
 ### Images
 
 The generated `createMedia` tool cannot carry a file, so a Media document made
