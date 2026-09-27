@@ -388,7 +388,153 @@ on the target — see
 [`MIGRATION_WEBSITE_COMPARATOR.md`](MIGRATION_WEBSITE_COMPARATOR.md). It is a
 warning, so it cannot fail the cutover gate, and `images_lost` is unchanged.
 The production comparison after the flip will therefore answer the `/about/`
-question even if nobody runs the curl above first.
+question even if nobody runs the curl above first — though not by crawling
+Ghost, which after the flip can no longer be done. See below.
+
+### The production run
+
+**Not run yet.** The last outstanding verification gate, and it has to happen
+before any change to live tag URLs: afterwards, a regression and a change made
+on purpose look the same.
+
+**Ghost cannot be the source any more.** DNS has moved, and Ghost's own
+hostname, `beyond-every-art.ghost.io` (from the rollback notes in
+[`CUTOVER_DAY.md`](CUTOVER_DAY.md)), answers every public path with a `302` to
+`https://www.beyondeveryart.com/<same path>` — this site. Checked 22 Sep for
+`/`, `/sitemap.xml`, `/robots.txt`, `/rss/`, `/about/`, `/tag/art/` and
+`/author/`; only `/ghost/` answers `200`. The comparator records a cross-origin
+redirect and follows nothing, so `--source https://beyond-every-art.ghost.io`
+compares four redirect stubs against production and covers no page at all.
+
+So the source is **replayed**: the 18 Sep report above kept its whole crawl of
+Ghost under `.source` — 143 pages, taken at `www` while Ghost was the live site
+— and `--source-crawl` compares that against a fresh crawl of production (see
+[`MIGRATION_WEBSITE_COMPARATOR.md`](MIGRATION_WEBSITE_COMPARATOR.md)). Nothing
+published has moved since: all 113 published posts carry Ghost IDs, and the only
+published post updated after the crawl is `fine-art-home-guide`, whose canonical
+was repaired at 13:09 that day.
+
+**Before running**, on the VPS:
+
+```bash
+cd ~/beyond-every-art && ls -l rehearsal/
+jq '{origin: .source.origin, pages: (.source.pages | length),
+     limit: .source.limitReached, summary}' rehearsal/site-comparison.json
+```
+
+Expect `https://www.beyondeveryart.com`, `143`, `false`, and the 18 Sep summary
+of 14 errors and 19 warnings. If the file is missing or says otherwise, stop:
+there is no second copy of the old site's rendered pages to rebuild it from, and
+the options left — another copy, or signing the gate off on the staging crawl
+plus `migrate:validate` — are a decision rather than a workaround.
+
+Then:
+
+- **Copy `rehearsal/site-comparison.{json,txt}` off the server** — next to the
+  held members export, not under the backup bucket's pruned prefix. Once Ghost
+  is cancelled it is the only record of what the old site served.
+- Confirm Cloudflare's Email Address Obfuscation is still off (§6 above).
+- Run between deploys. `docker compose run` never rebuilds, so the `migrate`
+  image needs a build that includes `--source-crawl`.
+
+```bash
+docker compose build migrate
+docker compose run --rm \
+  -v "$PWD/rehearsal:/app/rehearsal:ro" \
+  -v "$PWD/.migration-reports:/app/.migration-reports" \
+  migrate pnpm migration:compare \
+    --source-crawl rehearsal/site-comparison.json \
+    --target https://www.beyondeveryart.com \
+    --json .migration-reports/production-comparison.json \
+    --report .migration-reports/production-comparison.txt
+```
+
+No `--allow-target-noindex`: this is production, and a `noindex` or a
+`Disallow: /` anywhere must be an error. It **will** exit 1 — the thirteen
+known errors below — and that is read, not silenced with `--fail-on never`.
+The reports stay in the ignored `.migration-reports/` and are not committed:
+the repository is public and they are a full dump of both sites' crawl
+evidence. What gets committed is the conclusion, here.
+
+**What to expect**, so a new finding stands out. Carried over from 18 Sep:
+
+- **Errors, 13:** the seven `/%22https://…%22` 404-title differences and the
+  six on `/page/2` and `/page/2/`. A _new_ field on those two paths is the
+  `/journal/` page's own metadata having changed, not a regression.
+- **Warnings:** `h1_changed` on `/` and `/ultramarine-science/`;
+  `robots_changed` on `/robots.txt`, now Ghost's rules against production's
+  (`allow:/`, `disallow:/admin`, `disallow:/api`, `host:`, `sitemap:`);
+  `Article` → `WebPage` on the pages and `Person` → `ProfilePage` on the author
+  archives.
+
+Changed on purpose since 18 Sep:
+
+- `/` declares `ItemList, WebSite`, and its h1 is the new homepage's.
+- The nine tag archives go `Series` → `CollectionPage` — the `(none)` gap above,
+  since closed.
+- The seven-link footer, the first `/rss/` link, and the larger homepage link
+  set produce **no finding**: the comparator does not compare link sets. They
+  raise `targetPages`, and a footer target that failed would show as
+  `broken_internal_links` on every page at once.
+- `images_reduced` did not exist on 18 Sep. Expect it on `/`, perhaps on
+  `/about/`, and possibly on most posts if Ghost's template carried
+  related-post cards — in which case the missing sources are other posts'
+  feature images, which a sample confirms.
+
+Gone, and a regression if they come back: the `fine-art-home-guide` canonical,
+and `legacy_origin_link` — the comparator skips it when both sides share an
+origin.
+
+Always a regression: `target_url_missing`, `unexpected_target_status`,
+`temporary_target_redirect`, `meta_description_changed`,
+`target_canonical_off_origin`, `image_alt_regression`, `images_lost`,
+`broken_internal_links`, `legacy_image_hotlink`, `target_crawl_error`, and a
+title or canonical change on any post, page, tag or author URL.
+
+**Compare by issue key rather than by eye:**
+
+```bash
+key='.issues[] | [.severity, .code, .path, .field] | @tsv'
+jq -r "$key" rehearsal/site-comparison.json                | sort > /tmp/sep18.tsv
+jq -r "$key" .migration-reports/production-comparison.json | sort > /tmp/prod.tsv
+comm -13 /tmp/sep18.tsv /tmp/prod.tsv   # new: each is on the lists above, or it is a regression
+comm -23 /tmp/sep18.tsv /tmp/prod.tsv   # gone: each should be one of the two above
+```
+
+And check values, not only keys: production's `/robots.txt` must carry no
+`disallow:/` and must name `sitemap:/sitemap.xml`, and `/` must still declare
+`WebSite`.
+
+**The `/about/` answer.** Production's `/about/` has no content images today —
+only the masthead wordmark, checked 22 Sep. What Ghost's had is in the same
+file:
+
+```bash
+# Ghost's /about/ images
+jq '.source.pages[] | select(.path == "/about/") | .images' \
+  rehearsal/site-comparison.json
+# Ghost's chrome: sources on at least 90% of its rendered pages
+jq '[.source.pages[] | select(.error == null and .status >= 200 and .status < 300)] as $p
+    | ($p | length) as $n | [$p[] | [.images[].src] | unique[]]
+    | group_by(.) | map({src: .[0], share: (length / $n)})
+    | map(select(.share >= 0.9))' rehearsal/site-comparison.json
+```
+
+The first list less the second is what `/about/` actually carried. The page
+body in the export is a check that no theme can confuse:
+
+```bash
+jq '(.data // .db[0].data).posts[]
+    | select((.type == "page" or .page == true) and .slug == "about")
+    | {feature_image, imgs: ([(.html // "") | scan("<img[^>]*>")] | length)}' \
+  ghost-export/ghost-content.json
+```
+
+None means the first two 18 Sep runs were reporting Ghost's theme, and the
+question closes. Some, present in Payload's About page but not rendered, is a
+page-template defect; some, absent from Payload, is an import defect to restore
+from the Ghost archive's media. The run's own `images_reduced` on `/about/`
+should agree, but it rests on the chrome heuristic, and this does not.
 
 ## 7. Record and sign off
 

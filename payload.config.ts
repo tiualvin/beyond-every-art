@@ -22,6 +22,7 @@ import { OAuthClients } from './collections/OAuthClients'
 import { OAuthGrants } from './collections/OAuthGrants'
 import { Users } from './collections/Users'
 import { Footer } from './globals/Footer'
+import { Homepage } from './globals/Homepage'
 import { Header } from './globals/Header'
 import { SiteSettings } from './globals/SiteSettings'
 import { resendAdapter } from './lib/email/resend'
@@ -52,7 +53,12 @@ export default buildConfig({
       description:
         'Editorial CMS for Beyond Every Art — art, colour, materials and creative practice.',
     },
-    // The publication's own palette lives in `app/(payload)/custom.css`, which
+    // Payload's dark theme, always. The owner works in it and asked for it
+    // outright after a light palette leaked into dark mode and turned the
+    // admin beige; this also removes the per-user theme toggle, so nobody
+    // lands on a light screen by accident. See docs/EDITORIAL_ADMIN.md.
+    theme: 'dark',
+    // The publication's own accents live in `app/(payload)/custom.css`, which
     // the admin layout imports. Payload 3 has no `admin.css` key — a stylesheet
     // is an import in the layout, not configuration.
     components: {
@@ -170,7 +176,7 @@ export default buildConfig({
   // Transactional email (admin password reset, verification). Omitted when
   // RESEND_API_KEY / EMAIL_FROM_ADDRESS are unset so local dev and CI still boot.
   ...(email ? { email } : {}),
-  globals: [SiteSettings, Header, Footer],
+  globals: [SiteSettings, Header, Footer, Homepage],
   plugins: [
     // Always registered: the plugin keeps its API-key collection when disabled,
     // so the database schema does not change with MCP_ENABLED. Whether the

@@ -3,10 +3,18 @@
 //   pnpm migration:compare --source https://legacy.example.com \
 //     --target https://staging.example.com
 //
+//   pnpm migration:compare --source-crawl rehearsal/site-comparison.json \
+//     --target https://www.example.com
+//
 // The command writes a detailed deterministic JSON artifact and a concise text
 // report. It exits non-zero when the configured issue threshold is reached.
+//
+// The second form replays the source side of an earlier report instead of
+// crawling it: after cutover the old site no longer answers anywhere a crawler
+// can reach, and the last crawl of it is the only source there is. See
+// `lib/migration-verification/replay.ts`.
 
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
@@ -15,6 +23,7 @@ import {
   compareCrawls,
   crawlSite,
   DEFAULT_CRAWL_SEEDS,
+  parseStoredCrawl,
   renderHumanReport,
   targetDiscoveryPageBudget,
   type CrawlOptions,
@@ -24,7 +33,9 @@ import {
 type FailOn = IssueSeverity | 'never'
 
 interface CliOptions {
-  source: string
+  /** Exactly one of `source` and `sourceCrawlPath` is set. */
+  source?: string
+  sourceCrawlPath?: string
   target: string
   seeds: string[]
   crawl: Partial<CrawlOptions>
@@ -70,8 +81,11 @@ export function parseArgs(argv: string[]): CliOptions {
   if (argv.includes('--help')) {
     process.stdout.write(`Usage:
   pnpm migration:compare --source <origin> --target <origin> [options]
+  pnpm migration:compare --source-crawl <file> --target <origin> [options]
 
 Options:
+  --source-crawl <file>     Replay the source crawl kept in an earlier JSON
+                            report instead of crawling a source origin
   --seed <path>             Repeatable additional crawl seed
   --max-pages <n>           Source page cap (default: 500, max: 10000)
   --target-max-pages <n>    Target cap (default: 2x source, max: 10000)
@@ -95,9 +109,26 @@ Basic auth is accepted only by naming an environment variable.
   }
 
   const source = oneValue(argv, '--source')
+  const sourceCrawlPath = oneValue(argv, '--source-crawl')
   const target = oneValue(argv, '--target')
-  if (!source || !target) {
-    throw new Error('Provide --source <origin> and --target <origin>')
+  if (source && sourceCrawlPath) {
+    throw new Error('Provide --source or --source-crawl, not both')
+  }
+  if ((!source && !sourceCrawlPath) || !target) {
+    throw new Error(
+      'Provide --source <origin> (or --source-crawl <file>) and --target <origin>',
+    )
+  }
+  if (sourceCrawlPath) {
+    // Each of these shapes a source crawl, and a replay runs none. Accepting
+    // them silently would let a run look narrower or wider than it was.
+    for (const flag of ['--seed', '--max-pages', '--source-basic-auth-env']) {
+      if (argv.includes(flag)) {
+        throw new Error(
+          `${flag} configures a source crawl; --source-crawl replays one that already ran`,
+        )
+      }
+    }
   }
   const failOn = oneValue(argv, '--fail-on') ?? 'error'
   if (!['error', 'warning', 'never'].includes(failOn)) {
@@ -118,6 +149,7 @@ Basic auth is accepted only by naming an environment variable.
   }
   return {
     source,
+    sourceCrawlPath,
     target,
     seeds: [...new Set([...DEFAULT_CRAWL_SEEDS, ...valuesFor(argv, '--seed')])],
     crawl,
@@ -147,13 +179,13 @@ async function main(): Promise<void> {
   const targetAuthorization = basicAuthorizationFromEnvironment(
     options.targetBasicAuthEnv,
   )
-  const source = await crawlSite(
-    options.source,
-    options.seeds,
-    options.crawl,
-    fetch,
-    { authorization: sourceAuthorization },
-  )
+  const source = options.sourceCrawlPath
+    ? parseStoredCrawl(
+        JSON.parse(await readFile(resolve(options.sourceCrawlPath), 'utf8')),
+      )
+    : await crawlSite(options.source!, options.seeds, options.crawl, fetch, {
+        authorization: sourceAuthorization,
+      })
 
   // Every source URL is an explicit target seed. Target discovery is still
   // enabled, but a missing source URL cannot hide merely because target
@@ -174,6 +206,7 @@ async function main(): Promise<void> {
   )
   const comparison = compareCrawls(source, target, {
     allowTargetNoindex: options.allowTargetNoindex,
+    sourceReplayedFrom: options.sourceCrawlPath,
   })
   const human = renderHumanReport(comparison)
 

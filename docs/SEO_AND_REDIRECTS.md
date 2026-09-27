@@ -14,6 +14,7 @@ complements the migration handoff in
 | RSS feed      | `/rss`           | `app/rss/route.ts`           |
 | Redirects     | (all paths)      | `middleware.ts`              |
 | Redirect data | `/redirects-map` | `app/redirects-map/route.ts` |
+| IndexNow key  | `/indexnow.txt`  | `app/indexnow.txt/route.ts`  |
 
 The pure, framework-free logic lives under `lib/seo/` and is unit tested:
 
@@ -26,6 +27,49 @@ The pure, framework-free logic lives under `lib/seo/` and is unit tested:
 - `lib/seo/redirect-audit.ts` — judging a redirect against what a live site did.
 - `lib/seo/rss.ts` — RSS 2.0 rendering with XML escaping.
 - `lib/seo/sitemap.ts` — sitemap entry construction.
+- `lib/seo/indexing.ts` — the robots meta directive every page carries.
+- `lib/seo/topic-meta.ts` — a tag archive's title, description and share image.
+- `lib/seo/indexnow.ts` — announcing publishes to Bing through IndexNow.
+
+### Robots, images, and previews
+
+`/robots.txt` disallows `/api`, and every upload is served from
+`/api/media/file/` — so until 27 Sep a crawler could fetch an article but not
+the image its `og:image` and Article JSON-LD pointed at. Ghost served the same
+files from `/content/images/`, which nothing disallowed, so this was lost in
+the migration. `Allow: /api/media/file/` now opens uploads and nothing else,
+because crawlers apply the longest matching rule. `tests/seo/robots.test.ts`
+evaluates the rules the way a crawler does and pins the prefix to the
+Caddyfile exception.
+
+Every indexable page carries `max-image-preview:large`, which Google requires
+before it will show an image at full width — the large card in Discover
+included. `robotsDirective` in `lib/seo/indexing.ts` is the only way a page
+sets `robots`, and it never returns undefined: Next's metadata merge treats a
+page's `robots: undefined` as a value that replaces the layout's, which is how
+the empty search page came to drop staging's noindex.
+
+### IndexNow
+
+A published post or page is announced to IndexNow (Bing, and the engines that
+share its submissions) a few seconds after the publish, instead of waiting for
+Bing's next read of the sitemap. Google does not take part. It is off until
+`INDEXNOW_KEY` is set in production's `.env`; generate one with
+`openssl rand -hex 16`. The key is served at `/indexnow.txt`, which is how an
+engine verifies a submission, so it is public by design rather than a secret.
+
+What is announced, and what is not, is decided in `lib/seo/indexnow.ts` and
+unit tested: a publish, and a live post's old address when its slug changes; a
+delete of something that was live. Not a draft or an autosave, not a scheduled
+post before its date, not an unpublish (indistinguishable from an autosave in
+the hook; the sitemap drops the URL). Submissions are batched over five
+seconds and a URL is not resent within ten minutes. The `migrate` service has
+the key blanked in `docker-compose.yml`, so bulk imports never submit.
+
+After setting the key, publish something and look for an `indexnow_submitted`
+line in `docker compose logs app`. The first submission usually answers `202`
+(key being verified); `403` means the key file did not match — fetch
+`https://www.beyondeveryart.com/indexnow.txt` and compare.
 
 ## Redirects
 
@@ -228,6 +272,74 @@ So the two origins are now named separately, in `lib/security/origins.ts`:
 one the server is bound to. That is the assertion the old test could not make —
 under Playwright the bind address is the address the test dialled, so a redirect
 built the wrong way still pointed somewhere that worked.
+
+### Retiring or merging a tag
+
+A tag archive is a migrated URL like any other. `/tag/<slug>/` came from Ghost,
+it is in the sitemap whenever the tag has a published post (`listableTags` in
+`lib/seo/sitemap.ts`), and it may carry inbound links — so retiring a tag means
+a permanent redirect for its archive, never a URL that starts answering 404.
+Which tags go is therefore a decision about live URLs, and per `AGENTS.md` it is
+the owner's; no plan is committed until one is made.
+
+A retirement is three changes that have to land in order: the archive
+redirects, the posts filed under it move, and only then does the tag row go.
+`pnpm tags:apply` does them in that order from a committed plan:
+
+```json
+{
+  "$comment": "Why, for the reviewer.",
+  "merge": [{ "from": "old-slug", "into": "surviving-slug" }],
+  "retire": [{ "slug": "gone", "redirectTo": "/journal/", "ghostPages": 3 }],
+  "assign": { "a-post-slug": ["subject", "second-subject"] }
+}
+```
+
+`merge` moves a tag's posts to another and redirects its archive there.
+`retire` drops a tag from its posts and redirects its archive to `redirectTo`,
+which must be a site path ending in a slash. `ghostPages` is the highest
+`/tag/<slug>/page/N/` Ghost served — read it from the rehearsal's source crawl —
+and gets a row per page, because otherwise the built-in pagination rule sends
+those to the retired archive and they take two hops. `assign` gives a post its
+whole ordered tag list; the first is the card label.
+
+```bash
+docker compose run --rm \
+  -v "$PWD/.migration-reports:/app/.migration-reports" \
+  migrate pnpm tags:apply --plan <plan.json> --dry-run
+docker compose run --rm \
+  -v "$PWD/.migration-reports:/app/.migration-reports" \
+  migrate pnpm tags:apply --plan <plan.json> \
+    --site https://www.beyondeveryart.com --delete-retired
+```
+
+What it will not do, each decided in `lib/content/tag-plan.ts`:
+
+- **Retire half a tag.** Any post it cannot move safely blocks the whole tag:
+  no redirect, no post edits, no deletion.
+- **Leave a post without a subject.** A post that would end with no subject tag
+  — `featured` does not count — blocks the tag until the plan gives it one
+  under `assign`.
+- **Write a published post that has unpublished changes.** An update carries
+  one `_status`, and for that post it would be the draft's: the article would
+  come off the site. It is listed for an editor instead.
+- **Overwrite a redirect.** A row that already sends a retired archive
+  somewhere else blocks the tag. A row pointing _at_ a retired archive is
+  re-aimed at the new destination, so no chain forms.
+- **Move posts before the redirects are served.** Rows written from a script do
+  not purge the app's caches, so a new one can take about eleven minutes to be
+  served; the script asks `--site` until every retired archive answers `301`,
+  and stops without touching a post if it never does. A rerun picks up where it
+  stopped — every step plans to nothing once done.
+
+The dry run reports each post's tags before and after, the conflicts, the
+redirect rows, published posts left without a subject, and which topic swatches
+change colour: `assignPigments` assigns over the whole subject list, so a
+changed subject set repaints the swatches that collided with what was removed.
+Take a backup first, and do not run `migrate:ghost` afterwards — it would file
+the posts back under the retired tags. After a retirement, pass only surviving
+slugs to `validate:redirects --tag`: a retired archive now redirects, and its
+pagination probe would report a chain.
 
 ## URL structure
 

@@ -7,6 +7,7 @@ import {
   configuredLimit,
   FixedWindowRateLimiter,
 } from '@/lib/security/rate-limit'
+import { robotsDirective } from '@/lib/seo/indexing'
 import { absoluteUrl, getSiteUrl, SEARCH_PATH } from '@/lib/seo/site'
 
 import { FadeIn } from '../components/motion/fade-in'
@@ -44,7 +45,9 @@ export async function generateMetadata({
   return {
     title: query ? `Search: ${query}` : 'Search',
     alternates: { canonical },
-    robots: query ? { index: false, follow: true } : undefined,
+    // A results page is noindex; the empty search page is not. Through
+    // `robotsDirective` either way, so staging stays hidden on both.
+    robots: robotsDirective(Boolean(query)),
   }
 }
 

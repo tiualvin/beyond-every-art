@@ -44,12 +44,24 @@ report-only — but `CSP_MODE=enforce` would silently end analytics collection.
 Recorded with both candidate fixes in
 [`CONTENT_SECURITY_POLICY.md`](CONTENT_SECURITY_POLICY.md).
 
-Still to do after the flip: submit the sitemap in Search Console, confirm GA4
+Still to do after the flip: ~~submit the sitemap in Search Console~~ (done;
+the owner confirmed on 27 Sep, and that Bing is crawling it too), confirm GA4
 Realtime, run the production crawl comparison (which will now answer the
 `/about/` image question), the Stripe handover **before** cancelling Ghost, and
 the box reboot. (PRs #150 and #154, both listed here originally, merged later
 the same day — the js-yaml override bump and a Dependabot payload-group
 update.)
+
+**The crawl comparison cannot crawl Ghost any more** (found 22 Sep). Its own
+hostname redirects every public path back to this site, so the run replays the
+18 Sep crawl of Ghost kept in `rehearsal/site-comparison.json` on the VPS —
+procedure and expected findings in
+[`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md) §6, "The production run".
+**Copy that file off the server first**: it is now the only record of what the
+old site served, and it must be in hand before Ghost is cancelled. The same
+finding corrects [`CUTOVER_DAY.md`](CUTOVER_DAY.md)'s rollback note, which
+said Ghost serves at its own hostname; whether it still answers for the domain
+has not been checked since the flip, and that section has the one-line check.
 
 ---
 

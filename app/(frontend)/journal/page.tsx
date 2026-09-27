@@ -8,7 +8,11 @@ import {
   buildPagination,
   parsePageParam,
 } from '@/lib/content/pagination'
-import { getPublishedPosts, getSiteSettings } from '@/lib/content/queries'
+import {
+  getPublishedPosts,
+  getSiteSettings,
+  getTagsWithCounts,
+} from '@/lib/content/queries'
 import { absoluteUrl, getSiteUrl, JOURNAL_PATH } from '@/lib/seo/site'
 
 import { ArchiveFilter } from '../components/archive-filter'
@@ -54,7 +58,10 @@ export default async function JournalPage({
   searchParams: SearchParams
 }) {
   const requested = parsePageParam((await searchParams).page)
-  const archive = await resolve(requested)
+  const [archive, subjects] = await Promise.all([
+    resolve(requested),
+    getTagsWithCounts(),
+  ])
 
   if (requested > 1 && requested > archive.totalPages) notFound()
 
@@ -79,7 +86,10 @@ export default async function JournalPage({
             </div>
           </FadeIn>
 
-          <ArchiveFilter posts={archive.posts} />
+          <ArchiveFilter
+            posts={archive.posts}
+            subjects={subjects.map((topic) => topic.slug)}
+          />
 
           {pagination.totalPages > 1 && (
             <nav className="pagination" aria-label="Journal pages">

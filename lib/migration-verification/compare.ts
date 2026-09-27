@@ -124,6 +124,23 @@ function sitewideImageSrcs(pages: Map<string, PageEvidence>): Set<string> {
   )
 }
 
+/** Where Ghost served uploads. No route on this site answers under it. */
+const GHOST_MEDIA_PREFIX = '/content/images/'
+
+/**
+ * Whether an image is still being fetched from Ghost's media path — directly,
+ * or through `next/image`, which carries the original in its `url` parameter.
+ */
+function loadsGhostMedia(src: string): boolean {
+  try {
+    const url = new URL(src)
+    if (url.pathname.startsWith(GHOST_MEDIA_PREFIX)) return true
+    return url.searchParams.get('url')?.startsWith(GHOST_MEDIA_PREFIX) ?? false
+  } catch {
+    return false
+  }
+}
+
 function addIssue(
   issues: ComparisonIssue[],
   severity: IssueSeverity,
@@ -409,8 +426,19 @@ function comparePage(
       'Target page has more images without alt text than the source',
     )
   }
+  // After cutover the old site and the new one answer on the same origin, and
+  // "points at the source origin" describes every link and image the target
+  // has. The question the hotlink check exists to ask survives the move as a
+  // path instead: an image still requested from where Ghost kept its uploads,
+  // which nothing here serves. The link check has no such translation — a link
+  // to the shared origin is a link to this site — so it is skipped.
+  const sameOrigin = sourceOrigin === targetOrigin
   const legacyImages = target.images
-    .filter((image) => new URL(image.src).origin === sourceOrigin)
+    .filter((image) =>
+      sameOrigin
+        ? loadsGhostMedia(image.src)
+        : new URL(image.src).origin === sourceOrigin,
+    )
     .map((image) => image.src)
     .sort()
   if (legacyImages.length > 0) {
@@ -422,14 +450,18 @@ function comparePage(
       'images.src',
       [],
       legacyImages,
-      'Target page still loads image media from the source origin',
+      sameOrigin
+        ? "Target page still loads images from Ghost's media path"
+        : 'Target page still loads image media from the source origin',
     )
   }
 
-  const legacyLinks = target.links
-    .filter((link) => new URL(link.href).origin === sourceOrigin)
-    .map((link) => link.href)
-    .sort()
+  const legacyLinks = sameOrigin
+    ? []
+    : target.links
+        .filter((link) => new URL(link.href).origin === sourceOrigin)
+        .map((link) => link.href)
+        .sort()
   if (legacyLinks.length > 0) {
     addIssue(
       issues,
@@ -542,6 +574,9 @@ export function compareCrawls(
       targetLimitReached: target.limitReached,
     },
     issues,
+    ...(options.sourceReplayedFrom
+      ? { sourceReplayedFrom: options.sourceReplayedFrom }
+      : {}),
     source,
     target,
   }

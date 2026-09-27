@@ -389,6 +389,84 @@ export const getSiteSettings = cachedRead('site-settings', readSiteSettings, [
   CONTENT_TAGS.globals,
 ])
 
+/**
+ * What an editor has chosen about the homepage, resolved for rendering.
+ *
+ * Every part is optional and every absence is the pre-existing behaviour: no
+ * picks means the `featured` flag and then recency decide, no pairing means
+ * that section is not rendered at all, no cover wording means the page keeps
+ * the strings it was compiled with.
+ *
+ * A post that is a draft, scheduled, or was deleted out from under the
+ * relationship is dropped here rather than rendered — an editor's choice is
+ * still subject to whether a reader can open the thing.
+ */
+export type HomepageContent = {
+  picks: PostCard[]
+  pairing: { title: string; note: string; posts: PostCard[] } | null
+  cover: { kicker: string | null; headline: string | null }
+}
+
+const EMPTY_HOMEPAGE: HomepageContent = {
+  picks: [],
+  pairing: null,
+  cover: { kicker: null, headline: null },
+}
+
+/** Resolved relationship rows that are live posts, in the editor's order. */
+function toChosenPosts(value: unknown): PostCard[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .filter(isResolved)
+    .map((doc) => toPostCard(doc as RawPost))
+    .filter((post): post is PostCard => post !== null)
+}
+
+async function readHomepage(): Promise<HomepageContent> {
+  try {
+    const payload = await getPayloadClient()
+    const data = (await payload.findGlobal({
+      slug: 'homepage',
+      overrideAccess: true,
+      // Two hops: the global holds posts, and a card needs each post's tags,
+      // authors and featured image.
+      depth: 2,
+    })) as {
+      picks?: unknown
+      pairing?: { title?: string; note?: string; posts?: unknown }
+      cover?: { kicker?: string; headline?: string }
+    }
+
+    const pairPosts = toChosenPosts(data.pairing?.posts)
+    const title = data.pairing?.title?.trim() ?? ''
+    const note = data.pairing?.note?.trim() ?? ''
+
+    return {
+      picks: toChosenPosts(data.picks),
+      // All three or nothing: a heading with one article under it, or two
+      // articles with no reason given, is not the module — it is the module
+      // half filled in, and half of this one says nothing.
+      pairing:
+        pairPosts.length === 2 && title && note
+          ? { title, note, posts: pairPosts }
+          : null,
+      cover: {
+        kicker: data.cover?.kicker?.trim() || null,
+        headline: data.cover?.headline?.trim() || null,
+      },
+    }
+  } catch {
+    return EMPTY_HOMEPAGE
+  }
+}
+
+export const getHomepage = cachedRead('homepage', readHomepage, [
+  CONTENT_TAGS.globals,
+  CONTENT_TAGS.posts,
+  CONTENT_TAGS.tags,
+  CONTENT_TAGS.media,
+])
+
 function toNavLink(value: Partial<NavLink> | undefined | null): NavLink | null {
   const label = value?.label?.trim()
   const url = value?.url?.trim()
@@ -674,6 +752,11 @@ export type Archive = {
   name: string
   slug: string
   description: string
+  /** The owner's own search overrides, where it has them (tags do). */
+  metaTitle: string | null
+  metaDescription: string | null
+  /** A tag's featured image. Authors keep theirs on the author record. */
+  image: MediaImage | null
   posts: PostCard[]
 }
 
@@ -931,7 +1014,9 @@ async function readArchive(
     const owner = await payload.find({
       collection,
       overrideAccess: true,
-      depth: 0,
+      // One level, so a tag's `featuredImage` arrives as a media record with
+      // its sizes rather than as an id.
+      depth: 1,
       limit: 1,
       where: { slug: { equals: slug } },
     })
@@ -941,6 +1026,9 @@ async function readArchive(
           name?: string
           description?: string
           bio?: string
+          metaTitle?: string | null
+          metaDescription?: string | null
+          featuredImage?: unknown
         }
       | undefined
     if (!doc?.id) return null
@@ -958,6 +1046,9 @@ async function readArchive(
       name: doc.name ?? slug,
       slug,
       description: doc.description ?? doc.bio ?? '',
+      metaTitle: doc.metaTitle?.trim() || null,
+      metaDescription: doc.metaDescription?.trim() || null,
+      image: toMediaImage(doc.featuredImage),
       posts: (posts.docs as RawPost[])
         .map(toPostCard)
         .filter((p): p is PostCard => p !== null),

@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 
 import type { PostCard } from '@/lib/content/queries'
-import { pigmentFor } from '@/lib/design/pigments'
+import { assignPigments, pigmentFor } from '@/lib/design/pigments'
 
 import { ArchiveGroups } from './archive-groups'
 
@@ -32,11 +32,23 @@ function topicsIn(posts: PostCard[]): Topic[] {
  * that changed the query would need its own URLs and its own pagination, and
  * a reader who wants a whole subject already has the topic page.
  */
-export function ArchiveFilter({ posts }: { posts: PostCard[] }) {
+export function ArchiveFilter({
+  posts,
+  subjects,
+}: {
+  posts: PostCard[]
+  /** Every subject slug, as the homepage chart assigns colours over them. */
+  subjects: readonly string[]
+}) {
   const [open, setOpen] = useState(false)
   const [selected, setSelected] = useState<string[]>([])
 
   const topics = useMemo(() => topicsIn(posts), [posts])
+  // Assigned over every subject, as the homepage chart and the tag pages do,
+  // not hashed per slug: hashing alone painted Studio Insider in Palette's
+  // Verdigris here while the homepage showed it in Raw Umber. A tag that is
+  // not a subject (`featured`) keeps its hashed colour — see `assignPigments`.
+  const pigments = useMemo(() => assignPigments(subjects), [subjects])
   const visible = useMemo(
     () =>
       selected.length === 0
@@ -100,7 +112,13 @@ export function ArchiveFilter({ posts }: { posts: PostCard[] }) {
                 />
                 {/* The ring carries the pale pigments — Lead White on paper is
                     otherwise a dot you cannot see. */}
-                <i style={{ background: pigmentFor(topic.slug).hex }} />
+                <i
+                  style={{
+                    background: (
+                      pigments.get(topic.slug) ?? pigmentFor(topic.slug)
+                    ).hex,
+                  }}
+                />
                 {topic.name}
                 <span className="filter-option__count">{topic.count}</span>
               </label>

@@ -26,7 +26,11 @@ import { join, resolve } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { FALLBACK_CTA, FALLBACK_NAV } from '@/lib/content/fallback-nav'
+import {
+  FALLBACK_CTA,
+  FALLBACK_FOOTER_NAV,
+  FALLBACK_NAV,
+} from '@/lib/content/fallback-nav'
 
 const frontend = resolve(import.meta.dirname, '../../app/(frontend)')
 
@@ -56,14 +60,46 @@ function staticRoutes(dir: string, prefix = '/'): string[] {
   return routes
 }
 
-const routes = new Set(staticRoutes(frontend))
+/**
+ * Route handlers outside the `(frontend)` group, by URL.
+ *
+ * `/rss` is a real destination — the layout already declares it as this
+ * document's feed — but it is `app/rss/route.ts`, not a page under
+ * `app/(frontend)`, so the scan above cannot see it. A footer that indexes the
+ * site should link the feed, and without this the check would call it broken.
+ */
+function handlerRoutes(dir: string, prefix = '/'): string[] {
+  const routes: string[] = []
+  if (existsSync(join(dir, 'route.ts'))) routes.push(prefix)
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue
+    if (entry.name.startsWith('[') || entry.name.startsWith('(')) continue
+    routes.push(
+      ...handlerRoutes(join(dir, entry.name), `${prefix}${entry.name}/`),
+    )
+  }
+  return routes
+}
+
+const routes = new Set([
+  ...staticRoutes(frontend),
+  ...handlerRoutes(resolve(import.meta.dirname, '../../app')),
+])
 const home = readFileSync(join(frontend, 'page.tsx'), 'utf8')
 const header = readFileSync(
   join(frontend, 'components/site-header.tsx'),
   'utf8',
 )
+const footer = readFileSync(
+  join(frontend, 'components/site-footer.tsx'),
+  'utf8',
+)
 
-const fallbackUrls = [...FALLBACK_NAV, FALLBACK_CTA].map((link) => link.url)
+const fallbackUrls = [
+  ...FALLBACK_NAV,
+  FALLBACK_CTA,
+  ...FALLBACK_FOOTER_NAV,
+].map((link) => link.url)
 
 /** `/journal/` and `/journal` are the same destination under `trailingSlash`. */
 function slashed(path: string): string {
@@ -76,6 +112,8 @@ describe('the header fallback navigation', () => {
   it('finds the routes and the links it compares', () => {
     expect(routes.has('/')).toBe(true)
     expect(routes.has('/journal/')).toBe(true)
+    // The handler scan is load-bearing now that the footer links the feed.
+    expect(routes.has('/rss/')).toBe(true)
     expect(routes.size).toBeGreaterThan(3)
     expect(fallbackUrls.length).toBeGreaterThan(3)
   })
@@ -103,9 +141,34 @@ describe('the header fallback navigation', () => {
       .map((url) => url.split('#')[1])
       .filter((fragment): fragment is string => Boolean(fragment))
 
-    expect(fragments).toEqual(['topics'])
+    // Both menus point at it, and both are checked.
+    expect(new Set(fragments)).toEqual(new Set(['topics']))
     expect(home).toContain('id={HOME_TOPICS_ID}')
-    // The component takes the list whole rather than keeping a second copy.
+    // Each component takes its list whole rather than keeping a second copy.
     expect(header).toContain('FALLBACK_NAV')
+    expect(footer).toContain('FALLBACK_FOOTER_NAV')
+  })
+})
+
+describe('the footer fallback navigation', () => {
+  // The `footer` global is empty in production too, so until this existed every
+  // page on the site ended with a wordmark, a copyright line, and no way on.
+  it('is what the footer actually renders', () => {
+    expect(FALLBACK_FOOTER_NAV.length).toBeGreaterThan(0)
+    expect(footer).toContain('links.length > 0 ? links : FALLBACK_FOOTER_NAV')
+  })
+
+  it('offers the two destinations the masthead has no room for', () => {
+    // Search lives behind an icon up there and the feed is linked from nowhere
+    // a reader can see, which is the point of a footer being an index rather
+    // than a second menu.
+    const urls = FALLBACK_FOOTER_NAV.map((link) => link.url)
+    expect(urls).toContain('/search/')
+    expect(urls).toContain('/rss/')
+  })
+
+  it('names each destination once', () => {
+    const urls = FALLBACK_FOOTER_NAV.map((link) => link.url)
+    expect(new Set(urls).size).toBe(urls.length)
   })
 })

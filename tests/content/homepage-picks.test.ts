@@ -10,10 +10,12 @@ import { describe, expect, it } from 'vitest'
 
 import {
   FEATURED_SLOTS,
+  OPENING_SLOTS,
   PICK_SLOTS,
   RECENT_QUERY_SIZE,
-  selectPicks,
+  RUNNER_SLOTS,
 } from '../../lib/content/homepage'
+import { selectPicks } from '../../lib/content/homepage'
 import type { PostCard } from '../../lib/content/queries'
 
 function post(id: string, featured = false): PostCard {
@@ -118,5 +120,59 @@ describe('selectPicks', () => {
       exclude: [recent[0]!.id],
     })
     expect(picks).toHaveLength(PICK_SLOTS)
+  })
+})
+
+describe('the opening and the picks together', () => {
+  it('asks for enough recent posts to fill both, with nothing curated', () => {
+    // The worst case is the ordinary one on a site nobody has curated: the
+    // opening takes the six newest, and recency has to cover every pick slot
+    // below it too.
+    const recent = series(RECENT_QUERY_SIZE)
+    const opening = recent.slice(0, OPENING_SLOTS)
+    const picks = selectPicks({
+      recent,
+      exclude: opening.map((post) => post.id),
+    })
+
+    expect(opening).toHaveLength(OPENING_SLOTS)
+    expect(picks).toHaveLength(PICK_SLOTS)
+  })
+
+  it('never shows a piece in both the opening and the picks', () => {
+    const recent = series(RECENT_QUERY_SIZE)
+    const opening = recent.slice(0, OPENING_SLOTS)
+    // A flagged post that is also one of the newest is the case that used to
+    // produce a duplicate: the opening holds it, and the flag tier would
+    // happily offer it again.
+    const picks = selectPicks({
+      curated: [recent[0]!],
+      featured: [recent[1]!, post('f1', true)],
+      recent,
+      exclude: opening.map((post) => post.id),
+    })
+
+    const openingIds = new Set(ids(opening))
+    for (const id of ids(picks)) expect(openingIds.has(id)).toBe(false)
+  })
+
+  it('leaves the lead with one runner fewer when the archive is short', () => {
+    // Seven published posts: the opening takes six, one is left for the picks.
+    const recent = series(7)
+    const opening = recent.slice(0, OPENING_SLOTS)
+    const picks = selectPicks({
+      recent,
+      exclude: opening.map((post) => post.id),
+    })
+
+    expect(opening.slice(1)).toHaveLength(RUNNER_SLOTS)
+    expect(picks).toHaveLength(1)
+  })
+
+  it('gives a one-post site a lead and nothing else', () => {
+    const only = [post('solo')]
+    const opening = only.slice(0, OPENING_SLOTS)
+    expect(opening).toHaveLength(1)
+    expect(selectPicks({ recent: only, exclude: ids(opening) })).toEqual([])
   })
 })

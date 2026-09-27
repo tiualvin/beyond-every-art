@@ -207,3 +207,51 @@ is 5,958 words. The archive's mean does the same; a short piece takes three.
 than to the promo. An earlier build pinned the meta line to the bottom rule and
 left the whole difference as one hole under the standfirst; centring it is what
 these shots show.
+
+---
+
+## 6. The opening, the pairing, the palette, and both ends of the page
+
+The second homepage pass. Same capture conditions as above — seeded development
+site, Chromium, 1280px and 390px, full page, reduced motion so the cover's
+canvas is a still frame and the reveal modules have settled.
+
+### Home page — desktop
+
+| Before                                                                                                                                                                                                                | After                                                                                                                                                                                                                                                                                                      |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ![Home page at 1280px before: under the cover, a single Latest row about 5rem tall, then six identical entry rows, then the topic swatches, then the site-wide burgundy newsletter band.](opening-desktop-before.jpg) | ![Home page at 1280px after: a lead article with a large plate and five runners beside it in a second column, then the picks, then a two-up "Read together" pairing with an editor's note, then the swatches in distinct colours, then a homepage-specific newsletter section.](opening-desktop-after.jpg) |
+
+### Home page — mobile
+
+| Before                                                                                                    | After                                                                                                                                                     |
+| --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ![Home page at 390px before: the Latest row and the entry list in one column.](opening-mobile-before.jpg) | ![Home page at 390px after: the lead stacks above its runners, the pairing becomes one column, and the swatches reflow to two.](opening-mobile-after.jpg) |
+
+### What these shots do and do not show
+
+**The opening's columns do not end level here, and they do on the live site.**
+The development seed has four posts, so the lead gets three runners instead of
+five. The balance the module is built around needs six pieces; production has 113.
+
+**"Featured articles" is empty for the same reason.** The opening takes the six
+newest, and the seed has four — so every published piece is above it. That is
+the honest empty state, and the copy in it was rewritten for this pass because
+the threshold moved: it used to need an archive of none and now needs one of
+six or fewer.
+
+**The pairing was filled in by hand for the capture.** `scripts/seed-dev.ts`
+does not populate the Homepage global, and the module renders nothing until an
+editor sets a title, a note and two articles. The second of the two pieces was
+stripped of its excerpt on purpose, because that is the case the held row
+exists for — note that its date line still sits level with its neighbour's.
+
+**The footer still shows the seeded menu, not the new fallback.** `seed:dev`
+fills the `footer` global, so the fallback these shots cannot show is exactly
+the one production uses. Same blind spot the header's fallback has, recorded in
+`tests/content/nav-links.test.ts`.
+
+**Three swatches, three colours, which proves nothing.** The collision the
+palette work fixes needs more subjects than the seed's three tags. Live, eight
+subjects were sharing four colours; `tests/design/pigments.test.ts` is what
+holds that fixed.

@@ -13,10 +13,15 @@
 //   2. `Posts.featured` — an editor having flagged a piece at some point
 //   3. recency — nobody having said anything
 //
-// Tier 1 has no field behind it yet. The chain is built now because tier 2
-// alone is not a curation model: a flag with no order and no expiry says "this
-// was worth featuring once", which is a weaker claim than the section makes.
-// When the field lands, this function does not change.
+// The recency tier survives the opening taking the six newest pieces above this
+// section. It is the reason the section is never empty on a site where nobody
+// has curated anything yet, and once something is curated it only ever fills
+// the slots the tiers above it left.
+//
+// Tier 2 is not a curation model on its own, which is why the chain has three
+// rungs rather than two: a flag with no order and no expiry says "this was
+// worth featuring once", which is a weaker claim than the section makes. Tier 1
+// is the `picks` field on the Homepage global.
 
 import type { PostCard } from './queries'
 
@@ -83,11 +88,26 @@ export function selectPicks(tiers: PickTiers): PostCard[] {
 }
 
 /**
+ * How many articles stand beside the lead in the opening.
+ *
+ * Chosen to make the two columns end level. The lead is a 16:9 plate, a
+ * headline and a line of metadata; five runners at the width the second column
+ * gets land within a few pixels of that. Three — where this started — left the
+ * right-hand column about a third short, which is what made the module read as
+ * a lead with an afterthought next to it rather than as one block.
+ */
+export const RUNNER_SLOTS = 5
+
+/** The lead plus its runners. */
+export const OPENING_SLOTS = 1 + RUNNER_SLOTS
+
+/**
  * How many recent posts the page has to ask for.
  *
- * One for the Latest band, then enough to fill every pick slot on their own —
- * which is the worst case, and it is the ordinary one: when every flagged post
- * is also a recent post, the flag tier contributes no new candidates and
- * recency has to cover all six.
+ * Enough for the opening and then enough to fill every pick slot after it, and
+ * both halves are the worst case rather than a margin: when nothing is curated
+ * and every flagged post is also a recent post, neither tier above recency
+ * contributes a candidate the opening has not already used, so recency covers
+ * all twelve on its own.
  */
-export const RECENT_QUERY_SIZE = 1 + PICK_SLOTS
+export const RECENT_QUERY_SIZE = OPENING_SLOTS + PICK_SLOTS

@@ -12,7 +12,9 @@ export function renderHumanReport(
 ): string {
   const lines = [
     'Migration website comparison',
-    `Source: ${report.sourceOrigin}`,
+    report.sourceReplayedFrom
+      ? `Source: ${report.sourceOrigin} (replayed from ${report.sourceReplayedFrom}, not crawled)`
+      : `Source: ${report.sourceOrigin}`,
     `Target: ${report.targetOrigin}`,
     `Result: ${report.ok ? 'PASS' : 'FAIL'}`,
     `Pages: ${report.summary.comparedPages} compared (${report.summary.sourcePages} source, ${report.summary.targetPages} target)`,

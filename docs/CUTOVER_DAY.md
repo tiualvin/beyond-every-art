@@ -166,9 +166,30 @@ ROLLBACK — Ghost Pro, as recorded 19 Sep 2026
 
 Both **grey**. Ghost Pro terminates its own TLS at Fastly and will not work
 behind Cloudflare's proxy, so a rollback that restores these orange is still a
-broken site. Ghost itself is untouched by any of this — it keeps serving at
-`beyond-every-art.ghost.io` whatever DNS says, so rollback is purely recreating
-these two rows.
+broken site. Ghost itself is untouched by any of this, so rollback is purely
+recreating these two rows: what they arrange is that a request for
+`www.beyondeveryart.com` reaches Ghost's edge, which serves the site for that
+hostname.
+
+**Not at its own hostname — corrected 22 Sep.** This sheet first said Ghost
+"keeps serving at `beyond-every-art.ghost.io` whatever DNS says". It does not.
+With a custom domain set, Ghost(Pro) answers every public path there with a
+`302` to `https://www.beyondeveryart.com/<same path>` — which is this site now —
+and only `/ghost/`, the admin, answers `200`. So the old site cannot be browsed
+or crawled at that hostname, and the production crawl comparison replays the
+rehearsal's crawl of Ghost instead
+([`MIGRATION_REHEARSAL.md`](MIGRATION_REHEARSAL.md) §6, "The production run").
+Whether the rollback still works is a question about the hostname Ghost is
+asked for, not the one it lives at, and it has not been re-checked since the
+flip. From any machine:
+
+```bash
+curl -sI --connect-to www.beyondeveryart.com:443:beyond-every-art.ghost.io:443 \
+  https://www.beyondeveryart.com/
+```
+
+A `200` with no `cf-ray` header is Ghost answering for the domain, which is
+what the two rows above rely on.
 
 Two zone settings to confirm **before** editing anything:
 
