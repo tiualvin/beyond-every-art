@@ -120,3 +120,30 @@ describe('reading and revising a body as Markdown', () => {
     })
   })
 })
+
+describe('an article migrated from Ghost', () => {
+  const legacyHTML = '<p>The migrated body.</p>'
+
+  it('says so when the page renders from its Ghost HTML', async () => {
+    const { req } = await mcpRequest({ id: 1, legacyHTML, content: null })
+
+    const { markdown } = await call('readArticleMarkdown', { id: '1' }, req)
+
+    expect(markdown).toMatch(/renders from migrated Ghost HTML/)
+  })
+
+  it('reads the rich-text body once that is what the page renders', async () => {
+    // Rewritten in the editor since the import. The body wins over the HTML
+    // whenever it holds anything, so this is the text a reader sees — and
+    // telling the agent otherwise sent it away from the only edit that counts.
+    const { req } = await mcpRequest({
+      id: 1,
+      legacyHTML,
+      content: body(paragraph('Rewritten in the editor.')),
+    })
+
+    const { markdown } = await call('readArticleMarkdown', { id: '1' }, req)
+
+    expect(markdown).toBe('Rewritten in the editor.')
+  })
+})

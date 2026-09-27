@@ -15,6 +15,7 @@ import type { MCPPluginConfig } from '@payloadcms/plugin-mcp'
 import type { PayloadRequest, TypedUser } from 'payload'
 import { z } from 'zod'
 
+import { toArticleBody } from '../content/body'
 import { buildPreviewUrl } from '../preview/live-preview'
 import {
   lexicalToMarkdown,
@@ -134,6 +135,28 @@ async function findArticle(
   return doc
 }
 
+/**
+ * Whether the page renders this article from its migrated Ghost HTML.
+ *
+ * Asked of the renderer rather than decided here. `legacyHTML` being set is not
+ * the question: the rich-text body wins whenever it holds anything, so a
+ * migrated article that has since been rewritten in the editor renders from
+ * `content` — and a check on `legacyHTML` alone told the agent its edits would
+ * not reach the page when they were the only thing that would.
+ */
+function rendersFromLegacyHTML(doc: Record<string, unknown>): boolean {
+  return (
+    toArticleBody(
+      {
+        content: doc.content,
+        legacyHTML: doc.legacyHTML as string | null | undefined,
+        title: doc.title as string | null | undefined,
+      },
+      { preview: true },
+    ).kind === 'html'
+  )
+}
+
 const targetShape = {
   id: z.string().optional().describe('Document id. Provide this or `slug`.'),
   slug: z.string().optional().describe('Document slug. Provide this or `id`.'),
@@ -237,7 +260,7 @@ export const mcpTools: McpTool[] = [
         id: doc.id,
         // Migrated bodies live in `legacyHTML` and are not Lexical; say so
         // rather than returning an empty string that reads like an empty post.
-        markdown: doc.legacyHTML
+        markdown: rendersFromLegacyHTML(doc)
           ? '(This document renders from migrated Ghost HTML (`legacyHTML`), not from the ' +
             'rich-text body. Editing it as Markdown would not change the published page.)'
           : lexicalToMarkdown(
