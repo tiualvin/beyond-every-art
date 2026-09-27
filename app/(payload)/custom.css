@@ -7,8 +7,8 @@
  * identity and a Playfair/Inter pairing, and none of it reached the place the
  * work is actually done.
  *
- * Deliberately shallow. This sets Payload's own theme variables and styles one
- * component of this project's own; it does not restyle Payload's controls,
+ * Deliberately shallow. This styles this project's own components and leaves
+ * Payload's theme to Payload; it does not restyle Payload's controls,
  * because every selector reaching into vendor internals is a thing that breaks
  * on an upgrade for no reader-visible gain. The tokens are the same values as
  * `app/globals.css` — copied rather than imported, because that file is the
@@ -17,25 +17,23 @@
  */
 
 :root {
-  --bea-paper: #f6f2eb;
   --bea-surface: #fffdf9;
   --bea-ink: #1b1714;
   --bea-muted: #6f665c;
   --bea-burgundy: #6d1f2c;
   --bea-burgundy-deep: #4c1420;
   --bea-line: #e4ddd2;
-
-  /* Payload's own theme hooks, so the chrome follows without being overridden
-   * rule by rule. */
-  --theme-elevation-0: var(--bea-surface);
-  --theme-bg: var(--bea-paper);
-  --theme-text: var(--bea-ink);
 }
 
-/* Dark mode is left entirely to Payload. Inverting a paper-and-ink palette by
- * hand produces a muddy near-black that matches neither the site nor the
- * vendor's dark theme, and an editor who has chosen dark has chosen it for
- * contrast reasons this file cannot second-guess. */
+/* No Payload theme variables are set here. The admin is forced to Payload's
+ * dark theme (`admin.theme` in payload.config.ts), and its colours are left to
+ * Payload.
+ *
+ * A paper-and-ink palette once sat on a bare `:root` and painted the dark
+ * admin beige: Payload ships every rule inside `@layer payload-default`, and
+ * an unlayered declaration beats a layered one whatever its specificity.
+ * `tests/design/admin-theme.test.ts` fails if a `--theme-*` variable is set in
+ * this file again. */
 
 /* --- The editorial dashboard panel ------------------------------------- */
 

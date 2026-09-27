@@ -157,6 +157,12 @@ describe('documentation file references', () => {
     'lib/ads/gam.ts',
     'lib/ads/targeting.ts',
     'app/(frontend)/components/gpt.tsx',
+    // docs/LLMS_TXT.md §4 and §6: the route, its renderer and the renderer's
+    // tests. Planned; a new crawler-facing URL waits for the owner's go-ahead,
+    // and the Cloudflare and Bing steps in that document come first.
+    'app/llms.txt/route.ts',
+    'lib/seo/llms-txt.ts',
+    'tests/seo/llms-txt.test.ts',
     // docs/ANALYTICS.md names this precisely because it does not exist. Next
     // reserves `next/script`'s `beforeInteractive` for the literal root
     // `app/layout.tsx`, and this application's roots are the two route-group

@@ -260,6 +260,12 @@ services:
     environment:
       DATABASE_URI: ${DATABASE_URI:-postgresql://payload:payload@postgres:5432/beyond_every_art}
       PAYLOAD_SECRET: ${PAYLOAD_SECRET}
+      # Blanked over whatever `.env` says. This service runs the Ghost import
+      # and `tags:apply`, which write posts in bulk, and each published write
+      # would otherwise announce its URL to IndexNow — a hundred submissions for
+      # a re-import that changed nothing a reader sees. The app announces real
+      # publishes; see lib/seo/indexnow.ts.
+      INDEXNOW_KEY: ''
     restart: 'no'
     volumes:
       # The same volume as `app`. This image is also what runs `migrate:ghost`,

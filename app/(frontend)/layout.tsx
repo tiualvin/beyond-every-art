@@ -3,7 +3,7 @@ import { Inter, Playfair_Display } from 'next/font/google'
 
 import { getFooter, getHeader, getSiteSettings } from '@/lib/content/queries'
 import { getPreviewMode } from '@/lib/preview/mode'
-import { isNoindex } from '@/lib/seo/indexing'
+import { robotsDirective } from '@/lib/seo/indexing'
 import { getSiteUrl } from '@/lib/seo/site'
 
 import { resolveAdsenseClient } from '@/lib/ads/adsense'
@@ -49,7 +49,9 @@ export async function generateMetadata(): Promise<Metadata> {
       canonical: '/',
       types: { 'application/rss+xml': '/rss' },
     },
-    ...(isNoindex() ? { robots: { index: false, follow: false } } : {}),
+    // Inherited by every page that sets no `robots` of its own: noindex on
+    // staging, large image previews on the live site. See `robotsDirective`.
+    robots: robotsDirective(false),
   }
 }
 

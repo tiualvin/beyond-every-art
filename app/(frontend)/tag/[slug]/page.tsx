@@ -8,6 +8,7 @@ import {
   getSiteSettings,
   getTagsWithCounts,
 } from '@/lib/content/queries'
+import { shareImageSrc } from '@/lib/content/media'
 import { assignPigments, pigmentFor } from '@/lib/design/pigments'
 import { logMissingRoute } from '@/lib/observability/missing-route'
 import {
@@ -16,6 +17,7 @@ import {
 } from '@/lib/security/slug-requests'
 import { buildCollectionPageJsonLd, serializeJsonLd } from '@/lib/seo/jsonld'
 import { absoluteUrl, getSiteUrl, JOURNAL_PATH, tagPath } from '@/lib/seo/site'
+import { topicMeta } from '@/lib/seo/topic-meta'
 
 import { ArchiveGroups } from '../../components/archive-groups'
 import { FadeIn } from '../../components/motion/fade-in'
@@ -47,12 +49,40 @@ export async function generateMetadata({
   const { slug } = await params
   const archive = await resolve(slug)
   if (!archive) return { title: 'Not found' }
-  const canonical = absoluteUrl(tagPath(archive.slug), getSiteUrl())
+  const siteUrl = getSiteUrl()
+  const canonical = absoluteUrl(tagPath(archive.slug), siteUrl)
+  const settings = await getSiteSettings()
+  // The tag's own search fields first, then a sentence built from its
+  // articles; the newest article's image when the tag has none of its own.
+  // See `lib/seo/topic-meta.ts`.
+  const meta = topicMeta(archive, settings.title)
+  const images = meta.image
+    ? [
+        {
+          url: absoluteUrl(shareImageSrc(meta.image), siteUrl),
+          alt: meta.image.alt,
+        },
+      ]
+    : undefined
+  const shareTitle =
+    typeof meta.title === 'string' ? meta.title : meta.title.absolute
   return {
-    title: archive.name,
-    description: archive.description || undefined,
+    title: meta.title,
+    description: meta.description,
     alternates: { canonical },
-    openGraph: { type: 'website', title: archive.name, url: canonical },
+    openGraph: {
+      type: 'website',
+      title: shareTitle,
+      description: meta.description,
+      url: canonical,
+      images,
+    },
+    twitter: {
+      card: images ? 'summary_large_image' : 'summary',
+      title: shareTitle,
+      description: meta.description,
+      images,
+    },
   }
 }
 
@@ -86,7 +116,9 @@ export default async function TagPage({ params }: { params: Promise<Params> }) {
     buildCollectionPageJsonLd({
       url: absoluteUrl(tagPath(archive.slug), siteUrl),
       name: archive.name,
-      description: archive.description || undefined,
+      // The same sentence the meta description carries, so the two never
+      // describe one page differently.
+      description: topicMeta(archive, settings.title).description,
       siteName: settings.title,
       siteUrl,
     }),

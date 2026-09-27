@@ -97,6 +97,16 @@ const storageEnvironment = {
   S3_SECRET_ACCESS_KEY: 'e2e-not-a-real-secret',
 }
 
+/**
+ * A key, so `/indexnow.txt` is served and the suite can prove the dotted route
+ * answers on its own name in the standalone build. Nothing is submitted: the
+ * site URL here is loopback over http, and `indexNowConfig` refuses anything
+ * but a public https origin, so no test publish ever reaches a third party.
+ */
+const indexNowEnvironment = {
+  INDEXNOW_KEY: 'e2e-indexnow-key-0000',
+}
+
 const productionServer = {
   command: 'node .next/standalone/server.js',
   env: {
@@ -105,12 +115,18 @@ const productionServer = {
     PORT: '3000',
     ...mcpEnvironment,
     ...storageEnvironment,
+    ...indexNowEnvironment,
     ...rateLimitOverrides,
   },
 }
 const developmentServer = {
   command: 'pnpm exec next dev --hostname 127.0.0.1 --port 3000',
-  env: { ...mcpEnvironment, ...storageEnvironment, ...rateLimitOverrides },
+  env: {
+    ...mcpEnvironment,
+    ...storageEnvironment,
+    ...indexNowEnvironment,
+    ...rateLimitOverrides,
+  },
 }
 
 export default defineConfig({
