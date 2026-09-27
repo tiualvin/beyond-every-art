@@ -752,6 +752,11 @@ export type Archive = {
   name: string
   slug: string
   description: string
+  /** The owner's own search overrides, where it has them (tags do). */
+  metaTitle: string | null
+  metaDescription: string | null
+  /** A tag's featured image. Authors keep theirs on the author record. */
+  image: MediaImage | null
   posts: PostCard[]
 }
 
@@ -1009,7 +1014,9 @@ async function readArchive(
     const owner = await payload.find({
       collection,
       overrideAccess: true,
-      depth: 0,
+      // One level, so a tag's `featuredImage` arrives as a media record with
+      // its sizes rather than as an id.
+      depth: 1,
       limit: 1,
       where: { slug: { equals: slug } },
     })
@@ -1019,6 +1026,9 @@ async function readArchive(
           name?: string
           description?: string
           bio?: string
+          metaTitle?: string | null
+          metaDescription?: string | null
+          featuredImage?: unknown
         }
       | undefined
     if (!doc?.id) return null
@@ -1036,6 +1046,9 @@ async function readArchive(
       name: doc.name ?? slug,
       slug,
       description: doc.description ?? doc.bio ?? '',
+      metaTitle: doc.metaTitle?.trim() || null,
+      metaDescription: doc.metaDescription?.trim() || null,
+      image: toMediaImage(doc.featuredImage),
       posts: (posts.docs as RawPost[])
         .map(toPostCard)
         .filter((p): p is PostCard => p !== null),
