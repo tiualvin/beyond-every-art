@@ -24,6 +24,9 @@ export const RESERVED_ROOT_SLUGS = [
   // are answered from `app/robots.ts` and `app/sitemap.ts`. A file-based
   // root route is still a root route, so it reserves its segment here.
   'icon.png',
+  // The IndexNow key file (`app/indexnow.txt/route.ts`). A post claiming it
+  // would shadow the file and every submission would fail key verification.
+  'indexnow.txt',
   'journal',
   'newsletter',
   'oauth',

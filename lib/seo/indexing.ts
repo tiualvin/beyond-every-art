@@ -15,17 +15,38 @@ export function isNoindex(env: Env = process.env): boolean {
 }
 
 /** What a `robots` meta tag says, in the shape Next's Metadata accepts. */
-export type RobotsDirective = { index: false; follow: boolean }
+export type RobotsDirective =
+  { index: false; follow: boolean } | typeof INDEXABLE
 
 /**
- * The robots directive a document should carry, or undefined for the default.
+ * What an indexable page permits: large image previews, and nothing else.
  *
- * Undefined rather than `{ index: true }` on purpose. Next merges metadata by
- * letting the page override the layout, and `app/(frontend)/layout.tsx` is
- * where the deployment-wide `NEXT_PUBLIC_NOINDEX` switch lives — so a page that
- * cheerfully announced `index: true` would silently un-hide the whole of
- * staging. This function never emits a positive directive; the only thing it
- * can do is add a restriction.
+ * Google shows an image at full width — the large card in Discover, the big
+ * thumbnail beside a search result — only on pages that allow it with
+ * `max-image-preview:large`; without it the preview is capped at the standard
+ * size, and Discover's own documentation names the directive as a condition
+ * for large images. For a publication whose articles are about paintings and
+ * pigments, the image is most of the reason to tap. It says nothing about
+ * whether a page is indexed, so it cannot un-hide anything.
+ */
+const INDEXABLE = { 'max-image-preview': 'large' } as const
+
+/**
+ * The robots directive a page carries. Every page that sets `robots` sets it
+ * from this; the layout does too, and pages that set nothing inherit that.
+ *
+ * Never `{ index: true }`. `app/(frontend)/layout.tsx` is where the
+ * deployment-wide `NEXT_PUBLIC_NOINDEX` switch lives, and a page that
+ * cheerfully announced `index: true` would silently un-hide it on staging. The
+ * staging answer is checked first, so nothing a page passes can outrank it.
+ *
+ * Never undefined either, which is what this used to return for an ordinary
+ * document. Next's metadata merge treats `robots: undefined` as a value: the
+ * key is present, so the page's nothing replaces the layout's something. The
+ * search page did exactly that — `robots: query ? … : undefined` — and so on
+ * staging an empty search page carried no noindex at all. Returning a
+ * directive in every case, and routing every page through here, is what makes
+ * the override harmless. `tests/seo/indexing.test.ts` checks the routing.
  *
  * A document marked noindex still gets `follow`, which is the standard
  * treatment for a page that should not rank but should still pass its links on
@@ -34,10 +55,10 @@ export type RobotsDirective = { index: false; follow: boolean }
 export function robotsDirective(
   documentNoindex: boolean | null | undefined,
   env: Env = process.env,
-): RobotsDirective | undefined {
+): RobotsDirective {
   if (isNoindex(env)) return { index: false, follow: false }
   if (documentNoindex) return { index: false, follow: true }
-  return undefined
+  return INDEXABLE
 }
 
 export interface BasicAuthCredentials {

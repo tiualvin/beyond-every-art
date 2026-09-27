@@ -1,3 +1,6 @@
+import { readdirSync, readFileSync } from 'node:fs'
+import { join, relative, resolve } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -102,10 +105,17 @@ describe('isAuthorized', () => {
 describe('robotsDirective', () => {
   const live = {}
 
-  it('is undefined for an ordinary document on a live deployment', () => {
-    expect(robotsDirective(false, live)).toBeUndefined()
-    expect(robotsDirective(null, live)).toBeUndefined()
-    expect(robotsDirective(undefined, live)).toBeUndefined()
+  it('permits large image previews for an ordinary document on a live deployment', () => {
+    const indexable = { 'max-image-preview': 'large' }
+    expect(robotsDirective(false, live)).toEqual(indexable)
+    expect(robotsDirective(null, live)).toEqual(indexable)
+    expect(robotsDirective(undefined, live)).toEqual(indexable)
+  })
+
+  it('never announces index, which would outrank the staging switch', () => {
+    for (const noindex of [false, true, null, undefined]) {
+      expect(robotsDirective(noindex, live)).not.toHaveProperty('index', true)
+    }
   })
 
   it('hides a document that asked to be hidden, but keeps its links followed', () => {
@@ -122,5 +132,43 @@ describe('robotsDirective', () => {
       index: false,
       follow: false,
     })
+  })
+})
+
+describe('pages that set robots', () => {
+  // Next's metadata merge replaces the layout's `robots` with the page's, and a
+  // page's `robots: undefined` counts: the key is there, so the layout's
+  // staging noindex and large-preview permission are both dropped. The search
+  // page shipped exactly that. Routing every page through `robotsDirective`,
+  // which never returns undefined, is the whole fix — so this checks the
+  // routing rather than trusting it.
+  const frontend = resolve(import.meta.dirname, '../../app/(frontend)')
+
+  function walk(dir: string): string[] {
+    return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const path = join(dir, entry.name)
+      if (entry.isDirectory()) return walk(path)
+      return /\.tsx?$/.test(entry.name) ? [path] : []
+    })
+  }
+
+  const setters = walk(frontend)
+    .map((path) => ({
+      name: relative(frontend, path),
+      text: readFileSync(path, 'utf8'),
+    }))
+    .filter(({ text }) => /^\s*robots:/m.test(text))
+
+  it('finds the pages that do', () => {
+    // The layout, the post-and-page route, and search. A guard that matched
+    // nothing would pass forever.
+    expect(setters.length).toBeGreaterThanOrEqual(3)
+  })
+
+  it.each(setters)('$name sets it through robotsDirective', ({ text }) => {
+    const lines = text.match(/^\s*robots:.*$/gm) ?? []
+    for (const line of lines) {
+      expect(line).toMatch(/robots:\s*robotsDirective\(/)
+    }
   })
 })
