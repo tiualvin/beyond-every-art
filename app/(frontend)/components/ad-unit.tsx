@@ -186,8 +186,11 @@ export function AdUnit({
   }, [children])
 
   const size = SLOT_SIZES[placement]
-  // Google's two shapes. A fixed unit is sized by its own inline style; a
-  // fluid one is sized by the creative, and is told which layout to use.
+  // Google's shapes. A fixed unit is sized by its own inline style; a fluid
+  // one is sized by the creative, and is told which layout to use; a
+  // responsive one is told to size itself to the box it lands in, with the
+  // full-width flag so Google may serve a 970x250 on a desktop and a 300x250
+  // on a phone from the one id.
   const insProps =
     size.kind === 'fixed'
       ? {
@@ -197,11 +200,17 @@ export function AdUnit({
             height: size.height,
           },
         }
-      : {
-          style: { display: 'block', textAlign: 'center' as const },
-          'data-ad-format': 'fluid',
-          'data-ad-layout': size.layout,
-        }
+      : size.kind === 'fluid'
+        ? {
+            style: { display: 'block', textAlign: 'center' as const },
+            'data-ad-format': 'fluid',
+            'data-ad-layout': size.layout,
+          }
+        : {
+            style: { display: 'block' },
+            'data-ad-format': 'auto',
+            'data-full-width-responsive': 'true',
+          }
 
   return (
     <div className="ad-slot" data-fill={fill} data-placement={placement}>

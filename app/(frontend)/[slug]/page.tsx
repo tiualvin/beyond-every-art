@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { cache } from 'react'
 
+import { adClientFor } from '@/lib/ads/eligibility'
 import {
   getPageBySlug,
   getPostBySlug,
@@ -28,6 +29,7 @@ import {
 } from '@/lib/seo/jsonld'
 import { absoluteUrl, getSiteUrl, pagePath, postPath } from '@/lib/seo/site'
 
+import { AdUnit } from '../components/ad-unit'
 import { Article, FeaturedFigure } from '../components/article'
 import { ArticleBody } from '../components/body'
 import { ReadNext } from '../components/read-next'
@@ -226,6 +228,9 @@ export default async function SlugPage({
     ),
   ])
   const { readNext, inline: inlinePromos } = splitRelated(related)
+  // The end-of-article unit's publisher. Same answer the body and rail take,
+  // from the same predicate, so a restricted teaser carries none of the three.
+  const adClient = adClientFor({ restricted: post.restricted })
   const siteUrl = getSiteUrl()
   const url = post.canonicalURL || absoluteUrl(postPath(post.slug), siteUrl)
 
@@ -266,6 +271,14 @@ export default async function SlugPage({
         inlinePromos={inlinePromos}
         preview={draft}
       />
+      {/* `article-end`: below the author card the article renders, above
+          "Read next". The block and the container are the same width the
+          billboard is sized against — docs/ADVERTISING.md §8. */}
+      {adClient && (
+        <div className="container">
+          <AdUnit placement="article-end" client={adClient} />
+        </div>
+      )}
       <ReadNext posts={readNext} topic={post.tags[0]?.name} />
     </>
   )

@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { cache } from 'react'
 
+import { adClientFor } from '@/lib/ads/eligibility'
 import {
   archivePagePath,
   buildPagination,
@@ -71,6 +72,10 @@ export default async function JournalPage({
     totalPages: archive.totalPages,
   })
 
+  // The listing's own answer, resolved here and passed down because the filter
+  // below it is a client component and cannot read the server's environment.
+  const adClient = adClientFor()
+
   return (
     <main>
       <section className="archive">
@@ -89,6 +94,7 @@ export default async function JournalPage({
           <ArchiveFilter
             posts={archive.posts}
             subjects={subjects.map((topic) => topic.slug)}
+            adClient={adClient}
           />
 
           {pagination.totalPages > 1 && (

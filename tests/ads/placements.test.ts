@@ -52,18 +52,49 @@ describe('the placement inventory', () => {
   // A fluid unit has no maximum, so §8's "reserve the maximum" cannot be
   // honoured literally; the floor is what there is. Saying which shape a slot
   // is, in the type, is what stops a renderer guessing.
-  it('marks the in-article unit as the one with no fixed height', () => {
-    const size = SLOT_SIZES['article-inline']
-    expect(size.kind).toBe('fluid')
-    expect(reservedHeight('article-inline')).toBeGreaterThanOrEqual(250)
+  it('marks the in-article units as the ones with no fixed height', () => {
+    for (const placement of [
+      'article-inline-1',
+      'article-inline-2',
+      'article-inline-3',
+    ] as Placement[]) {
+      expect(SLOT_SIZES[placement].kind).toBe('fluid')
+      expect(reservedHeight(placement)).toBeGreaterThanOrEqual(250)
+    }
   })
 
-  // Only placements with a call site. §8 has five and four are unbuilt; a name
-  // with nothing rendering it is a name nobody has had to make work.
+  // The three billboards are Google's auto-sized display unit: one id serves
+  // 970x250 on a desktop and 300x250 on a phone, so there is no single size to
+  // pin. The reservation is the phone's height, held before anything fills.
+  it('marks the billboards as responsive and reserves the mobile height', () => {
+    for (const placement of [
+      'article-end',
+      'archive-inline',
+      'home-mid',
+    ] as Placement[]) {
+      expect(SLOT_SIZES[placement].kind).toBe('responsive')
+      expect(reservedHeight(placement)).toBeGreaterThanOrEqual(250)
+    }
+  })
+
+  // Only placements with a call site. §8 has five placements and every one is
+  // now rendered, so the inventory is exactly the ids and nothing speculative.
   it('lists only the placements something renders', () => {
-    expect(Object.keys(AD_SLOTS)).toEqual(['rail-1', 'article-inline'])
+    expect(Object.keys(AD_SLOTS)).toEqual([
+      'rail-1',
+      'article-inline-1',
+      'article-inline-2',
+      'article-inline-3',
+      'article-end',
+      'archive-inline',
+      'home-mid',
+    ])
     expect(rail).toContain('placement="rail-1"')
-    expect(body).toContain('placement="article-inline"')
+    // The in-body unit is chosen by position, so the three ids are in `body`
+    // as the return values of `inlinePlacement`, not as literal JSX props.
+    expect(body).toContain("'article-inline-1'")
+    expect(body).toContain("'article-inline-2'")
+    expect(body).toContain("'article-inline-3'")
   })
 })
 
@@ -107,7 +138,7 @@ describe('a placement its track has hidden', () => {
   // requirement. A number here would stop it filling on phones, which is where
   // most of the reading happens.
   it('puts no requirement on a unit in the reading column', () => {
-    expect(minViewportWidth('article-inline')).toBeNull()
+    expect(minViewportWidth('article-inline-1')).toBeNull()
   })
 
   it('asks the browser before pushing, and keeps listening', () => {

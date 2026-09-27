@@ -35,10 +35,13 @@ function topicsIn(posts: PostCard[]): Topic[] {
 export function ArchiveFilter({
   posts,
   subjects,
+  adClient = null,
 }: {
   posts: PostCard[]
   /** Every subject slug, as the homepage chart assigns colours over them. */
   subjects: readonly string[]
+  /** Passed straight to `ArchiveGroups`; see its note on why it arrives here. */
+  adClient?: string | null
 }) {
   const [open, setOpen] = useState(false)
   const [selected, setSelected] = useState<string[]>([])
@@ -144,7 +147,7 @@ export function ArchiveFilter({
       </div>
 
       {visible.length > 0 ? (
-        <ArchiveGroups posts={visible} />
+        <ArchiveGroups posts={visible} adClient={adClient} />
       ) : (
         <p className="archive__empty">
           Nothing on this page matches that filter.
