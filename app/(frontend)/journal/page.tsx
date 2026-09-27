@@ -59,9 +59,10 @@ export default async function JournalPage({
   searchParams: SearchParams
 }) {
   const requested = parsePageParam((await searchParams).page)
-  const [archive, subjects] = await Promise.all([
+  const [archive, subjects, settings] = await Promise.all([
     resolve(requested),
     getTagsWithCounts(),
+    getSiteSettings(),
   ])
 
   if (requested > 1 && requested > archive.totalPages) notFound()
@@ -95,6 +96,7 @@ export default async function JournalPage({
             posts={archive.posts}
             subjects={subjects.map((topic) => topic.slug)}
             adClient={adClient}
+            fallback={settings.railFallback}
           />
 
           {pagination.totalPages > 1 && (

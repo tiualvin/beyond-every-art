@@ -1,9 +1,10 @@
 import { Fragment } from 'react'
 
-import type { PostCard } from '@/lib/content/queries'
+import type { PostCard, RailFallback } from '@/lib/content/queries'
 
 import { AdUnit } from './ad-unit'
 import { EntryRow } from './entry-row'
+import { HouseBand } from './house-band'
 
 /**
  * How many entries between listing units.
@@ -57,6 +58,7 @@ export function groupByMonth(posts: PostCard[]): PostGroup[] {
 export function ArchiveGroups({
   posts,
   adClient = null,
+  fallback = null,
 }: {
   posts: PostCard[]
   /**
@@ -68,6 +70,8 @@ export function ArchiveGroups({
    * not serve ad code, which is the ordinary state of staging.
    */
   adClient?: string | null
+  /** What an unfilled listing unit holds, from `SiteSettings`. */
+  fallback?: RailFallback
 }) {
   // One running count across the whole list, not one per month group: the
   // unit's job is to break the reading of the list, and a piece low in a short
@@ -86,7 +90,9 @@ export function ArchiveGroups({
                 <Fragment key={post.id}>
                   <EntryRow post={post} />
                   {adClient && seen % INLINE_EVERY === 0 && (
-                    <AdUnit placement="archive-inline" client={adClient} />
+                    <AdUnit placement="archive-inline" client={adClient}>
+                      {fallback ? <HouseBand fallback={fallback} /> : undefined}
+                    </AdUnit>
                   )}
                 </Fragment>
               )

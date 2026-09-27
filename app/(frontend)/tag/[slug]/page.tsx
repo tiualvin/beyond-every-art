@@ -166,7 +166,11 @@ export default async function TagPage({ params }: { params: Promise<Params> }) {
       <section className="archive">
         <div className="container">
           {archive.posts.length > 0 ? (
-            <ArchiveGroups posts={archive.posts} adClient={adClient} />
+            <ArchiveGroups
+              posts={archive.posts}
+              adClient={adClient}
+              fallback={settings.railFallback}
+            />
           ) : (
             <p className="archive__empty">
               Nothing filed under this topic yet.

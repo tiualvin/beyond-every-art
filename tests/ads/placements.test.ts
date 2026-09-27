@@ -20,6 +20,18 @@ const body = readFileSync(
   join(process.cwd(), 'app/(frontend)/components/body.tsx'),
   'utf8',
 )
+const slugPage = readFileSync(
+  join(process.cwd(), 'app/(frontend)/[slug]/page.tsx'),
+  'utf8',
+)
+const homePage = readFileSync(
+  join(process.cwd(), 'app/(frontend)/page.tsx'),
+  'utf8',
+)
+const archiveGroups = readFileSync(
+  join(process.cwd(), 'app/(frontend)/components/archive-groups.tsx'),
+  'utf8',
+)
 
 describe('the placement inventory', () => {
   // A slot id is interpolated into a `data-ad-slot` attribute. A malformed one
@@ -115,6 +127,16 @@ describe('an unfilled slot', () => {
   it('gives every in-body box something to hold', () => {
     expect(body).toContain('<InlinePromo post={promo} />')
     expect(body).not.toMatch(/<AdUnit[^>]*\/>/)
+  })
+
+  // The three billboards reserve 250px and would otherwise be labelled empty
+  // boxes. They reuse the editor's existing `railFallback` supply through
+  // `HouseBand`, so there is one "when no ad is shown" surface rather than a
+  // second field to configure and a second migration to run.
+  it('gives every billboard something to hold', () => {
+    expect(slugPage).toContain('<HouseBand fallback={settings.railFallback} />')
+    expect(homePage).toContain('<HouseBand fallback={settings.railFallback} />')
+    expect(archiveGroups).toContain('<HouseBand fallback={fallback} />')
   })
 
   // House content is not the ad and is never handed to the network as though

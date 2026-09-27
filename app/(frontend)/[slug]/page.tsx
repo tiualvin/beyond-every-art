@@ -32,6 +32,7 @@ import { absoluteUrl, getSiteUrl, pagePath, postPath } from '@/lib/seo/site'
 import { AdUnit } from '../components/ad-unit'
 import { Article, FeaturedFigure } from '../components/article'
 import { ArticleBody } from '../components/body'
+import { HouseBand } from '../components/house-band'
 import { ReadNext } from '../components/read-next'
 
 // Rendered per request so canonical URLs, feeds and JSON-LD come from the
@@ -276,7 +277,11 @@ export default async function SlugPage({
           billboard is sized against — docs/ADVERTISING.md §8. */}
       {adClient && (
         <div className="container">
-          <AdUnit placement="article-end" client={adClient} />
+          <AdUnit placement="article-end" client={adClient}>
+            {settings.railFallback ? (
+              <HouseBand fallback={settings.railFallback} />
+            ) : undefined}
+          </AdUnit>
         </div>
       )}
       <ReadNext posts={readNext} topic={post.tags[0]?.name} />

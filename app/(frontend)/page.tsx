@@ -32,6 +32,7 @@ import {
 import { AdUnit } from './components/ad-unit'
 import { CoverField } from './components/cover-field'
 import { HomepageNewsletter } from './components/homepage-newsletter'
+import { HouseBand } from './components/house-band'
 import { Opening } from './components/opening'
 import { Pairing } from './components/pairing'
 import { EntryRow } from './components/entry-row'
@@ -193,7 +194,11 @@ export default async function HomePage() {
           where it breaks the page without landing inside one. */}
       {adClient && (
         <div className="container">
-          <AdUnit placement="home-mid" client={adClient} />
+          <AdUnit placement="home-mid" client={adClient}>
+            {settings.railFallback ? (
+              <HouseBand fallback={settings.railFallback} />
+            ) : undefined}
+          </AdUnit>
         </div>
       )}
 

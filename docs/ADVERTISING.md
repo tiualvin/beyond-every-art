@@ -503,10 +503,12 @@ that slot's request is deferred to idle.
 Five placements, each now rendered. The in-body position is one — a unit after
 a boundary `planInlineBreaks` picks — carried under three ids so AdSense's
 per-unit report can say which position fills; the coverage work made that the
-question, and a single repeated id reports all six slots as one row. The rail
-and the in-body units carry house content when nothing fills — `RailFallback`
-and `InlinePromo`; the three billboards hold their reservation and nothing
-else until a fallback is decided for them.
+question, and a single repeated id reports all six slots as one row. Every
+slot carries house content when nothing fills: the rail through
+`RailFallback`, the in-body units through `InlinePromo`, and the three
+billboards through `HouseBand`, which reads the same `SiteSettings →
+railFallback` supply as the rail rather than adding a second field to
+configure.
 
 `archive-inline` reaches the journal and the topic archive, which render entry
 rows. The author archive renders a card grid, and a billboard between cards is
@@ -602,10 +604,15 @@ rail carrying one unit removes the question.
 **An unfilled slot shows house content, not a blank.** Google declines
 impressions routinely — no demand, no consent, a blocker in front of the tag —
 and the reserved height is held either way, so without this a reader gets a
-labelled empty box. Both built placements now answer this. `rail-1`'s fallback
-is chosen in Payload under Site Settings → "Article rail — when no ad is
-shown": up to three articles, one of the apps, or nothing. `article-inline`'s
-is not chosen at all — see "Six boxes, not one" below.
+labelled empty box. Every placement answers this. The rail's box and the three
+billboards take the house promotion chosen in Payload under Site Settings →
+"House promotion — when no ad is shown": up to three articles, one of the
+apps, or nothing. The rail renders it as `RailFallback`, a column; the
+billboards render the same supply as `HouseBand`, a row, because a stack of
+headlines in a 970px band reads as a rail promo that failed to fill its box.
+One field, like the eligibility predicate, so there is not a second place for
+the same decision to drift. `article-inline`'s is not chosen at all — see "Six
+boxes, not one" below.
 
 **Up to three, because filling 250px is the design problem.** The first version
 took a single article and put its headline in the middle of the box, which left
