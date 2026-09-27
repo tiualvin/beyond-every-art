@@ -76,6 +76,32 @@ async function callTool(
   return JSON.stringify(message)
 }
 
+/**
+ * Calls a tool that answers in JSON and returns the parsed answer, failing the
+ * test with the tool's own message if it refused.
+ */
+async function toolJson(
+  request: APIRequestContext,
+  key: string,
+  name: string,
+  args: Record<string, unknown>,
+  // Loose on purpose: each test asserts the shape it cares about.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<Record<string, any>> {
+  const message = await rpc(request, key, 'tools/call', {
+    arguments: args,
+    name,
+  })
+  const result = message.result as
+    { content?: Array<{ text?: string }>; isError?: boolean } | undefined
+  const text = result?.content?.[0]?.text ?? ''
+  expect(
+    !message.error && !result?.isError,
+    `${name} refused: ${text || JSON.stringify(message.error)}`,
+  ).toBe(true)
+  return JSON.parse(text)
+}
+
 test.describe('MCP endpoint', () => {
   // The refusals, first. Each one runs before the MCP handler is entered, so
   // they are the paths Payload's `routeError` shapes rather than the SDK.
@@ -138,6 +164,7 @@ test.describe('MCP endpoint', () => {
         'draftArticle',
         'readArticleMarkdown',
         'updateArticleMarkdown',
+        'setKeyFactsBlock',
         'uploadMedia',
         'findPosts',
       ]),
@@ -195,6 +222,66 @@ test.describe('MCP endpoint', () => {
     // the markdown tools exist to avoid.
     expect(read).toContain('Ground layers')
     expect(read).toContain('emphasis')
+  })
+
+  test('sets key facts on a draft, and a revision keeps them', async ({
+    request,
+  }) => {
+    // The one place the written block meets Payload's real save — its hooks,
+    // its rich-text validation, Postgres — rather than a stub.
+    const key = fixtures.mcp.editorKey
+    const slug = `e2e-mcp-facts-${Date.now()}-${Math.floor(Math.random() * 1e6)}`
+    const facts = [
+      { label: 'Insect', value: 'Dactylopius coccus' },
+      { label: 'Yield', value: '~70,000 insects per lb' },
+    ]
+
+    await toolJson(request, key, 'draftArticle', {
+      markdown:
+        '## The short answer\n\n| | |\n|---|---|\n| Insect | Dactylopius coccus |\n\n' +
+        '## The insect\n\nA scale insect.\n',
+      slug,
+      title: 'E2E MCP Key Facts',
+    })
+
+    const set = await toolJson(request, key, 'setKeyFactsBlock', {
+      afterHeading: 'The short answer',
+      facts,
+      replacePipeTable: true,
+      slug,
+    })
+    expect(set).toMatchObject({
+      placement: 'inserted',
+      removedTable: true,
+      status: 'draft',
+    })
+
+    const read = await toolJson(request, key, 'readArticleMarkdown', { slug })
+    expect(read.markdown).toContain(set.keyFacts.marker)
+    expect(read.markdown).not.toContain('|---|')
+    expect(read.blocks).toHaveLength(1)
+    expect(read.blocks[0].fields.items).toEqual([
+      expect.objectContaining(facts[0]),
+      expect.objectContaining(facts[1]),
+    ])
+
+    const revised = await toolJson(request, key, 'updateArticleMarkdown', {
+      markdown: read.markdown.replace(
+        'A scale insect.',
+        'A small scale insect.',
+      ),
+      slug,
+    })
+    expect(revised.blocks).toEqual({
+      kept: [{ key: set.keyFacts.key, blockType: 'keyFacts' }],
+      removed: [],
+    })
+
+    const reread = await toolJson(request, key, 'readArticleMarkdown', {
+      slug,
+    })
+    expect(reread.markdown).toContain('A small scale insect.')
+    expect(reread.blocks).toEqual(read.blocks)
   })
 
   // The guard on `uploadMediaFromUrl`, over the wire rather than in isolation.

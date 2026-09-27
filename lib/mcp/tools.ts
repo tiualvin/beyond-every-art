@@ -15,9 +15,11 @@ import type { MCPPluginConfig } from '@payloadcms/plugin-mcp'
 import type { PayloadRequest, TypedUser } from 'payload'
 import { z } from 'zod'
 
+import { KEY_FACTS_MAX_ITEMS } from '../../blocks/schema'
 import { toArticleBody } from '../content/body'
 import { buildPreviewUrl } from '../preview/live-preview'
 import { listBlocks, markBlocks, restoreBlocks } from './blocks'
+import { setKeyFacts, type Fact } from './key-facts'
 import {
   lexicalToMarkdown,
   markdownToLexical,
@@ -337,6 +339,134 @@ export const mcpTools: McpTool[] = [
     name: 'updateArticleMarkdown',
     parameters: {
       markdown: z.string().describe('The replacement body, in Markdown.'),
+      ...targetShape,
+    },
+  },
+  {
+    description:
+      'Set the key facts on an article: short label and value pairs ' +
+      '("Insect" / "Dactylopius coccus") shown as a fact card in the body. ' +
+      'If the article already has key facts they are replaced where they ' +
+      'stand; otherwise they are inserted directly under the body heading ' +
+      'named in `afterHeading`. The call describes the whole card, heading ' +
+      'included. Saved as a draft and never published; the rest of the body ' +
+      'is left exactly as it is. Refused for an article that still renders ' +
+      'from migrated Ghost HTML.',
+    handler: async (args: Record<string, unknown>, req: PayloadRequest) => {
+      const { afterHeading, facts, heading, replacePipeTable, ...target } =
+        args as {
+          afterHeading?: string
+          facts: Fact[]
+          heading?: string
+          id?: string
+          replacePipeTable?: boolean
+          slug?: string
+        }
+
+      const doc = (await findArticle(
+        req,
+        COLLECTION,
+        target,
+      )) as unknown as Record<string, unknown>
+
+      // The rich-text body wins over the Ghost HTML whenever it holds
+      // anything. Giving an article that renders from the HTML a body of one
+      // fact card would replace the whole article on the page with the card.
+      if (rendersFromLegacyHTML(doc)) {
+        throw new Error(
+          'This article renders from migrated Ghost HTML (`legacyHTML`), and ' +
+            'its rich-text body is empty. Adding key facts would make the ' +
+            'page render the rich-text body — the facts alone — in place of ' +
+            'the article. Move its body into the editor first.',
+        )
+      }
+
+      const result = setKeyFacts(doc.content as EditorState | null, {
+        afterHeading,
+        facts,
+        heading,
+        replacePipeTable,
+      })
+
+      const updated = await req.payload.update({
+        collection: COLLECTION,
+        id: doc.id as number | string,
+        data: { _status: 'draft', content: result.state },
+        draft: true,
+        overrideAccess: false,
+        req,
+        user: req.user as TypedUser,
+      })
+
+      return text({
+        afterHeading: result.afterHeading,
+        id: updated.id,
+        keyFacts: {
+          facts: facts.length,
+          heading: heading?.trim() || null,
+          key: result.key,
+          marker: result.marker,
+        },
+        placement: result.placement,
+        preview: buildPreviewUrl({
+          collection: COLLECTION,
+          slug: updated.slug,
+        }),
+        removedTable: result.removedTable,
+        slug: updated.slug,
+        status: 'draft',
+      })
+    },
+    name: 'setKeyFactsBlock',
+    parameters: {
+      afterHeading: z
+        .string()
+        .optional()
+        .describe(
+          'Where the facts go when the article has none yet: the text of a ' +
+            'heading in the body, e.g. "The short answer". They are placed ' +
+            'directly under it. Ignored when the article already has key ' +
+            'facts; move those by moving their marker line in ' +
+            'updateArticleMarkdown.',
+        ),
+      facts: z
+        .array(
+          z.object({
+            label: z
+              .string()
+              .min(1)
+              .describe('What the fact is about, e.g. "Insect". A few words.'),
+            value: z
+              .string()
+              .min(1)
+              .describe('The fact, e.g. "Dactylopius coccus". A few words.'),
+          }),
+        )
+        .min(1)
+        .max(KEY_FACTS_MAX_ITEMS)
+        .describe(
+          `The facts, in the order a reader should see them, 1 to ` +
+            `${KEY_FACTS_MAX_ITEMS}. Replaces any facts the article already ` +
+            'has.',
+        ),
+      heading: z
+        .string()
+        .optional()
+        .describe(
+          'Optional label on the card, e.g. "At a glance". Leave it out when ' +
+            'a body heading already introduces the facts. Leaving it out also ' +
+            'removes a heading the card had.',
+        ),
+      replacePipeTable: z
+        .boolean()
+        .optional()
+        .describe(
+          'When inserting, also remove the Markdown table directly under ' +
+            '`afterHeading`. A table typed in Markdown is stored as a ' +
+            'paragraph of literal | characters and prints as pipes on the ' +
+            'page; this swaps it for the card. Refused if there is no such ' +
+            'table there.',
+        ),
       ...targetShape,
     },
   },

@@ -384,3 +384,312 @@ describe('revising a body that holds modules', () => {
     expect(payload.update).not.toHaveBeenCalled()
   })
 })
+
+describe('setKeyFactsBlock', () => {
+  const cochineal = [
+    { label: 'Insect', value: 'Dactylopius coccus' },
+    { label: 'Yield', value: '~70,000 insects per lb' },
+  ]
+
+  // A Markdown table as the body really stores one: the editor has no table
+  // feature, so the converter keeps it as one paragraph of pipe-bounded lines.
+  const pipeTable = (): Node => ({
+    ...paragraph('| | |'),
+    children: [
+      text('| | |'),
+      { type: 'linebreak', version: 1 },
+      text('|---|---|'),
+      { type: 'linebreak', version: 1 },
+      text('| Insect | Dactylopius coccus |'),
+    ],
+  })
+
+  const children = (content: unknown) => (content as Body).root.children
+  const factsNode = (content: unknown) =>
+    children(content).find((node) => node.type === 'block') as
+      (Node & { fields: Record<string, unknown> }) | undefined
+
+  it('inserts the facts under the named heading and leaves the rest alone', async () => {
+    const original = body(
+      paragraph('Intro.'),
+      heading('The short answer'),
+      paragraph('Under it.'),
+      heading('The insect'),
+    )
+    const { req, payload, current } = await mcpRequest({
+      id: 1,
+      content: structuredClone(original),
+    })
+
+    const result = await call(
+      'setKeyFactsBlock',
+      { id: '1', afterHeading: 'The short answer', facts: cochineal },
+      req,
+    )
+
+    expect(types(current().content)).toEqual([
+      'paragraph',
+      'heading',
+      'block',
+      'paragraph',
+      'heading',
+    ])
+    const written = children(current().content)
+    expect([written[0], written[1], written[3], written[4]]).toEqual(
+      children(original),
+    )
+    expect(factsNode(current().content)!.fields).toMatchObject({
+      blockType: 'keyFacts',
+      items: [
+        { label: 'Insect', value: 'Dactylopius coccus' },
+        { label: 'Yield', value: '~70,000 insects per lb' },
+      ],
+    })
+    expect(factsNode(current().content)!.fields).not.toHaveProperty('heading')
+
+    // Drafts only, as the key's own user, exactly like a Markdown revision.
+    expect(payload.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        draft: true,
+        overrideAccess: false,
+        data: expect.objectContaining({ _status: 'draft' }),
+      }),
+    )
+    expect(result).toMatchObject({
+      placement: 'inserted',
+      afterHeading: 'The short answer',
+      removedTable: false,
+      status: 'draft',
+      keyFacts: { facts: 2, heading: null },
+    })
+  })
+
+  it('matches the heading however it is capitalised or spaced', async () => {
+    const { req, current } = await mcpRequest({
+      id: 1,
+      content: body(heading('The Short  Answer')),
+    })
+
+    await call(
+      'setKeyFactsBlock',
+      { id: '1', afterHeading: ' the short answer ', facts: cochineal },
+      req,
+    )
+
+    expect(types(current().content)).toEqual(['heading', 'block'])
+  })
+
+  it('swaps a pipe table under the heading for the card when asked', async () => {
+    const { req, current } = await mcpRequest({
+      id: 1,
+      content: body(
+        heading('The short answer'),
+        pipeTable(),
+        paragraph('Next.'),
+      ),
+    })
+
+    const result = await call(
+      'setKeyFactsBlock',
+      {
+        id: '1',
+        afterHeading: 'The short answer',
+        facts: cochineal,
+        replacePipeTable: true,
+      },
+      req,
+    )
+
+    expect(types(current().content)).toEqual(['heading', 'block', 'paragraph'])
+    expect(JSON.stringify(current().content)).not.toContain('|---|')
+    expect(result.removedTable).toBe(true)
+  })
+
+  it('refuses to replace a table that is not there, and saves nothing', async () => {
+    const { req, payload } = await mcpRequest({
+      id: 1,
+      content: body(
+        heading('The short answer'),
+        paragraph('Prose, not pipes.'),
+      ),
+    })
+
+    await expect(
+      call(
+        'setKeyFactsBlock',
+        {
+          id: '1',
+          afterHeading: 'The short answer',
+          facts: cochineal,
+          replacePipeTable: true,
+        },
+        req,
+      ),
+    ).rejects.toThrow(/no Markdown table directly under "The short answer"/)
+    expect(payload.update).not.toHaveBeenCalled()
+  })
+
+  it('replaces existing facts where they stand, keeping their marker', async () => {
+    const { req, current } = await mcpRequest({
+      id: 1,
+      content: body(
+        heading('The insect'),
+        block('keyFacts', { heading: 'At a glance', ...facts }),
+        heading('The short answer'),
+      ),
+    })
+
+    const result = await call(
+      'setKeyFactsBlock',
+      {
+        id: '1',
+        // Ignored: the facts already have a place.
+        afterHeading: 'The short answer',
+        facts: [{ label: 'Colourant', value: 'Carminic acid' }],
+      },
+      req,
+    )
+
+    expect(types(current().content)).toEqual(['heading', 'block', 'heading'])
+    const fields = factsNode(current().content)!.fields
+    expect(fields.id).toBe('65f0c0ffee0000000000abcd')
+    expect(fields.items).toEqual([
+      expect.objectContaining({ label: 'Colourant', value: 'Carminic acid' }),
+    ])
+    // The call describes the whole card: no heading given, none kept.
+    expect(fields).not.toHaveProperty('heading')
+    expect(result).toMatchObject({
+      placement: 'replaced',
+      afterHeading: 'The insect',
+      keyFacts: { marker: '<!-- block:keyFacts:65f0c0ffee0000000000abcd -->' },
+    })
+  })
+
+  it.each([
+    [
+      'no afterHeading for an article without facts',
+      { facts: cochineal },
+      body(heading('The short answer')),
+      /pass afterHeading.*"The short answer"/,
+    ],
+    [
+      'a heading the body does not have',
+      { afterHeading: 'At a glance', facts: cochineal },
+      body(heading('The short answer'), heading('The insect')),
+      /No heading in the body reads "At a glance".*"The short answer", "The insect"/,
+    ],
+    [
+      'a heading that heads two sections',
+      { afterHeading: 'Notes', facts: cochineal },
+      body(heading('Notes'), heading('Notes')),
+      /heads 2 sections/,
+    ],
+    [
+      'an article with two sets of facts',
+      { facts: cochineal },
+      body(
+        heading('One'),
+        block('keyFacts', facts, 'aa11'),
+        heading('Two'),
+        block('keyFacts', facts, 'bb22'),
+      ),
+      /2 key facts modules, under "One", "Two"/,
+    ],
+    [
+      'a fact with a blank value',
+      { afterHeading: 'X', facts: [{ label: 'Yield', value: '  ' }] },
+      body(heading('X')),
+      /Fact 1 has no value/,
+    ],
+    [
+      'more facts than the module holds',
+      {
+        afterHeading: 'X',
+        facts: Array.from({ length: 13 }, (_, i) => ({
+          label: `L${i}`,
+          value: `V${i}`,
+        })),
+      },
+      body(heading('X')),
+      /at most 12 facts/,
+    ],
+  ])('refuses %s, and saves nothing', async (_case, args, content, message) => {
+    const { req, payload } = await mcpRequest({ id: 1, content })
+
+    await expect(
+      call('setKeyFactsBlock', { id: '1', ...args }, req),
+    ).rejects.toThrow(message)
+    expect(payload.update).not.toHaveBeenCalled()
+  })
+
+  it('refuses an article whose page renders from Ghost HTML', async () => {
+    // A body of one fact card would replace the whole migrated article.
+    const { req, payload } = await mcpRequest({
+      id: 1,
+      legacyHTML: '<h2>The short answer</h2><p>Migrated.</p>',
+      content: null,
+    })
+
+    await expect(
+      call(
+        'setKeyFactsBlock',
+        { id: '1', afterHeading: 'The short answer', facts: cochineal },
+        req,
+      ),
+    ).rejects.toThrow(/renders from migrated Ghost HTML/)
+    expect(payload.update).not.toHaveBeenCalled()
+  })
+
+  it('writes facts that the read tool reports and a revision keeps', async () => {
+    // The whole loop an agent runs on a draft: set, review, revise.
+    const { req, current } = await mcpRequest({
+      id: 1,
+      content: body(
+        heading('The short answer'),
+        pipeTable(),
+        paragraph('After.'),
+      ),
+    })
+
+    const set = await call(
+      'setKeyFactsBlock',
+      {
+        id: '1',
+        afterHeading: 'The short answer',
+        facts: cochineal,
+        heading: 'At a glance',
+        replacePipeTable: true,
+      },
+      req,
+    )
+    const marker = (set.keyFacts as { marker: string }).marker
+
+    const read = await call('readArticleMarkdown', { id: '1' }, req)
+    expect(read.markdown).toBe(`## The short answer\n\n${marker}\n\nAfter.`)
+    expect(read.blocks).toEqual([
+      expect.objectContaining({
+        blockType: 'keyFacts',
+        marker,
+        afterHeading: 'The short answer',
+        fields: expect.objectContaining({
+          heading: 'At a glance',
+          items: [
+            expect.objectContaining(cochineal[0]),
+            expect.objectContaining(cochineal[1]),
+          ],
+        }),
+      }),
+    ])
+
+    const before = structuredClone(factsNode(current().content))
+    await call(
+      'updateArticleMarkdown',
+      {
+        id: '1',
+        markdown: String(read.markdown).replace('After.', 'Revised.'),
+      },
+      req,
+    )
+    expect(factsNode(current().content)).toEqual(before)
+  })
+})

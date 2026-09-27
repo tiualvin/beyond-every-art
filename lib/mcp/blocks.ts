@@ -25,7 +25,7 @@
 import { headingText } from '../content/headings'
 import type { EditorState } from './markdown'
 
-type LexicalNode = {
+export type LexicalNode = {
   [key: string]: unknown
   type: string
   version: number
@@ -197,7 +197,7 @@ export function markBlocks(state: EditorState): EditorState {
 export type BlockRef = { key: string; blockType: string }
 
 /** Every word under a node, however it is split into text nodes. */
-function textOf(node: LexicalNode): string {
+export function textOf(node: LexicalNode): string {
   return `${node.text ?? ''}${(node.children ?? []).map(textOf).join('')}`
 }
 
