@@ -74,6 +74,10 @@ const mcpEnvironment = {
   // chose. The suite drives the app directly, so the issuer is the loopback
   // address the test server actually answers on.
   CMS_ADDRESS: '127.0.0.1:3000',
+  // Blank on purpose, whatever the shell running the suite holds: the stock
+  // tools are asserted unconfigured, and a key here would make the suite spend
+  // a real deployment's Unsplash quota.
+  UNSPLASH_ACCESS_KEY: '',
 }
 
 /**

@@ -6,13 +6,15 @@
 // internet that gap matters: without this there is no trail from a change back
 // to the key that made it.
 //
-// Four lines, alongside the existing `request_error`, `not_found`,
+// Five lines, alongside the existing `request_error`, `not_found`,
 // `webhook_rejected`, and `csp_violation` lines in `docker compose logs app`:
 //
 //   `mcp_auth`     one per authenticated request — which key, acting as whom
 //   `mcp_refused`  one per request that never reached a tool
 //   `mcp_request`  one per JSON-RPC call — which tool, how long, how it ended
 //   `mcp_write`    one per document written
+//   `mcp_stock`    one per stock photograph imported — the one write whose
+//                  side effect is somebody else's record
 //
 // `mcp_auth` and `mcp_request` describe the same request from two sides and
 // cannot be merged: the first is written where the key is known and the tool is
@@ -86,11 +88,31 @@ export interface McpWriteLogEntry {
   role: string | null
 }
 
+export interface McpStockLogEntry {
+  /** `warn` when a stored photograph's download went unreported. */
+  level: 'info' | 'warn'
+  event: 'mcp_stock'
+  time: string
+  /** Where the photograph came from, e.g. `unsplash`. */
+  source: string
+  photoId: string | null
+  mediaId: string | null
+  /** An earlier import was returned rather than a new copy stored. */
+  reused: boolean
+  /**
+   * Whether the library was told about the download. Null when nothing was
+   * downloaded — a reused import owes no report.
+   */
+  downloadTracked: boolean | null
+  userId: string | null
+}
+
 export type McpLogEntry =
   | McpAuthLogEntry
   | McpErrorLogEntry
   | McpRefusedLogEntry
   | McpRequestLogEntry
+  | McpStockLogEntry
   | McpWriteLogEntry
 
 function field(value: unknown): string | null {
@@ -158,6 +180,36 @@ export function mcpWriteLogEntry(input: {
     operation: input.operation,
     role: field(input.role),
     status: field(input.status),
+    time: input.time ?? new Date().toISOString(),
+    userId: field(input.userId),
+  }
+}
+
+/**
+ * A stock photograph imported over MCP.
+ *
+ * `mcp_write` already records the Media document; this adds what only the
+ * import knows. Unsplash's API terms oblige a download report for every
+ * photograph stored, so a report that failed is the line worth finding, and
+ * is written at `warn`.
+ */
+export function mcpStockLogEntry(input: {
+  downloadTracked: boolean | null
+  mediaId?: unknown
+  photoId?: unknown
+  reused: boolean
+  source: string
+  time?: string
+  userId?: unknown
+}): McpStockLogEntry {
+  return {
+    downloadTracked: input.downloadTracked,
+    event: 'mcp_stock',
+    level: input.downloadTracked === false ? 'warn' : 'info',
+    mediaId: field(input.mediaId),
+    photoId: field(input.photoId),
+    reused: input.reused,
+    source: input.source,
     time: input.time ?? new Date().toISOString(),
     userId: field(input.userId),
   }

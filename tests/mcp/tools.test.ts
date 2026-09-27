@@ -21,13 +21,15 @@ describe('nativeGhostID', () => {
 })
 
 describe('mcpTools', () => {
-  it('exposes the drafting loop: create, read back, revise, illustrate', () => {
+  it('exposes the drafting loop: create, read back, revise, illustrate, find a photograph', () => {
     expect(mcpTools.map((tool) => tool.name)).toEqual([
       'draftArticle',
       'readArticleMarkdown',
       'updateArticleMarkdown',
       'uploadMedia',
       'uploadMediaFromUrl',
+      'findStockPhoto',
+      'importStockPhoto',
     ])
   })
 

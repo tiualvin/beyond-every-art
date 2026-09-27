@@ -100,9 +100,11 @@ export const mcpPluginConfig: MCPPluginConfig = {
     },
     media: {
       description:
-        'Images. Use `uploadMedia` to add one — the generated create tool ' +
-        'cannot carry a file, so a document made through it would have no ' +
-        'image attached. Editing and deleting stay in the admin panel.',
+        'Images. Use `uploadMedia` or `uploadMediaFromUrl` to add one, or ' +
+        '`findStockPhoto` then `importStockPhoto` for an Unsplash photograph — ' +
+        'the generated create tool cannot carry a file, so a document made ' +
+        'through it would have no image attached. Editing and deleting stay ' +
+        'in the admin panel.',
       enabled: { find: true },
     },
     posts: {

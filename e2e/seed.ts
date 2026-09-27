@@ -195,6 +195,8 @@ async function upsertKeyedUser(
       updateArticleMarkdown: true,
       uploadMedia: true,
       uploadMediaFromUrl: true,
+      findStockPhoto: true,
+      importStockPhoto: true,
     },
   }
 

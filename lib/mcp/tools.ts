@@ -21,12 +21,30 @@ import {
   markdownToLexical,
   type MarkdownCollection,
 } from './markdown'
+import { logMcpEvent, mcpStockLogEntry } from './audit'
+import {
+  configuredLimit,
+  FixedWindowRateLimiter,
+  retryAfterSeconds,
+} from './rate-limit'
 import { decodeImageUpload, vetImageBytes } from './upload'
 import { MAX_AGENT_UPLOAD_BYTES } from '../security/uploads'
 import {
   fetchPublicBytes,
   OutboundFetchError,
 } from '../security/outbound-fetch'
+import {
+  attributionFor,
+  imageAddress,
+  isPhotoId,
+  MAX_PAGE,
+  NOT_CONFIGURED,
+  ORIENTATIONS,
+  photoPageURL,
+  StockPhotoError,
+  unsplashClient,
+  type Orientation,
+} from '../stock/unsplash'
 
 type McpTool = NonNullable<NonNullable<MCPPluginConfig['mcp']>['tools']>[number]
 
@@ -118,6 +136,58 @@ async function findArticle(
     throw new Error(`No ${collection} document with slug \`${args.slug}\`.`)
   return doc
 }
+
+/**
+ * Stock-photo calls per user per hour, unless `RATE_LIMIT_STOCK_PER_HOUR` says
+ * otherwise.
+ *
+ * The MCP limit is 120 requests per key per *minute*; Unsplash's demo quota is
+ * 50 an hour for the whole deployment. One agent looping on a search would
+ * spend the hour in under half a minute and leave every other key without
+ * stock search until it reset. This holds one caller to a share of the quota.
+ * A person choosing a feature image needs a search or two and one import per
+ * article, so the ceiling costs the real workflow nothing.
+ */
+const STOCK_LIMIT = 20
+const STOCK_WINDOW_MS = 60 * 60_000
+
+const stockLimiter = new FixedWindowRateLimiter(
+  configuredLimit('RATE_LIMIT_STOCK_PER_HOUR', STOCK_LIMIT),
+  STOCK_WINDOW_MS,
+)
+
+/** Spends one unit of the caller's stock budget, or refuses with when to retry. */
+function spendStockBudget(req: PayloadRequest): void {
+  const result = stockLimiter.check(`user:${String(req.user?.id ?? 'none')}`)
+  if (!result.allowed) {
+    throw new StockPhotoError(
+      'The stock-photo budget for this user is spent for the hour. Try again ' +
+        `in ${retryAfterSeconds(result.resetAt)} seconds.`,
+    )
+  }
+}
+
+/**
+ * Passes refusals written for a model through, and flattens anything else,
+ * which would describe this server to its caller.
+ */
+function stockFailure(error: unknown, fallback: string): Error {
+  if (error instanceof StockPhotoError) return error
+  if (error instanceof OutboundFetchError) return error
+  return new Error(fallback)
+}
+
+/**
+ * The house rule on stock photographs, carried in both tool descriptions
+ * because the description is the only thing an agent reads before it chooses.
+ * docs/STOCK_IMAGERY.md, Finding 5 and Decision 3.
+ */
+const STOCK_RULE =
+  'House rule: stock photographs are for mood only — atmosphere, texture, ' +
+  'abstraction, or the header for an essay about an idea. Never use one ' +
+  'where a reader could take it as a picture of the work, place or person ' +
+  'the article names: this publication writes about specific works, and a ' +
+  'stock photograph there reads as documentation of them.'
 
 const targetShape = {
   id: z.string().optional().describe('Document id. Provide this or `slug`.'),
@@ -479,6 +549,228 @@ export const mcpTools: McpTool[] = [
             'private, loopback and link-local addresses are refused, at every ' +
             'redirect.',
         ),
+    },
+  },
+  {
+    description:
+      'Search Unsplash for a photograph to use as an article’s feature ' +
+      'image. Returns up to six candidates, each with a small `preview` ' +
+      'address. Show the previews to the person and let them choose — do ' +
+      'not import one they have not seen — then call `importStockPhoto` ' +
+      'with the chosen `id`. ' +
+      STOCK_RULE +
+      ' Each call spends a small shared hourly quota, so search ' +
+      'deliberately rather than paging through results.',
+    handler: async (args: Record<string, unknown>, req: PayloadRequest) => {
+      const { orientation, page, query } = args as {
+        orientation?: Orientation
+        page?: number
+        query: string
+      }
+
+      const unsplash = unsplashClient()
+      if (!unsplash) throw new StockPhotoError(NOT_CONFIGURED)
+
+      spendStockBudget(req)
+
+      try {
+        const result = await unsplash.search({ orientation, page, query })
+        return text({
+          ...result,
+          next: result.candidates.length
+            ? 'Show these previews to the person and let them choose. Then ' +
+              'call importStockPhoto with the chosen id and alt text.'
+            : 'Nothing usable matched. Try different words — describe the ' +
+              'mood or texture rather than a subject.',
+          page: page ?? 1,
+        })
+      } catch (error) {
+        throw stockFailure(error, 'The stock search failed.')
+      }
+    },
+    name: 'findStockPhoto',
+    parameters: {
+      orientation: z
+        .enum(ORIENTATIONS)
+        .optional()
+        .describe(
+          'Shape of the photograph. Feature images are wide, so `landscape` ' +
+            'is usually right.',
+        ),
+      page: z
+        .number()
+        .int()
+        .min(1)
+        .max(MAX_PAGE)
+        .optional()
+        .describe('Page of results, from 1. Rewording beats paging.'),
+      query: z
+        .string()
+        .min(2)
+        .max(100)
+        .describe(
+          'What the photograph should show or feel like, in a few words — ' +
+            '"weathered ochre plaster", "morning light on water".',
+        ),
+    },
+  },
+  {
+    description:
+      'Store an Unsplash photograph the person chose from `findStockPhoto` ' +
+      'in the Media library, and return its id for use as a post’s ' +
+      'featuredImage via `updatePosts`. Takes only the photo’s `id` and ' +
+      'your alt text: the credit, its link to the photographer and where the ' +
+      'file came from are written from Unsplash’s own record, and the image ' +
+      'is marked as a photograph rather than generated. Importing the same ' +
+      'photograph again returns the copy already stored. ' +
+      STOCK_RULE,
+    handler: async (args: Record<string, unknown>, req: PayloadRequest) => {
+      const { alt, caption, photoId } = args as {
+        alt: string
+        caption?: string
+        photoId: string
+      }
+
+      const unsplash = unsplashClient()
+      if (!unsplash) throw new StockPhotoError(NOT_CONFIGURED)
+
+      const id = photoId.trim()
+      if (!isPhotoId(id)) {
+        throw new StockPhotoError(
+          'That is not an Unsplash photo id. Use an `id` returned by ' +
+            '`findStockPhoto`.',
+        )
+      }
+
+      // An earlier import of the same photograph is returned rather than
+      // stored twice. Nothing is downloaded, so nothing is reported to
+      // Unsplash and no budget is spent. Trashed copies are not matched: a
+      // photograph somebody threw away can be brought back as a new one.
+      const sourceURL = photoPageURL(id)
+      const { docs } = await req.payload.find({
+        collection: 'media',
+        depth: 0,
+        limit: 1,
+        overrideAccess: false,
+        req,
+        user: req.user,
+        where: { sourceURL: { equals: sourceURL } },
+      })
+      const existing = docs[0] as unknown as Record<string, unknown> | undefined
+      if (existing) {
+        logMcpEvent(
+          mcpStockLogEntry({
+            downloadTracked: null,
+            mediaId: existing.id,
+            photoId: id,
+            reused: true,
+            source: 'unsplash',
+            userId: req.user?.id,
+          }),
+        )
+        return text({
+          alt: existing.alt,
+          credit: existing.credit ?? null,
+          creditURL: existing.creditURL ?? null,
+          id: existing.id,
+          reused: true,
+          sourceURL,
+          url: existing.url,
+        })
+      }
+
+      spendStockBudget(req)
+
+      let photo
+      let fetched
+      try {
+        // The canonical record, not anything that came back through the
+        // agent — attribution and the image address are derived from this.
+        photo = await unsplash.photo(id)
+        fetched = await fetchPublicBytes(
+          imageAddress(photo),
+          MAX_AGENT_UPLOAD_BYTES,
+        )
+      } catch (error) {
+        throw stockFailure(error, 'The photograph could not be downloaded.')
+      }
+
+      const attribution = attributionFor(photo)
+      // Read from the bytes, exactly as on the other two upload paths.
+      const file = vetImageBytes(
+        fetched.bytes,
+        `unsplash-${photo.photographer.name}-${photo.id}`,
+      )
+
+      const created = await req.payload.create({
+        collection: 'media',
+        data: {
+          // Not a parameter: this path only ever carries a photograph, and
+          // the default elsewhere is the wrong answer for one.
+          aiGenerated: false,
+          alt,
+          caption,
+          credit: attribution.credit,
+          creditURL: attribution.creditURL,
+          sourceURL: attribution.sourceURL,
+        },
+        file,
+        overrideAccess: false,
+        req,
+        user: req.user as TypedUser,
+      })
+
+      // After the create, so a failed upload never counts as a download.
+      // A report that fails does not undo the import; it is logged at warn.
+      const downloadTracked = await unsplash.trackDownload(photo)
+
+      logMcpEvent(
+        mcpStockLogEntry({
+          downloadTracked,
+          mediaId: created.id,
+          photoId: id,
+          reused: false,
+          source: 'unsplash',
+          userId: req.user?.id,
+        }),
+      )
+
+      return text({
+        aiGenerated: false,
+        alt: created.alt,
+        credit: attribution.credit,
+        creditURL: attribution.creditURL,
+        downloadTracked,
+        id: created.id,
+        mimetype: file.mimetype,
+        reused: false,
+        sizeBytes: file.size,
+        sourceURL: attribution.sourceURL,
+        url: created.url,
+      })
+    },
+    name: 'importStockPhoto',
+    parameters: {
+      alt: z
+        .string()
+        .min(1)
+        .describe(
+          'Alternative text describing what the photograph shows. Required. ' +
+            'The candidate’s `description` is machine-written; use it as a ' +
+            'starting point, not as the answer.',
+        ),
+      caption: z
+        .string()
+        .optional()
+        .describe(
+          'Caption shown under the image, when it has one. The credit is ' +
+            'added separately.',
+        ),
+      photoId: z
+        .string()
+        .min(1)
+        .max(32)
+        .describe('The `id` of the candidate the person chose.'),
     },
   },
 ]

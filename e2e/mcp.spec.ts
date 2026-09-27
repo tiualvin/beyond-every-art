@@ -139,6 +139,8 @@ test.describe('MCP endpoint', () => {
         'readArticleMarkdown',
         'updateArticleMarkdown',
         'uploadMedia',
+        'findStockPhoto',
+        'importStockPhoto',
         'findPosts',
       ]),
     )
@@ -233,6 +235,26 @@ test.describe('MCP endpoint', () => {
       // envelope of every reply, error or not.
       expect(result, url).toContain('"isError":true')
       expect(result, url).not.toContain('sourceUrl')
+    }
+  })
+
+  // CI has no Unsplash key, which is also production's default until an
+  // administrator sets one. Both tools have to say so — and refuse before
+  // anything is looked up or stored — rather than fail in a way an agent
+  // retries. The unit tests cover the configured path with the network stubbed;
+  // this proves the tools are mounted and the unconfigured path is the one a
+  // real deployment without a key takes.
+  test('says stock search is not configured, rather than failing', async ({
+    request,
+  }) => {
+    for (const [name, args] of [
+      ['findStockPhoto', { query: 'weathered plaster' }],
+      ['importStockPhoto', { alt: 'A probe.', photoId: 'Abc123' }],
+    ] as const) {
+      const result = await callTool(request, fixtures.mcp.editorKey, name, args)
+
+      expect(result, name).toContain('not configured')
+      expect(result, name).toContain('"isError":true')
     }
   })
 

@@ -53,6 +53,9 @@ const STORED_WIDTH = 2400
 /** Unsplash ids are short and URL-safe; anything else is not put in a path. */
 const PHOTO_ID = /^[A-Za-z0-9_-]{1,32}$/
 
+/** Whether a value could be an Unsplash photo id, before anything is asked. */
+export const isPhotoId = (value: string): boolean => PHOTO_ID.test(value)
+
 export const ORIENTATIONS = ['landscape', 'portrait', 'squarish'] as const
 export type Orientation = (typeof ORIENTATIONS)[number]
 
