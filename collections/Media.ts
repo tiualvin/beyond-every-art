@@ -1,12 +1,24 @@
 import type { CollectionConfig } from 'payload'
 
-import { editorsAndAdmins, publicRead } from '../access/roles'
+import {
+  editorsAndAdmins,
+  editorsAndAdminsField,
+  publicRead,
+} from '../access/roles'
 import { toCreditURL } from '../lib/content/attribution'
 import { ghostUrlField, migrationStatusField } from '../fields/ghost'
 import { CONTENT_TAGS } from '../lib/cache/content'
 import { purgeOnChange, purgeOnDelete } from '../lib/cache/purge'
 import { recordMcpWrite } from '../lib/mcp/audit'
 import { refuseOversizedUpload } from '../lib/security/uploads'
+
+/** Empty, or a full https address; shared by the two link fields below. */
+const httpsAddress = (value: string | null | undefined) => {
+  const raw = (value ?? '').trim()
+  if (!raw) return true
+  if (toCreditURL(raw)) return true
+  return 'Must be a full https:// address.'
+}
 
 export const Media: CollectionConfig = {
   slug: 'media',
@@ -131,12 +143,33 @@ export const Media: CollectionConfig = {
       // Checked here and again in `lib/content/attribution.ts`, which is what
       // the page actually renders through. This stops a bad value being
       // stored; that stops one already stored from reaching an `href`.
-      validate: (value: string | null | undefined) => {
-        const raw = (value ?? '').trim()
-        if (!raw) return true
-        if (toCreditURL(raw)) return true
-        return 'Credit links must be a full https:// address.'
+      validate: httpsAddress,
+    },
+    {
+      // Provenance, the way `aiGenerated` is: "which pictures are stock?" has
+      // to stay as answerable as "which pictures are generated?", because a
+      // stock photograph above an article about a named work reads as a
+      // picture of that work. See docs/STOCK_IMAGERY.md, Finding 5.
+      //
+      // Indexed rather than unique, unlike `ghostURL`: media is soft-deleted,
+      // and a unique column would refuse to re-import a photograph somebody
+      // had put in the trash. `importStockPhoto` looks this up before it
+      // downloads anything, which is what makes an import safe to repeat.
+      //
+      // Staff-only to read, like `ghostURL`: nothing renders it.
+      name: 'sourceURL',
+      label: 'Source URL',
+      type: 'text',
+      index: true,
+      access: { read: editorsAndAdminsField },
+      admin: {
+        description:
+          'Where the file itself came from — the photograph’s page on a ' +
+          'stock library, say. Written by the MCP stock import, which also ' +
+          'checks it so the same photograph is not stored twice. Filter on ' +
+          'it to find stock imagery.',
       },
+      validate: httpsAddress,
     },
     {
       name: 'aiGenerated',

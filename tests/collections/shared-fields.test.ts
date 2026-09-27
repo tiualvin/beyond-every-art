@@ -31,7 +31,9 @@ const INTERNAL_FIELDS: Array<[string, Field[], string[]]> = [
     ['ghostID', 'ghostURL', 'ghostUpdatedAt', 'migrationStatus'],
   ],
   ['pages', Pages.fields, ['ghostID']],
-  ['media', Media.fields, ['ghostURL', 'migrationStatus']],
+  // `sourceURL` is provenance rather than migration state, but the reasoning
+  // is the same: nothing renders it, so nothing public needs it.
+  ['media', Media.fields, ['ghostURL', 'migrationStatus', 'sourceURL']],
   ['tags', Tags.fields, ['ghostID']],
   ['authors', Authors.fields, ['ghostID']],
 ]
@@ -221,5 +223,25 @@ describe('seoFields', () => {
         `${collection.slug} has metaDescription`,
       ).toBeDefined()
     }
+  })
+})
+
+describe('media link fields', () => {
+  // Both end up somewhere a browser follows or a server fetches, so neither
+  // may hold anything but https. `creditURL` is re-checked at render; this is
+  // the half that stops a bad value being stored at all.
+  const validate = (name: string, value: string) =>
+    (fieldNamed(Media.fields, name) as TextField).validate!(
+      value as never,
+      {} as never,
+    )
+
+  it.each(['creditURL', 'sourceURL'])('%s accepts https or nothing', (name) => {
+    expect(validate(name, 'https://unsplash.com/photos/abc123')).toBe(true)
+    expect(validate(name, '')).toBe(true)
+    expect(validate(name, 'javascript:alert(1)')).toContain('https://')
+    expect(validate(name, 'http://unsplash.com/photos/abc123')).toContain(
+      'https://',
+    )
   })
 })
