@@ -107,6 +107,21 @@ const indexNowEnvironment = {
   INDEXNOW_KEY: 'e2e-indexnow-key-0000',
 }
 
+/**
+ * A Google tag, so `consent-mode.tsx` renders and `analytics-consent.spec.ts`
+ * has a bootstrap to assert on. It is GA4 rather than the AdSense loader on
+ * purpose: the tag is gated on the deployment's origin being public
+ * (`resolveAdsenseClient`), and this server answers on loopback over http, so
+ * AdSense is refused here by design. Before that guard existed the consent
+ * specs passed only because the real publisher's tag loaded against
+ * `127.0.0.1` — the bug the guard fixes — so the tag they depend on is now
+ * named explicitly. Nothing is sent: the id is a valid shape and a property
+ * that does not exist.
+ */
+const analyticsEnvironment = {
+  NEXT_PUBLIC_GA_ID: 'G-E2ETEST0000',
+}
+
 const productionServer = {
   command: 'node .next/standalone/server.js',
   env: {
@@ -116,6 +131,7 @@ const productionServer = {
     ...mcpEnvironment,
     ...storageEnvironment,
     ...indexNowEnvironment,
+    ...analyticsEnvironment,
     ...rateLimitOverrides,
   },
 }
@@ -125,6 +141,7 @@ const developmentServer = {
     ...mcpEnvironment,
     ...storageEnvironment,
     ...indexNowEnvironment,
+    ...analyticsEnvironment,
     ...rateLimitOverrides,
   },
 }
