@@ -196,6 +196,7 @@ async function upsertKeyedUser(
       readArticleVersion: true,
       restoreArticleVersion: true,
       updateArticleMarkdown: true,
+      setKeyFactsBlock: true,
       uploadMedia: true,
       uploadMediaFromUrl: true,
     },

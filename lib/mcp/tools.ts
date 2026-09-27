@@ -18,11 +18,16 @@ import type { MCPPluginConfig } from '@payloadcms/plugin-mcp'
 import type { PayloadRequest, TypedUser } from 'payload'
 import { z } from 'zod'
 
+import { KEY_FACTS_MAX_ITEMS } from '../../blocks/schema'
+import { toArticleBody } from '../content/body'
 import { htmlToPlainText, richTextToPlainText } from '../content/plain-text'
 import { buildPreviewUrl } from '../preview/live-preview'
+import { listBlocks, markBlocks, restoreBlocks } from './blocks'
+import { setKeyFacts, type Fact } from './key-facts'
 import {
   lexicalToMarkdown,
   markdownToLexical,
+  type EditorState,
   type MarkdownCollection,
 } from './markdown'
 import { decodeImageUpload, vetImageBytes } from './upload'
@@ -89,6 +94,19 @@ async function idsForSlugs(
 // the real surface. Adding pages is a Phase 3 decision, taken in both places.
 const COLLECTION = 'posts' satisfies MarkdownCollection
 
+/**
+ * The article's draft, with relationships left as ids.
+ *
+ * Depth 0 is what makes an inline image survive a read and a revision. Left at
+ * Payload's default depth, the image's upload is populated, and the Markdown
+ * converter writes a populated image as `![alt](url)` — which is not a form it
+ * reads back: the revision stored that line as literal text, so the picture
+ * vanished and its Markdown source printed on the page instead. Unpopulated, it
+ * writes `![media:7]()`, which it does read back, as the same upload.
+ *
+ * It is also the only honest thing for a tool that writes the body back to
+ * start from: what it saves is then exactly what it read.
+ */
 async function findArticle(
   req: PayloadRequest,
   collection: MarkdownCollection,
@@ -98,6 +116,7 @@ async function findArticle(
     return req.payload.findByID({
       collection,
       id: args.id,
+      depth: 0,
       draft: true,
       overrideAccess: false,
       req,
@@ -109,6 +128,7 @@ async function findArticle(
 
   const { docs } = await req.payload.find({
     collection,
+    depth: 0,
     draft: true,
     limit: 1,
     overrideAccess: false,
@@ -121,6 +141,28 @@ async function findArticle(
   if (!doc)
     throw new Error(`No ${collection} document with slug \`${args.slug}\`.`)
   return doc
+}
+
+/**
+ * Whether the page renders this article from its migrated Ghost HTML.
+ *
+ * Asked of the renderer rather than decided here. `legacyHTML` being set is not
+ * the question: the rich-text body wins whenever it holds anything, so a
+ * migrated article that has since been rewritten in the editor renders from
+ * `content` — and a check on `legacyHTML` alone told the agent its edits would
+ * not reach the page when they were the only thing that would.
+ */
+function rendersFromLegacyHTML(doc: Record<string, unknown>): boolean {
+  return (
+    toArticleBody(
+      {
+        content: doc.content,
+        legacyHTML: doc.legacyHTML as string | null | undefined,
+        title: doc.title as string | null | undefined,
+      },
+      { preview: true },
+    ).kind === 'html'
+  )
 }
 
 const targetShape = {
@@ -138,17 +180,22 @@ const targetShape = {
  * show up as a spurious difference in somebody's merge.
  */
 function articleView(req: PayloadRequest, doc: Record<string, unknown>) {
+  const content = doc.content as EditorState | null | undefined
+
   return {
+    // Beside the Markdown rather than in it, so reviewing a draft shows what
+    // each module says as well as where it is.
+    blocks: listBlocks(content),
     excerpt: doc.excerpt ?? null,
     // Migrated bodies live in `legacyHTML` and are not Lexical; say so
     // rather than returning an empty string that reads like an empty post.
-    markdown: doc.legacyHTML
+    markdown: rendersFromLegacyHTML(doc)
       ? '(This document renders from migrated Ghost HTML (`legacyHTML`), not from the ' +
         'rich-text body. Editing it as Markdown would not change the published page.)'
       : lexicalToMarkdown(
           req.payload,
           COLLECTION,
-          doc.content as Parameters<typeof lexicalToMarkdown>[2],
+          content && markBlocks(content),
         ),
     slug: doc.slug,
     status: doc._status ?? null,
@@ -334,7 +381,11 @@ export const mcpTools: McpTool[] = [
   {
     description:
       'Read an article back as Markdown, including its draft body. ' +
-      'Use this before revising, so edits are made against the current text.',
+      'Use this before revising, so edits are made against the current text. ' +
+      'Modules inserted into the body (key facts, FAQs, galleries, callouts) ' +
+      'have no Markdown form: each appears as a line like ' +
+      '`<!-- block:keyFacts:<key> -->` where it sits, and its contents are ' +
+      'listed in `blocks`.',
     handler: async (args: Record<string, unknown>, req: PayloadRequest) => {
       const target = args as { id?: string; slug?: string }
 
@@ -430,13 +481,15 @@ export const mcpTools: McpTool[] = [
     handler: async (args: Record<string, unknown>, req: PayloadRequest) => {
       const { versionId } = args as { versionId: string }
 
-      // Default depth, as `findArticle` reads the live draft. An image in the
-      // body converts to `![alt](url)` only when its upload is populated, and
-      // to a bare `![media:id]()` placeholder when it is not — so reading a
-      // version any shallower would make the two outputs differ where the
-      // article did not.
+      // Depth 0, as `findArticle` reads the live draft. An image in the body
+      // converts to `![alt](url)` only when its upload is populated, and to a
+      // bare `![media:id]()` placeholder when it is not — so reading a version
+      // at any other depth would make the two outputs differ where the
+      // article did not. (The placeholder is also the only form
+      // `updateArticleMarkdown` reads back as an image.)
       const entry = await req.payload.findVersionByID({
         collection: COLLECTION,
+        depth: 0,
         id: versionId,
         overrideAccess: false,
         req,
@@ -616,7 +669,11 @@ export const mcpTools: McpTool[] = [
   {
     description:
       'Replace the body of an existing article with Markdown, saved as a draft. ' +
-      'Does not publish, and does not touch the published version of the document.',
+      'Does not publish, and does not touch the published version of the document. ' +
+      'Keep each `<!-- block:... -->` line from readArticleMarkdown where its ' +
+      'module should sit, on a line of its own: the module is put back exactly ' +
+      'as it was. Leaving a line out removes that module; the response lists ' +
+      'which were kept and which removed.',
     handler: async (args: Record<string, unknown>, req: PayloadRequest) => {
       const { markdown, ...target } = args as {
         id?: string
@@ -626,12 +683,19 @@ export const mcpTools: McpTool[] = [
 
       const doc = await findArticle(req, COLLECTION, target)
 
+      // Before this, every module in the body was lost on a revision: Markdown
+      // has no form for one, so it came back as a line of text. See `blocks.ts`.
+      const { state, kept, removed } = restoreBlocks(
+        markdownToLexical(req.payload, COLLECTION, markdown),
+        (doc as unknown as { content?: EditorState | null }).content,
+      )
+
       const updated = await req.payload.update({
         collection: COLLECTION,
         id: doc.id,
         data: {
           _status: 'draft',
-          content: markdownToLexical(req.payload, COLLECTION, markdown),
+          content: state,
         },
         draft: true,
         overrideAccess: false,
@@ -640,6 +704,7 @@ export const mcpTools: McpTool[] = [
       })
 
       return text({
+        blocks: { kept, removed },
         id: updated.id,
         preview: buildPreviewUrl({
           collection: COLLECTION,
@@ -652,6 +717,134 @@ export const mcpTools: McpTool[] = [
     name: 'updateArticleMarkdown',
     parameters: {
       markdown: z.string().describe('The replacement body, in Markdown.'),
+      ...targetShape,
+    },
+  },
+  {
+    description:
+      'Set the key facts on an article: short label and value pairs ' +
+      '("Insect" / "Dactylopius coccus") shown as a fact card in the body. ' +
+      'If the article already has key facts they are replaced where they ' +
+      'stand; otherwise they are inserted directly under the body heading ' +
+      'named in `afterHeading`. The call describes the whole card, heading ' +
+      'included. Saved as a draft and never published; the rest of the body ' +
+      'is left exactly as it is. Refused for an article that still renders ' +
+      'from migrated Ghost HTML.',
+    handler: async (args: Record<string, unknown>, req: PayloadRequest) => {
+      const { afterHeading, facts, heading, replacePipeTable, ...target } =
+        args as {
+          afterHeading?: string
+          facts: Fact[]
+          heading?: string
+          id?: string
+          replacePipeTable?: boolean
+          slug?: string
+        }
+
+      const doc = (await findArticle(
+        req,
+        COLLECTION,
+        target,
+      )) as unknown as Record<string, unknown>
+
+      // The rich-text body wins over the Ghost HTML whenever it holds
+      // anything. Giving an article that renders from the HTML a body of one
+      // fact card would replace the whole article on the page with the card.
+      if (rendersFromLegacyHTML(doc)) {
+        throw new Error(
+          'This article renders from migrated Ghost HTML (`legacyHTML`), and ' +
+            'its rich-text body is empty. Adding key facts would make the ' +
+            'page render the rich-text body — the facts alone — in place of ' +
+            'the article. Move its body into the editor first.',
+        )
+      }
+
+      const result = setKeyFacts(doc.content as EditorState | null, {
+        afterHeading,
+        facts,
+        heading,
+        replacePipeTable,
+      })
+
+      const updated = await req.payload.update({
+        collection: COLLECTION,
+        id: doc.id as number | string,
+        data: { _status: 'draft', content: result.state },
+        draft: true,
+        overrideAccess: false,
+        req,
+        user: req.user as TypedUser,
+      })
+
+      return text({
+        afterHeading: result.afterHeading,
+        id: updated.id,
+        keyFacts: {
+          facts: facts.length,
+          heading: heading?.trim() || null,
+          key: result.key,
+          marker: result.marker,
+        },
+        placement: result.placement,
+        preview: buildPreviewUrl({
+          collection: COLLECTION,
+          slug: updated.slug,
+        }),
+        removedTable: result.removedTable,
+        slug: updated.slug,
+        status: 'draft',
+      })
+    },
+    name: 'setKeyFactsBlock',
+    parameters: {
+      afterHeading: z
+        .string()
+        .optional()
+        .describe(
+          'Where the facts go when the article has none yet: the text of a ' +
+            'heading in the body, e.g. "The short answer". They are placed ' +
+            'directly under it. Ignored when the article already has key ' +
+            'facts; move those by moving their marker line in ' +
+            'updateArticleMarkdown.',
+        ),
+      facts: z
+        .array(
+          z.object({
+            label: z
+              .string()
+              .min(1)
+              .describe('What the fact is about, e.g. "Insect". A few words.'),
+            value: z
+              .string()
+              .min(1)
+              .describe('The fact, e.g. "Dactylopius coccus". A few words.'),
+          }),
+        )
+        .min(1)
+        .max(KEY_FACTS_MAX_ITEMS)
+        .describe(
+          `The facts, in the order a reader should see them, 1 to ` +
+            `${KEY_FACTS_MAX_ITEMS}. Replaces any facts the article already ` +
+            'has.',
+        ),
+      heading: z
+        .string()
+        .optional()
+        .describe(
+          'Optional label on the card, e.g. "At a glance". Leave it out when ' +
+            'a body heading already introduces the facts. Leaving it out also ' +
+            'removes a heading the card had.',
+        ),
+      replacePipeTable: z
+        .boolean()
+        .optional()
+        .describe(
+          'When inserting, also remove the Markdown table directly under ' +
+            '`afterHeading`. A table typed in Markdown is stored as a ' +
+            'paragraph of literal | characters and prints as pipes on the ' +
+            'page; this swaps it for the card. Refused if there is no such ' +
+            'table there.',
+        ),
       ...targetShape,
     },
   },

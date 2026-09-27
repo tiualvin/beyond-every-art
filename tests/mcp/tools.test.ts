@@ -24,7 +24,7 @@ describe('nativeGhostID', () => {
 })
 
 describe('mcpTools', () => {
-  it('exposes the drafting loop: create, read back, look back, revise, illustrate', () => {
+  it('exposes the drafting loop: create, read back, look back, revise, add facts, illustrate', () => {
     expect(mcpTools.map((tool) => tool.name)).toEqual([
       'draftArticle',
       'readArticleMarkdown',
@@ -32,6 +32,7 @@ describe('mcpTools', () => {
       'readArticleVersion',
       'restoreArticleVersion',
       'updateArticleMarkdown',
+      'setKeyFactsBlock',
       'uploadMedia',
       'uploadMediaFromUrl',
     ])
@@ -298,8 +299,8 @@ describe('version history tools', () => {
         autosave: false,
         id: 900,
         latest: false,
-        // Populated at the default depth, which the read deliberately keeps.
-        parent: { id: 42, title: 'Ground Layers' },
+        // An id rather than a document: the read is made at depth 0.
+        parent: 42,
         updatedAt: '2026-09-26T10:00:00.000Z',
         version: migrated,
       }),
@@ -311,18 +312,22 @@ describe('version history tools', () => {
       string,
       unknown
     >
+    // Depth 0, the same depth `findArticle` reads the live draft at. An image
+    // in the body exports as `![alt](url)` only when populated, so a version
+    // read at any other depth would differ from the draft where the text did
+    // not — and only the unpopulated form survives a revision.
     expect(options).toMatchObject({
       collection: 'posts',
+      depth: 0,
       id: '900',
       overrideAccess: false,
       user,
     })
-    // An image in the body exports as `![alt](url)` only when populated, so a
-    // shallower read than the live draft's would differ where the text did not.
-    expect(options).not.toHaveProperty('depth')
 
     expect(version).toEqual({
       autosave: false,
+      // The migrated fixture has no rich-text body, so no modules.
+      blocks: [],
       excerpt: 'An excerpt as it was.',
       id: 42,
       latest: false,

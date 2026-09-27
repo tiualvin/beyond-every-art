@@ -1,6 +1,6 @@
 // Small drawings for the block picker.
 //
-// The picker listed fourteen modules as a column of names. "Media text" and
+// The picker listed its modules as a column of names. "Media text" and
 // "Feature list" are not words that tell an editor what they are about to
 // insert, and the only way to find out was to insert one and look — which on a
 // published article means inserting it, looking, and deleting it again.
@@ -9,8 +9,8 @@
 // string, a data URI is one, and `img-src` in `lib/security/csp.ts` already
 // permits `data:` — its comment says "for inlined icons", which is this. The
 // alternative is a public asset directory that has to survive the Dockerfile's
-// copy steps and the R2 rewrite, for fourteen pictures that are under 300 bytes
-// each.
+// copy steps and the R2 rewrite, for a handful of pictures that are under 300
+// bytes each.
 //
 // One fixed colour, not `currentColor`: these render inside an `<img>`, where a
 // stylesheet cannot reach them. The muted ink below is legible on the admin's
@@ -90,12 +90,16 @@ export const BLOCK_ICONS = {
     `<rect x="2.5" y="4" width="15" height="12" rx="1"/>` +
       `<path d="M2.5 8h15M8 4v12M13 4v12"/>`,
   ),
+  // A short label beside a longer value, three times over: a `<dl>`.
+  keyFacts: icon(
+    lines([5.5, 10, 14.5], 3, 6.5) + lines([5.5, 10, 14.5], 9, 17),
+  ),
 } as const
 
 export type BlockIconName = keyof typeof BLOCK_ICONS
 
 /**
- * How the picker groups the fourteen modules.
+ * How the picker groups the modules.
  *
  * Named for what an editor is trying to do rather than for how the module is
  * built — "Audience" holds the signup and the members-only cut because both are
@@ -113,6 +117,7 @@ export const BLOCK_GROUPS = {
   bookmark: 'Media',
   featureList: 'Lists & tables',
   comparisonTable: 'Lists & tables',
+  keyFacts: 'Lists & tables',
   button: 'Lists & tables',
   signup: 'Audience',
   paywall: 'Audience',

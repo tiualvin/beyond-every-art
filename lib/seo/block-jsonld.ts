@@ -23,6 +23,7 @@ import {
   FAQ_BLOCK,
   FEATURE_LIST_BLOCK,
   GALLERY_BLOCK,
+  KEY_FACTS_BLOCK,
   KEY_TAKEAWAYS_BLOCK,
   MEDIA_TEXT_BLOCK,
   PAYWALL_BLOCK,
@@ -60,6 +61,12 @@ const blockJsonLd: Record<BlockSlug, (fields: unknown) => JsonLdNode[]> = {
   // the `<table>` element already said, to every consumer, more reliably. The
   // structured-data win for a table is the markup, not a node describing it.
   [COMPARISON_TABLE_BLOCK]: NOTHING,
+
+  // `PropertyValue` exists, but only means something hung off a typed subject
+  // as its `additionalProperty` — and the block does not know what its subject
+  // is. "Insect: Dactylopius coccus" describes a dye, not the Article, and a
+  // list of properties attached to the Article would be a false claim about it.
+  [KEY_FACTS_BLOCK]: NOTHING,
 
   // Form chrome and an editorial marker. Neither is content.
   [SIGNUP_BLOCK]: NOTHING,

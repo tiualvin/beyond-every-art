@@ -163,6 +163,7 @@ test.describe('MCP endpoint', () => {
         'readArticleVersion',
         'restoreArticleVersion',
         'updateArticleMarkdown',
+        'setKeyFactsBlock',
         'uploadMedia',
         'findPosts',
       ]),
@@ -226,6 +227,76 @@ test.describe('MCP endpoint', () => {
     // the markdown tools exist to avoid.
     expect(read).toContain('Ground layers')
     expect(read).toContain('emphasis')
+  })
+
+  test('sets key facts on a draft, and a revision keeps them', async ({
+    request,
+  }) => {
+    // The one place the written block meets Payload's real save — its hooks,
+    // its rich-text validation, Postgres — rather than a stub.
+    const key = fixtures.mcp.editorKey
+    const slug = `e2e-mcp-facts-${Date.now()}-${Math.floor(Math.random() * 1e6)}`
+    const facts = [
+      { label: 'Insect', value: 'Dactylopius coccus' },
+      { label: 'Yield', value: '~70,000 insects per lb' },
+    ]
+    type Read = {
+      markdown: string
+      blocks: Array<{ fields: { items: unknown[] } }>
+    }
+
+    await callToolJson(request, key, 'draftArticle', {
+      markdown:
+        '## The short answer\n\n| | |\n|---|---|\n| Insect | Dactylopius coccus |\n\n' +
+        '## The insect\n\nA scale insect.\n',
+      slug,
+      title: 'E2E MCP Key Facts',
+    })
+
+    const set = await callToolJson(request, key, 'setKeyFactsBlock', {
+      afterHeading: 'The short answer',
+      facts,
+      replacePipeTable: true,
+      slug,
+    })
+    expect(set).toMatchObject({
+      placement: 'inserted',
+      removedTable: true,
+      status: 'draft',
+    })
+    const { key: blockKey, marker } = set.keyFacts as {
+      key: string
+      marker: string
+    }
+
+    const read = (await callToolJson(request, key, 'readArticleMarkdown', {
+      slug,
+    })) as Read
+    expect(read.markdown).toContain(marker)
+    expect(read.markdown).not.toContain('|---|')
+    expect(read.blocks).toHaveLength(1)
+    expect(read.blocks[0].fields.items).toEqual([
+      expect.objectContaining(facts[0]),
+      expect.objectContaining(facts[1]),
+    ])
+
+    const revised = await callToolJson(request, key, 'updateArticleMarkdown', {
+      markdown: read.markdown.replace(
+        'A scale insect.',
+        'A small scale insect.',
+      ),
+      slug,
+    })
+    expect(revised.blocks).toEqual({
+      kept: [{ key: blockKey, blockType: 'keyFacts' }],
+      removed: [],
+    })
+
+    const reread = (await callToolJson(request, key, 'readArticleMarkdown', {
+      slug,
+    })) as Read
+    expect(reread.markdown).toContain('A small scale insect.')
+    expect(reread.blocks).toEqual(read.blocks)
   })
 
   // Version history, over the wire: a real Lexical round trip against a real

@@ -18,6 +18,7 @@ import * as migration_20260927_070848_add_password_reset_requested_at from './20
 import * as migration_20260927_073635_add_media_object_key from './20260927_073635_add_media_object_key';
 import * as migration_20260927_085527_add_article_version_capabilities from './20260927_085527_add_article_version_capabilities';
 import * as migration_20260927_085810_add_restore_article_version_capability from './20260927_085810_add_restore_article_version_capability';
+import * as migration_20260927_095529_add_set_key_facts_block_capability from './20260927_095529_add_set_key_facts_block_capability';
 
 export const migrations = [
   {
@@ -118,6 +119,11 @@ export const migrations = [
   {
     up: migration_20260927_085810_add_restore_article_version_capability.up,
     down: migration_20260927_085810_add_restore_article_version_capability.down,
-    name: '20260927_085810_add_restore_article_version_capability'
+    name: '20260927_085810_add_restore_article_version_capability',
+  },
+  {
+    up: migration_20260927_095529_add_set_key_facts_block_capability.up,
+    down: migration_20260927_095529_add_set_key_facts_block_capability.down,
+    name: '20260927_095529_add_set_key_facts_block_capability'
   },
 ];
