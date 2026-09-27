@@ -32,6 +32,17 @@ export const pagePath = (slug: string): string => `/${slug}/`
 export const tagPath = (slug: string): string => `/tag/${slug}/`
 export const authorPath = (slug: string): string => `/author/${slug}/`
 
+/**
+ * Where Payload serves every upload: `/api/media/file/<filename>`.
+ *
+ * Named once because three things have to agree on it — the robots rule that
+ * lets crawlers fetch images under an otherwise disallowed `/api`, the
+ * Caddyfile exception that serves them on the public hostname, and the image
+ * optimizer's allowlist (`lib/security/images.ts`). `tests/seo/robots.test.ts`
+ * checks all three against this.
+ */
+export const MEDIA_FILE_PATH = '/api/media/file/'
+
 /** Path of the RSS feed route, as Ghost served it. */
 export const FEED_PATH = '/rss/'
 
