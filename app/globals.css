@@ -3718,6 +3718,20 @@ ol.feature-list__items .feature-list__title::before {
 .rail__slot {
   min-height: 250px;
   margin-bottom: 0.85rem;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The house promo is laid over `.ad-slot`, not over this box — and `.ad-slot`
+   is only as tall as what is in it. With the `<ins>` present that is 265.7px
+   and the promo spreads across it. A blocker hides the `<ins>` outright, which
+   is the commonest way a slot ends up empty, and then `.ad-slot` is the 9px
+   label and nothing else: the promo overflows a box with no height, every item
+   collapses to its content, and three headlines stack rule-to-meta above 66px
+   of empty reservation. Growing into the reservation makes the box the promo
+   fills this one, whatever has or has not been done to the unit. */
+.rail__slot > .ad-slot {
+  flex-grow: 1;
 }
 
 /* Google's snippet styles the unit `display: inline-block`, which puts it on a
