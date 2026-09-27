@@ -66,6 +66,17 @@ test('the homepage, a page, a tag and an author archive each describe themselves
   // work published in parts. Reasoning in lib/seo/jsonld.ts.
   expect(tag['@type']).toBe('CollectionPage')
   expect(tag.name).toBe(fixtures.tag.title)
+  // A topic page describes itself and has a picture to share: the seeded tag's
+  // description, and the newest of its articles' images since the tag has
+  // none of its own. `lib/seo/topic-meta.ts`.
+  await expect(page.locator('meta[name="description"]')).toHaveAttribute(
+    'content',
+    'The science and history behind the materials artists use.',
+  )
+  await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
+    'content',
+    /\/api\/media\/file\//,
+  )
 
   await page.goto(`/author/${fixtures.author.slug}/`)
   const author = await firstNode()
