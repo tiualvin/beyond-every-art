@@ -85,6 +85,19 @@ async function idsForSlugs(
 // the real surface. Adding pages is a Phase 3 decision, taken in both places.
 const COLLECTION = 'posts' satisfies MarkdownCollection
 
+/**
+ * The article's draft, with relationships left as ids.
+ *
+ * Depth 0 is what makes an inline image survive a read and a revision. Left at
+ * Payload's default depth, the image's upload is populated, and the Markdown
+ * converter writes a populated image as `![alt](url)` — which is not a form it
+ * reads back: the revision stored that line as literal text, so the picture
+ * vanished and its Markdown source printed on the page instead. Unpopulated, it
+ * writes `![media:7]()`, which it does read back, as the same upload.
+ *
+ * It is also the only honest thing for a tool that writes the body back to
+ * start from: what it saves is then exactly what it read.
+ */
 async function findArticle(
   req: PayloadRequest,
   collection: MarkdownCollection,
@@ -94,6 +107,7 @@ async function findArticle(
     return req.payload.findByID({
       collection,
       id: args.id,
+      depth: 0,
       draft: true,
       overrideAccess: false,
       req,
@@ -105,6 +119,7 @@ async function findArticle(
 
   const { docs } = await req.payload.find({
     collection,
+    depth: 0,
     draft: true,
     limit: 1,
     overrideAccess: false,
