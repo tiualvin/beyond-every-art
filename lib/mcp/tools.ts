@@ -25,6 +25,7 @@ import { buildPreviewUrl } from '../preview/live-preview'
 import { listBlocks, markBlocks, restoreBlocks } from './blocks'
 import { setKeyFacts, type Fact } from './key-facts'
 import {
+  blockFieldsForReading,
   lexicalToMarkdown,
   markdownToLexical,
   type EditorState,
@@ -184,8 +185,11 @@ function articleView(req: PayloadRequest, doc: Record<string, unknown>) {
 
   return {
     // Beside the Markdown rather than in it, so reviewing a draft shows what
-    // each module says as well as where it is.
-    blocks: listBlocks(content),
+    // each module says as well as where it is. Rich text inside a module — an
+    // FAQ answer, a callout — reads as Markdown, like the body around it.
+    blocks: listBlocks(content, (fields) =>
+      blockFieldsForReading(req.payload, COLLECTION, fields),
+    ),
     excerpt: doc.excerpt ?? null,
     // Migrated bodies live in `legacyHTML` and are not Lexical; say so
     // rather than returning an empty string that reads like an empty post.

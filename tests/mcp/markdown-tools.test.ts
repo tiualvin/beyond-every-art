@@ -281,6 +281,102 @@ describe('modules in a body read as Markdown', () => {
   })
 })
 
+describe('rich text inside a module, read back', () => {
+  // A bold word, so the test shows Markdown and not merely plain text.
+  const answer = () => ({
+    ...body({
+      ...paragraph(''),
+      children: [
+        text('The dried bodies of '),
+        { ...text('females'), format: 1 },
+        text('.'),
+      ],
+    }).root,
+  })
+  const richText = () => ({ root: answer() })
+
+  it('reads an FAQ answer as Markdown, not as editor state', async () => {
+    const { req } = await mcpRequest({
+      id: 1,
+      content: body(
+        heading('FAQ'),
+        block('faq', {
+          heading: 'FAQ',
+          items: [
+            { id: 'q1', question: 'What is it made from?', answer: richText() },
+          ],
+        }),
+      ),
+    })
+
+    const { blocks } = await call('readArticleMarkdown', { id: '1' }, req)
+
+    expect(blocks).toEqual([
+      expect.objectContaining({
+        blockType: 'faq',
+        fields: expect.objectContaining({
+          heading: 'FAQ',
+          items: [
+            {
+              id: 'q1',
+              question: 'What is it made from?',
+              answer: 'The dried bodies of **females**.',
+            },
+          ],
+        }),
+      }),
+    ])
+  })
+
+  it('does the same for every module that holds rich text', async () => {
+    const { req } = await mcpRequest({
+      id: 1,
+      content: body(block('callout', { tone: 'neutral', content: richText() })),
+    })
+
+    const { blocks } = await call('readArticleMarkdown', { id: '1' }, req)
+
+    expect(
+      (blocks as Array<{ fields: { content: unknown } }>)[0].fields.content,
+    ).toBe('The dried bodies of **females**.')
+  })
+
+  it('reports a rich-text value it cannot read as stored, and reads the rest', async () => {
+    // One malformed module must not hide every other one from a review.
+    const { req } = await mcpRequest({
+      id: 1,
+      content: body(
+        block('callout', { content: 'not editor state' }, 'aa11'),
+        block('callout', { content: richText() }, 'bb22'),
+      ),
+    })
+
+    const { blocks } = await call('readArticleMarkdown', { id: '1' }, req)
+
+    expect(
+      (blocks as Array<{ fields: { content: unknown } }>).map(
+        (b) => b.fields.content,
+      ),
+    ).toEqual(['not editor state', 'The dried bodies of **females**.'])
+  })
+
+  it('leaves the stored document alone', async () => {
+    const content = body(
+      block('faq', {
+        items: [{ id: 'q1', question: 'Q?', answer: richText() }],
+      }),
+    )
+    const { req, current } = await mcpRequest({ id: 1, content })
+
+    await call('readArticleMarkdown', { id: '1' }, req)
+
+    const stored = (current().content as Body).root.children[0] as Node & {
+      fields: { items: Array<{ answer: unknown }> }
+    }
+    expect(stored.fields.items[0].answer).toEqual(richText())
+  })
+})
+
 describe('revising a body that holds modules', () => {
   const KEY = '65f0c0ffee0000000000abcd'
   const MARKER = `<!-- block:keyFacts:${KEY} -->`

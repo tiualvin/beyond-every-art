@@ -163,7 +163,11 @@ a line of its own:
 
 The read tool returns the module's contents beside the Markdown, in `blocks`,
 with the heading it sits under — and so does `readArticleVersion`, which shares
-its format, so an old version's modules can be reviewed the same way. The update tool swaps each marker back for the
+its format, so an old version's modules can be reviewed the same way. Rich text
+inside a module — an FAQ answer, a callout, a dropdown panel — reads as
+Markdown, converted with that field's own editor rather than the body's; a value
+that is not editor state is reported exactly as stored, so a broken module
+never reads as a blank one. The update tool swaps each marker back for the
 module it names, exactly as stored: moving a marker moves the module, and
 leaving one out removes it, which the response always reports. A marker naming
 nothing in the current draft, used twice, or run into a paragraph is refused
