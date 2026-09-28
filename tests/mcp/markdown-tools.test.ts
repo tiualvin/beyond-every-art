@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { mcpTools } from '../../lib/mcp/tools'
+import { collectBlockJsonLd } from '../../lib/seo/block-jsonld'
 import { mcpRequest } from '../support/mcp-request'
 
 // The drafting tools, run for real against the real `content` editor. Only the
@@ -787,5 +788,398 @@ describe('setKeyFactsBlock', () => {
       req,
     )
     expect(factsNode(current().content)).toEqual(before)
+  })
+})
+
+describe('setFAQBlock', () => {
+  const qa = [
+    {
+      question: 'What is cochineal made from?',
+      answer: 'The dried bodies of the **cochineal** scale insect.',
+    },
+    {
+      question: 'Is cochineal still used?',
+      answer: 'Yes, as [E120](https://example.com/e120) in food.',
+    },
+  ]
+
+  // How a draft written in Markdown states its FAQ: a section heading, then
+  // one paragraph per question with the question in bold.
+  const markdownFaqSection = () => [
+    heading('FAQ'),
+    paragraph('**What is cochineal made from?** The dried bodies.'),
+    paragraph('**Is cochineal still used?** Yes, as E120.'),
+  ]
+
+  const children = (content: unknown) => (content as Body).root.children
+  const faqNode = (content: unknown) =>
+    children(content).find(
+      (node) =>
+        node.type === 'block' &&
+        (node as { fields?: { blockType?: string } }).fields?.blockType ===
+          'faq',
+    ) as (Node & { fields: Record<string, unknown> }) | undefined
+
+  it('inserts under the named heading, with answers as rich text', async () => {
+    const original = body(
+      paragraph('Intro.'),
+      heading('Questions readers ask'),
+      heading('The claim'),
+    )
+    const { req, payload, current } = await mcpRequest({
+      id: 1,
+      content: structuredClone(original),
+    })
+
+    const result = await call(
+      'setFAQBlock',
+      { id: '1', afterHeading: 'Questions readers ask', items: qa },
+      req,
+    )
+
+    expect(types(current().content)).toEqual([
+      'paragraph',
+      'heading',
+      'block',
+      'heading',
+    ])
+    const written = children(current().content)
+    expect([written[0], written[1], written[3]]).toEqual(children(original))
+
+    const fields = faqNode(current().content)!.fields as {
+      heading: string
+      items: Array<{ question: string; answer: Body }>
+    }
+    // No heading asked for: the block's own default, written explicitly.
+    expect(fields.heading).toBe('Frequently asked questions')
+    expect(fields.items.map((item) => item.question)).toEqual([
+      'What is cochineal made from?',
+      'Is cochineal still used?',
+    ])
+    // Rich text, converted with the answer's editor: bold and a link.
+    const answer = JSON.stringify(fields.items)
+    expect(answer).toContain('"format":1')
+    expect(answer).toContain('"type":"link"')
+    expect(answer).toContain('https://example.com/e120')
+
+    expect(payload.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        draft: true,
+        overrideAccess: false,
+        data: expect.objectContaining({ _status: 'draft' }),
+      }),
+    )
+    expect(result).toMatchObject({
+      placement: 'inserted',
+      afterHeading: 'Questions readers ask',
+      replacedSection: null,
+      status: 'draft',
+      faq: { heading: 'Frequently asked questions', questions: 2 },
+    })
+  })
+
+  it('replaces a Markdown FAQ section, keeping its heading', async () => {
+    const { req, current } = await mcpRequest({
+      id: 1,
+      content: body(
+        paragraph('Intro.'),
+        heading('The short answer'),
+        paragraph('Short.'),
+        ...markdownFaqSection(),
+        heading('The claim'),
+        paragraph('Claimed.'),
+      ),
+    })
+
+    const result = await call(
+      'setFAQBlock',
+      {
+        id: '1',
+        afterHeading: 'FAQ',
+        items: qa,
+        replaceExisting: true,
+      },
+      req,
+    )
+
+    // The heading and both Markdown questions are gone; one block stands in
+    // for all three, and the sections either side are untouched.
+    expect(types(current().content)).toEqual([
+      'paragraph',
+      'heading',
+      'paragraph',
+      'block',
+      'heading',
+      'paragraph',
+    ])
+    expect(JSON.stringify(current().content)).not.toContain('**What is')
+    expect(faqNode(current().content)!.fields.heading).toBe('FAQ')
+    expect(result).toMatchObject({
+      placement: 'inserted',
+      replacedSection: 'FAQ',
+      afterHeading: 'The short answer',
+      faq: { heading: 'FAQ' },
+    })
+  })
+
+  it('takes a deeper heading inside the section with it, and stops at the next', async () => {
+    const { req, current } = await mcpRequest({
+      id: 1,
+      content: body(
+        heading('FAQ'),
+        heading('What is it?', 'h3'),
+        paragraph('An insect.'),
+        heading('Next section'),
+      ),
+    })
+
+    await call(
+      'setFAQBlock',
+      { id: '1', afterHeading: 'faq', items: qa, replaceExisting: true },
+      req,
+    )
+
+    expect(types(current().content)).toEqual(['block', 'heading'])
+  })
+
+  it.each([
+    ['an image', upload(7)],
+    ['a key facts module', block('keyFacts', facts, 'aa11')],
+  ])(
+    'refuses to replace a section holding %s, and saves nothing',
+    async (_what, node) => {
+      const { req, payload } = await mcpRequest({
+        id: 1,
+        content: body(...markdownFaqSection(), node, heading('After')),
+      })
+
+      await expect(
+        call(
+          'setFAQBlock',
+          { id: '1', afterHeading: 'FAQ', items: qa, replaceExisting: true },
+          req,
+        ),
+      ).rejects.toThrow(/which replacing it would delete/)
+      expect(payload.update).not.toHaveBeenCalled()
+    },
+  )
+
+  it('refuses a section that would take whole sections with it', async () => {
+    // An `h1` "FAQ" would otherwise run to the end of the article.
+    const { req, payload } = await mcpRequest({
+      id: 1,
+      content: body(
+        heading('FAQ', 'h1'),
+        paragraph('**Q?** A.'),
+        heading('The insect'),
+        paragraph('A scale insect.'),
+      ),
+    })
+
+    await expect(
+      call(
+        'setFAQBlock',
+        { id: '1', afterHeading: 'FAQ', items: qa, replaceExisting: true },
+        req,
+      ),
+    ).rejects.toThrow(/contains the sections "The insect"/)
+    expect(payload.update).not.toHaveBeenCalled()
+  })
+
+  it('replaces an existing FAQ where it stands, keeping its id and heading', async () => {
+    const { req, current } = await mcpRequest({
+      id: 1,
+      content: body(
+        heading('Intro'),
+        block('faq', { heading: 'FAQ', items: [] }),
+        heading('The claim'),
+      ),
+    })
+
+    const result = await call(
+      'setFAQBlock',
+      // Both ignored: the FAQ already has a place.
+      { id: '1', afterHeading: 'The claim', replaceExisting: true, items: qa },
+      req,
+    )
+
+    expect(types(current().content)).toEqual(['heading', 'block', 'heading'])
+    const fields = faqNode(current().content)!.fields
+    expect(fields.id).toBe('65f0c0ffee0000000000abcd')
+    // Not reset to the default: that would move the section's anchor.
+    expect(fields.heading).toBe('FAQ')
+    expect(result).toMatchObject({
+      placement: 'replaced',
+      afterHeading: 'Intro',
+      faq: {
+        heading: 'FAQ',
+        marker: '<!-- block:faq:65f0c0ffee0000000000abcd -->',
+      },
+    })
+  })
+
+  it('renames an existing FAQ when a heading is given', async () => {
+    const { req, current } = await mcpRequest({
+      id: 1,
+      content: body(block('faq', { heading: 'FAQ', items: [] })),
+    })
+
+    await call('setFAQBlock', { id: '1', heading: 'Questions', items: qa }, req)
+
+    expect(faqNode(current().content)!.fields.heading).toBe('Questions')
+  })
+
+  it.each([
+    [
+      'no afterHeading for an article without an FAQ',
+      { items: qa },
+      body(heading('FAQ')),
+      /no FAQ yet, so say where the FAQ goes: pass afterHeading.*"FAQ"/,
+    ],
+    [
+      'a heading the body does not have',
+      { afterHeading: 'Questions', items: qa },
+      body(heading('FAQ')),
+      /No heading in the body reads "Questions"/,
+    ],
+    [
+      'an article with two FAQs',
+      { items: qa },
+      body(
+        heading('One'),
+        block('faq', {}, 'aa11'),
+        heading('Two'),
+        block('faq', {}, 'bb22'),
+      ),
+      /2 FAQ modules, under "One", "Two"/,
+    ],
+    [
+      'a question with no answer',
+      { afterHeading: 'FAQ', items: [{ question: 'Why?', answer: '  ' }] },
+      body(heading('FAQ')),
+      /Question 1 has no answer/,
+    ],
+    [
+      'an answer with a heading in it',
+      {
+        afterHeading: 'FAQ',
+        items: [{ question: 'Why?', answer: '## Because\n\nIt is.' }],
+      },
+      body(heading('FAQ')),
+      /The answer to "Why\?" contains a heading/,
+    ],
+    [
+      'no questions at all',
+      { afterHeading: 'FAQ', items: [] },
+      body(heading('FAQ')),
+      /at least one question/,
+    ],
+  ])('refuses %s, and saves nothing', async (_case, args, content, message) => {
+    const { req, payload } = await mcpRequest({ id: 1, content })
+
+    await expect(
+      call('setFAQBlock', { id: '1', ...args }, req),
+    ).rejects.toThrow(message)
+    expect(payload.update).not.toHaveBeenCalled()
+  })
+
+  it('refuses an article whose page renders from Ghost HTML', async () => {
+    const { req, payload } = await mcpRequest({
+      id: 1,
+      legacyHTML: '<h2>FAQ</h2><p>Migrated.</p>',
+      content: null,
+    })
+
+    await expect(
+      call('setFAQBlock', { id: '1', afterHeading: 'FAQ', items: qa }, req),
+    ).rejects.toThrow(/renders from migrated Ghost HTML/)
+    expect(payload.update).not.toHaveBeenCalled()
+  })
+
+  it('writes an FAQ the page describes to search engines', async () => {
+    // The stored shape has to be the one the renderer and the structured
+    // data read, or the module saves and then says nothing.
+    const { req, current } = await mcpRequest({
+      id: 1,
+      content: body(heading('FAQ')),
+    })
+
+    await call(
+      'setFAQBlock',
+      { id: '1', afterHeading: 'FAQ', items: qa, replaceExisting: true },
+      req,
+    )
+
+    const nodes = collectBlockJsonLd({
+      kind: 'lexical',
+      content: current().content,
+    } as never)
+    expect(nodes).toEqual([
+      {
+        '@type': 'FAQPage',
+        mainEntity: [
+          {
+            '@type': 'Question',
+            name: 'What is cochineal made from?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'The dried bodies of the cochineal scale insect.',
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'Is cochineal still used?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'Yes, as E120 in food.',
+            },
+          },
+        ],
+      },
+    ])
+  })
+
+  it('writes an FAQ the read tool reports and a revision keeps', async () => {
+    const { req, current } = await mcpRequest({
+      id: 1,
+      content: body(...markdownFaqSection(), heading('The claim')),
+    })
+
+    const set = await call(
+      'setFAQBlock',
+      { id: '1', afterHeading: 'FAQ', items: qa, replaceExisting: true },
+      req,
+    )
+    const marker = (set.faq as { marker: string }).marker
+
+    const read = await call('readArticleMarkdown', { id: '1' }, req)
+    expect(read.markdown).toBe(`${marker}\n\n## The claim`)
+    expect(read.blocks).toEqual([
+      expect.objectContaining({
+        blockType: 'faq',
+        marker,
+        fields: expect.objectContaining({
+          heading: 'FAQ',
+          items: [
+            expect.objectContaining({
+              question: 'What is cochineal made from?',
+              answer: 'The dried bodies of the **cochineal** scale insect.',
+            }),
+            expect.objectContaining({
+              question: 'Is cochineal still used?',
+              answer: 'Yes, as [E120](https://example.com/e120) in food.',
+            }),
+          ],
+        }),
+      }),
+    ])
+
+    const before = structuredClone(faqNode(current().content))
+    await call(
+      'updateArticleMarkdown',
+      { id: '1', markdown: `${marker}\n\n## The claim\n\nAdded.` },
+      req,
+    )
+    expect(faqNode(current().content)).toEqual(before)
   })
 })

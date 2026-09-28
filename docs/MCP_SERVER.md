@@ -118,9 +118,9 @@ second way to it by deploy. `restoreArticleVersion` writes, so an existing key
 gets it only where it already had both `updateArticleMarkdown` and
 `posts.update` — the two capabilities a restore can already be done with, by
 hand.
-`setKeyFactsBlock` writes the draft body and nothing else — what
-`updateArticleMarkdown` already does — so an existing key gets it exactly where
-it already had `updateArticleMarkdown`.
+`setKeyFactsBlock` and `setFAQBlock` write the draft body and nothing else —
+what `updateArticleMarkdown` already does — so an existing key gets them exactly
+where it already had `updateArticleMarkdown`.
 
 ### Tools
 
@@ -131,17 +131,18 @@ all.
 
 Written for this project, because the generated ones cannot do the job:
 
-| Tool                    | Does                                                                                                                                                                      |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `draftArticle`          | Creates a post from Markdown, always as a draft. Resolves tag and author slugs, refuses unknown ones. The `ghostID` is autofilled by the collection.                      |
-| `readArticleMarkdown`   | Reads a post back as Markdown, including the draft body, with each module as a marker line and its contents in `blocks`. Says so when the page renders from `legacyHTML`. |
-| `listArticleVersions`   | Lists a post's saved versions, newest first — id, time, title, status and a 100-character snippet each, never a body.                                                     |
-| `readArticleVersion`    | Reads one saved version in exactly the shape `readArticleMarkdown` returns the draft. Read-only.                                                                          |
-| `restoreArticleVersion` | Reverts a post's body, or its whole article, to a saved version — as a draft, overwriting rather than merging. Has a dry run and an undo.                                 |
-| `updateArticleMarkdown` | Replaces a body from Markdown, saved as a draft. Puts each marked module back as it was; reports which were kept and which removed.                                       |
-| `setKeyFactsBlock`      | Sets an article's key facts card — label and value pairs — in place, or under a named body heading. Saved as a draft; the rest of the body is untouched.                  |
-| `uploadMedia`           | Adds an image to the Media library from base64 and returns its id, for `updatePosts` to set as a `featuredImage`.                                                         |
-| `uploadMediaFromUrl`    | The same, from an https address the server fetches itself. The only one of the two that works from a phone or a scheduled run.                                            |
+| Tool                    | Does                                                                                                                                                                                        |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `draftArticle`          | Creates a post from Markdown, always as a draft. Resolves tag and author slugs, refuses unknown ones. The `ghostID` is autofilled by the collection.                                        |
+| `readArticleMarkdown`   | Reads a post back as Markdown, including the draft body, with each module as a marker line and its contents in `blocks`. Says so when the page renders from `legacyHTML`.                   |
+| `listArticleVersions`   | Lists a post's saved versions, newest first — id, time, title, status and a 100-character snippet each, never a body.                                                                       |
+| `readArticleVersion`    | Reads one saved version in exactly the shape `readArticleMarkdown` returns the draft. Read-only.                                                                                            |
+| `restoreArticleVersion` | Reverts a post's body, or its whole article, to a saved version — as a draft, overwriting rather than merging. Has a dry run and an undo.                                                   |
+| `updateArticleMarkdown` | Replaces a body from Markdown, saved as a draft. Puts each marked module back as it was; reports which were kept and which removed.                                                         |
+| `setKeyFactsBlock`      | Sets an article's key facts card — label and value pairs — in place, or under a named body heading. Saved as a draft; the rest of the body is untouched.                                    |
+| `setFAQBlock`           | Sets an article's FAQ — questions with Markdown answers — in place, under a named body heading, or in place of a Markdown FAQ section. Saved as a draft; the rest of the body is untouched. |
+| `uploadMedia`           | Adds an image to the Media library from base64 and returns its id, for `updatePosts` to set as a `featuredImage`.                                                                           |
+| `uploadMediaFromUrl`    | The same, from an https address the server fetches itself. The only one of the two that works from a phone or a scheduled run.                                                              |
 
 ### Modules in a body
 
@@ -174,7 +175,7 @@ nothing in the current draft, used twice, or run into a paragraph is refused
 before anything is saved, since saving it would print a literal comment on the
 page.
 
-`setKeyFactsBlock` writes the one module there is a tool for. It replaces an
+Two modules have a tool that writes them. `setKeyFactsBlock` replaces an
 article's key facts where they stand, or, if there are none, inserts them
 directly under the body heading the call names — headings being the one address
 in a body that an agent and an editor both see and that survives a revision.
@@ -184,6 +185,22 @@ as a paragraph of literal pipes and printed as one. It refuses an article with
 two sets of key facts, a heading that is missing or heads two sections, and any
 article whose page renders from `legacyHTML`, where a body holding only the card
 would replace the whole article.
+
+`setFAQBlock` places an FAQ by the same rules, from the same code
+([`lib/mcp/placement.ts`](../lib/mcp/placement.ts)), with two differences that
+come from the block. An FAQ always shows a heading of its own, so inserting one
+under a body heading such as `## FAQ` stacks two; `replaceExisting` instead puts
+it in place of that heading's whole section — the heading and everything under
+it, up to the next heading of the same or higher level — and gives it that
+heading's text, so the outline and the section's `#faq` link survive. That is how
+an FAQ drafted in Markdown, a bold question and its answer per paragraph, becomes
+the module. It refuses when the section holds an image or another module, which would be lost, or whole sections of its own — the sign of a heading named above the article's sections rather than one of them. And an FAQ is never unheaded, so an existing one keeps its heading
+when the call gives none, rather than being reset to "Frequently asked
+questions" and moving its anchor. Answers are Markdown, converted with the answer
+field's own editor, which has no module picker; an answer with a heading in it
+is refused, since each question is itself a heading. A published FAQ is also
+described to search engines as questions and answers (`FAQPage`), from the same
+fields.
 
 Two details keep this lossless. Articles are read at depth 0: populated, an
 inline image exports as a Markdown image pointing at its URL, which the

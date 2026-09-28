@@ -207,6 +207,13 @@ export type FaqItem = {
   answer?: unknown
 }
 
+/**
+ * What an FAQ is headed when it is given no heading of its own. Read by the
+ * schema's default, the renderer's fallback, and the MCP tool that writes one,
+ * so all three agree on what an unheaded FAQ says.
+ */
+export const FAQ_DEFAULT_HEADING = 'Frequently asked questions'
+
 export type FaqData = {
   heading?: string | null
   items?: FaqItem[] | null
@@ -744,7 +751,7 @@ export const FaqBlock: Block = {
     {
       name: 'heading',
       type: 'text',
-      defaultValue: 'Frequently asked questions',
+      defaultValue: FAQ_DEFAULT_HEADING,
     },
     {
       name: 'items',

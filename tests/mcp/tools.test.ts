@@ -24,7 +24,7 @@ describe('nativeGhostID', () => {
 })
 
 describe('mcpTools', () => {
-  it('exposes the drafting loop: create, read back, look back, revise, add facts, illustrate', () => {
+  it('exposes the drafting loop: create, read back, look back, revise, add facts and FAQs, illustrate', () => {
     expect(mcpTools.map((tool) => tool.name)).toEqual([
       'draftArticle',
       'readArticleMarkdown',
@@ -33,6 +33,7 @@ describe('mcpTools', () => {
       'restoreArticleVersion',
       'updateArticleMarkdown',
       'setKeyFactsBlock',
+      'setFAQBlock',
       'uploadMedia',
       'uploadMediaFromUrl',
     ])

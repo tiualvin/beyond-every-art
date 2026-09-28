@@ -164,6 +164,7 @@ test.describe('MCP endpoint', () => {
         'restoreArticleVersion',
         'updateArticleMarkdown',
         'setKeyFactsBlock',
+        'setFAQBlock',
         'uploadMedia',
         'findPosts',
       ]),
@@ -296,6 +297,67 @@ test.describe('MCP endpoint', () => {
       slug,
     })) as Read
     expect(reread.markdown).toContain('A small scale insect.')
+    expect(reread.blocks).toEqual(read.blocks)
+  })
+
+  test('converts a Markdown FAQ to an FAQ module, and a revision keeps it', async ({
+    request,
+  }) => {
+    // Rich-text answers meet Payload's real save here, validation and all.
+    const key = fixtures.mcp.editorKey
+    const slug = `e2e-mcp-faq-${Date.now()}-${Math.floor(Math.random() * 1e6)}`
+    type Read = {
+      markdown: string
+      blocks: Array<{
+        blockType: string
+        fields: { heading: string; items: Array<{ answer: string }> }
+      }>
+    }
+
+    await callToolJson(request, key, 'draftArticle', {
+      markdown:
+        '## The insect\n\nA scale insect.\n\n## FAQ\n\n' +
+        '**What is it made from?** Dried insects.\n\n' +
+        '**Is it still used?** Yes.\n\n## The claim\n\nRed.\n',
+      slug,
+      title: 'E2E MCP FAQ',
+    })
+
+    const set = await callToolJson(request, key, 'setFAQBlock', {
+      afterHeading: 'FAQ',
+      items: [
+        { question: 'What is it made from?', answer: 'Dried **insects**.' },
+        { question: 'Is it still used?', answer: 'Yes, as E120.' },
+      ],
+      replaceExisting: true,
+      slug,
+    })
+    expect(set).toMatchObject({
+      placement: 'inserted',
+      replacedSection: 'FAQ',
+      status: 'draft',
+    })
+    const { marker } = set.faq as { marker: string }
+
+    const read = (await callToolJson(request, key, 'readArticleMarkdown', {
+      slug,
+    })) as Read
+    expect(read.markdown).toContain(marker)
+    expect(read.markdown).not.toContain('**What is it made from?**')
+    expect(read.blocks).toHaveLength(1)
+    expect(read.blocks[0].fields.heading).toBe('FAQ')
+    expect(read.blocks[0].fields.items[0].answer).toBe('Dried **insects**.')
+
+    const revised = await callToolJson(request, key, 'updateArticleMarkdown', {
+      markdown: read.markdown.replace('Red.', 'A red worth an empire.'),
+      slug,
+    })
+    expect((revised.blocks as { kept: unknown[] }).kept).toHaveLength(1)
+
+    const reread = (await callToolJson(request, key, 'readArticleMarkdown', {
+      slug,
+    })) as Read
+    expect(reread.markdown).toContain('A red worth an empire.')
     expect(reread.blocks).toEqual(read.blocks)
   })
 

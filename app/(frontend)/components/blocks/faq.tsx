@@ -1,9 +1,7 @@
 import { RichText } from '@payloadcms/richtext-lexical/react'
 
-import type { FaqData } from '@/blocks/schema'
+import { FAQ_DEFAULT_HEADING, type FaqData } from '@/blocks/schema'
 import { isEmptyRichText } from '@/lib/content/richtext'
-
-const DEFAULT_HEADING = 'Frequently asked questions'
 
 /**
  * Questions and their answers.
@@ -46,7 +44,7 @@ export function Faq({
 
   if (items.length === 0) return null
 
-  const heading = data.heading?.trim() || DEFAULT_HEADING
+  const heading = data.heading?.trim() || FAQ_DEFAULT_HEADING
 
   return (
     <section className="module module--faq faq" aria-labelledby={headingAnchor}>

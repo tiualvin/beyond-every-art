@@ -18,15 +18,17 @@ import type { MCPPluginConfig } from '@payloadcms/plugin-mcp'
 import type { PayloadRequest, TypedUser } from 'payload'
 import { z } from 'zod'
 
-import { KEY_FACTS_MAX_ITEMS } from '../../blocks/schema'
+import { FAQ_BLOCK, KEY_FACTS_MAX_ITEMS } from '../../blocks/schema'
 import { toArticleBody } from '../content/body'
 import { htmlToPlainText, richTextToPlainText } from '../content/plain-text'
 import { buildPreviewUrl } from '../preview/live-preview'
 import { listBlocks, markBlocks, restoreBlocks } from './blocks'
+import { setFaq, type FaqInputItem } from './faq'
 import { setKeyFacts, type Fact } from './key-facts'
 import {
   blockFieldsForReading,
   lexicalToMarkdown,
+  markdownToBlockRichText,
   markdownToLexical,
   type EditorState,
   type MarkdownCollection,
@@ -163,6 +165,23 @@ function rendersFromLegacyHTML(doc: Record<string, unknown>): boolean {
       },
       { preview: true },
     ).kind === 'html'
+  )
+}
+
+/**
+ * Refuses to give a body to an article that renders from its Ghost HTML.
+ *
+ * The rich-text body wins over the HTML whenever it holds anything, so a body
+ * holding only one module would replace the whole migrated article on the page
+ * with that module. `what` names the module in the refusal.
+ */
+function refuseLegacyBody(doc: Record<string, unknown>, what: string): void {
+  if (!rendersFromLegacyHTML(doc)) return
+  throw new Error(
+    'This article renders from migrated Ghost HTML (`legacyHTML`), and ' +
+      `its rich-text body is empty. Adding ${what} would make the page ` +
+      `render the rich-text body — ${what} alone — in place of the ` +
+      'article. Move its body into the editor first.',
   )
 }
 
@@ -751,17 +770,7 @@ export const mcpTools: McpTool[] = [
         target,
       )) as unknown as Record<string, unknown>
 
-      // The rich-text body wins over the Ghost HTML whenever it holds
-      // anything. Giving an article that renders from the HTML a body of one
-      // fact card would replace the whole article on the page with the card.
-      if (rendersFromLegacyHTML(doc)) {
-        throw new Error(
-          'This article renders from migrated Ghost HTML (`legacyHTML`), and ' +
-            'its rich-text body is empty. Adding key facts would make the ' +
-            'page render the rich-text body — the facts alone — in place of ' +
-            'the article. Move its body into the editor first.',
-        )
-      }
+      refuseLegacyBody(doc, 'key facts')
 
       const result = setKeyFacts(doc.content as EditorState | null, {
         afterHeading,
@@ -848,6 +857,138 @@ export const mcpTools: McpTool[] = [
             'paragraph of literal | characters and prints as pipes on the ' +
             'page; this swaps it for the card. Refused if there is no such ' +
             'table there.',
+        ),
+      ...targetShape,
+    },
+  },
+  {
+    description:
+      'Set the FAQ on an article: questions and their answers, shown in the ' +
+      'body as a list of questions that open to their answers, and ' +
+      'described to search engines as an FAQ. If the article already has ' +
+      'an FAQ it is replaced where it stands, keeping its heading unless ' +
+      '`heading` is given. Otherwise it goes under the body heading named ' +
+      'in `afterHeading` — or, with `replaceExisting`, takes the place of ' +
+      "that heading's whole section, which is how to convert an FAQ written " +
+      'in Markdown. Answers are Markdown. The call describes every question: ' +
+      'any left out are removed. Saved as a draft and never published; the ' +
+      'rest of the body is left exactly as it is. Refused for an article ' +
+      'that still renders from migrated Ghost HTML.',
+    handler: async (args: Record<string, unknown>, req: PayloadRequest) => {
+      const { afterHeading, heading, items, replaceExisting, ...target } =
+        args as {
+          afterHeading?: string
+          heading?: string
+          id?: string
+          items: FaqInputItem[]
+          replaceExisting?: boolean
+          slug?: string
+        }
+
+      const doc = (await findArticle(
+        req,
+        COLLECTION,
+        target,
+      )) as unknown as Record<string, unknown>
+
+      refuseLegacyBody(doc, 'an FAQ')
+
+      const result = setFaq(
+        doc.content as EditorState | null,
+        { afterHeading, heading, items, replaceExisting },
+        // Against the answer field's own editor, not the body's.
+        (markdown) =>
+          markdownToBlockRichText(
+            req.payload,
+            COLLECTION,
+            FAQ_BLOCK,
+            ['items', 'answer'],
+            markdown,
+          ),
+      )
+
+      const updated = await req.payload.update({
+        collection: COLLECTION,
+        id: doc.id as number | string,
+        data: { _status: 'draft', content: result.state },
+        draft: true,
+        overrideAccess: false,
+        req,
+        user: req.user as TypedUser,
+      })
+
+      return text({
+        afterHeading: result.afterHeading,
+        faq: {
+          heading: result.heading,
+          key: result.key,
+          marker: result.marker,
+          questions: items.length,
+        },
+        id: updated.id,
+        placement: result.placement,
+        preview: buildPreviewUrl({
+          collection: COLLECTION,
+          slug: updated.slug,
+        }),
+        replacedSection: result.replacedSection,
+        slug: updated.slug,
+        status: 'draft',
+      })
+    },
+    name: 'setFAQBlock',
+    parameters: {
+      afterHeading: z
+        .string()
+        .optional()
+        .describe(
+          'Where the FAQ goes when the article has none yet: the text of a ' +
+            'heading in the body, e.g. "FAQ". Ignored when the article ' +
+            'already has an FAQ; move that by moving its marker line in ' +
+            'updateArticleMarkdown.',
+        ),
+      heading: z
+        .string()
+        .optional()
+        .describe(
+          'The heading the FAQ shows, e.g. "FAQ". Left out, an existing FAQ ' +
+            'keeps its heading, one that replaces a section takes that ' +
+            'section\'s heading, and any other shows "Frequently asked ' +
+            'questions". The FAQ always shows a heading of its own, so ' +
+            'inserting it directly under a body heading such as "## FAQ" ' +
+            'gives two in a row — use replaceExisting for that.',
+        ),
+      items: z
+        .array(
+          z.object({
+            answer: z
+              .string()
+              .min(1)
+              .describe(
+                'The answer, in Markdown: a paragraph or two, with links, ' +
+                  'bold and lists if needed. No headings.',
+              ),
+            question: z
+              .string()
+              .min(1)
+              .describe('The question, as a reader would ask it.'),
+          }),
+        )
+        .min(1)
+        .describe(
+          'Every question, in the order a reader should see them. Replaces ' +
+            'any questions the article already has.',
+        ),
+      replaceExisting: z
+        .boolean()
+        .optional()
+        .describe(
+          'When the article has no FAQ yet: instead of inserting under ' +
+            '`afterHeading`, replace that heading and everything below it, ' +
+            'up to the next heading of the same or higher level, with the ' +
+            "FAQ — which takes that heading's text. This converts an FAQ " +
+            'written in Markdown. Refused if the section holds an image or ' +
+            'another module, which would be lost.',
         ),
       ...targetShape,
     },
