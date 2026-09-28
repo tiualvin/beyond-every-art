@@ -165,6 +165,7 @@ test.describe('MCP endpoint', () => {
         'updateArticleMarkdown',
         'setKeyFactsBlock',
         'setFAQBlock',
+        'setTableBlock',
         'uploadMedia',
         'findPosts',
       ]),
@@ -358,6 +359,77 @@ test.describe('MCP endpoint', () => {
       slug,
     })) as Read
     expect(reread.markdown).toContain('A red worth an empire.')
+    expect(reread.blocks).toEqual(read.blocks)
+  })
+
+  test('converts a Markdown table to a comparison table, and a revision keeps it', async ({
+    request,
+  }) => {
+    // Read from the pipe table itself, then saved through Payload's real
+    // validation — the caption and labels publish would otherwise refuse.
+    const key = fixtures.mcp.editorKey
+    const slug = `e2e-mcp-table-${Date.now()}-${Math.floor(Math.random() * 1e6)}`
+    type Read = {
+      markdown: string
+      blocks: Array<{
+        blockType: string
+        fields: {
+          caption: string
+          rowHeader?: string
+          columns: Array<{ label: string }>
+          rows: Array<{ label: string; cells: Array<{ value: string }> }>
+        }
+      }>
+    }
+
+    await callToolJson(request, key, 'draftArticle', {
+      markdown:
+        '## How the reds compare\n\n' +
+        '| Pigment | Source | Lightfastness |\n|---|---|---|\n' +
+        '| Carmine | *Dactylopius coccus* | Poor |\n' +
+        '| Vermilion | Cinnabar | Fair |\n\n## After\n\nText.\n',
+      slug,
+      title: 'E2E MCP Table',
+    })
+
+    const set = await callToolJson(request, key, 'setTableBlock', {
+      afterHeading: 'How the reds compare',
+      caption: 'Where two reds come from, and how well they last',
+      slug,
+    })
+    expect(set).toMatchObject({
+      placement: 'inserted',
+      removedTable: true,
+      status: 'draft',
+      table: { parsedFromPipeTable: true, columns: 2, rows: 2 },
+    })
+    const { marker } = set.table as { marker: string }
+
+    const read = (await callToolJson(request, key, 'readArticleMarkdown', {
+      slug,
+    })) as Read
+    expect(read.markdown).toContain(marker)
+    expect(read.markdown).not.toContain('|---|')
+    expect(read.blocks).toHaveLength(1)
+    expect(read.blocks[0].fields).toMatchObject({
+      rowHeader: 'Pigment',
+      columns: [{ label: 'Source' }, { label: 'Lightfastness' }],
+    })
+    expect(read.blocks[0].fields.rows[0]).toMatchObject({
+      label: 'Carmine',
+      cells: [{ value: '*Dactylopius coccus*' }, { value: 'Poor' }],
+    })
+
+    const revised = await callToolJson(request, key, 'updateArticleMarkdown', {
+      markdown: read.markdown.replace('Text.', 'More text.'),
+      slug,
+    })
+    expect((revised.blocks as { kept: unknown[] }).kept).toHaveLength(1)
+
+    const reread = (await callToolJson(request, key, 'readArticleMarkdown', {
+      slug,
+    })) as Read
+    expect(reread.markdown).toContain('More text.')
     expect(reread.blocks).toEqual(read.blocks)
   })
 

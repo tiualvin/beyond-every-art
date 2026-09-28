@@ -3206,10 +3206,28 @@ ol.feature-list__items .feature-list__title::before {
 
 /* A table wider than the screen scrolls inside its own box rather than
    stretching the page. The box is focusable — see the component — so a
-   keyboard user can reach the scroll; the outline says when they have. */
+   keyboard user can reach the scroll; the outline says when they have.
+
+   The backgrounds are the cue that there is more to the right, now that the
+   caption no longer runs off the edge and says so by accident. The first,
+   attached to the content (`local`), is a strip of page colour at the far end
+   of the table; the second, attached to the box (`scroll`), is a soft shadow
+   at its right edge. While columns are hidden the shadow shows; scrolled to
+   the end, the strip arrives over it and hides it. A table that fits never
+   shows it. No script, and nothing to go stale.
+
+   The shadow stops a pixel short of the box's top and bottom. The two layers
+   are painted separately, and when the box sits at a fractional offset they
+   round to different device pixels, which left a hairline of shadow showing
+   above the strip at the end of the scroll. */
 .comparison__scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  background:
+    linear-gradient(to left, var(--color-paper) 40%, transparent) right / 2.5rem
+      100% no-repeat local,
+    linear-gradient(to left, rgb(27 23 20 / 0.14), transparent) right center /
+      0.9rem calc(100% - 2px) no-repeat scroll;
 }
 
 .comparison__scroll:focus-visible {
@@ -3219,16 +3237,23 @@ ol.feature-list__items .feature-list__title::before {
 
 .comparison__table {
   width: 100%;
-  border-collapse: collapse;
+  /* Separate rather than collapsed: a sticky cell in a collapsed table leaves
+     its border behind when it moves, which would break the row rules under
+     the pinned first column. Only bottom borders are drawn, so with no
+     spacing the two look the same. */
+  border-collapse: separate;
+  border-spacing: 0;
   font-family: var(--font-sans);
   font-size: 0.92rem;
   line-height: 1.5;
 }
 
+/* A figcaption above the scroll box, not a caption inside the table: it wraps
+   to the column instead of scrolling away with a wide table. See the
+   component for why. */
 .comparison__caption {
-  caption-side: top;
+  margin: 0 0 0.75rem;
   text-align: left;
-  padding-bottom: 0.75rem;
   font-size: 0.85rem;
   color: var(--color-muted);
 }
@@ -3252,6 +3277,27 @@ ol.feature-list__items .feature-list__title::before {
 
 .comparison__table tbody th {
   font-weight: 600;
+}
+
+/* The column naming the rows stays put while the others scroll under it, so a
+   reader four columns across still knows which row they are in. Painted with
+   the page colour so what passes beneath is hidden. Harmless when the table
+   fits: nothing scrolls, so nothing moves. */
+.comparison__table tbody th,
+.comparison__table thead > tr > :first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--color-paper);
+}
+
+/* Where a phone makes the table scroll, a rule on the pinned column's edge
+   shows where it ends. Wider screens keep the unruled look. */
+@media (max-width: 39.99rem) {
+  .comparison__table tbody th,
+  .comparison__table thead > tr > :first-child {
+    box-shadow: inset -1px 0 0 var(--color-line);
+  }
 }
 
 .comparison__table tbody tr:last-child th,

@@ -210,11 +210,36 @@ describe('ComparisonTable', () => {
   it('builds a real table with a caption and scoped headers', () => {
     const html = render(<ComparisonTable data={data} />)
 
-    expect(html).toContain('<caption')
+    expect(html).toContain('<figcaption class="comparison__caption"')
     expect(html).toContain('How three pigments behave in oil')
     expect(html).toContain('<th scope="col">Pigment</th>')
     expect(html).toContain('<th scope="col">Lightfastness</th>')
     expect(html).toContain('<th scope="row">Ultramarine</th>')
+  })
+
+  it('keeps the caption outside the scroll box, where it wraps', () => {
+    // A `<caption>` is as wide as its table, so on a phone it scrolled with a
+    // wide table and was cut off until the reader scrolled sideways.
+    const html = render(<ComparisonTable data={data} />)
+
+    expect(html).not.toContain('<caption')
+    expect(html.indexOf('<figcaption')).toBeGreaterThan(-1)
+    expect(html.indexOf('<figcaption')).toBeLessThan(
+      html.indexOf('comparison__scroll'),
+    )
+  })
+
+  it('names the table by its caption when given an id to do it with', () => {
+    const html = render(<ComparisonTable data={data} id="comparison-aa11" />)
+
+    expect(html).toContain('id="comparison-aa11-caption"')
+    expect(html).toContain(
+      '<table class="comparison__table" aria-labelledby="comparison-aa11-caption">',
+    )
+    // Without one there is nothing unique to point at, so it points at nothing.
+    expect(render(<ComparisonTable data={data} />)).not.toContain(
+      'aria-labelledby',
+    )
   })
 
   it('makes the scroll box reachable and named for a keyboard user', () => {
@@ -270,6 +295,74 @@ describe('ComparisonTable', () => {
     )
 
     expect(html).not.toContain('Stray')
+  })
+
+  it('reads row labels and cells as inline Markdown', () => {
+    const html = render(
+      <ComparisonTable
+        data={{
+          ...data,
+          rows: [
+            {
+              label: '*Dactylopius coccus*',
+              cells: [
+                { value: '**Excellent**, per [the chart](/lightfastness/)' },
+                { value: 'See [Britannica](https://www.britannica.com/x)' },
+              ],
+            },
+          ],
+        }}
+      />,
+    )
+
+    expect(html).toContain('<th scope="row"><em>Dactylopius coccus</em></th>')
+    expect(html).toContain('<strong>Excellent</strong>')
+    // A path on this site: `next/link`, no `rel`. Its trailing slash is
+    // `next.config.ts`'s `trailingSlash` to keep, which this test does not
+    // load. Elsewhere: never the opener.
+    expect(html).toMatch(/<a href="\/lightfastness\/?">the chart<\/a>/)
+    expect(html).toContain(
+      '<a href="https://www.britannica.com/x" rel="noopener noreferrer">Britannica</a>',
+    )
+  })
+
+  it('never builds a link it cannot vouch for, or any HTML', () => {
+    const html = render(
+      <ComparisonTable
+        data={{
+          ...data,
+          rows: [
+            {
+              label: 'Vermilion',
+              cells: [
+                { value: '[click](javascript:alert(1))' },
+                { value: '<img src=x onerror=alert(1)>' },
+              ],
+            },
+          ],
+        }}
+      />,
+    )
+
+    expect(html).not.toContain('javascript:')
+    expect(html).toContain('<td>click</td>')
+    expect(html).not.toContain('<img')
+    expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;')
+  })
+
+  it('keeps column heads and the caption as plain text', () => {
+    const html = render(
+      <ComparisonTable
+        data={{
+          ...data,
+          caption: 'Pigments *in oil*',
+          columns: [{ label: '*Lightfastness*' }, { label: 'Opacity' }],
+        }}
+      />,
+    )
+
+    expect(html).toContain('Pigments *in oil*')
+    expect(html).toContain('<th scope="col">*Lightfastness*</th>')
   })
 
   it('renders nothing without usable columns or rows', () => {

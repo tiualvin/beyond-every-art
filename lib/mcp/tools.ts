@@ -25,6 +25,8 @@ import { buildPreviewUrl } from '../preview/live-preview'
 import { listBlocks, markBlocks, restoreBlocks } from './blocks'
 import { setFaq, type FaqInputItem } from './faq'
 import { setKeyFacts, type Fact } from './key-facts'
+import { withChildren } from './placement'
+import { setTable, TABLE_MAX_COLUMNS, TABLE_MAX_ROWS } from './table'
 import {
   blockFieldsForReading,
   lexicalToMarkdown,
@@ -989,6 +991,151 @@ export const mcpTools: McpTool[] = [
             "FAQ — which takes that heading's text. This converts an FAQ " +
             'written in Markdown. Refused if the section holds an image or ' +
             'another module, which would be lost.',
+        ),
+      ...targetShape,
+    },
+  },
+  {
+    description:
+      'Set a comparison table in an article: a caption, a header row and ' +
+      'rows of values, shown as a real table that scrolls sideways on a ' +
+      'phone. The first column names the rows: `columns[0]` heads it (may ' +
+      'be blank) and each row starts with its label. Row labels and cells ' +
+      'take inline Markdown — italics, bold, code, links. Replaces the table ' +
+      'named by `key`; otherwise the table in the section under ' +
+      '`afterHeading`, or inserts one directly under that heading if the ' +
+      "section has none; with neither, the article's only table. " +
+      'Leave out columns and rows with replacePipeTable to read them from ' +
+      'the Markdown table under the heading. Saved as a draft and never ' +
+      'published; the rest of the body is left exactly as it is. Refused ' +
+      'for an article that still renders from migrated Ghost HTML.',
+    handler: async (args: Record<string, unknown>, req: PayloadRequest) => {
+      const {
+        afterHeading,
+        caption,
+        columns,
+        key,
+        replacePipeTable,
+        rows,
+        ...target
+      } = args as {
+        afterHeading?: string
+        caption: string
+        columns?: string[]
+        id?: string
+        key?: string
+        replacePipeTable?: boolean
+        rows?: string[][]
+        slug?: string
+      }
+
+      const doc = (await findArticle(
+        req,
+        COLLECTION,
+        target,
+      )) as unknown as Record<string, unknown>
+
+      refuseLegacyBody(doc, 'a comparison table')
+
+      const result = setTable(
+        doc.content as EditorState | null,
+        { afterHeading, caption, columns, key, replacePipeTable, rows },
+        // The pipe paragraph, back as the Markdown it was typed as — with the
+        // body's converter, so formatting inside a cell comes back with it.
+        (node) =>
+          lexicalToMarkdown(
+            req.payload,
+            COLLECTION,
+            withChildren(null, [node]),
+          ),
+      )
+
+      const updated = await req.payload.update({
+        collection: COLLECTION,
+        id: doc.id as number | string,
+        data: { _status: 'draft', content: result.state },
+        draft: true,
+        overrideAccess: false,
+        req,
+        user: req.user as TypedUser,
+      })
+
+      return text({
+        afterHeading: result.afterHeading,
+        id: updated.id,
+        placement: result.placement,
+        preview: buildPreviewUrl({
+          collection: COLLECTION,
+          slug: updated.slug,
+        }),
+        removedTable: result.removedTable,
+        slug: updated.slug,
+        status: 'draft',
+        table: {
+          columns: result.columns,
+          key: result.key,
+          marker: result.marker,
+          parsedFromPipeTable: result.parsedFromPipeTable,
+          rows: result.rows,
+        },
+      })
+    },
+    name: 'setTableBlock',
+    parameters: {
+      afterHeading: z
+        .string()
+        .optional()
+        .describe(
+          'A heading in the body, e.g. "How the reds compare". The table in ' +
+            'its section is replaced; if the section has none, a new table ' +
+            'goes directly under the heading.',
+        ),
+      caption: z
+        .string()
+        .min(1)
+        .describe(
+          'What the table shows, as a sentence. Required: it is read out ' +
+            'before the table, and often the only description a search ' +
+            'result gets.',
+        ),
+      columns: z
+        .array(z.string())
+        .min(2)
+        .max(TABLE_MAX_COLUMNS + 1)
+        .optional()
+        .describe(
+          'The header row. The first heads the column naming the rows (may ' +
+            `be ""); the rest, 1 to ${TABLE_MAX_COLUMNS}, head the columns of ` +
+            'values. Leave out, with rows, to read them from the Markdown ' +
+            'table under afterHeading.',
+        ),
+      key: z
+        .string()
+        .optional()
+        .describe(
+          'Replace this table: the key from its `<!-- block:comparisonTable:' +
+            'key -->` line in readArticleMarkdown. Needed when a section or ' +
+            'an article has more than one table.',
+        ),
+      replacePipeTable: z
+        .boolean()
+        .optional()
+        .describe(
+          'When inserting, also remove the Markdown table directly under ' +
+            '`afterHeading`, which the body stores as a paragraph of literal ' +
+            '| characters and prints as pipes. Implied when columns and rows ' +
+            'are left out, since the table is read from it. Refused if there ' +
+            'is no such table there.',
+        ),
+      rows: z
+        .array(z.array(z.string()))
+        .min(1)
+        .max(TABLE_MAX_ROWS)
+        .optional()
+        .describe(
+          `The rows, 1 to ${TABLE_MAX_ROWS}. Each starts with its label, then ` +
+            'one value per column; a short row is padded with blanks. Inline ' +
+            'Markdown allowed.',
         ),
       ...targetShape,
     },

@@ -49,6 +49,7 @@ import {
   type PullQuoteData,
 } from '../../blocks/schema'
 import type { ArticleBody } from './body'
+import { inlineMarkdownToPlainText } from './inline-markdown'
 
 type PlaintextArgs = Parameters<typeof convertLexicalToPlaintext>[0]
 type EditorState = PlaintextArgs['data']
@@ -177,8 +178,15 @@ const blockSerializers: Record<BlockSlug, (fields: unknown) => string> = {
       data.caption,
       data.rowHeader,
       ...(data.columns ?? []).map((column) => column?.label),
+      // Label and cells are inline Markdown: their words, not their markup,
+      // and a link's text without its URL.
       ...(data.rows ?? []).map((row) =>
-        join([row?.label, ...(row?.cells ?? []).map((cell) => cell?.value)]),
+        join([
+          inlineMarkdownToPlainText(row?.label),
+          ...(row?.cells ?? []).map((cell) =>
+            inlineMarkdownToPlainText(cell?.value),
+          ),
+        ]),
       ),
     ])
   },

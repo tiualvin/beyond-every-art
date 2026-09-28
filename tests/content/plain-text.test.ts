@@ -315,6 +315,28 @@ describe('block serialization', () => {
     expect(plain).toContain('Excellent')
   })
 
+  it('reads a table cell for its words, not its Markdown', () => {
+    const plain = richTextToPlainText(
+      editorState(
+        block(COMPARISON_TABLE_BLOCK, {
+          caption: 'Reds',
+          columns: [{ label: 'Source' }],
+          rows: [
+            {
+              label: '*Carmine*',
+              cells: [{ value: 'See [the insect](https://example.com/x)' }],
+            },
+          ],
+        }),
+      ),
+    )
+
+    expect(plain).toContain('Carmine')
+    expect(plain).toContain('See the insect')
+    expect(plain).not.toContain('*')
+    expect(plain).not.toContain('example.com')
+  })
+
   it('keeps each key fact as a label and its value together', () => {
     const plain = richTextToPlainText(
       editorState(

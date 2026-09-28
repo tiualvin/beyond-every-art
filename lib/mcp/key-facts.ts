@@ -22,12 +22,13 @@ import {
   KEY_FACTS_MAX_ITEMS,
   type KeyFactItem,
 } from '../../blocks/schema'
-import { blockMarker, textOf, type BlockNode, type LexicalNode } from './blocks'
+import { blockMarker, type BlockNode, type LexicalNode } from './blocks'
 import type { EditorState } from './markdown'
 import {
   blockNode,
   bodyChildren,
   findHeading,
+  isPipeTable,
   keptKey,
   objectId,
   singleExisting,
@@ -51,16 +52,6 @@ export type KeyFactsResult = {
   /** The heading the facts now sit under, or null when they precede them all. */
   afterHeading: string | null
   removedTable: boolean
-}
-
-/**
- * A Markdown table as the body stores one: a single paragraph of pipe-bounded
- * lines, because the editor has no table feature to convert it into.
- */
-function isPipeTable(node: LexicalNode | undefined): boolean {
-  if (node?.type !== 'paragraph') return false
-  const text = textOf(node).trim()
-  return text.startsWith('|') && text.endsWith('|')
 }
 
 /**
