@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+
+import { ComparisonTable } from '../../app/(frontend)/components/blocks/comparison-table'
+import { parsePipeTable } from '../../lib/mcp/table'
 import { mcpTools } from '../../lib/mcp/tools'
 import { collectBlockJsonLd } from '../../lib/seo/block-jsonld'
 import { mcpRequest } from '../support/mcp-request'
@@ -1181,5 +1186,439 @@ describe('setFAQBlock', () => {
       req,
     )
     expect(faqNode(current().content)).toEqual(before)
+  })
+})
+
+describe('setTableBlock', () => {
+  const caption = 'How three reds compare'
+  const columns = ['Pigment', 'Source', 'Lightfastness']
+  const rows = [
+    ['Carmine', '*Dactylopius coccus*', 'Poor'],
+    ['Vermilion', 'Cinnabar', 'Fair'],
+  ]
+
+  // A Markdown table as the body stores it, with an italic cell: one
+  // paragraph, lines split by line breaks, formatting as text-node flags.
+  const pipeTable = (): Node => ({
+    ...paragraph(''),
+    children: [
+      text('| Pigment | Source |'),
+      { type: 'linebreak', version: 1 },
+      text('|---|---|'),
+      { type: 'linebreak', version: 1 },
+      text('| Carmine | '),
+      { ...text('Dactylopius coccus'), format: 2 },
+      text(' |'),
+    ],
+  })
+
+  const tables = (content: unknown) =>
+    (content as Body).root.children.filter(
+      (node) =>
+        node.type === 'block' &&
+        (node as { fields?: { blockType?: string } }).fields?.blockType ===
+          'comparisonTable',
+    ) as Array<Node & { fields: Record<string, unknown> }>
+
+  it('inserts under the named heading, the first column naming the rows', async () => {
+    const original = body(heading('How the reds compare'), heading('Next'))
+    const { req, payload, current } = await mcpRequest({
+      id: 1,
+      content: structuredClone(original),
+    })
+
+    const result = await call(
+      'setTableBlock',
+      { id: '1', afterHeading: 'How the reds compare', caption, columns, rows },
+      req,
+    )
+
+    expect(types(current().content)).toEqual(['heading', 'block', 'heading'])
+    expect(tables(current().content)[0].fields).toMatchObject({
+      blockType: 'comparisonTable',
+      caption,
+      rowHeader: 'Pigment',
+      columns: [{ label: 'Source' }, { label: 'Lightfastness' }],
+      rows: [
+        {
+          label: 'Carmine',
+          cells: [{ value: '*Dactylopius coccus*' }, { value: 'Poor' }],
+        },
+        {
+          label: 'Vermilion',
+          cells: [{ value: 'Cinnabar' }, { value: 'Fair' }],
+        },
+      ],
+    })
+    expect(payload.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        draft: true,
+        overrideAccess: false,
+        data: expect.objectContaining({ _status: 'draft' }),
+      }),
+    )
+    expect(result).toMatchObject({
+      placement: 'inserted',
+      afterHeading: 'How the reds compare',
+      removedTable: false,
+      status: 'draft',
+      table: { columns: 2, rows: 2, parsedFromPipeTable: false },
+    })
+  })
+
+  it('leaves out the row header when the first column is unheaded', async () => {
+    const { req, current } = await mcpRequest({
+      id: 1,
+      content: body(heading('Reds')),
+    })
+
+    await call(
+      'setTableBlock',
+      {
+        id: '1',
+        afterHeading: 'Reds',
+        caption,
+        columns: ['', 'Source'],
+        rows: [['Carmine', 'Insect']],
+      },
+      req,
+    )
+
+    expect(tables(current().content)[0].fields).not.toHaveProperty('rowHeader')
+  })
+
+  it('reads the table from the Markdown one under the heading, formatting and all', async () => {
+    const { req, current } = await mcpRequest({
+      id: 1,
+      content: body(heading('Reds'), pipeTable(), paragraph('After.')),
+    })
+
+    const result = await call(
+      'setTableBlock',
+      { id: '1', afterHeading: 'Reds', caption: 'Where carmine comes from' },
+      req,
+    )
+
+    expect(types(current().content)).toEqual(['heading', 'block', 'paragraph'])
+    expect(tables(current().content)[0].fields).toMatchObject({
+      rowHeader: 'Pigment',
+      columns: [{ label: 'Source' }],
+      rows: [{ label: 'Carmine', cells: [{ value: '*Dactylopius coccus*' }] }],
+    })
+    expect(result).toMatchObject({
+      removedTable: true,
+      table: { parsedFromPipeTable: true, columns: 1, rows: 1 },
+    })
+  })
+
+  it('swaps the Markdown table for the given one with replacePipeTable', async () => {
+    const { req, current } = await mcpRequest({
+      id: 1,
+      content: body(heading('Reds'), pipeTable(), paragraph('After.')),
+    })
+
+    await call(
+      'setTableBlock',
+      {
+        id: '1',
+        afterHeading: 'Reds',
+        caption,
+        columns,
+        rows,
+        replacePipeTable: true,
+      },
+      req,
+    )
+
+    expect(types(current().content)).toEqual(['heading', 'block', 'paragraph'])
+    expect(JSON.stringify(current().content)).not.toContain('|---|')
+  })
+
+  it('replaces the table in the named section, and adds one to a section without', async () => {
+    // Two sections, one table: a second table is a normal article.
+    const { req, current } = await mcpRequest({
+      id: 1,
+      content: body(
+        heading('Reds'),
+        block('comparisonTable', { caption: 'Old' }, 'aa11'),
+        heading('Blues'),
+      ),
+    })
+
+    await call(
+      'setTableBlock',
+      { id: '1', afterHeading: 'Reds', caption: 'New reds', columns, rows },
+      req,
+    )
+    await call(
+      'setTableBlock',
+      { id: '1', afterHeading: 'Blues', caption: 'Blues', columns, rows },
+      req,
+    )
+
+    const found = tables(current().content)
+    expect(types(current().content)).toEqual([
+      'heading',
+      'block',
+      'heading',
+      'block',
+    ])
+    expect(found.map((table) => table.fields.caption)).toEqual([
+      'New reds',
+      'Blues',
+    ])
+    // Replaced where it stood, under the key it had.
+    expect(found[0].fields.id).toBe('aa11')
+  })
+
+  it('replaces a table by key', async () => {
+    const { req, current } = await mcpRequest({
+      id: 1,
+      content: body(
+        heading('Reds'),
+        block('comparisonTable', { caption: 'A' }, 'aa11'),
+        block('comparisonTable', { caption: 'B' }, 'bb22'),
+      ),
+    })
+
+    const result = await call(
+      'setTableBlock',
+      { id: '1', key: 'bb22', caption: 'B, revised', columns, rows },
+      req,
+    )
+
+    expect(
+      tables(current().content).map((table) => table.fields.caption),
+    ).toEqual(['A', 'B, revised'])
+    expect(result).toMatchObject({
+      placement: 'replaced',
+      table: { key: 'bb22', marker: '<!-- block:comparisonTable:bb22 -->' },
+    })
+  })
+
+  it("replaces the article's only table when told nothing else", async () => {
+    const { req, current } = await mcpRequest({
+      id: 1,
+      content: body(
+        heading('Reds'),
+        block('comparisonTable', { caption: 'Old' }, 'aa11'),
+      ),
+    })
+
+    await call('setTableBlock', { id: '1', caption, columns, rows }, req)
+
+    expect(tables(current().content)[0].fields.caption).toBe(caption)
+  })
+
+  it.each([
+    [
+      'no placement in an article without tables',
+      { caption, columns, rows },
+      body(heading('Reds')),
+      /no comparison table yet, so say where the table goes: pass afterHeading/,
+    ],
+    [
+      'no placement in an article with two tables',
+      { caption, columns, rows },
+      body(
+        heading('A'),
+        block('comparisonTable', {}, 'aa11'),
+        heading('B'),
+        block('comparisonTable', {}, 'bb22'),
+      ),
+      /has 2 comparison tables, so say which.*aa11, under A.*bb22, under B/,
+    ],
+    [
+      'a section holding two tables',
+      { afterHeading: 'Reds', caption, columns, rows },
+      body(
+        heading('Reds'),
+        block('comparisonTable', {}, 'aa11'),
+        block('comparisonTable', {}, 'bb22'),
+      ),
+      /holds 2 comparison tables.*"aa11", "bb22"/,
+    ],
+    [
+      'a key no table has',
+      { key: 'zz99', caption, columns, rows },
+      body(block('comparisonTable', {}, 'aa11')),
+      /No comparison table in this article has the key "zz99"/,
+    ],
+    [
+      'a blank caption',
+      { afterHeading: 'Reds', caption: '  ', columns, rows },
+      body(heading('Reds')),
+      /needs a caption/,
+    ],
+    [
+      'a single column',
+      { afterHeading: 'Reds', caption, columns: ['Pigment'], rows: [['A']] },
+      body(heading('Reds')),
+      /at least two columns/,
+    ],
+    [
+      'more than five columns of values',
+      {
+        afterHeading: 'Reds',
+        caption,
+        columns: ['P', 'a', 'b', 'c', 'd', 'e', 'f'],
+        rows: [['x']],
+      },
+      body(heading('Reds')),
+      /at most 5 columns of values.*gave 6/,
+    ],
+    [
+      'an unheaded column of values, pointing a facts list at key facts',
+      {
+        afterHeading: 'Reds',
+        caption,
+        columns: ['', ''],
+        rows: [['Insect', 'Dactylopius coccus']],
+      },
+      body(heading('Reds')),
+      /Column 2 has no heading.*use setKeyFactsBlock/,
+    ],
+    [
+      'a row with more cells than columns',
+      {
+        afterHeading: 'Reds',
+        caption,
+        columns: ['P', 'S'],
+        rows: [['Carmine', 'Insect', 'Stray']],
+      },
+      body(heading('Reds')),
+      /Row 1 has 3 cells, more than the 2 columns/,
+    ],
+    [
+      'a row without a label',
+      {
+        afterHeading: 'Reds',
+        caption,
+        columns: ['P', 'S'],
+        rows: [['', 'Insect']],
+      },
+      body(heading('Reds')),
+      /Row 1 has no label/,
+    ],
+    [
+      'columns without rows',
+      { afterHeading: 'Reds', caption, columns },
+      body(heading('Reds')),
+      /both columns and rows, or neither/,
+    ],
+    [
+      'reading a Markdown table that is not there',
+      { afterHeading: 'Reds', caption },
+      body(heading('Reds'), paragraph('Prose.')),
+      /no Markdown table directly under "Reds" to read the table from/,
+    ],
+    [
+      'reading a Markdown table to replace an existing table',
+      { key: 'aa11', caption },
+      body(heading('Reds'), block('comparisonTable', {}, 'aa11')),
+      /no Markdown table to read: give columns and rows/,
+    ],
+  ])('refuses %s, and saves nothing', async (_case, args, content, message) => {
+    const { req, payload } = await mcpRequest({ id: 1, content })
+
+    await expect(
+      call('setTableBlock', { id: '1', ...args }, req),
+    ).rejects.toThrow(message)
+    expect(payload.update).not.toHaveBeenCalled()
+  })
+
+  it('refuses an article whose page renders from Ghost HTML', async () => {
+    const { req, payload } = await mcpRequest({
+      id: 1,
+      legacyHTML: '<h2>Reds</h2><p>Migrated.</p>',
+      content: null,
+    })
+
+    await expect(
+      call(
+        'setTableBlock',
+        { id: '1', afterHeading: 'Reds', caption, columns, rows },
+        req,
+      ),
+    ).rejects.toThrow(/renders from migrated Ghost HTML/)
+    expect(payload.update).not.toHaveBeenCalled()
+  })
+
+  it('writes a table the page renders, italics and all', async () => {
+    const { req, current } = await mcpRequest({
+      id: 1,
+      content: body(heading('Reds'), pipeTable()),
+    })
+
+    await call(
+      'setTableBlock',
+      { id: '1', afterHeading: 'Reds', caption: 'Where carmine comes from' },
+      req,
+    )
+
+    const html = renderToStaticMarkup(
+      createElement(ComparisonTable, {
+        data: tables(current().content)[0].fields as never,
+      }),
+    )
+    expect(html).toContain(
+      '<caption class="comparison__caption">Where carmine comes from</caption>',
+    )
+    expect(html).toContain('<th scope="col">Pigment</th>')
+    expect(html).toContain('<th scope="row">Carmine</th>')
+    expect(html).toContain('<td><em>Dactylopius coccus</em></td>')
+  })
+
+  it('writes a table the read tool reports and a revision keeps', async () => {
+    const { req, current } = await mcpRequest({
+      id: 1,
+      content: body(heading('Reds'), paragraph('After.')),
+    })
+
+    const set = await call(
+      'setTableBlock',
+      { id: '1', afterHeading: 'Reds', caption, columns, rows },
+      req,
+    )
+    const marker = (set.table as { marker: string }).marker
+
+    const read = await call('readArticleMarkdown', { id: '1' }, req)
+    expect(read.markdown).toBe(`## Reds\n\n${marker}\n\nAfter.`)
+    expect(read.blocks).toEqual([
+      expect.objectContaining({
+        blockType: 'comparisonTable',
+        marker,
+        afterHeading: 'Reds',
+        fields: expect.objectContaining({ caption, rowHeader: 'Pigment' }),
+      }),
+    ])
+
+    const before = structuredClone(tables(current().content)[0])
+    await call(
+      'updateArticleMarkdown',
+      { id: '1', markdown: `## Reds\n\n${marker}\n\nRevised.` },
+      req,
+    )
+    expect(tables(current().content)[0]).toEqual(before)
+  })
+})
+
+describe('parsePipeTable', () => {
+  it('reads a header and rows, dropping the separator line', () => {
+    expect(
+      parsePipeTable('| A | B |\n|:--|--:|\n| 1 | *two* |\n| 3 | a \\| b |'),
+    ).toEqual({
+      columns: ['A', 'B'],
+      rows: [
+        ['1', '*two*'],
+        ['3', 'a | b'],
+      ],
+    })
+  })
+
+  it('is null for text that is not a pipe table', () => {
+    expect(parsePipeTable('Just prose.')).toBeNull()
+    expect(parsePipeTable('| a |\nnot a row')).toBeNull()
+    expect(parsePipeTable('')).toBeNull()
   })
 })

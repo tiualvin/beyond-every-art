@@ -9,7 +9,7 @@
 import { randomBytes } from 'node:crypto'
 
 import { headingText } from '../content/headings'
-import { indexBlocks, type BlockNode, type LexicalNode } from './blocks'
+import { indexBlocks, textOf, type BlockNode, type LexicalNode } from './blocks'
 import type { EditorState } from './markdown'
 
 /**
@@ -164,4 +164,37 @@ export function findHeading(
 /** A block node as the editor writes one. */
 export function blockNode(fields: BlockNode['fields']): LexicalNode {
   return { type: 'block', version: 2, format: '', fields } as LexicalNode
+}
+
+/**
+ * A Markdown table as the body stores one: a single paragraph of pipe-bounded
+ * lines, because the editor has no table feature to convert it into.
+ */
+export function isPipeTable(node: LexicalNode | undefined): boolean {
+  if (node?.type !== 'paragraph') return false
+  const text = textOf(node).trim()
+  return text.startsWith('|') && text.endsWith('|')
+}
+
+/**
+ * Where the section under the heading at `index` ends: the next heading of
+ * the same or higher level, or the end of the body. A deeper heading — a
+ * `###` inside a `##` section — is part of the section.
+ */
+export function sectionEnd(
+  children: LexicalNode[],
+  index: number,
+  level: number,
+): number {
+  let end = index + 1
+  while (
+    end < children.length &&
+    !(
+      children[end].type === 'heading' &&
+      (Number(String(children[end].tag ?? 'h2').slice(1)) || 2) <= level
+    )
+  ) {
+    end += 1
+  }
+  return end
 }

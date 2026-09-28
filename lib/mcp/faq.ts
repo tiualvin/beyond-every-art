@@ -43,6 +43,7 @@ import {
   findHeading,
   keptKey,
   objectId,
+  sectionEnd,
   singleExisting,
   withChildren,
 } from './placement'
@@ -195,16 +196,7 @@ export function setFaq(
 
   // The section runs to the next heading of the same or higher level, so a
   // question written as its own `###` heading is part of it.
-  let end = match.index + 1
-  while (
-    end < children.length &&
-    !(
-      children[end].type === 'heading' &&
-      headingLevel(children[end]) <= match.level
-    )
-  ) {
-    end += 1
-  }
+  const end = sectionEnd(children, match.index, match.level)
 
   // A section heading inside the section means the named heading is above
   // the article's sections rather than one of them — an `h1`, say — and the
