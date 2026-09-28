@@ -885,6 +885,14 @@ export const MediaTextBlock: Block = {
  * Deliberately capped small. A table with fifteen columns is a spreadsheet,
  * and no phone renders one usefully.
  */
+/**
+ * What an editor is told a table cell can hold. Admin copy only — changing it
+ * changes no stored document; `lib/content/inline-markdown.ts` is what reads
+ * the syntax.
+ */
+const INLINE_MARKDOWN_HINT =
+  'Supports *italics*, **bold**, `code` and [links](https://example.com) — to a page on this site or an https:// address.'
+
 export const ComparisonTableBlock: Block = {
   slug: COMPARISON_TABLE_BLOCK,
   interfaceName: 'ComparisonTableBlock',
@@ -928,7 +936,9 @@ export const ComparisonTableBlock: Block = {
           name: 'label',
           type: 'text',
           required: true,
-          admin: { description: 'Names the row. Becomes its row header.' },
+          admin: {
+            description: `Names the row. Becomes its row header. ${INLINE_MARKDOWN_HINT}`,
+          },
         },
         {
           name: 'cells',
@@ -938,7 +948,13 @@ export const ComparisonTableBlock: Block = {
             description:
               'One per column, in order. A row with too few is padded with blanks rather than rejected.',
           },
-          fields: [{ name: 'value', type: 'text' }],
+          fields: [
+            {
+              name: 'value',
+              type: 'text',
+              admin: { description: INLINE_MARKDOWN_HINT },
+            },
+          ],
         },
       ],
     },

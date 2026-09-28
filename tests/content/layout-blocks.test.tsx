@@ -272,6 +272,74 @@ describe('ComparisonTable', () => {
     expect(html).not.toContain('Stray')
   })
 
+  it('reads row labels and cells as inline Markdown', () => {
+    const html = render(
+      <ComparisonTable
+        data={{
+          ...data,
+          rows: [
+            {
+              label: '*Dactylopius coccus*',
+              cells: [
+                { value: '**Excellent**, per [the chart](/lightfastness/)' },
+                { value: 'See [Britannica](https://www.britannica.com/x)' },
+              ],
+            },
+          ],
+        }}
+      />,
+    )
+
+    expect(html).toContain('<th scope="row"><em>Dactylopius coccus</em></th>')
+    expect(html).toContain('<strong>Excellent</strong>')
+    // A path on this site: `next/link`, no `rel`. Its trailing slash is
+    // `next.config.ts`'s `trailingSlash` to keep, which this test does not
+    // load. Elsewhere: never the opener.
+    expect(html).toMatch(/<a href="\/lightfastness\/?">the chart<\/a>/)
+    expect(html).toContain(
+      '<a href="https://www.britannica.com/x" rel="noopener noreferrer">Britannica</a>',
+    )
+  })
+
+  it('never builds a link it cannot vouch for, or any HTML', () => {
+    const html = render(
+      <ComparisonTable
+        data={{
+          ...data,
+          rows: [
+            {
+              label: 'Vermilion',
+              cells: [
+                { value: '[click](javascript:alert(1))' },
+                { value: '<img src=x onerror=alert(1)>' },
+              ],
+            },
+          ],
+        }}
+      />,
+    )
+
+    expect(html).not.toContain('javascript:')
+    expect(html).toContain('<td>click</td>')
+    expect(html).not.toContain('<img')
+    expect(html).toContain('&lt;img src=x onerror=alert(1)&gt;')
+  })
+
+  it('keeps column heads and the caption as plain text', () => {
+    const html = render(
+      <ComparisonTable
+        data={{
+          ...data,
+          caption: 'Pigments *in oil*',
+          columns: [{ label: '*Lightfastness*' }, { label: 'Opacity' }],
+        }}
+      />,
+    )
+
+    expect(html).toContain('Pigments *in oil*')
+    expect(html).toContain('<th scope="col">*Lightfastness*</th>')
+  })
+
   it('renders nothing without usable columns or rows', () => {
     expect(render(<ComparisonTable data={{ ...data, columns: [] }} />)).toBe('')
     expect(render(<ComparisonTable data={{ ...data, rows: [] }} />)).toBe('')

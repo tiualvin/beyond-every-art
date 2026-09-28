@@ -1,4 +1,5 @@
 import type { ComparisonTableData } from '@/blocks/schema'
+import { InlineMarkdown } from './inline-markdown'
 
 /**
  * A small table of values compared across columns.
@@ -9,6 +10,11 @@ import type { ComparisonTableData } from '@/blocks/schema'
  * of loose words; and a real `<table>` is what a search engine can lift into a
  * result. None of that survives an editor building a grid out of paragraphs,
  * which is the alternative this replaces.
+ *
+ * Row labels and cells are read as inline Markdown — a species in italics, a
+ * link to a source — and column heads and the caption as plain text. See
+ * `lib/content/inline-markdown.ts` for what counts, and why a cell stays a
+ * plain text field rather than rich text.
  *
  * Rows are padded to the column count rather than rejected for having too few
  * cells. A half-filled row is what a draft looks like, and a table that
@@ -73,9 +79,13 @@ export function ComparisonTable({ data }: { data: ComparisonTableData }) {
           <tbody>
             {rows.map((row, rowIndex) => (
               <tr key={row.id ?? rowIndex}>
-                <th scope="row">{row.label}</th>
+                <th scope="row">
+                  <InlineMarkdown source={row.label} />
+                </th>
                 {row.cells.map((cell, cellIndex) => (
-                  <td key={cellIndex}>{cell}</td>
+                  <td key={cellIndex}>
+                    <InlineMarkdown source={cell} />
+                  </td>
                 ))}
               </tr>
             ))}
