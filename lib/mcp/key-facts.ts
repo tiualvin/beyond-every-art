@@ -17,22 +17,22 @@
 // Every other node in the body is passed through as the same object, so the
 // save changes the facts and nothing else.
 
-import { randomBytes } from 'node:crypto'
-
 import {
   KEY_FACTS_BLOCK,
   KEY_FACTS_MAX_ITEMS,
   type KeyFactItem,
 } from '../../blocks/schema'
-import { headingText } from '../content/headings'
-import {
-  blockMarker,
-  indexBlocks,
-  textOf,
-  type BlockNode,
-  type LexicalNode,
-} from './blocks'
+import { blockMarker, textOf, type BlockNode, type LexicalNode } from './blocks'
 import type { EditorState } from './markdown'
+import {
+  blockNode,
+  bodyChildren,
+  findHeading,
+  keptKey,
+  objectId,
+  singleExisting,
+  withChildren,
+} from './placement'
 
 export type Fact = { label: string; value: string }
 
@@ -54,19 +54,6 @@ export type KeyFactsResult = {
 }
 
 /**
- * A fresh id, in the shape Payload gives its own blocks and array rows: 24 hex
- * digits. Letters and digits only, which is what lets it be a marker key.
- */
-function objectId(): string {
-  return randomBytes(12).toString('hex')
-}
-
-/** Heading text as a person would compare it: case and spacing ignored. */
-function normalise(text: string): string {
-  return text.replace(/\s+/g, ' ').trim().toLowerCase()
-}
-
-/**
  * A Markdown table as the body stores one: a single paragraph of pipe-bounded
  * lines, because the editor has no table feature to convert it into.
  */
@@ -74,10 +61,6 @@ function isPipeTable(node: LexicalNode | undefined): boolean {
   if (node?.type !== 'paragraph') return false
   const text = textOf(node).trim()
   return text.startsWith('|') && text.endsWith('|')
-}
-
-function quoteList(values: string[]): string {
-  return values.map((value) => `"${value}"`).join(', ')
 }
 
 /**
@@ -117,21 +100,8 @@ export function setKeyFacts(
 ): KeyFactsResult {
   const items = toItems(input.facts)
   const heading = input.heading?.trim()
-  const children = [...(state?.root?.children ?? [])] as LexicalNode[]
-
-  const existing = indexBlocks(state).filter(
-    ({ node }) => node.fields.blockType === KEY_FACTS_BLOCK,
-  )
-
-  if (existing.length > 1) {
-    const where = existing.map(({ afterHeading }) => afterHeading ?? '(top)')
-    throw new Error(
-      `This article has ${existing.length} key facts modules, under ` +
-        `${quoteList(where)}, and it is not clear which to replace. Remove ` +
-        'all but one with updateArticleMarkdown — leave their marker lines ' +
-        'out — then call this again.',
-    )
-  }
+  const children = bodyChildren(state)
+  const existing = singleExisting(state, KEY_FACTS_BLOCK, 'key facts modules')
 
   // The whole module is described by the call. A heading left out is a
   // heading removed, so what the card shows is always what was last asked for.
@@ -143,33 +113,16 @@ export function setKeyFacts(
     items,
   })
 
-  const root = (next: LexicalNode[]): EditorState =>
-    ({
-      ...(state ?? {}),
-      root: {
-        type: 'root',
-        version: 1,
-        format: '',
-        indent: 0,
-        direction: 'ltr',
-        ...(state?.root ?? {}),
-        children: next,
-      },
-    }) as EditorState
-
-  if (existing.length === 1) {
-    const [{ index, node, afterHeading }] = existing
-    // Kept, so a marker the agent already holds still names this module. An
-    // id that cannot be a marker is replaced with one that can.
-    const id = node.fields.id ?? ''
-    const key = /^[A-Za-z0-9]+$/.test(id) ? id : objectId()
+  if (existing) {
+    const { index, node, afterHeading } = existing
+    const key = keptKey(node)
     children[index] = {
       ...node,
       fields: fieldsFor(key, node.fields.blockName ?? ''),
     } as LexicalNode
 
     return {
-      state: root(children),
+      state: withChildren(state, children),
       placement: 'replaced',
       key,
       marker: blockMarker(KEY_FACTS_BLOCK, key),
@@ -178,48 +131,14 @@ export function setKeyFacts(
     }
   }
 
-  const headings = children.flatMap((node, index) =>
-    node.type === 'heading' ? [{ index, text: headingText(node) }] : [],
+  const { index: headingIndex, text: headingAbove } = findHeading(
+    children,
+    input.afterHeading,
+    { none: 'key facts', placed: 'the facts go' },
   )
-
-  if (!input.afterHeading?.trim()) {
-    throw new Error(
-      'This article has no key facts yet, so say where they go: pass ' +
-        'afterHeading with the text of a heading in the body. ' +
-        (headings.length
-          ? `Its headings are ${quoteList(headings.map((h) => h.text))}.`
-          : 'The body has no headings; add one with updateArticleMarkdown first.'),
-    )
-  }
-
-  const wanted = normalise(input.afterHeading)
-  const matches = headings.filter((h) => normalise(h.text) === wanted)
-
-  if (matches.length === 0) {
-    throw new Error(
-      `No heading in the body reads "${input.afterHeading.trim()}". ` +
-        (headings.length
-          ? `Its headings are ${quoteList(headings.map((h) => h.text))}.`
-          : 'The body has no headings.'),
-    )
-  }
-  if (matches.length > 1) {
-    throw new Error(
-      `"${matches[0].text}" heads ${matches.length} sections, so it does not ` +
-        'say which one the facts go under. Rename one with ' +
-        'updateArticleMarkdown first.',
-    )
-  }
-
-  const [{ index: headingIndex, text: headingAbove }] = matches
   const at = headingIndex + 1
   const key = objectId()
-  const node = {
-    type: 'block',
-    version: 2,
-    format: '',
-    fields: fieldsFor(key),
-  } as LexicalNode
+  const node = blockNode(fieldsFor(key))
 
   if (input.replacePipeTable) {
     if (!isPipeTable(children[at])) {
@@ -235,7 +154,7 @@ export function setKeyFacts(
   }
 
   return {
-    state: root(children),
+    state: withChildren(state, children),
     placement: 'inserted',
     key,
     marker: blockMarker(KEY_FACTS_BLOCK, key),

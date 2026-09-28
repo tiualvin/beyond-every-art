@@ -15,7 +15,7 @@ import {
   convertMarkdownToLexical,
   editorConfigFactory,
 } from '@payloadcms/richtext-lexical'
-import type { Field, Payload, RichTextField } from 'payload'
+import type { Block, Field, Payload, RichTextField } from 'payload'
 
 /** Collections whose `content` field these tools may convert. */
 export type MarkdownCollection = 'posts' | 'pages'
@@ -107,20 +107,15 @@ export function contentEditorConfig(
   return editorConfigFactory.fromField({ field })
 }
 
-export function markdownToLexical(
-  payload: Payload,
-  collection: MarkdownCollection,
-  markdown: string,
-): EditorState {
+function fromMarkdown(editorConfig: EditorConfig, markdown: string) {
   return convertMarkdownToLexical({
-    editorConfig: contentEditorConfig(payload, collection),
+    editorConfig,
     markdown,
   }) as unknown as EditorState
 }
 
-export function lexicalToMarkdown(
-  payload: Payload,
-  collection: MarkdownCollection,
+function toMarkdown(
+  editorConfig: EditorConfig,
   data: EditorState | null | undefined,
 ): string {
   if (!data) return ''
@@ -128,6 +123,155 @@ export function lexicalToMarkdown(
     data: data as unknown as Parameters<
       typeof convertLexicalToMarkdown
     >[0]['data'],
-    editorConfig: contentEditorConfig(payload, collection),
+    editorConfig,
   })
+}
+
+export function markdownToLexical(
+  payload: Payload,
+  collection: MarkdownCollection,
+  markdown: string,
+): EditorState {
+  return fromMarkdown(contentEditorConfig(payload, collection), markdown)
+}
+
+export function lexicalToMarkdown(
+  payload: Payload,
+  collection: MarkdownCollection,
+  data: EditorState | null | undefined,
+): string {
+  return toMarkdown(contentEditorConfig(payload, collection), data)
+}
+
+// --- Rich text inside a block ---------------------------------------------
+//
+// An FAQ answer, a callout, a dropdown panel: rich-text fields that live inside
+// a block in the body. None of them uses the body's editor — they are given
+// the plain one, which is what stops a module being nested inside a module —
+// so converting one against `contentEditorConfig` would be converting against
+// the wrong feature set. Each is converted against its own field instead,
+// found in the sanitized config. Sanitizing is what gives such a field its
+// editor at all: the definitions in `blocks/schema.ts` have none.
+
+/** The body's insertable blocks, as Payload sanitized them. */
+function contentBlocks(
+  payload: Payload,
+  collection: MarkdownCollection,
+): Block[] {
+  const feature = contentEditorConfig(
+    payload,
+    collection,
+  ).resolvedFeatureMap.get('blocks')
+  return (
+    (feature?.sanitizedServerFeatureProps as { blocks?: Block[] } | undefined)
+      ?.blocks ?? []
+  )
+}
+
+/**
+ * A copy of `data` with every rich-text value in it as Markdown.
+ *
+ * Driven by the block's schema rather than by the shape of the data, so a
+ * field is converted because it *is* rich text, never because a value happens
+ * to look like editor state.
+ */
+function withMarkdown(
+  schema: Field[],
+  data: Record<string, unknown>,
+): Record<string, unknown> {
+  let out: Record<string, unknown> = { ...data }
+
+  for (const field of schema) {
+    if (!('name' in field)) {
+      // A row or a collapsible: it lays fields out without nesting their data.
+      const nested = (field as { fields?: Field[] }).fields
+      if (nested) out = withMarkdown(nested, out)
+      continue
+    }
+
+    const value = out[field.name]
+    if (value === null || value === undefined) continue
+
+    if (field.type === 'richText') {
+      // Converted only when it is editor state. The converter reads anything
+      // else as an empty document and answers "", which would report a broken
+      // module as a blank one.
+      const root = (value as { root?: { children?: unknown } }).root
+      if (!Array.isArray(root?.children)) continue
+      try {
+        out[field.name] = toMarkdown(
+          editorConfigFactory.fromField({ field: field as RichTextField }),
+          value as EditorState,
+        )
+      } catch {
+        // A value the converter cannot read is reported as stored. A review
+        // tool that failed on one malformed module would hide every other one.
+      }
+    } else if (field.type === 'array' && Array.isArray(value)) {
+      out[field.name] = value.map((row) =>
+        row && typeof row === 'object'
+          ? withMarkdown(field.fields, row as Record<string, unknown>)
+          : row,
+      )
+    } else if (field.type === 'group' && typeof value === 'object') {
+      out[field.name] = withMarkdown(
+        field.fields,
+        value as Record<string, unknown>,
+      )
+    }
+  }
+
+  return out
+}
+
+/**
+ * A block's stored fields as the read tools report them: rich text as
+ * Markdown, everything else as stored. A block type this config does not
+ * know is returned untouched.
+ */
+export function blockFieldsForReading(
+  payload: Payload,
+  collection: MarkdownCollection,
+  fields: Record<string, unknown>,
+): Record<string, unknown> {
+  const block = contentBlocks(payload, collection).find(
+    (candidate) => candidate.slug === fields.blockType,
+  )
+  return block ? withMarkdown(block.fields, fields) : fields
+}
+
+/**
+ * Markdown converted for a rich-text field inside a block, against that
+ * field's own editor. `path` names the field through any arrays on the way to
+ * it: `['items', 'answer']` for an FAQ answer.
+ */
+export function markdownToBlockRichText(
+  payload: Payload,
+  collection: MarkdownCollection,
+  blockType: string,
+  path: string[],
+  markdown: string,
+): EditorState {
+  let fields = contentBlocks(payload, collection).find(
+    (block) => block.slug === blockType,
+  )?.fields
+  let field: Field | undefined
+
+  for (const name of path) {
+    field = fields?.find(
+      (candidate) => 'name' in candidate && candidate.name === name,
+    )
+    fields = (field as { fields?: Field[] } | undefined)?.fields
+  }
+
+  if (field?.type !== 'richText') {
+    throw new Error(
+      `No rich-text \`${path.join('.')}\` on the \`${blockType}\` block.`,
+    )
+  }
+
+  return fromMarkdown(
+    editorConfigFactory.fromField({ field: field as RichTextField }),
+    markdown,
+  )
 }

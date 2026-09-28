@@ -11,6 +11,7 @@ import {
   COMPARISON_TABLE_BLOCK,
   EMBED_BLOCK,
   FAQ_BLOCK,
+  FAQ_DEFAULT_HEADING,
   FEATURE_LIST_BLOCK,
   GALLERY_BLOCK,
   KEY_FACTS_BLOCK,
@@ -112,9 +113,7 @@ const renderers: BlockRenderers = {
     // The heading is allocated first because it renders first; the questions
     // follow in their own order. Allocating in reading order is what keeps a
     // `-2` suffix landing on the later of two identical headings.
-    const headingAnchor = allocate(
-      data.heading?.trim() || 'Frequently asked questions',
-    )
+    const headingAnchor = allocate(data.heading?.trim() || FAQ_DEFAULT_HEADING)
     const anchors = (data.items ?? []).map((item) =>
       allocate(item?.question?.trim() || 'question'),
     )

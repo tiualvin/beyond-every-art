@@ -126,20 +126,30 @@ export function indexBlocks(
   return blocks
 }
 
-/** What the read tool reports about each block. */
+/**
+ * What the read tool reports about each block.
+ *
+ * `present` shapes each block's fields for reading; the tools pass one that
+ * renders rich text as Markdown (see `blockFieldsForReading`). Kept a
+ * parameter so this module stays free of Payload and its config.
+ */
 export function listBlocks(
   state: EditorState | null | undefined,
+  present: (fields: Record<string, unknown>) => Record<string, unknown> = (
+    fields,
+  ) => fields,
 ): BlockSummary[] {
   return indexBlocks(state).map(({ key, node, afterHeading }) => {
     // `blockName` is the admin's label for one placement, empty unless an
     // editor typed one, and noise to an agent when it is.
     const { blockName, ...fields } = node.fields
+    const shown = present(fields)
     return {
       key,
       blockType: node.fields.blockType,
       marker: blockMarker(node.fields.blockType, key),
       afterHeading,
-      fields: blockName ? { blockName, ...fields } : fields,
+      fields: blockName ? { blockName, ...shown } : shown,
     }
   })
 }
