@@ -210,11 +210,36 @@ describe('ComparisonTable', () => {
   it('builds a real table with a caption and scoped headers', () => {
     const html = render(<ComparisonTable data={data} />)
 
-    expect(html).toContain('<caption')
+    expect(html).toContain('<figcaption class="comparison__caption"')
     expect(html).toContain('How three pigments behave in oil')
     expect(html).toContain('<th scope="col">Pigment</th>')
     expect(html).toContain('<th scope="col">Lightfastness</th>')
     expect(html).toContain('<th scope="row">Ultramarine</th>')
+  })
+
+  it('keeps the caption outside the scroll box, where it wraps', () => {
+    // A `<caption>` is as wide as its table, so on a phone it scrolled with a
+    // wide table and was cut off until the reader scrolled sideways.
+    const html = render(<ComparisonTable data={data} />)
+
+    expect(html).not.toContain('<caption')
+    expect(html.indexOf('<figcaption')).toBeGreaterThan(-1)
+    expect(html.indexOf('<figcaption')).toBeLessThan(
+      html.indexOf('comparison__scroll'),
+    )
+  })
+
+  it('names the table by its caption when given an id to do it with', () => {
+    const html = render(<ComparisonTable data={data} id="comparison-aa11" />)
+
+    expect(html).toContain('id="comparison-aa11-caption"')
+    expect(html).toContain(
+      '<table class="comparison__table" aria-labelledby="comparison-aa11-caption">',
+    )
+    // Without one there is nothing unique to point at, so it points at nothing.
+    expect(render(<ComparisonTable data={data} />)).not.toContain(
+      'aria-labelledby',
+    )
   })
 
   it('makes the scroll box reachable and named for a keyboard user', () => {

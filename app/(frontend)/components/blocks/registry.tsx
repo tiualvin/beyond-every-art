@@ -133,9 +133,17 @@ const renderers: BlockRenderers = {
     const heading = data.heading?.trim()
     return <KeyFacts data={data} anchor={heading ? allocate(heading) : ''} />
   },
-  // Nothing to allocate: a table's caption is a caption, not a heading.
+  // The block's own id makes the caption's: unique on the page without
+  // drawing on the heading allocator, whose numbering the headings own.
   [COMPARISON_TABLE_BLOCK]: (fields) => (
-    <ComparisonTable data={fields as ComparisonTableData} />
+    <ComparisonTable
+      data={fields as ComparisonTableData}
+      id={
+        typeof fields.id === 'string' && /^[A-Za-z0-9_-]+$/.test(fields.id)
+          ? `comparison-${fields.id}`
+          : undefined
+      }
+    />
   ),
   [MEDIA_TEXT_BLOCK]: (fields, { allocate }) => {
     const data = fields as MediaTextData

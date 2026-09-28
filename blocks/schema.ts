@@ -877,7 +877,7 @@ export const MediaTextBlock: Block = {
  *
  * Pigment against binder, one material against another — the shape this
  * publication keeps needing and the shape a general rich-text table serves
- * badly. Owning the markup is the point: a real `<caption>`, `scope="col"` on
+ * badly. Owning the markup is the point: a real caption, `scope="col"` on
  * the column heads and `scope="row"` on the first cell of each row are what
  * make a table readable out loud and liftable into a search result, and none
  * of them survive an editor building a grid by hand.

@@ -1562,7 +1562,7 @@ describe('setTableBlock', () => {
       }),
     )
     expect(html).toContain(
-      '<caption class="comparison__caption">Where carmine comes from</caption>',
+      '<figcaption class="comparison__caption">Where carmine comes from</figcaption>',
     )
     expect(html).toContain('<th scope="col">Pigment</th>')
     expect(html).toContain('<th scope="row">Carmine</th>')
