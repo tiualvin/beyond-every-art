@@ -55,7 +55,7 @@
     "@payloadcms/ui": "3.90.1",
     "framer-motion": "^13.4.4",
     "graphql": "16.14.2",
-    "next": "15.5.25",
+    "next": "15.5.26",
     "payload": "3.90.1",
     "react": "19.3.0",
     "react-dom": "19.3.0",
