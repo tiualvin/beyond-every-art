@@ -102,9 +102,10 @@ const OVERRIDES: Record<string, { floor: string; reason: string }> = {
     floor: '7.29.1',
     reason:
       'Two high-severity advisories on the 7.x line: a denial of service ' +
-      'through an unrequested response path, and a TLS certificate ' +
-      'validation bypass where BalancedPool drops connect options. Via ' +
-      'payload, which uses undici for outbound fetches.',
+      'when a server answers with a WebSocket subprotocol the client never ' +
+      'requested, and a TLS certificate validation bypass where BalancedPool ' +
+      'drops connect options. Via payload, which uses undici for outbound ' +
+      'fetches.',
   },
 }
 
