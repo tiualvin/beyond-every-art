@@ -186,18 +186,26 @@ sends one GA4 event per slot when it settles.
 is that state, reported once per slot. Country, page and session come from GA4
 itself, so a report splitting `ad_slot` by `fill` and `placement`, broken down by
 country, is coverage by placement _and_ country — the two things AdSense reports
-separately and never together.
+separately and never together. GA4 shows neither parameter in a report until
+each is registered as an event-scoped custom dimension.
 
-Two things to know before trusting it:
+Three things to know before trusting it:
 
 - **It is relative, not absolute.** A reader with JavaScript off, or a blocker
   that stops GA4 as well as AdSense, is in neither number. AdSense's own
   coverage stays the absolute figure; this one says which placement fills
   better, and where.
-- **It rides the tag you chose.** GA4 loaded directly makes it a `gtag` event;
-  under a Tag Manager container it is a `dataLayer` push, and the container needs
-  a GA4 event tag that maps `ad_slot` to a hit. Without that tag the push is
-  recorded and fires nothing.
+- **It counts only slots that were asked for.** The settle clock starts at the
+  push, not at mount, so `rail-1` on a phone — hidden, and never requested — is
+  not reported at all rather than reported `unfilled`.
+- **It rides the tag the server rendered.** The layout writes it onto `<html>`
+  as `data-analytics-tag`, and that decides the shape. GA4 loaded directly makes
+  it a `gtag` event. Under a Tag Manager container it is a `dataLayer` push of
+  `{ event: 'ad_slot', placement, fill }`, and the container needs a Custom
+  Event trigger on `ad_slot`, two Data Layer Variables, and a GA4 event tag that
+  sends them; without that tag the push is recorded and fires nothing. The
+  window is not asked which tag is present, because the consent bootstrap
+  defines `gtag` on every page with a Google tag, a container included.
 
 ## A container and a CSP are in tension
 

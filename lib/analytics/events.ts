@@ -19,6 +19,8 @@
 // signal — which placement fills better, and in which country — not an
 // absolute fill rate.
 
+import type { AnalyticsTag } from './tag'
+
 /** What a slot turned out to hold, once anything is known about it. */
 export type AdSlotFill = 'filled' | 'unfilled'
 
@@ -33,8 +35,13 @@ export function adSlotParams(
   return { placement, fill }
 }
 
-/** What a custom event needs from wherever the tag happens to live. */
+/** What a custom event needs from the page the tag was rendered into. */
 export type TagTarget = {
+  /**
+   * Which tag the server rendered — `<html data-analytics-tag>`, written by
+   * the layout from `resolveAnalyticsTag()`. Absent when there is none.
+   */
+  tag?: string
   gtag?: (...args: unknown[]) => void
   dataLayer?: unknown[]
 }
@@ -43,16 +50,25 @@ export type TagTarget = {
  * Send one `ad_slot` event through whichever tag is loaded.
  *
  * Two modes, because the site loads two kinds of tag and they take an event
- * differently (`docs/ANALYTICS.md`). The GA4 tag, loaded directly, defines
- * `gtag` and queues onto `dataLayer` itself; a Tag Manager container does not
- * define `gtag`, so the event goes on `dataLayer` in the shape a container
- * consumes, and a GA4 event tag in the container maps `ad_slot` to a hit.
+ * differently (`docs/ANALYTICS.md`). The GA4 tag, loaded directly, takes a
+ * `gtag('event', …)` command. A Tag Manager container takes a `dataLayer`
+ * push in its own `{ event }` shape, which a Custom Event trigger matches and a
+ * GA4 event tag in the container turns into a hit; a `gtag` command pushes an
+ * `arguments` object instead, which no such trigger ever sees.
+ *
+ * **The mode is the server's word, not a guess from the window.** `gtag` is no
+ * signal: the consent bootstrap (`lib/analytics/consent.ts`) defines it in the
+ * head of every page that loads any Google tag, a container included, so
+ * testing for it would send every event down the GA4 path under the Tag
+ * Manager setup production runs. The layout writes which tag it rendered onto
+ * `<html>`, and that decides.
  *
  * It is one or the other, never both: in the GA4-direct case `dataLayer` is
  * also an array, so pushing as well would send the event twice.
  *
- * A target with neither is a no-op. That is the ordinary state of a deployment
- * with analytics off — staging, or a local build — and it is not an error.
+ * No analytics tag is a no-op — staging, a local build, or a page carrying
+ * AdSense alone, where `gtag` and `dataLayer` exist for the consent defaults
+ * and nothing would consume the event. Not an error.
  */
 export function sendAdSlot(
   target: TagTarget,
@@ -61,18 +77,28 @@ export function sendAdSlot(
 ): void {
   const params = adSlotParams(placement, fill)
 
-  if (typeof target.gtag === 'function') {
-    target.gtag('event', AD_SLOT_EVENT, params)
+  if (target.tag === ('gtm' satisfies AnalyticsTag['kind'])) {
+    if (Array.isArray(target.dataLayer)) {
+      target.dataLayer.push({ event: AD_SLOT_EVENT, ...params })
+    }
     return
   }
 
-  if (Array.isArray(target.dataLayer)) {
-    target.dataLayer.push({ event: AD_SLOT_EVENT, ...params })
+  if (
+    target.tag === ('ga4' satisfies AnalyticsTag['kind']) &&
+    typeof target.gtag === 'function'
+  ) {
+    target.gtag('event', AD_SLOT_EVENT, params)
   }
 }
 
-/** `sendAdSlot` against the live window, or a no-op on the server. */
+/** `sendAdSlot` against the live page, or a no-op on the server. */
 export function reportAdSlot(placement: string, fill: AdSlotFill): void {
   if (typeof window === 'undefined') return
-  sendAdSlot(window as TagTarget, placement, fill)
+  const { gtag, dataLayer } = window as Window & Omit<TagTarget, 'tag'>
+  sendAdSlot(
+    { tag: document.documentElement.dataset.analyticsTag, gtag, dataLayer },
+    placement,
+    fill,
+  )
 }
