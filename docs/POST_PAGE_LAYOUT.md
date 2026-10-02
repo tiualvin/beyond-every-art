@@ -323,10 +323,12 @@ first.
 
 ## Not built, deliberately
 
-- **The other three placements.** [`ADVERTISING.md`](ADVERTISING.md) §8 has
-  five and two are rendered: `rail-1` and `article-inline`. `article-end`,
-  `archive-inline` and `home-mid` are not, and `lib/ads/placements.ts`
-  deliberately does not name a placement that nothing renders.
+- **The author archive's listing unit.** [`ADVERTISING.md`](ADVERTISING.md) §8
+  now has every placement rendered, and `lib/ads/placements.ts` names only what
+  a call site uses. `archive-inline` reaches the journal and the topic archive,
+  which render entry rows; the author archive renders a card grid, and a
+  billboard between cards is a different rule from one between rows, so it is
+  left out rather than approximated.
 - **A contents list on every article.** `extractHeadings` stops at the first
   block node. Anchors come from a stateful allocator the renderer shares
   between the body's headings and any block that emits one, so past a block

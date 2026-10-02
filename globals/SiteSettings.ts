@@ -30,20 +30,24 @@ export const SiteSettings: GlobalConfig = {
       },
     },
     {
-      // What fills the rail's 300x250 when Google does not. An ad network
-      // declines impressions routinely — no demand, no consent, a blocker —
-      // and the slot holds its height either way, so without this the reader
-      // gets a labelled empty box. `kind` rather than "is it a post or an
-      // app": the answer is a third thing today and may be a fourth later,
-      // and a boolean would have to be rewritten to say so.
+      // What fills an ad box when Google does not. An ad network declines
+      // impressions routinely — no demand, no consent, a blocker — and every
+      // slot holds its height either way, so without this the reader gets a
+      // labelled empty box. It fills the rail's 300x250 and the three wide
+      // billboards (`article-end`, `archive-inline`, `home-mid`); `kind`
+      // rather than "is it a post or an app": the answer is a third thing
+      // today and may be a fourth later, and a boolean would have to be
+      // rewritten to say so.
       name: 'railFallback',
-      label: 'Article rail — when no ad is shown',
+      label: 'House promotion — when no ad is shown',
       type: 'group',
       admin: {
         description:
-          'The rail reserves a 300x250 box for an ad. When none is served, ' +
-          'this is what goes there instead. It never competes with an ad: it ' +
-          'appears only once the slot is known to be empty.',
+          'Ad slots reserve their height whether or not an ad is served. When ' +
+          'none is, this is what goes there instead — in the article rail and ' +
+          'in the wide billboards on articles, listings and the homepage. It ' +
+          'never competes with an ad: it appears only once the slot is known ' +
+          'to be empty.',
       },
       fields: [
         {

@@ -7,8 +7,9 @@ go, and in what order the work should happen.
 Five pieces of it are now built: `/ads.txt` (§1), the AdSense loader itself
 (`app/(frontend)/layout.tsx`, whenever the deployment is indexable), the slot
 layer (`lib/ads/placements.ts`, `lib/ads/eligibility.ts` and `lib/ads/inline.ts`,
-per §5), and two units — `rail-1`, the 300×250 in the post rail, and
-`article-inline`, repeated down the body by length. Both render through
+per §5), and the five placements of §8 — `rail-1` in the post rail, the
+`article-inline` units down the body by length, and the `article-end`,
+`archive-inline` and `home-mid` billboards. Every unit renders through
 `app/(frontend)/components/ad-unit.tsx`.
 
 **Consent is no longer the blocker.** Google's Privacy & messaging — the
@@ -492,17 +493,30 @@ that slot's request is deferred to idle.
 
 ### Inventory
 
-| ID                         | Track / template     | Position                                          | Desktop | Mobile  | Reserved |
-| -------------------------- | -------------------- | ------------------------------------------------- | ------- | ------- | -------- |
-| `rail-1` **built**         | Rail, `/[slug]`      | Above the newsletter card, inside the sticky pair | 300×250 | —       | 250px    |
-| `article-inline` **built** | Text, `/[slug]`      | Repeated down the body, by length — see below     | fluid   | fluid   | 280px    |
-| `article-end`              | Block, `/[slug]`     | Below the author card, above Read Next            | 970×250 | 300×250 | 250px    |
-| `archive-inline`           | journal, tag, author | After every 6th entry row                         | 970×250 | 300×250 | 250px    |
-| `home-mid`                 | `/`                  | Between Featured and Topics                       | 970×250 | 300×250 | 250px    |
+| ID                           | Track / template | Position                                          | Desktop | Mobile  | Reserved |
+| ---------------------------- | ---------------- | ------------------------------------------------- | ------- | ------- | -------- |
+| `rail-1` **built**           | Rail, `/[slug]`  | Above the newsletter card, inside the sticky pair | 300×250 | —       | 250px    |
+| `article-inline-1` **built** | Text, `/[slug]`  | First in-body unit — see below                    | fluid   | fluid   | 280px    |
+| `article-inline-2` **built** | Text, `/[slug]`  | Second in-body unit — see below                   | fluid   | fluid   | 280px    |
+| `article-inline-3` **built** | Text, `/[slug]`  | Third and later in-body units — see below         | fluid   | fluid   | 280px    |
+| `article-end` **built**      | Block, `/[slug]` | Below the author card, above Read Next            | 970×250 | 300×250 | 250px    |
+| `archive-inline` **built**   | journal, tag     | After every 6th entry row                         | 970×250 | 300×250 | 250px    |
+| `home-mid` **built**         | `/`              | Between Featured and Topics                       | 970×250 | 300×250 | 250px    |
 
-Five identified placements, of which **four should be live at launch**: all but
-`home-mid`. Two are, both with house content behind them, and `rail-1`'s
-reservation held: turning it on was a fill rather than a re-layout.
+Five placements, each now rendered. The in-body position is one — a unit after
+a boundary `planInlineBreaks` picks — carried under three ids so AdSense's
+per-unit report can say which position fills; the coverage work made that the
+question, and a single repeated id reports all six slots as one row. Every
+slot carries house content when nothing fills: the rail through
+`RailFallback`, the in-body units through `InlinePromo`, and the three
+billboards through `HouseBand`, which reads the same `SiteSettings →
+railFallback` supply as the rail rather than adding a second field to
+configure.
+
+`archive-inline` reaches the journal and the topic archive, which render entry
+rows. The author archive renders a card grid, and a billboard between cards is
+a different rule from one between rows, so it is left out rather than
+approximated.
 
 What it was _not_ was free of consequences for the rail around it, and the
 outcome is worth recording because it cost an editorial module. 279.3px of the
@@ -568,9 +582,13 @@ the type rather than about the writing.
 recomputes the gap from `.prose`'s size and leading and fails if a type change
 would put a third unit on a screen.
 
-`article-inline-2` and `-3` are retired as _names_: there is one placement
-inside the reading column, rendered as many times as the article is long,
-rather than three hand-placed slots.
+`article-inline-1`, `-2` and `-3` are three _ids_ for one placement, not three
+placements: the boundary arithmetic above is unchanged, and which id a slot
+carries is decided by its position — first, second, third or later. The ids
+were retired once, when serving and reporting were the same question; the
+coverage work split them, because a repeated unit code fills every `<ins>` but
+reports all of them as one row, and that row could not say whether position
+four ever fills.
 
 ### Rules that go with it
 
@@ -589,10 +607,15 @@ rail carrying one unit removes the question.
 **An unfilled slot shows house content, not a blank.** Google declines
 impressions routinely — no demand, no consent, a blocker in front of the tag —
 and the reserved height is held either way, so without this a reader gets a
-labelled empty box. Both built placements now answer this. `rail-1`'s fallback
-is chosen in Payload under Site Settings → "Article rail — when no ad is
-shown": up to three articles, one of the apps, or nothing. `article-inline`'s
-is not chosen at all — see "Six boxes, not one" below.
+labelled empty box. Every placement answers this. The rail's box and the three
+billboards take the house promotion chosen in Payload under Site Settings →
+"House promotion — when no ad is shown": up to three articles, one of the
+apps, or nothing. The rail renders it as `RailFallback`, a column; the
+billboards render the same supply as `HouseBand`, a row, because a stack of
+headlines in a 970px band reads as a rail promo that failed to fill its box.
+One field, like the eligibility predicate, so there is not a second place for
+the same decision to drift. `article-inline`'s is not chosen at all — see "Six
+boxes, not one" below.
 
 **Up to three, because filling 250px is the design problem.** The first version
 took a single article and put its headline in the middle of the box, which left

@@ -72,7 +72,14 @@ export default async function FrontendLayout({
   const googleTags = Boolean(analyticsTag || adsenseClient)
 
   return (
-    <html lang="en" className={`${playfair.variable} ${inter.variable}`}>
+    <html
+      lang="en"
+      className={`${playfair.variable} ${inter.variable}`}
+      // Which tag loaded, for the custom events that have to address it in
+      // its own shape — `lib/analytics/events.ts` says why the window cannot
+      // be asked instead. Omitted when there is none.
+      data-analytics-tag={analyticsTag?.kind}
+    >
       {/* An explicit `<head>` for one reason: it is the only placement that
           actually puts the consent default in the head. React still hoists the
           two async loaders above it, which is in time — `consent-mode.tsx` has

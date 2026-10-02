@@ -1,5 +1,6 @@
 import Link from 'next/link'
 
+import { adClientFor } from '@/lib/ads/eligibility'
 import {
   FEATURED_SLOTS,
   OPENING_SLOTS,
@@ -28,8 +29,10 @@ import {
   SEARCH_PATH,
 } from '@/lib/seo/site'
 
+import { AdUnit } from './components/ad-unit'
 import { CoverField } from './components/cover-field'
 import { HomepageNewsletter } from './components/homepage-newsletter'
+import { HouseBand } from './components/house-band'
 import { Opening } from './components/opening'
 import { Pairing } from './components/pairing'
 import { EntryRow } from './components/entry-row'
@@ -51,6 +54,9 @@ export default async function HomePage() {
     getFeaturedPosts(FEATURED_SLOTS),
     getTagsWithCounts(),
   ])
+
+  // The mid-page unit's publisher, resolved once for the whole page.
+  const adClient = adClientFor()
 
   // The opening takes the newest work; the picks are what is left, in tier
   // order. Excluding by id rather than slicing is what keeps a piece from
@@ -182,6 +188,19 @@ export default async function HomePage() {
           editor's reason for reading them in sequence. Absent until all three
           parts are set. */}
       {homepage.pairing && <Pairing pairing={homepage.pairing} />}
+
+      {/* ── Mid-page unit ──
+          `home-mid` in docs/ADVERTISING.md §8, between the curated sections
+          where it breaks the page without landing inside one. */}
+      {adClient && (
+        <div className="container">
+          <AdUnit placement="home-mid" client={adClient}>
+            {settings.railFallback ? (
+              <HouseBand fallback={settings.railFallback} />
+            ) : undefined}
+          </AdUnit>
+        </div>
+      )}
 
       {/* ── Topics ── */}
       {topics.length > 0 && (

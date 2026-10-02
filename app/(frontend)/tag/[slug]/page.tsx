@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { cache } from 'react'
 
+import { adClientFor } from '@/lib/ads/eligibility'
 import {
   getPostsByTag,
   getSiteSettings,
@@ -95,6 +96,8 @@ export default async function TagPage({ params }: { params: Promise<Params> }) {
   }
 
   const subjects = await getTagsWithCounts()
+  // The topic archive carries listing units on the same terms as the journal.
+  const adClient = adClientFor()
   const siblings = subjects
     .filter((topic) => topic.slug !== archive.slug)
     .slice(0, SIBLING_TOPICS)
@@ -163,7 +166,11 @@ export default async function TagPage({ params }: { params: Promise<Params> }) {
       <section className="archive">
         <div className="container">
           {archive.posts.length > 0 ? (
-            <ArchiveGroups posts={archive.posts} />
+            <ArchiveGroups
+              posts={archive.posts}
+              adClient={adClient}
+              fallback={settings.railFallback}
+            />
           ) : (
             <p className="archive__empty">
               Nothing filed under this topic yet.
