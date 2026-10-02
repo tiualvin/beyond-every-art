@@ -11,8 +11,10 @@ import {
   COMPARISON_TABLE_BLOCK,
   EMBED_BLOCK,
   FAQ_BLOCK,
+  FAQ_DEFAULT_HEADING,
   FEATURE_LIST_BLOCK,
   GALLERY_BLOCK,
+  KEY_FACTS_BLOCK,
   KEY_TAKEAWAYS_BLOCK,
   MEDIA_TEXT_BLOCK,
   PAYWALL_BLOCK,
@@ -28,6 +30,7 @@ import {
   type FaqData,
   type FeatureListData,
   type GalleryData,
+  type KeyFactsData,
   type KeyTakeawaysData,
   type MediaTextData,
   type PaywallData,
@@ -44,6 +47,7 @@ import { Embed } from './embed'
 import { Faq } from './faq'
 import { FeatureList } from './feature-list'
 import { Gallery } from './gallery'
+import { KeyFacts } from './key-facts'
 import { KeyTakeaways } from './key-takeaways'
 import { MediaText } from './media-text'
 import { PaywallMarker } from './paywall'
@@ -109,9 +113,7 @@ const renderers: BlockRenderers = {
     // The heading is allocated first because it renders first; the questions
     // follow in their own order. Allocating in reading order is what keeps a
     // `-2` suffix landing on the later of two identical headings.
-    const headingAnchor = allocate(
-      data.heading?.trim() || 'Frequently asked questions',
-    )
+    const headingAnchor = allocate(data.heading?.trim() || FAQ_DEFAULT_HEADING)
     const anchors = (data.items ?? []).map((item) =>
       allocate(item?.question?.trim() || 'question'),
     )
@@ -124,9 +126,24 @@ const renderers: BlockRenderers = {
       />
     )
   },
-  // Nothing to allocate: a table's caption is a caption, not a heading.
+  // Allocated only when there is a heading, for the reason the feature list
+  // gives below: an unheaded module must not consume an anchor.
+  [KEY_FACTS_BLOCK]: (fields, { allocate }) => {
+    const data = fields as KeyFactsData
+    const heading = data.heading?.trim()
+    return <KeyFacts data={data} anchor={heading ? allocate(heading) : ''} />
+  },
+  // The block's own id makes the caption's: unique on the page without
+  // drawing on the heading allocator, whose numbering the headings own.
   [COMPARISON_TABLE_BLOCK]: (fields) => (
-    <ComparisonTable data={fields as ComparisonTableData} />
+    <ComparisonTable
+      data={fields as ComparisonTableData}
+      id={
+        typeof fields.id === 'string' && /^[A-Za-z0-9_-]+$/.test(fields.id)
+          ? `comparison-${fields.id}`
+          : undefined
+      }
+    />
   ),
   [MEDIA_TEXT_BLOCK]: (fields, { allocate }) => {
     const data = fields as MediaTextData

@@ -19,6 +19,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
+import { mcpTools } from '../../lib/mcp/tools'
 import { CLOUDFLARE_IPV4, CLOUDFLARE_IPV6 } from '../../lib/security/cloudflare'
 import { RESERVED_ROOT_SLUGS } from '../../lib/seo/reserved-slugs'
 
@@ -338,5 +339,23 @@ describe('the Cloudflare ranges', () => {
     // Reported as sorted arrays rather than sets, so a failure names the entry
     // that differs instead of printing two collections to compare by eye.
     expect([...documented].sort()).toEqual([...compiled].sort())
+  })
+})
+
+describe('the MCP tool table', () => {
+  // MCP_SERVER.md's table of custom tools is what an operator reads before
+  // ticking a key's checkboxes, and every custom tool defaults to ticked. A tool
+  // missing from it is reach the document understates — the failure the plugin
+  // allowlist exists to prevent, reproduced in prose.
+  const doc = docs.find((entry) => entry.name === 'docs/MCP_SERVER.md')
+
+  it('lists every custom tool the server offers, and nothing else', () => {
+    const table = doc!.text.match(/\| Tool +\| Does +\|\n([\s\S]*?)\n\n/)
+    expect(table, 'the custom tool table in MCP_SERVER.md').not.toBeNull()
+
+    const documented = [...table![1].matchAll(/^\| `(\w+)` /gm)].map(
+      (row) => row[1],
+    )
+    expect(documented.sort()).toEqual(mcpTools.map((tool) => tool.name).sort())
   })
 })

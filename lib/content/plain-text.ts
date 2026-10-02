@@ -27,6 +27,7 @@ import {
   FAQ_BLOCK,
   FEATURE_LIST_BLOCK,
   GALLERY_BLOCK,
+  KEY_FACTS_BLOCK,
   KEY_TAKEAWAYS_BLOCK,
   MEDIA_TEXT_BLOCK,
   PAYWALL_BLOCK,
@@ -42,11 +43,13 @@ import {
   type FaqData,
   type FeatureListData,
   type GalleryData,
+  type KeyFactsData,
   type KeyTakeawaysData,
   type MediaTextData,
   type PullQuoteData,
 } from '../../blocks/schema'
 import type { ArticleBody } from './body'
+import { inlineMarkdownToPlainText } from './inline-markdown'
 
 type PlaintextArgs = Parameters<typeof convertLexicalToPlaintext>[0]
 type EditorState = PlaintextArgs['data']
@@ -175,9 +178,32 @@ const blockSerializers: Record<BlockSlug, (fields: unknown) => string> = {
       data.caption,
       data.rowHeader,
       ...(data.columns ?? []).map((column) => column?.label),
+      // Label and cells are inline Markdown: their words, not their markup,
+      // and a link's text without its URL.
       ...(data.rows ?? []).map((row) =>
-        join([row?.label, ...(row?.cells ?? []).map((cell) => cell?.value)]),
+        join([
+          inlineMarkdownToPlainText(row?.label),
+          ...(row?.cells ?? []).map((cell) =>
+            inlineMarkdownToPlainText(cell?.value),
+          ),
+        ]),
       ),
+    ])
+  },
+
+  // Each fact as "Label: value" — a label alone is a word with no claim in it,
+  // and a value alone is a word with no subject. Half-filled facts are dropped
+  // here as the renderer drops them, so a feed never carries what the page
+  // does not show.
+  [KEY_FACTS_BLOCK]: (fields) => {
+    const data = (fields ?? {}) as KeyFactsData
+    return join([
+      data.heading,
+      ...(data.items ?? []).map((item) => {
+        const label = item?.label?.trim()
+        const value = item?.value?.trim()
+        return label && value ? `${label}: ${value}` : ''
+      }),
     ])
   },
 

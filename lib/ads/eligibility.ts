@@ -18,6 +18,7 @@
 // so that opening ad-free membership is a change in one function rather than a
 // hunt through every template.
 
+import { getSiteUrl } from '../seo/site'
 import { resolveAdsenseClient } from './adsense'
 
 type Env = Record<string, string | undefined>
@@ -43,7 +44,8 @@ export type AdContext = {
 export function adClientFor(
   context: AdContext = {},
   env: Env = process.env,
+  siteUrl: string = getSiteUrl(),
 ): string | null {
   if (context.restricted) return null
-  return resolveAdsenseClient(env)
+  return resolveAdsenseClient(env, siteUrl)
 }

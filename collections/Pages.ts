@@ -1,6 +1,10 @@
 import type { CollectionConfig } from 'payload'
 
-import { editorsAndAdmins, publishedOrEditors } from '../access/roles'
+import {
+  editorsAndAdmins,
+  publishedOrEditors,
+  versionsOf,
+} from '../access/roles'
 import { ghostIdField } from '../fields/ghost'
 import { noindexField, seoFields } from '../fields/seo'
 import { slugField } from '../fields/slug'
@@ -26,6 +30,7 @@ export const Pages: CollectionConfig = {
   access: {
     create: editorsAndAdmins,
     read: publishedOrEditors,
+    readVersions: versionsOf(publishedOrEditors),
     update: editorsAndAdmins,
     delete: editorsAndAdmins,
   },

@@ -45,6 +45,12 @@ export const fixtures = {
     editorEmail: 'e2e-mcp-editor@example.test',
     adminKey: 'e2e-mcp-admin-key-7b1ec3d94a6f2085',
     adminEmail: 'e2e-mcp-admin@example.test',
+    /**
+     * The least privileged role. `postsRead` keeps it out of other people's
+     * drafts, and version history has to keep it out of theirs too.
+     */
+    authorKey: 'e2e-mcp-author-key-c83d1f0e6a9b4527',
+    authorEmail: 'e2e-mcp-author@example.test',
     password: 'e2e-mcp-Password-1!',
     /** Collections that must have no tool at all, whatever a key allows. */
     forbiddenCollections: [

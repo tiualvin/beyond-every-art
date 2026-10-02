@@ -42,7 +42,7 @@ missing and does not refuse the save or the publish.
 
 ![The rich-text editor with the slash-command menu open, headed "Blocks". Nine entries are visible — Key takeaways, FAQ, Feature list, Image and text, Comparison table, Dropdown, Pull quote, Newsletter signup, Callout — each with a small line drawing to its left.](block-picker.png)
 
-Fourteen modules, each with a 20×20 line drawing. The icons are inline `data:`
+Every module has a 20×20 line drawing. The icons are inline `data:`
 URIs rather than files, so there is no asset directory to survive the
 Dockerfile's copy steps; `img-src` already permits `data:` for exactly this.
 

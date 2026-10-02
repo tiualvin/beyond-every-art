@@ -17,8 +17,9 @@
   [Turning it on](#turning-it-on) step 3.
 - **What it does:** drafts and revises articles from Claude Code, Codex, or the
   Claude mobile app, writing bodies in Markdown, through the same role-based
-  access control the admin panel uses. It never publishes unless the key belongs
-  to an administrator.
+  access control the admin panel uses. It reads an article's version history
+  and reverts to it, always as a draft. It never publishes unless the key
+  belongs to an administrator.
 - **What it deliberately cannot reach:** `members`, `billing-events`,
   `newsletter-signups`, `users`, and every global. Deleting articles is off.
 - **How to turn it on:** [What is built](#what-is-built).
@@ -45,7 +46,8 @@
 ## What is built
 
 Configuration lives in [`lib/mcp/`](../lib/mcp): `plugin.ts` (allowlist, rate
-limit, request logging), `tools.ts` (the drafting tools), `markdown.ts`
+limit, request logging), `tools.ts` (the drafting and version-history tools),
+`markdown.ts`
 (Markdown ⇄ Lexical), `response.ts` (keeping bodies out of find responses),
 `api-keys.ts` (who may issue and revoke a key), `errors.ts` (the shape of a
 refusal), `publish-guard.ts`, `rate-limit.ts`, and `audit.ts`.
@@ -102,10 +104,23 @@ both access rules — no field moves, so the schema is untouched:
   visible.
 
 One more thing about that screen, because it runs the other way from the
-collection checkboxes: **custom tools default to ticked.** `draftArticle`,
-`readArticleMarkdown`, `updateArticleMarkdown`, and `uploadMedia` are all
-enabled on a new key unless you untick them, while every collection capability
-starts unticked. That is the plugin's default, not this project's choice.
+collection checkboxes: **custom tools default to ticked.** Every tool in the
+table below is enabled on a new key unless you untick it, while every collection
+capability starts unticked. That is the plugin's default, not this project's
+choice.
+
+A tool added later reaches keys that already exist the same way — its column
+arrives with the plugin's `DEFAULT true` — unless its migration says otherwise.
+`listArticleVersions` and `readArticleVersion` do: an existing key or OAuth grant
+gets them exactly when it already had `readArticleMarkdown`, because they read
+the same text, and a grant whose approver unticked that tool should not gain a
+second way to it by deploy. `restoreArticleVersion` writes, so an existing key
+gets it only where it already had both `updateArticleMarkdown` and
+`posts.update` — the two capabilities a restore can already be done with, by
+hand.
+`setKeyFactsBlock`, `setFAQBlock` and `setTableBlock` write the draft body and
+nothing else — what `updateArticleMarkdown` already does — so an existing key
+gets them exactly where it already had `updateArticleMarkdown`.
 
 ### Tools
 
@@ -116,13 +131,111 @@ all.
 
 Written for this project, because the generated ones cannot do the job:
 
-| Tool                    | Does                                                                                                                                                 |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `draftArticle`          | Creates a post from Markdown, always as a draft. Resolves tag and author slugs, refuses unknown ones. The `ghostID` is autofilled by the collection. |
-| `readArticleMarkdown`   | Reads a post back as Markdown, including the draft body. Says so plainly when the document renders from migrated `legacyHTML` instead.               |
-| `updateArticleMarkdown` | Replaces a body from Markdown, saved as a draft.                                                                                                     |
-| `uploadMedia`           | Adds an image to the Media library from base64 and returns its id, for `updatePosts` to set as a `featuredImage`.                                    |
-| `uploadMediaFromUrl`    | The same, from an https address the server fetches itself. The only one of the two that works from a phone or a scheduled run.                       |
+| Tool                    | Does                                                                                                                                                                                                               |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `draftArticle`          | Creates a post from Markdown, always as a draft. Resolves tag and author slugs, refuses unknown ones. The `ghostID` is autofilled by the collection.                                                               |
+| `readArticleMarkdown`   | Reads a post back as Markdown, including the draft body, with each module as a marker line and its contents in `blocks`. Says so when the page renders from `legacyHTML`.                                          |
+| `listArticleVersions`   | Lists a post's saved versions, newest first — id, time, title, status and a 100-character snippet each, never a body.                                                                                              |
+| `readArticleVersion`    | Reads one saved version in exactly the shape `readArticleMarkdown` returns the draft. Read-only.                                                                                                                   |
+| `restoreArticleVersion` | Reverts a post's body, or its whole article, to a saved version — as a draft, overwriting rather than merging. Has a dry run and an undo.                                                                          |
+| `updateArticleMarkdown` | Replaces a body from Markdown, saved as a draft. Puts each marked module back as it was; reports which were kept and which removed.                                                                                |
+| `setKeyFactsBlock`      | Sets an article's key facts card — label and value pairs — in place, or under a named body heading. Saved as a draft; the rest of the body is untouched.                                                           |
+| `setFAQBlock`           | Sets an article's FAQ — questions with Markdown answers — in place, under a named body heading, or in place of a Markdown FAQ section. Saved as a draft; the rest of the body is untouched.                        |
+| `setTableBlock`         | Sets a comparison table — caption, header row, rows with inline-Markdown cells — by key, in a named section, or read from the Markdown table under a heading. Saved as a draft; the rest of the body is untouched. |
+| `uploadMedia`           | Adds an image to the Media library from base64 and returns its id, for `updatePosts` to set as a `featuredImage`.                                                                                                  |
+| `uploadMediaFromUrl`    | The same, from an https address the server fetches itself. The only one of the two that works from a phone or a scheduled run.                                                                                     |
+
+### Modules in a body
+
+The modules an editor inserts into a body — key facts, FAQs, galleries,
+callouts, and the rest of [`blocks/schema.ts`](../blocks/schema.ts) — are
+Lexical block nodes inside `content`, not fields beside it, and none of them has
+a Markdown form. Until the tools accounted for that, Payload's converter wrote
+each as the words "Block Field": a read could not show what a module said, and a
+revision replaced every module in the body with that line of text, which would
+have published. That was true of modules an editor added in the admin panel, not
+only of anything an agent wrote.
+
+[`lib/mcp/blocks.ts`](../lib/mcp/blocks.ts) stands a marker in for each one, on
+a line of its own:
+
+```
+<!-- block:keyFacts:65f0c0ffee0000000000abcd -->
+```
+
+The read tool returns the module's contents beside the Markdown, in `blocks`,
+with the heading it sits under — and so does `readArticleVersion`, which shares
+its format, so an old version's modules can be reviewed the same way. Rich text
+inside a module — an FAQ answer, a callout, a dropdown panel — reads as
+Markdown, converted with that field's own editor rather than the body's; a value
+that is not editor state is reported exactly as stored, so a broken module
+never reads as a blank one. The update tool swaps each marker back for the
+module it names, exactly as stored: moving a marker moves the module, and
+leaving one out removes it, which the response always reports. A marker naming
+nothing in the current draft, used twice, or run into a paragraph is refused
+before anything is saved, since saving it would print a literal comment on the
+page.
+
+Three modules have a tool that writes them. `setKeyFactsBlock` replaces an
+article's key facts where they stand, or, if there are none, inserts them
+directly under the body heading the call names — headings being the one address
+in a body that an agent and an editor both see and that survives a revision.
+`replacePipeTable` removes the Markdown table under that heading at the same
+time: the editor has no table feature, so a table drafted in Markdown is stored
+as a paragraph of literal pipes and printed as one. It refuses an article with
+two sets of key facts, a heading that is missing or heads two sections, and any
+article whose page renders from `legacyHTML`, where a body holding only the card
+would replace the whole article.
+
+`setFAQBlock` places an FAQ by the same rules, from the same code
+([`lib/mcp/placement.ts`](../lib/mcp/placement.ts)), with two differences that
+come from the block. An FAQ always shows a heading of its own, so inserting one
+under a body heading such as `## FAQ` stacks two; `replaceExisting` instead puts
+it in place of that heading's whole section — the heading and everything under
+it, up to the next heading of the same or higher level — and gives it that
+heading's text, so the outline and the section's `#faq` link survive. That is how
+an FAQ drafted in Markdown, a bold question and its answer per paragraph, becomes
+the module. It refuses when the section holds an image or another module, which would be lost, or whole sections of its own — the sign of a heading named above the article's sections rather than one of them. And an FAQ is never unheaded, so an existing one keeps its heading
+when the call gives none, rather than being reset to "Frequently asked
+questions" and moving its anchor. Answers are Markdown, converted with the answer
+field's own editor, which has no module picker; an answer with a heading in it
+is refused, since each question is itself a heading. A published FAQ is also
+described to search engines as questions and answers (`FAQPage`), from the same
+fields.
+
+Two details keep this lossless. Articles are read at depth 0: populated, an
+inline image exports as a Markdown image pointing at its URL, which the
+converter does not read back, so a revision used to turn every image into its
+own Markdown source; unpopulated it exports as `![media:7]()`, which it does.
+`readArticleVersion` reads at the same depth, so a version and the draft still
+come back identical where the article is. And whether an article renders from
+`legacyHTML` is asked of the renderer (`toArticleBody`) rather than read off the
+field, because the rich-text body wins whenever it holds anything.
+
+`setTableBlock` writes a comparison table, and differs from the other two in
+one respect: an article has one set of key facts and one FAQ, but any number of
+tables, so replacing "the one it has" cannot be the only rule. A table is
+addressed by `key` (from its marker line), or by `afterHeading` — the table in
+that heading's section is replaced, and a section without one gets a new table
+directly under the heading — or, with neither, as the article's only table.
+Two tables in one section, or an article with several and no address, is
+refused. The call's `columns` and `rows` read the way a Markdown table does:
+the first column names the rows, so `columns[0]` is the block's row header and
+each row's first cell its label. Leave both out and the table is read from the
+Markdown one under the heading — converted back to Markdown with the body's own
+converter first, so a species typed in italics inside the pipe table is still
+in italics in the cell. A caption is required, as the block requires it at
+publish; a blank column heading is refused, with a pointer to `setKeyFactsBlock`
+when the table is really two columns of facts. Row labels and cells are inline
+Markdown — italics, bold, code, links to this site or `https:` — read by
+[`lib/content/inline-markdown.ts`](../lib/content/inline-markdown.ts), which
+builds elements and never HTML. A cell stays a plain text field rather than
+rich text: an editor per cell would put up to a hundred and fifty on one admin
+screen.
+
+Relationship nodes — a link card to another document, inserted from the editor's
+toolbar — have the same problem modules had, and are not covered: one still
+comes back from a revision as a line of text.
 
 ### Images
 
@@ -214,6 +327,90 @@ key that publishes a post whose draft was written by `updateArticleMarkdown`
 will publish the older body and leave the revision sitting in the versions
 table. Publish from the admin panel, where the draft is promoted and Live
 Preview shows what is going out.
+
+### Version history
+
+Payload keeps a version of a post on every save — autosave included, up to
+`maxPerDoc` (fifty) per document. `listArticleVersions` finds a point in that
+history and `readArticleVersion` reads it. From there, two ways back:
+
+- **Merge by hand**, to keep what has been added since: read the version, read
+  the current draft with `readArticleMarkdown`, reconcile them, and save the
+  result with `updateArticleMarkdown`. Only text survives this route — see
+  [the Markdown round trip](#the-markdown-round-trip-loses-blocks-and-images).
+- **Revert with `restoreArticleVersion`**, which overwrites. `scope: "body"`
+  replaces the body; `scope: "article"` also replaces the title, excerpt,
+  featured image, SEO title and description, authors, and tags. Whatever is in
+  scope is replaced wholesale — anything added to those fields since the
+  version was saved is gone from the draft — and the tool's description says
+  so in capitals, because a caller told to "restore Tuesday's version" could
+  reasonably assume a merge. `dryRun: true` lists the fields that would change
+  and writes nothing.
+
+What a revert **never** touches, whatever the scope, is everything that decides
+where, when, and to whom the post is served: the slug, visibility, canonical
+URL, `noindex`, the homepage `featured` flag, `publishedAt`, owners, review
+state, and the Ghost migration fields. Each would change a URL, a paywall, or
+what crawlers are told the next time somebody pressed publish, with nothing on
+the edit screen to say it had moved. `RESTORED_FIELDS` and `KEPT_ON_RESTORE` in
+[`lib/mcp/tools.ts`](../lib/mcp/tools.ts) are allowlists, and
+`tests/mcp/tools.test.ts` fails when a field on Posts is in neither — so a new
+field is left alone by a revert until somebody decides otherwise.
+
+A revert is always a **draft**. The published page does not change until a
+person publishes from the admin panel. The draft it replaced stays in history,
+and the response names it as `undo`: reverting to that version reverts the
+revert. The body is copied exactly as stored, so a revert brings back blocks
+and images that the Markdown route cannot carry.
+
+**It is built on an ordinary draft update, not on Payload's `restoreVersion`.**
+That operation does two things this tool must not. Without `draft: true` it
+writes the snapshot over the live document, so reverting a published post to
+an older draft would unpublish it. And with `draft: true` it still hands the
+collection hooks the snapshot's own `_status`, so reverting to a _published_
+version trips `refuseMcpPublish` for every editor key although nothing is being
+published — checked by swapping it in: the e2e revert fails with the publish
+guard's refusal. The update path runs the same access rules, publish guard,
+audit line, and authorship stamp as `updateArticleMarkdown`.
+
+#### The Markdown round trip loses blocks and images
+
+Measured against the real editor config, and true of `readArticleMarkdown` →
+`updateArticleMarkdown` as much as of a merge from history:
+
+- **Blocks are destroyed.** A callout exports as the literal words "Block
+  Field", which imports back as a paragraph reading "Block Field". No block in
+  [`blocks/schema.ts`](../blocks/schema.ts) defines a Markdown converter, so
+  this holds for every insertable module.
+- **Inline images become text.** Read at the default depth, an image exports
+  as a Markdown image with its address, which imports back as that literal text
+  in a paragraph, not as an image. Read at depth 0 it exports as a `media:12`
+  placeholder, which does import back as an image.
+
+So an agent revising a post that holds a block or an inline image through
+Markdown damages it. `restoreArticleVersion` is the way back from that.
+
+Three things the tools do that are easy to break:
+
+- **A version reads back byte-identical to the draft**, because both go through
+  one function (`articleView` in [`lib/mcp/tools.ts`](../lib/mcp/tools.ts)) at
+  the same population depth. The depth matters more than it looks: an image in
+  the body converts to a Markdown image carrying its alt text and address only
+  when its upload is populated, and to a bare `media:12` placeholder when it is
+  not, so a shallower read of the version would show a difference the article
+  does not have.
+- **A slug means the same document as in `readArticleMarkdown`**, because
+  `listArticleVersions` resolves it through the same `findArticle` — which is
+  also what refuses a document the key cannot read before any history is
+  looked at.
+- **History is readable under the same rule as the document.** Payload does not
+  derive `readVersions` from `read`, and left unset it lets any signed-in user
+  read every version of every post — so an author whom `postsRead` keeps out of
+  a colleague's draft could read it from the version table, over MCP or at
+  `/api/posts/versions`. `versionsOf` in [`access/roles.ts`](../access/roles.ts)
+  applies the document rule to each version's stored fields, on every versioned
+  collection. Without it, `readArticleVersion` hands an author key an editor's
+  draft; `e2e/mcp.spec.ts` checks that it does not.
 
 ### What gets logged
 
@@ -492,10 +689,11 @@ to close that. At `3.88.0` the plugin assigns it too, immediately after
 than load-bearing. It is kept: it costs nothing, it holds if that changes again,
 and the audit line needs the user in hand anyway.
 
-Note that migrated posts render from `legacyHTML`, not `content`, so a
-markdown-drafted body only appears on the public site for documents that have no
-`legacyHTML` — which is exactly the newly authored ones. `readArticleMarkdown`
-says so rather than returning an empty string.
+Note that migrated posts render from `legacyHTML` only while `content` is empty:
+the rich-text body wins whenever it holds anything, so the first edit to a
+migrated article in the editor — or over MCP — becomes what the page shows.
+`readArticleMarkdown` asks the renderer which body applies, and says so rather
+than returning an empty string when it is the migrated HTML.
 
 ### Finding 4: the endpoint is not behind the staging gate
 

@@ -319,7 +319,9 @@ meet, and each of them is a bug if it is checked in only some of the places a
 unit appears:
 
 - the deployment is indexable (`isNoindex()` — no ads on staging, same reason
-  analytics does not run there);
+  analytics does not run there) and its own origin is public
+  (`isPublicSiteUrl()` — no ads from a laptop on `localhost` or `127.0.0.1`,
+  where the tag would report that address to Google as the property);
 - the post is not a restricted teaser;
 - later, the reader is not a paying member.
 
@@ -423,10 +425,11 @@ AdSense in the meantime.
    decline that is slow to appeal.
 5. **Build `lib/ads/`.** Three of §5's four modules exist. `lib/ads/adsense.ts`
    resolves the publisher and `app/(frontend)/components/adsense.tsx` renders
-   Google's loader, gated on the deployment being indexable so staging never
-   serves ad code. It ships _on_ rather than off — the publisher defaults to the
-   id committed in `ads.txt`, since a loader nobody switched on is
-   indistinguishable from the problem it was meant to fix — with
+   Google's loader, gated on the deployment being indexable and its own origin
+   being public so staging and a laptop never serve ad code. It ships _on_
+   rather than off — the publisher defaults to the id committed in `ads.txt`,
+   since a loader nobody switched on is indistinguishable from the problem it
+   was meant to fix — with
    `NEXT_PUBLIC_ADSENSE_CLIENT=off` as the switch for pulling it without a
    deploy. `lib/ads/placements.ts` holds the placement names and the sizes they
    reserve; `lib/ads/eligibility.ts` is the one predicate, and it already
