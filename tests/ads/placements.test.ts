@@ -20,6 +20,18 @@ const body = readFileSync(
   join(process.cwd(), 'app/(frontend)/components/body.tsx'),
   'utf8',
 )
+const slugPage = readFileSync(
+  join(process.cwd(), 'app/(frontend)/[slug]/page.tsx'),
+  'utf8',
+)
+const homePage = readFileSync(
+  join(process.cwd(), 'app/(frontend)/page.tsx'),
+  'utf8',
+)
+const archiveGroups = readFileSync(
+  join(process.cwd(), 'app/(frontend)/components/archive-groups.tsx'),
+  'utf8',
+)
 
 describe('the placement inventory', () => {
   // A slot id is interpolated into a `data-ad-slot` attribute. A malformed one
@@ -52,18 +64,49 @@ describe('the placement inventory', () => {
   // A fluid unit has no maximum, so §8's "reserve the maximum" cannot be
   // honoured literally; the floor is what there is. Saying which shape a slot
   // is, in the type, is what stops a renderer guessing.
-  it('marks the in-article unit as the one with no fixed height', () => {
-    const size = SLOT_SIZES['article-inline']
-    expect(size.kind).toBe('fluid')
-    expect(reservedHeight('article-inline')).toBeGreaterThanOrEqual(250)
+  it('marks the in-article units as the ones with no fixed height', () => {
+    for (const placement of [
+      'article-inline-1',
+      'article-inline-2',
+      'article-inline-3',
+    ] as Placement[]) {
+      expect(SLOT_SIZES[placement].kind).toBe('fluid')
+      expect(reservedHeight(placement)).toBeGreaterThanOrEqual(250)
+    }
   })
 
-  // Only placements with a call site. §8 has five and four are unbuilt; a name
-  // with nothing rendering it is a name nobody has had to make work.
+  // The three billboards are Google's auto-sized display unit: one id serves
+  // 970x250 on a desktop and 300x250 on a phone, so there is no single size to
+  // pin. The reservation is the phone's height, held before anything fills.
+  it('marks the billboards as responsive and reserves the mobile height', () => {
+    for (const placement of [
+      'article-end',
+      'archive-inline',
+      'home-mid',
+    ] as Placement[]) {
+      expect(SLOT_SIZES[placement].kind).toBe('responsive')
+      expect(reservedHeight(placement)).toBeGreaterThanOrEqual(250)
+    }
+  })
+
+  // Only placements with a call site. §8 has five placements and every one is
+  // now rendered, so the inventory is exactly the ids and nothing speculative.
   it('lists only the placements something renders', () => {
-    expect(Object.keys(AD_SLOTS)).toEqual(['rail-1', 'article-inline'])
+    expect(Object.keys(AD_SLOTS)).toEqual([
+      'rail-1',
+      'article-inline-1',
+      'article-inline-2',
+      'article-inline-3',
+      'article-end',
+      'archive-inline',
+      'home-mid',
+    ])
     expect(rail).toContain('placement="rail-1"')
-    expect(body).toContain('placement="article-inline"')
+    // The in-body unit is chosen by position, so the three ids are in `body`
+    // as the return values of `inlinePlacement`, not as literal JSX props.
+    expect(body).toContain("'article-inline-1'")
+    expect(body).toContain("'article-inline-2'")
+    expect(body).toContain("'article-inline-3'")
   })
 })
 
@@ -84,6 +127,16 @@ describe('an unfilled slot', () => {
   it('gives every in-body box something to hold', () => {
     expect(body).toContain('<InlinePromo post={promo} />')
     expect(body).not.toMatch(/<AdUnit[^>]*\/>/)
+  })
+
+  // The three billboards reserve 250px and would otherwise be labelled empty
+  // boxes. They reuse the editor's existing `railFallback` supply through
+  // `HouseBand`, so there is one "when no ad is shown" surface rather than a
+  // second field to configure and a second migration to run.
+  it('gives every billboard something to hold', () => {
+    expect(slugPage).toContain('<HouseBand fallback={settings.railFallback} />')
+    expect(homePage).toContain('<HouseBand fallback={settings.railFallback} />')
+    expect(archiveGroups).toContain('<HouseBand fallback={fallback} />')
   })
 
   // House content is not the ad and is never handed to the network as though
@@ -107,7 +160,7 @@ describe('a placement its track has hidden', () => {
   // requirement. A number here would stop it filling on phones, which is where
   // most of the reading happens.
   it('puts no requirement on a unit in the reading column', () => {
-    expect(minViewportWidth('article-inline')).toBeNull()
+    expect(minViewportWidth('article-inline-1')).toBeNull()
   })
 
   it('asks the browser before pushing, and keeps listening', () => {
@@ -150,5 +203,36 @@ describe('the rail unit', () => {
     )
     expect(unit.match(/adsbygoogle\s*=\s*window\.adsbygoogle/g)!.length).toBe(1)
     expect(unit).not.toMatch(/setInterval/)
+  })
+})
+
+describe('ad coverage instrumentation', () => {
+  const unit = readFileSync(
+    join(process.cwd(), 'app/(frontend)/components/ad-unit.tsx'),
+    'utf8',
+  )
+
+  // Coverage is per placement and per country, and only GA4 can join the two —
+  // AdSense reports per ad unit but not against the reader's country. The
+  // observation has to run for every slot, not only the ones with a fallback:
+  // a slot with nothing to show is the one most worth counting, and it used to
+  // skip every measurement.
+  it('observes every slot, fallback or not, and reports once', () => {
+    expect(unit).toMatch(/reportAdSlot\(placement, next\)/)
+    expect(unit).toMatch(/reported\.current/)
+    expect(unit).not.toMatch(/if \(!unit \|\| !children\) return/)
+  })
+
+  // Only a slot Google was asked to fill has a fill to report. `rail-1` is
+  // never asked below 1280px, and a settle clock started at mount would report
+  // it `unfilled` from every phone — the rail's coverage diluted by impressions
+  // nobody requested. Starting the clock at the push also gives a slow tag its
+  // full `SETTLE_MS`, rather than whatever the idle callback left of it.
+  it('settles and reports only once the slot has been asked for', () => {
+    expect(unit).toMatch(/if \(!unit \|\| !requested\) return/)
+    expect(unit).toMatch(/\}, \[placement, requested\]\)/)
+    const push = unit.indexOf('.push({})')
+    expect(push).toBeGreaterThan(-1)
+    expect(unit.indexOf('setRequested(true)', push)).toBeGreaterThan(push)
   })
 })

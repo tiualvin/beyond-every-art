@@ -1,6 +1,20 @@
-import type { PostCard } from '@/lib/content/queries'
+import { Fragment } from 'react'
 
+import type { PostCard, RailFallback } from '@/lib/content/queries'
+
+import { AdUnit } from './ad-unit'
 import { EntryRow } from './entry-row'
+import { HouseBand } from './house-band'
+
+/**
+ * How many entries between listing units.
+ *
+ * Six, because the unit is a billboard and the row is a line of text: it is a
+ * break in the list rather than another row, and putting one in every few
+ * entries would read as the list failing to load. It is also the count §8
+ * planned, so the reservation and the rule agree.
+ */
+const INLINE_EVERY = 6
 
 const MONTH = new Intl.DateTimeFormat('en-GB', {
   month: 'long',
@@ -41,16 +55,48 @@ export function groupByMonth(posts: PostCard[]): PostGroup[] {
  * When something was published is an archive's one organising fact, so the
  * month carries the structure rather than a card grid that only implies order.
  */
-export function ArchiveGroups({ posts }: { posts: PostCard[] }) {
+export function ArchiveGroups({
+  posts,
+  adClient = null,
+  fallback = null,
+}: {
+  posts: PostCard[]
+  /**
+   * The publisher to run listing units for, or null for none.
+   *
+   * Passed in rather than resolved here because the same list renders inside
+   * `ArchiveFilter`, which is a client component and cannot read the server's
+   * environment — see `lib/ads/eligibility.ts`. Null on a deployment that must
+   * not serve ad code, which is the ordinary state of staging.
+   */
+  adClient?: string | null
+  /** What an unfilled listing unit holds, from `SiteSettings`. */
+  fallback?: RailFallback
+}) {
+  // One running count across the whole list, not one per month group: the
+  // unit's job is to break the reading of the list, and a piece low in a short
+  // month should not go unbroken because the group restarted the count.
+  let seen = 0
+
   return (
     <>
       {groupByMonth(posts).map((group) => (
         <section className="group" key={group.label}>
           <h2 className="group__label">{group.label}</h2>
           <div className="group__items">
-            {group.posts.map((post) => (
-              <EntryRow key={post.id} post={post} />
-            ))}
+            {group.posts.map((post) => {
+              seen += 1
+              return (
+                <Fragment key={post.id}>
+                  <EntryRow post={post} />
+                  {adClient && seen % INLINE_EVERY === 0 && (
+                    <AdUnit placement="archive-inline" client={adClient}>
+                      {fallback ? <HouseBand fallback={fallback} /> : undefined}
+                    </AdUnit>
+                  )}
+                </Fragment>
+              )
+            })}
           </div>
         </section>
       ))}
