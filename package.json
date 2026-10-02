@@ -88,6 +88,7 @@
       "postcss": "^8.5.23",
       "qs": "^6.16.0",
       "sharp": "^0.35.3",
+      "undici": "^7.29.1",
       "@esbuild-kit/core-utils>esbuild": "^0.25.12"
     }
   }
