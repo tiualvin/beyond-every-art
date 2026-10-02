@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 
-import type { PostCard } from '@/lib/content/queries'
+import type { PostCard, RailFallback } from '@/lib/content/queries'
 import { assignPigments, pigmentFor } from '@/lib/design/pigments'
 
 import { ArchiveGroups } from './archive-groups'
@@ -35,10 +35,16 @@ function topicsIn(posts: PostCard[]): Topic[] {
 export function ArchiveFilter({
   posts,
   subjects,
+  adClient = null,
+  fallback = null,
 }: {
   posts: PostCard[]
   /** Every subject slug, as the homepage chart assigns colours over them. */
   subjects: readonly string[]
+  /** Passed straight to `ArchiveGroups`; see its note on why it arrives here. */
+  adClient?: string | null
+  /** What an unfilled listing unit holds, from `SiteSettings`. */
+  fallback?: RailFallback
 }) {
   const [open, setOpen] = useState(false)
   const [selected, setSelected] = useState<string[]>([])
@@ -144,7 +150,11 @@ export function ArchiveFilter({
       </div>
 
       {visible.length > 0 ? (
-        <ArchiveGroups posts={visible} />
+        <ArchiveGroups
+          posts={visible}
+          adClient={adClient}
+          fallback={fallback}
+        />
       ) : (
         <p className="archive__empty">
           Nothing on this page matches that filter.

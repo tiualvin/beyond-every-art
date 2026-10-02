@@ -1,6 +1,7 @@
 import { RichText } from '@payloadcms/richtext-lexical/react'
 
 import { splitHtmlForAds, splitLexicalForAds } from '@/lib/ads/inline'
+import type { Placement } from '@/lib/ads/placements'
 import type { ArticleBody as ArticleBodyValue } from '@/lib/content/body'
 import type { PostCard } from '@/lib/content/queries'
 
@@ -80,7 +81,11 @@ export function ArticleBody({
         {chunks.map((chunk, index) => (
           <ArticleBodyChunk key={index}>
             {index > 0 && (
-              <InlineSlot client={adClient!} promo={inlinePromos[index - 1]} />
+              <InlineSlot
+                client={adClient!}
+                position={index - 1}
+                promo={inlinePromos[index - 1]}
+              />
             )}
             <div
               className={
@@ -101,7 +106,11 @@ export function ArticleBody({
       {parts.map((part, index) => (
         <ArticleBodyChunk key={index}>
           {index > 0 && (
-            <InlineSlot client={adClient!} promo={inlinePromos[index - 1]} />
+            <InlineSlot
+              client={adClient!}
+              position={index - 1}
+              promo={inlinePromos[index - 1]}
+            />
           )}
           <RichText
             data={part as never}
@@ -115,6 +124,21 @@ export function ArticleBody({
 }
 
 /**
+ * Which of the three in-body units a slot is.
+ *
+ * Positions one to three carry their own ids so their fill can be read apart
+ * — `docs/ADVERTISING.md` §8. Past the third they share `article-inline-3`,
+ * because the tail is what one row is worth: the returns after the third are
+ * thin enough that measuring the fourth apart from the fifth settles nothing,
+ * and a name per position would be six units to keep in step for one of them.
+ */
+function inlinePlacement(position: number): Placement {
+  if (position === 0) return 'article-inline-1'
+  if (position === 1) return 'article-inline-2'
+  return 'article-inline-3'
+}
+
+/**
  * One in-article unit, and the piece it shows when no ad is served.
  *
  * Both body branches render this, so what a slot holds is decided once. The
@@ -122,9 +146,17 @@ export function ArticleBody({
  * given children for, so a slot with nothing to show stays exactly the box it
  * was before any of this existed rather than becoming an emptier one.
  */
-function InlineSlot({ client, promo }: { client: string; promo?: PostCard }) {
+function InlineSlot({
+  client,
+  position,
+  promo,
+}: {
+  client: string
+  position: number
+  promo?: PostCard
+}) {
   return (
-    <AdUnit placement="article-inline" client={client}>
+    <AdUnit placement={inlinePlacement(position)} client={client}>
       {promo && <InlinePromo post={promo} />}
     </AdUnit>
   )

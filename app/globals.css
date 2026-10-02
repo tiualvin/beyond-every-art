@@ -3856,7 +3856,7 @@ ol.feature-list__items .feature-list__title::before {
    still pushes the rest of the article down, which is the one place on the
    site that trade is accepted, and it is accepted because the alternative is
    a fixed unit that earns less. docs/ADVERTISING.md §8 records it. */
-.ad-slot[data-placement='article-inline'] {
+.ad-slot[data-placement^='article-inline'] {
   min-height: 280px;
   margin: 2.5rem 0;
   /* The same rhythm a `.module` gets, because that is what this is from the
@@ -3864,8 +3864,100 @@ ol.feature-list__items .feature-list__title::before {
      of the article. */
 }
 
-.ad-slot[data-placement='article-inline'] .adsbygoogle {
+.ad-slot[data-placement^='article-inline'] .adsbygoogle {
   min-height: 280px;
+}
+
+/* The three billboards — `article-end`, `archive-inline`, `home-mid`. A
+   responsive unit serves 970x250 on a desktop and 300x250 on a phone from the
+   one id, so this reserves the phone's 250px and lets the desktop creative be
+   wider than the reservation is tall. §8's "reserve the maximum" is a floor
+   here for the same reason it is for the fluid units, and the mobile height is
+   the one to hold: a unit taller than its box drags the page down under the
+   reader, which is the shift every reservation exists to stop. */
+.ad-slot[data-placement='article-end'],
+.ad-slot[data-placement='archive-inline'],
+.ad-slot[data-placement='home-mid'] {
+  min-height: 250px;
+  margin: 2.5rem 0;
+}
+
+/* The billboards' house content, when no ad is served. The same idea as the
+   rail's `.rail__promo` (#173) and the in-body `.inline-promo` (#176), laid
+   out for a wide band rather than a 300px column: the pieces sit in a row so
+   the 970px reservation is filled by the shape it was reserved for. */
+.house-band {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  height: 100%;
+  justify-content: center;
+}
+
+.house-band__label {
+  margin: 0;
+}
+
+.house-band__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.75rem;
+}
+
+.house-band__item,
+.house-band__app {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  text-decoration: none;
+}
+
+.house-band__title {
+  font-family: var(--font-serif);
+  font-size: 1.05rem;
+  font-weight: 500;
+  line-height: 1.25;
+  margin: 0;
+  color: var(--color-ink);
+}
+
+.house-band__item:hover .house-band__title,
+.house-band__app:hover .house-band__title {
+  color: var(--color-burgundy);
+}
+
+.house-band__excerpt {
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: var(--color-muted);
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.house-band__meta {
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+@media (max-width: 40rem) {
+  /* One piece on a phone: three stacked would overflow the 250px the slot
+     holds, which is the shift the reservation exists to stop. */
+  .house-band__list {
+    grid-template-columns: 1fr;
+    gap: 0.9rem;
+  }
+
+  .house-band__list > li:not(:first-child) {
+    display: none;
+  }
 }
 
 /* Every chunk of a split HTML body after the first.
@@ -3923,8 +4015,14 @@ ol.feature-list__items .feature-list__title::before {
    claim about our own content that is not true, and the sort of thing an ad
    network is entitled to take a dim view of — but removing the label from the
    flow would shorten the box by 22px at the moment the fallback appears, which
-   is a layout shift under the reader for the sake of a word. */
-.ad-slot[data-fill='unfilled'] .ad-slot__label {
+   is a layout shift under the reader for the sake of a word.
+
+   Gated on `data-has-fallback`, because the label goes only where house
+   content replaced it. A slot with nothing to show keeps its cap: an empty box
+   that says it is an advertisement is the honest minimum, and the alternative
+   is an unlabelled blank. `AdUnit` observes every slot for coverage now, so
+   `data-fill` can be `unfilled` on one with no children. */
+.ad-slot[data-fill='unfilled'][data-has-fallback='true'] .ad-slot__label {
   visibility: hidden;
 }
 

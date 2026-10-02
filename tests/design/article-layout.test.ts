@@ -416,7 +416,9 @@ describe('the ad box when nothing is served', () => {
   // removing it from the flow would shorten the box by 22px at the moment the
   // fallback appears — a shift under the reader, for a word.
   it('hides the label without taking its space', () => {
-    const label = rule(".ad-slot[data-fill='unfilled'] .ad-slot__label")
+    const label = rule(
+      ".ad-slot[data-fill='unfilled'][data-has-fallback='true'] .ad-slot__label",
+    )
     expect(label).toMatch(/visibility: hidden/)
     expect(label).not.toMatch(/display: none/)
   })
