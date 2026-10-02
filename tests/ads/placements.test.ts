@@ -222,4 +222,17 @@ describe('ad coverage instrumentation', () => {
     expect(unit).toMatch(/reported\.current/)
     expect(unit).not.toMatch(/if \(!unit \|\| !children\) return/)
   })
+
+  // Only a slot Google was asked to fill has a fill to report. `rail-1` is
+  // never asked below 1280px, and a settle clock started at mount would report
+  // it `unfilled` from every phone — the rail's coverage diluted by impressions
+  // nobody requested. Starting the clock at the push also gives a slow tag its
+  // full `SETTLE_MS`, rather than whatever the idle callback left of it.
+  it('settles and reports only once the slot has been asked for', () => {
+    expect(unit).toMatch(/if \(!unit \|\| !requested\) return/)
+    expect(unit).toMatch(/\}, \[placement, requested\]\)/)
+    const push = unit.indexOf('.push({})')
+    expect(push).toBeGreaterThan(-1)
+    expect(unit.indexOf('setRequested(true)', push)).toBeGreaterThan(push)
+  })
 })
