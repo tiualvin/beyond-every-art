@@ -21,8 +21,10 @@ prepare the non-invasive routing foundation for the later publication system.
 | 5     | Publication groundwork    | Only route/slug primitives        | Reserved route collisions appear during migration planning and Payload editing; path helpers are unit tested              |
 
 Workstreams 1–4 may proceed in parallel because they own separate surfaces.
-Workstream 5 is deliberately limited to primitives until the acceptance gates
-in the handoff and cutover runbooks pass.
+Workstream 5 was deliberately limited to primitives until the acceptance gates
+in the handoff and cutover runbooks passed. The owner lifted that limit on
+3 Oct 2026 (see the last shared invariant below); the publication work now
+follows its own build order rather than this table.
 
 ## Shared invariants
 
@@ -37,8 +39,13 @@ in the handoff and cutover runbooks pass.
 - New root routes must reserve their first path segment before launch. A
   migration collision is resolved explicitly with a replacement slug and a
   redirect, never silently rewritten.
-- Publication collections, PDF processing, analytics, and reader UI remain
-  out of scope until the migration is signed off.
+- ~~Publication collections, PDF processing, analytics, and reader UI remain
+  out of scope until the migration is signed off.~~ Lifted by the owner on
+  3 Oct 2026, two weeks after the 19 Sep cutover. Publication work proceeds in
+  the order set in [`PUBLICATION_SYSTEM.md`](PUBLICATION_SYSTEM.md) ("Build
+  order"); it must not displace the open items in
+  [`DEPLOYMENT_STATUS.md`](DEPLOYMENT_STATUS.md), and nothing under
+  `/publication/` is shown to readers without the owner's sign-off.
 
 ## Integration ownership
 
