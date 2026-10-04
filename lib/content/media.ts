@@ -76,6 +76,28 @@ function toOptionalText(value: unknown): string | null {
   return trimmed ? trimmed : null
 }
 
+/**
+ * Drops a trailing slash from a media URL.
+ *
+ * Every row in the media table stores its `url` (and each derivative's) with a
+ * trailing slash — `/api/media/file/name.png/` — even though Payload serves the
+ * file at the unslashed path and redirects the slashed one to it. A browser
+ * follows that redirect, but `next/image` does not: the optimiser resolves a
+ * local URL by dispatching it through the app's own handler and treats the 308
+ * it gets back as the image, sniffing the redirect body and answering
+ * `400 The requested resource isn't a valid image.` So every feature image and
+ * card thumbnail on the site fails to render, and each `og:image` names a URL
+ * that only works through a redirect.
+ *
+ * Normalising here, at the one point every caller turns a Payload media record
+ * into something renderable, fixes new and existing rows alike without
+ * depending on how the slash got written. `collections/Media.ts` stops it being
+ * written again.
+ */
+export function normalizeMediaUrl(value: string): string {
+  return value.replace(/\/+$/, '')
+}
+
 type RawMedia = {
   url?: unknown
   alt?: unknown
@@ -93,7 +115,8 @@ function sizeUrl(sizes: unknown, name: string): string | null {
   if (!sizes || typeof sizes !== 'object') return null
   const size = (sizes as Record<string, unknown>)[name]
   if (!size || typeof size !== 'object') return null
-  return toOptionalText((size as { url?: unknown }).url)
+  const url = toOptionalText((size as { url?: unknown }).url)
+  return url ? normalizeMediaUrl(url) : url
 }
 
 /**
@@ -113,7 +136,7 @@ export function toMediaImage(value: unknown): MediaImage | null {
   const filename = typeof raw.filename === 'string' ? raw.filename : null
 
   return {
-    url,
+    url: normalizeMediaUrl(url),
     alt: toAltText(typeof raw.alt === 'string' ? raw.alt : null, filename),
     width: toDimension(raw.width),
     height: toDimension(raw.height),
