@@ -5,6 +5,7 @@ import { toCreditURL } from '../lib/content/attribution'
 import { ghostUrlField, migrationStatusField } from '../fields/ghost'
 import { CONTENT_TAGS } from '../lib/cache/content'
 import { purgeOnChange, purgeOnDelete } from '../lib/cache/purge'
+import { stripMediaUrlSlashes } from '../lib/media/urls'
 import { refuseOversizedUpload } from '../lib/security/uploads'
 
 export const Media: CollectionConfig = {
@@ -27,6 +28,10 @@ export const Media: CollectionConfig = {
   trash: true,
   hooks: {
     beforeOperation: [refuseOversizedUpload],
+    // Runs after the upload field has generated `url` and every derivative's,
+    // so this is the point a stored URL can be corrected. See lib/media/urls.ts
+    // for why a trailing slash breaks every image on the site.
+    beforeChange: [(args) => stripMediaUrlSlashes(args.data)],
     afterChange: [purgeOnChange(CONTENT_TAGS.media)],
     afterDelete: [purgeOnDelete(CONTENT_TAGS.media)],
   },

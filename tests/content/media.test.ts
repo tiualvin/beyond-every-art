@@ -108,6 +108,26 @@ describe('toMediaImage', () => {
     expect(toMediaImage({ alt: 'orphaned' })).toBeNull()
   })
 
+  // Every media row stores its URLs with a trailing slash, and `next/image`
+  // cannot fetch one: the optimiser does not follow the redirect that strips
+  // it and fails the request as "not a valid image". This is the fix that
+  // makes the existing 188 rows render; `collections/Media.ts` stops new ones
+  // being written.
+  it('drops the stored trailing slash from every URL it renders', () => {
+    const image = toMediaImage({
+      ...record,
+      url: '/api/media/file/ultramarine.jpg/',
+      sizes: {
+        card: { url: '/api/media/file/ultramarine-768.jpg/' },
+        og: { url: '/api/media/file/ultramarine-1200x630.jpg/' },
+      },
+    })
+
+    expect(image?.url).toBe('/api/media/file/ultramarine.jpg')
+    expect(image?.cardUrl).toBe('/api/media/file/ultramarine-768.jpg')
+    expect(image?.ogUrl).toBe('/api/media/file/ultramarine-1200x630.jpg')
+  })
+
   it('omits dimensions that cannot reserve space', () => {
     const image = toMediaImage({
       ...record,
