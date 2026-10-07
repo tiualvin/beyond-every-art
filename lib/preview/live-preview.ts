@@ -1,7 +1,12 @@
-import { appPath, pagePath, postPath } from '../seo/site'
+import { appPath, pagePath, postPath, publicationPath } from '../seo/site'
 
 /** Collections an editor can preview on the public site. */
-export const PREVIEW_COLLECTIONS = ['posts', 'pages', 'apps'] as const
+export const PREVIEW_COLLECTIONS = [
+  'posts',
+  'pages',
+  'apps',
+  'publications',
+] as const
 
 /**
  * Globals an editor can preview, and the page each is previewed against.
@@ -63,14 +68,30 @@ export function isPreviewRole(user: unknown): boolean {
   return typeof role === 'string' && PREVIEW_ROLES.has(role)
 }
 
-/** Where a previewable document lives on the public site. */
+/**
+ * Where a previewable document lives on the public site.
+ *
+ * Every collection is named, with no default. This used to end in
+ * `return postPath(slug)`, so a collection added to the list above without a
+ * branch here still compiled and previewed at `/<slug>/` — a root URL that is
+ * not where the document lives. A switch over the union with no fallthrough
+ * makes that a type error instead: the function cannot reach its end for a
+ * member nobody handled.
+ */
 export function previewTargetPath(
   collection: PreviewCollection,
   slug: string,
 ): string {
-  if (collection === 'pages') return pagePath(slug)
-  if (collection === 'apps') return appPath(slug)
-  return postPath(slug)
+  switch (collection) {
+    case 'posts':
+      return postPath(slug)
+    case 'pages':
+      return pagePath(slug)
+    case 'apps':
+      return appPath(slug)
+    case 'publications':
+      return publicationPath(slug)
+  }
 }
 
 type PreviewUrlArgs = {
