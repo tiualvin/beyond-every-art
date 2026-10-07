@@ -1,10 +1,7 @@
 import type { CollectionConfig } from 'payload'
 
-import {
-  editorsAndAdmins,
-  publishedOrEditors,
-  versionsOf,
-} from '../access/roles'
+import { publicationsRead } from '../access/publications'
+import { editorsAndAdmins } from '../access/roles'
 import { seoFields } from '../fields/seo'
 import { slugField } from '../fields/slug'
 import { CONTENT_TAGS } from '../lib/cache/content'
@@ -37,16 +34,22 @@ export const Publications: CollectionConfig = {
     useAsTitle: 'title',
     defaultColumns: ['title', 'issueNumber', 'publishedAt', '_status'],
     description:
-      'Issues listed at /publication/. Readers see none of this until the ' +
-      'publication system launches; until then an issue can be previewed ' +
-      'like a page.',
+      'Issues listed at /publication/. Readers see none of this, on the site ' +
+      'or through the API, until the publication system launches; until then ' +
+      'an issue can be previewed like a page.',
     preview: (doc) =>
       buildPreviewUrl({ collection: 'publications', slug: doc?.slug }),
   },
   access: {
     create: editorsAndAdmins,
-    read: publishedOrEditors,
-    readVersions: versionsOf(publishedOrEditors),
+    // Closed before launch, and the same rules as the site after it; see
+    // access/publications.ts for why the routes' own gate is not enough.
+    read: publicationsRead,
+    // Editors only. An issue's history is editorial working material, and
+    // nobody else edits one: `versionsOf(read)` would let a signed-in author
+    // read every revision that was once published, including those of an issue
+    // since withdrawn, because it judges each version by its own stored status.
+    readVersions: editorsAndAdmins,
     update: editorsAndAdmins,
     delete: editorsAndAdmins,
   },
