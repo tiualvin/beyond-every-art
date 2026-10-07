@@ -132,12 +132,22 @@ export function toContents(value: unknown): ContentsEntry[] {
  * Only *consecutive* entries share a group. A magazine can return to a section
  * — Materials, then Practice, then Materials again — and merging the two runs
  * would reorder the issue into something that is not its contents.
+ *
+ * An entry with no section continues the one above it. That is how an editor
+ * types a contents list — the heading once, then the rows beneath it — and it
+ * is the only reading that renders honestly: an unheaded group after a headed
+ * one sat visually and in the heading outline under the previous heading
+ * without belonging to it. Entries before the first heading form an unheaded
+ * group of their own.
  */
 export function groupContents(entries: ContentsEntry[]): ContentsSection[] {
   const sections: ContentsSection[] = []
   for (const entry of entries) {
     const current = sections.at(-1)
-    if (current && current.section === entry.section) {
+    if (
+      current &&
+      (entry.section === '' || entry.section === current.section)
+    ) {
       current.entries.push(entry)
     } else {
       sections.push({ section: entry.section, entries: [entry] })

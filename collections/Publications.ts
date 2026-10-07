@@ -132,8 +132,9 @@ export const Publications: CollectionConfig = {
       labels: { singular: 'Entry', plural: 'Contents' },
       admin: {
         description:
-          'The table of contents, in order. Entries with the same section are ' +
-          'grouped under it.',
+          'The table of contents, in order. Give the section on the first ' +
+          'entry of each run; entries below it with the section left blank ' +
+          'stay under the same heading.',
       },
       fields: [
         {

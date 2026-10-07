@@ -142,9 +142,32 @@ describe('groupContents', () => {
     ])
   })
 
-  it('puts entries with no heading in a group of their own', () => {
+  it('keeps entries before the first heading in an unheaded group', () => {
     expect(groupContents([entry('', 'a'), entry('', 'b')])).toEqual([
       { section: '', entries: [entry('', 'a'), entry('', 'b')] },
+    ])
+  })
+
+  it('reads a blank section as the one above it', () => {
+    // An editor gives the heading once and leaves the rows beneath it blank.
+    // Read the other way, the blank rows rendered under the previous heading
+    // without belonging to it.
+    const grouped = groupContents([
+      entry('', 'Editor’s note'),
+      entry('Materials', 'a'),
+      entry('', 'b'),
+      entry('Practice', 'c'),
+      entry('', 'd'),
+    ])
+    expect(
+      grouped.map((group) => [
+        group.section,
+        group.entries.map((e) => e.title),
+      ]),
+    ).toEqual([
+      ['', ['Editor’s note']],
+      ['Materials', ['a', 'b']],
+      ['Practice', ['c', 'd']],
     ])
   })
 
