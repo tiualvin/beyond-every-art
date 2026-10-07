@@ -5479,6 +5479,210 @@ h1.archive__title {
   margin: 0;
 }
 
+/* --- Publication: the archive and an issue's own page ---
+   Not shown to readers until launch (lib/publications/launch.ts). A cover is a
+   printed page, so the archive gives every one the A-series proportion most
+   issues are set in, and an issue's own page shows its cover uncropped, at
+   whatever proportion it was printed. */
+
+.publication__head {
+  max-width: 62rem;
+}
+
+.publication__head h1 {
+  font-size: clamp(2.2rem, 5vw, 3.4rem);
+  letter-spacing: -0.03em;
+  margin: 0 0 0.9rem;
+}
+
+.publication__intro {
+  margin: 0;
+  font-size: clamp(1.02rem, 1.6vw, 1.2rem);
+  color: var(--color-muted);
+  max-width: 54ch;
+}
+
+.issues {
+  list-style: none;
+  margin: clamp(2rem, 4vw, 3rem) 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+  gap: clamp(2.25rem, 4vw, 3.25rem) clamp(1.25rem, 3vw, 2.25rem);
+}
+
+.issue {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.issue__cover {
+  position: relative;
+  display: block;
+  aspect-ratio: 210 / 297;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--color-ink) 10%, transparent),
+    0 14px 28px -18px color-mix(in srgb, var(--color-ink) 45%, transparent);
+}
+
+/* The wash a listing shows where an image should have been (--plate-wash). */
+.issue__plate {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background: var(--plate-wash);
+}
+
+.issue__meta {
+  margin: 0;
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+  color: var(--color-muted);
+}
+
+.issue__title {
+  font-size: clamp(1.3rem, 2vw, 1.55rem);
+  line-height: 1.2;
+  margin: 0.25rem 0 0;
+}
+
+.issue__title a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.issue__title a:hover,
+.issue__title a:focus-visible {
+  color: var(--color-burgundy);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.issue__subtitle {
+  margin: 0.35rem 0 0;
+  font-family: var(--font-serif);
+  font-style: italic;
+  color: var(--color-burgundy);
+}
+
+.issue__description {
+  margin: 0.6rem 0 0;
+  font-size: 0.95rem;
+  color: color-mix(in srgb, var(--color-ink) 84%, var(--color-paper));
+}
+
+.issue__date {
+  margin: 0.6rem 0 0;
+  font-size: 0.85rem;
+  color: var(--color-muted);
+}
+
+.issue-page__grid {
+  display: grid;
+  gap: clamp(2rem, 5vw, 4rem);
+  align-items: start;
+}
+
+@media (min-width: 48rem) {
+  .issue-page__grid {
+    grid-template-columns: minmax(15rem, 26rem) minmax(0, 1fr);
+  }
+}
+
+.issue-page__cover {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius);
+  box-shadow:
+    0 1px 2px color-mix(in srgb, var(--color-ink) 10%, transparent),
+    0 18px 36px -22px color-mix(in srgb, var(--color-ink) 50%, transparent);
+}
+
+.issue-page__cover img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* No cover yet: the wash, at a page's proportions. */
+.issue-page__cover .issue__plate {
+  position: static;
+  aspect-ratio: 210 / 297;
+}
+
+.issue-page__title {
+  font-size: clamp(2.2rem, 5vw, 3.4rem);
+  letter-spacing: -0.03em;
+  margin: 0.3rem 0 0.5rem;
+}
+
+.issue-page__subtitle {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: clamp(1.2rem, 2.4vw, 1.6rem);
+  color: var(--color-burgundy);
+  margin: 0 0 0.5rem;
+}
+
+.issue-page__description {
+  font-size: clamp(1.05rem, 1.8vw, 1.2rem);
+  line-height: 1.6;
+  max-width: 42rem;
+  margin: 1.25rem 0 0;
+}
+
+.issue-contents {
+  margin-top: clamp(2rem, 4vw, 3rem);
+  padding-top: 1.35rem;
+  border-top: 1px solid var(--color-rule);
+  max-width: 42rem;
+}
+
+.issue-contents h2 {
+  font-size: 1.25rem;
+  margin: 0 0 1rem;
+}
+
+.issue-contents__group + .issue-contents__group {
+  margin-top: 1.5rem;
+}
+
+/* Section headings in the serif rather than as small capitals: PRODUCT.md
+   rules out tracked uppercase labels over every block. */
+.issue-contents h3 {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 1.05rem;
+  color: var(--color-burgundy);
+  margin: 0 0 0.35rem;
+}
+
+.issue-contents ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.issue-contents li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.issue-contents__page {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-muted);
+}
+
 /* --- Waitlist ---
    One email against any number of apps, which is the shape the collection
    already has: a row per (email, app) pair. */

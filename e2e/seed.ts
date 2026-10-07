@@ -76,6 +76,44 @@ async function upsertDraftApp(payload: Payload): Promise<void> {
   } as unknown as CreateOptions)
 }
 
+/**
+ * A published issue. Readers must still get a 404 for it until the publication
+ * system launches, so the spec checks the gate rather than an empty table.
+ */
+async function upsertPublishedPublication(payload: Payload): Promise<void> {
+  const data = {
+    title: fixtures.publishedPublication.title,
+    slug: fixtures.publishedPublication.slug,
+    description: 'Synthetic published issue, hidden from readers until launch.',
+    publishedAt: '2025-03-01T09:00:00.000Z',
+    _status: 'published',
+  }
+
+  const existing = await payload.find({
+    collection: 'publications',
+    where: { slug: { equals: fixtures.publishedPublication.slug } },
+    limit: 1,
+    depth: 0,
+    overrideAccess: true,
+  })
+
+  if (existing.docs.length > 0) {
+    await payload.update({
+      collection: 'publications',
+      id: existing.docs[0].id,
+      data,
+      overrideAccess: true,
+    } as unknown as UpdateOptions)
+    return
+  }
+
+  await payload.create({
+    collection: 'publications',
+    data,
+    overrideAccess: true,
+  } as unknown as CreateOptions)
+}
+
 async function upsertPost(
   payload: Payload,
   slug: string,
@@ -283,6 +321,7 @@ async function seed(): Promise<void> {
   })
 
   await upsertDraftApp(payload)
+  await upsertPublishedPublication(payload)
   await upsertRedirect(payload)
 
   await upsertKeyedUser(payload, {
@@ -303,7 +342,7 @@ async function seed(): Promise<void> {
 
   payload.logger.info(
     'E2E seed complete: draft, members post, duplicate-title post, ' +
-      'draft app, redirect, MCP keys.',
+      'draft app, published issue, redirect, MCP keys.',
   )
 }
 
