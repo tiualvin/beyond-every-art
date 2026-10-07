@@ -29,10 +29,15 @@ rather than drifts.
 longer than the margin existed.)
 
 [`docs/PUBLICATION_SYSTEM.md`](docs/PUBLICATION_SYSTEM.md) records the planned
-self-hosted digital publication system—the `/publication` archive, issue landing
-pages, the full-screen reader, PDF processing worker, interactive hotspots,
-transcripts, and first-party analytics. None of it is built, and it must not
-displace migration or cutover work.
+self-hosted digital publication system—the `/publication/` archive, issue
+landing pages, the full-screen reader, PDF processing worker, interactive
+hotspots, transcripts, and first-party analytics. The owner lifted its
+migration gate on 3 Oct 2026. Only groundwork is built — the path helpers, the
+reserved slug, and the reader's page logic and link policy in
+`lib/publications/` — and no source PDF exists yet. Read its build order and
+open decisions before adding a publication collection, route or service; it
+still must not displace the open post-cutover work, and nothing under
+`/publication/` reaches readers without the owner's sign-off.
 
 [`docs/INSERTABLE_CONTENT_MODULES.md`](docs/INSERTABLE_CONTENT_MODULES.md)
 records the evaluated architecture for Ghost-style insertable blocks, reusable

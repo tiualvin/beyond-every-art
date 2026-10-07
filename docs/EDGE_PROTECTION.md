@@ -572,6 +572,18 @@ concerns already handled in the repo, and nothing about these:
   path keeps its own lower ceiling of 8MB, because those bytes arrive as base64
   through a model's context.
 
+  _Corrected 3 Oct 2026:_ for uploads through the admin panel or the REST API,
+  the limit actually met is Payload's own. The installed version parses every
+  multipart body with defaults of 20MB per file and 50MB per request, and
+  refuses anything larger with a `413` before a collection hook can run —
+  `payload.config.ts` sets no root `upload` options, so the defaults stand. The
+  25MB hook therefore governs the Local API (the import and restore scripts)
+  and is a backstop on the admin path. The parser stops reading at its limit,
+  so it also bounds what a multipart request can make the process buffer.
+  Raising that root setting raises it for every upload collection at once;
+  [`PUBLICATION_SYSTEM.md`](PUBLICATION_SYSTEM.md) has the alternatives for a
+  collection that genuinely needs large files.
+
   That bounds what gets **stored**, not what a stranger can make the server
   **receive**: the bytes have already been buffered by the time a collection
   hook runs. The real defence is still a request body limit in front of

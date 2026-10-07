@@ -61,15 +61,27 @@ afterEach(() => {
   vi.resetModules()
 })
 
-describe('the storage plugin leaves the schema alone', () => {
-  it('gives upload collections the same columns with R2 on and off', async () => {
-    const off = await uploadColumns({ S3_BUCKET: '', S3_ENDPOINT: '' })
-    const on = await uploadColumns(R2)
-    expect(off).toEqual(on)
-  })
+// The first case imports the whole of `payload.config.ts` twice inside the
+// test body, after `vi.resetModules()`. That is the point of the test, and it
+// is seconds of work that count against the per-test limit, unlike the config
+// imports in the other collection tests, which happen at load time. Alone it
+// takes about 4.2 seconds, most of Vitest's five-second default; alongside 160
+// other files in parallel it has gone past that and failed with a timeout that
+// says nothing about the schema. The limit is raised for these cases, not the
+// assertions, and every collection added to the config makes the import slower.
+describe(
+  'the storage plugin leaves the schema alone',
+  { timeout: 30_000 },
+  () => {
+    it('gives upload collections the same columns with R2 on and off', async () => {
+      const off = await uploadColumns({ S3_BUCKET: '', S3_ENDPOINT: '' })
+      const on = await uploadColumns(R2)
+      expect(off).toEqual(on)
+    })
 
-  it('keeps the object key column either way', async () => {
-    const off = await uploadColumns({ S3_BUCKET: '', S3_ENDPOINT: '' })
-    expect(off.media).toContain('_objectKey')
-  })
-})
+    it('keeps the object key column either way', async () => {
+      const off = await uploadColumns({ S3_BUCKET: '', S3_ENDPOINT: '' })
+      expect(off.media).toContain('_objectKey')
+    })
+  },
+)
