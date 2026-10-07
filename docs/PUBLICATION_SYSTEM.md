@@ -30,7 +30,12 @@ What is built:
   `PUBLICATIONS_LAUNCHED` in `lib/publications/launch.ts`, and renders for an
   editor previewing. `tests/publications/launch.test.ts` fails if the switch is
   turned on, or if a page under `/publication/` stops consulting it, and
-  `e2e/publication.spec.ts` checks a published issue is still a 404.
+  `e2e/publication.spec.ts` checks a published issue is still a 404;
+- the same gate on the API: `access/publications.ts` lets nobody but editors
+  read an issue through Payload before launch — the CMS hostname forwards any
+  `/api` request carrying an `Authorization` header, so the routes alone were
+  not enough — and after launch gives readers only what the site would show.
+  Version history is editors-only.
 
 **No source PDF exists yet.** Development can use a generated sample issue, but
 the first real issue — its page count, file size and image rights — is a
@@ -463,7 +468,9 @@ editor / author roles. Two cautions from the code: `publishedOrEditors` filters
 on `_status`, which only a versioned collection has, so it cannot guard an
 upload or page collection; and every versioned collection also needs
 `readVersions: versionsOf(...)`, which `tests/access/roles.test.ts` checks
-against a hand-kept list.
+against a hand-kept list. `publications` itself reads through
+`access/publications.ts` rather than `publishedOrEditors`, which checks
+neither the launch switch, nor the publish date, nor the trash.
 
 **Corrected 3 Oct 2026.** The four collections above were the first sketch.
 Three things in the code change their shape, and the subsections below follow
