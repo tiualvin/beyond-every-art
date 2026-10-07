@@ -32,6 +32,14 @@ export const fixtures = {
     slug: 'e2e-unpublished-app',
     title: 'E2E Unpublished App',
   },
+  // Published, and still a 404: the publication routes stay closed to readers
+  // until the owner signs off the launch (lib/publications/launch.ts). A
+  // published issue is what makes that a test of the gate rather than of an
+  // empty table.
+  publishedPublication: {
+    slug: 'e2e-published-issue',
+    title: 'E2E Published Issue',
+  },
   // MCP keys for the endpoint smoke suite. Both are literals rather than
   // generated values because the spec has to present them, and the seed runs in
   // a different process — they are only ever valid against a disposable test

@@ -77,10 +77,11 @@ describe('reserved root slugs', () => {
   })
 
   it('stays aligned with the static top-level App Router segments', () => {
-    // `publication` is reserved ahead of its planned route. Dynamic root
+    // A segment reserved ahead of its route goes here until the route lands;
+    // `publication` sat here until /publication/ was built. Dynamic root
     // segments such as `[slug]` are deliberately discovered and excluded by
     // `staticRootRouteSegments` because they do not own a literal root slug.
-    const policyOnlySegments = ['publication']
+    const policyOnlySegments: string[] = []
     const discoveredSegments = [
       ...staticRootRouteSegments(APP_DIRECTORY),
       ...metadataRootRouteSegments(APP_DIRECTORY),

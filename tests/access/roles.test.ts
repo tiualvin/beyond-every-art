@@ -159,6 +159,7 @@ describe('version history access', () => {
       'apps',
       'pages',
       'posts',
+      'publications',
     ])
     for (const collection of versioned) {
       expect(collection.access?.readVersions, collection.slug).toBeTypeOf(

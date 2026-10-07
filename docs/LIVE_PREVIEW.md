@@ -179,7 +179,10 @@ What this does not do is follow typing. See "Not built" below.
   its frame follows _saves_.
 - A Playwright spec in `e2e/`. The browser run above was a one-off against a
   seeded instance, not a committed regression test.
-- Preview of publication-system surfaces, which are gated behind cutover by
+- Preview of the publication reader. An issue's landing page previews like a
+  page (`publications` is in `PREVIEW_COLLECTIONS`); the full-screen reader is
+  not built, and when it is it needs its own listener, because it lives
+  outside the frontend layout that mounts this one — see
   [`PUBLICATION_SYSTEM.md`](PUBLICATION_SYSTEM.md).
 - Member-gated rendering, so `members` and `paid` posts preview as staff see
   them rather than as a subscriber would.

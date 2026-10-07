@@ -4,6 +4,7 @@ import {
   buildPreviewUrl,
   isPreviewCollection,
   isPreviewRole,
+  PREVIEW_COLLECTIONS,
   previewTargetPath,
 } from '../../lib/preview/live-preview'
 
@@ -131,5 +132,34 @@ describe('apps preview', () => {
     expect(buildPreviewUrl({ collection: 'apps', slug: 'dapple' })).toBe(
       `/api/preview?collection=apps&slug=dapple`,
     )
+  })
+})
+
+describe('publications preview', () => {
+  it('is previewable, so an editor can see an issue before readers can', () => {
+    expect(isPreviewCollection('publications')).toBe(true)
+  })
+
+  it('targets the issue’s landing page, not a root slug', () => {
+    expect(previewTargetPath('publications', 'spring-2026')).toBe(
+      '/publication/spring-2026/',
+    )
+    expect(
+      buildPreviewUrl({ collection: 'publications', slug: 'spring-2026' }),
+    ).toBe(`/api/preview?collection=publications&slug=spring-2026`)
+  })
+})
+
+describe('previewTargetPath, for every collection', () => {
+  it('sends every previewable collection somewhere of its own', () => {
+    // A collection added to PREVIEW_COLLECTIONS without a branch used to fall
+    // through to a root slug. Each must now have a distinct prefix, or be one
+    // of the two that genuinely live at the root.
+    const ROOT = new Set(['posts', 'pages'])
+    for (const collection of PREVIEW_COLLECTIONS) {
+      const path = previewTargetPath(collection, 'x')
+      if (ROOT.has(collection)) expect(path).toBe('/x/')
+      else expect(path).not.toBe('/x/')
+    }
   })
 })

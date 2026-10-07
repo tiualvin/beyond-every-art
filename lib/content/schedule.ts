@@ -27,8 +27,12 @@
 
 import type { Where } from 'payload'
 
-/** Only `posts` and `pages` carry a publication date. `apps` do not. */
-export const SCHEDULABLE_COLLECTIONS = ['posts', 'pages'] as const
+/** The collections that carry a publication date. `apps` do not. */
+export const SCHEDULABLE_COLLECTIONS = [
+  'posts',
+  'pages',
+  'publications',
+] as const
 
 /**
  * The `_status` half, on its own.

@@ -1,6 +1,8 @@
 import config from '@payload-config'
 import { getPayload, type Payload } from 'payload'
 
+import { live } from '../lib/content/schedule'
+
 import { fixtures } from './fixtures'
 
 type CreateOptions = Parameters<Payload['create']>[0]
@@ -74,6 +76,63 @@ async function upsertDraftApp(payload: Payload): Promise<void> {
     draft: true,
     overrideAccess: true,
   } as unknown as CreateOptions)
+}
+
+/**
+ * A published issue. Readers must still get a 404 for it until the publication
+ * system launches, so the spec checks the gate rather than an empty table.
+ */
+async function upsertPublishedPublication(payload: Payload): Promise<void> {
+  const data = {
+    title: fixtures.publishedPublication.title,
+    slug: fixtures.publishedPublication.slug,
+    description: 'Synthetic published issue, hidden from readers until launch.',
+    publishedAt: '2025-03-01T09:00:00.000Z',
+    _status: 'published',
+  }
+
+  const existing = await payload.find({
+    collection: 'publications',
+    where: { slug: { equals: fixtures.publishedPublication.slug } },
+    limit: 1,
+    depth: 0,
+    overrideAccess: true,
+  })
+
+  if (existing.docs.length > 0) {
+    await payload.update({
+      collection: 'publications',
+      id: existing.docs[0].id,
+      data,
+      overrideAccess: true,
+    } as unknown as UpdateOptions)
+  } else {
+    await payload.create({
+      collection: 'publications',
+      data,
+      overrideAccess: true,
+    } as unknown as CreateOptions)
+  }
+
+  // The spec's 404s prove the launch gate only if this issue is one the site
+  // would otherwise show. A seed that left it a draft, future-dated or
+  // missing would let every assertion pass for the wrong reason, so the
+  // premise is checked here, with the same filter the site reads through.
+  const visible = await payload.find({
+    collection: 'publications',
+    where: {
+      and: [{ slug: { equals: fixtures.publishedPublication.slug } }, live()],
+    },
+    limit: 1,
+    depth: 0,
+    overrideAccess: true,
+  })
+  if (visible.docs.length === 0) {
+    throw new Error(
+      'The seeded publication is not live, so e2e/publication.spec.ts would ' +
+        'prove nothing about the launch gate.',
+    )
+  }
 }
 
 async function upsertPost(
@@ -283,6 +342,7 @@ async function seed(): Promise<void> {
   })
 
   await upsertDraftApp(payload)
+  await upsertPublishedPublication(payload)
   await upsertRedirect(payload)
 
   await upsertKeyedUser(payload, {
@@ -303,7 +363,7 @@ async function seed(): Promise<void> {
 
   payload.logger.info(
     'E2E seed complete: draft, members post, duplicate-title post, ' +
-      'draft app, redirect, MCP keys.',
+      'draft app, published issue, redirect, MCP keys.',
   )
 }
 

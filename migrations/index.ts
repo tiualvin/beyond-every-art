@@ -21,6 +21,7 @@ import * as migration_20260927_085810_add_restore_article_version_capability fro
 import * as migration_20260927_095529_add_set_key_facts_block_capability from './20260927_095529_add_set_key_facts_block_capability';
 import * as migration_20260928_012336_add_set_faq_block_capability from './20260928_012336_add_set_faq_block_capability';
 import * as migration_20260928_080021_add_set_table_block_capability from './20260928_080021_add_set_table_block_capability';
+import * as migration_20261007_035208_add_publications from './20261007_035208_add_publications';
 
 export const migrations = [
   {
@@ -136,6 +137,11 @@ export const migrations = [
   {
     up: migration_20260928_080021_add_set_table_block_capability.up,
     down: migration_20260928_080021_add_set_table_block_capability.down,
-    name: '20260928_080021_add_set_table_block_capability'
+    name: '20260928_080021_add_set_table_block_capability',
+  },
+  {
+    up: migration_20261007_035208_add_publications.up,
+    down: migration_20261007_035208_add_publications.down,
+    name: '20261007_035208_add_publications'
   },
 ];

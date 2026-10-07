@@ -14,6 +14,7 @@ import { Authors } from '../../collections/Authors'
 import { Media } from '../../collections/Media'
 import { Pages } from '../../collections/Pages'
 import { Posts } from '../../collections/Posts'
+import { Publications } from '../../collections/Publications'
 import { Tags } from '../../collections/Tags'
 import { ghostIdField } from '../../fields/ghost'
 import { seoFields } from '../../fields/seo'
@@ -21,7 +22,7 @@ import { slugField } from '../../fields/slug'
 import { findField } from '../support/fields'
 
 /** Every collection whose documents are addressable by slug. */
-const SLUGGED = [Posts, Pages, Apps, Tags, Authors]
+const SLUGGED = [Posts, Pages, Apps, Publications, Tags, Authors]
 
 /** Fields that used to be public and are now editor-only, by collection. */
 const INTERNAL_FIELDS: Array<[string, Field[], string[]]> = [
