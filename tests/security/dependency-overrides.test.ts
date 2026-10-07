@@ -40,6 +40,16 @@ const OVERRIDES: Record<string, { floor: string; reason: string }> = {
       'deprecated @esbuild-kit loader. Scoped to that path so the current ' +
       'esbuild elsewhere in the tree is left alone.',
   },
+  '@modelcontextprotocol/sdk': {
+    floor: '1.31.0',
+    reason:
+      'The SDK’s OAuth client could send credentials to an authorization ' +
+      'server chosen by the MCP server it was talking to. This site runs the ' +
+      'SDK as a server, through @payloadcms/plugin-mcp, which pins 1.30.0 ' +
+      'exactly; the client code is not on a request path here, but the ' +
+      'advisory is high and the fix is a minor release on the same line, so ' +
+      'it is taken rather than argued about.',
+  },
   dompurify: {
     floor: '3.4.13',
     reason:
@@ -177,7 +187,10 @@ describe('pnpm overrides', () => {
   // builds is not the tree that was reviewed.
   it('has been installed, not just declared', () => {
     for (const [name, range] of Object.entries(configured)) {
-      const quoted = name.includes('>') ? `'${name}'` : name
+      // YAML quotes a key containing `>`, and one starting with `@` — a
+      // scoped package name.
+      const quoted =
+        name.includes('>') || name.startsWith('@') ? `'${name}'` : name
       expect(lockfile).toContain(`\n  ${quoted}: ${range}`)
     }
   })
