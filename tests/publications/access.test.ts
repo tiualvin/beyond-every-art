@@ -61,3 +61,28 @@ describe('the Publications collection', () => {
     expect(Publications.access?.readVersions).toBe(editorsAndAdmins)
   })
 })
+
+describe('the contents page number', () => {
+  type Validate = (value: unknown, options: unknown) => true | string
+  const contents = Publications.fields.find(
+    (field) => 'name' in field && field.name === 'contents',
+  ) as unknown as { fields: Array<{ fields: Array<Record<string, unknown>> }> }
+  const page = contents.fields[0]!.fields.find(
+    (field) => field.name === 'page',
+  )!
+  const validate = page.validate as Validate
+
+  it('accepts a whole page number, or none', () => {
+    expect(validate(1, {})).toBe(true)
+    expect(validate(96, {})).toBe(true)
+    expect(validate(null, {})).toBe(true)
+    expect(validate(undefined, {})).toBe(true)
+  })
+
+  it('refuses a fraction or a page before the first', () => {
+    // `min: 1` alone let 2.5 through, and the page then silently dropped it.
+    expect(validate(2.5, {})).toMatch(/whole number/)
+    expect(validate(0, {})).toMatch(/whole number/)
+    expect(validate(-3, {})).toMatch(/whole number/)
+  })
+})

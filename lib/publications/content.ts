@@ -77,9 +77,9 @@ function optionalText(value: unknown): string | null {
 /**
  * A page number an editor typed, or null.
  *
- * The field has `min: 1`, but a restore or an import never ran the validator,
- * and a contents line pointing at page 0 or page 2.5 is worse than one with no
- * number at all.
+ * The field refuses anything but a whole number from 1, but a restore or an
+ * import never ran the validator, and a contents line pointing at page 0 or
+ * page 2.5 is worse than one with no number at all.
  */
 function pageNumber(value: unknown): number | null {
   return typeof value === 'number' && Number.isInteger(value) && value >= 1

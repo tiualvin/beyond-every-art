@@ -1,4 +1,4 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionConfig, NumberFieldSingleValidation } from 'payload'
 
 import { publicationsRead } from '../access/publications'
 import { editorsAndAdmins } from '../access/roles'
@@ -152,6 +152,14 @@ export const Publications: CollectionConfig = {
               name: 'page',
               type: 'number',
               min: 1,
+              // `min` alone lets 2.5 through, and the page would then show the
+              // entry with no number and no word to the editor about why. A
+              // custom validator replaces Payload's own, so it checks both.
+              validate: ((value) =>
+                value === null ||
+                value === undefined ||
+                (Number.isInteger(value) && value >= 1) ||
+                'A page number is a whole number, from 1.') as NumberFieldSingleValidation,
               admin: { width: '15%', description: 'Where it starts.' },
             },
           ],
