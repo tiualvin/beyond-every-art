@@ -1,6 +1,8 @@
 import config from '@payload-config'
 import { getPayload, type Payload } from 'payload'
 
+import { live } from '../lib/content/schedule'
+
 import { fixtures } from './fixtures'
 
 type CreateOptions = Parameters<Payload['create']>[0]
@@ -104,14 +106,33 @@ async function upsertPublishedPublication(payload: Payload): Promise<void> {
       data,
       overrideAccess: true,
     } as unknown as UpdateOptions)
-    return
+  } else {
+    await payload.create({
+      collection: 'publications',
+      data,
+      overrideAccess: true,
+    } as unknown as CreateOptions)
   }
 
-  await payload.create({
+  // The spec's 404s prove the launch gate only if this issue is one the site
+  // would otherwise show. A seed that left it a draft, future-dated or
+  // missing would let every assertion pass for the wrong reason, so the
+  // premise is checked here, with the same filter the site reads through.
+  const visible = await payload.find({
     collection: 'publications',
-    data,
+    where: {
+      and: [{ slug: { equals: fixtures.publishedPublication.slug } }, live()],
+    },
+    limit: 1,
+    depth: 0,
     overrideAccess: true,
-  } as unknown as CreateOptions)
+  })
+  if (visible.docs.length === 0) {
+    throw new Error(
+      'The seeded publication is not live, so e2e/publication.spec.ts would ' +
+        'prove nothing about the launch gate.',
+    )
+  }
 }
 
 async function upsertPost(
