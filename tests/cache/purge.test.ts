@@ -6,6 +6,7 @@ import { Authors } from '../../collections/Authors'
 import { Media } from '../../collections/Media'
 import { Pages } from '../../collections/Pages'
 import { Posts } from '../../collections/Posts'
+import { Publications } from '../../collections/Publications'
 import { Redirects } from '../../collections/Redirects'
 import { Tags } from '../../collections/Tags'
 import { Footer } from '../../globals/Footer'
@@ -109,6 +110,7 @@ describe('cache wiring', () => {
     ['posts', Posts, CONTENT_TAGS.posts],
     ['pages', Pages, CONTENT_TAGS.pages],
     ['apps', Apps, CONTENT_TAGS.apps],
+    ['publications', Publications, CONTENT_TAGS.publications],
     ['tags', Tags, CONTENT_TAGS.tags],
     ['authors', Authors, CONTENT_TAGS.authors],
     ['media', Media, CONTENT_TAGS.media],

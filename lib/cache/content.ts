@@ -13,6 +13,7 @@ export const CONTENT_TAGS = {
   posts: 'content:posts',
   pages: 'content:pages',
   apps: 'content:apps',
+  publications: 'content:publications',
   tags: 'content:tags',
   authors: 'content:authors',
   media: 'content:media',

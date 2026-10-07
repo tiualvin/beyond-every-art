@@ -16,6 +16,7 @@ import { NewsletterSignups } from './collections/NewsletterSignups'
 import { SignupCampaigns } from './collections/SignupCampaigns'
 import { Pages } from './collections/Pages'
 import { Posts } from './collections/Posts'
+import { Publications } from './collections/Publications'
 import { Redirects } from './collections/Redirects'
 import { Tags } from './collections/Tags'
 import { OAuthClients } from './collections/OAuthClients'
@@ -117,6 +118,7 @@ export default buildConfig({
     Pages,
     Apps,
     AppWaitlist,
+    Publications,
     Redirects,
     Members,
     NewsletterSignups,

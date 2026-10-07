@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import { Pages } from '../../collections/Pages'
 import { Posts } from '../../collections/Posts'
+import { Publications } from '../../collections/Publications'
 import { stampPublishedAt } from '../../lib/content/publish-date'
 import { isScheduled, live, notScheduled } from '../../lib/content/schedule'
 
@@ -69,9 +70,10 @@ describe('stampPublishedAt', () => {
     expect(kept.publishedAt).toBeUndefined()
   })
 
-  it('is wired into both collections that carry a date', () => {
+  it('is wired into every collection that carries a date', () => {
     expect(Posts.hooks?.beforeChange).toContain(stampPublishedAt)
     expect(Pages.hooks?.beforeChange).toContain(stampPublishedAt)
+    expect(Publications.hooks?.beforeChange).toContain(stampPublishedAt)
   })
 })
 
