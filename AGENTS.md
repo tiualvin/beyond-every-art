@@ -32,12 +32,13 @@ longer than the margin existed.)
 self-hosted digital publication system—the `/publication/` archive, issue
 landing pages, the full-screen reader, PDF processing worker, interactive
 hotspots, transcripts, and first-party analytics. The owner lifted its
-migration gate on 3 Oct 2026. Only groundwork is built — the path helpers, the
-reserved slug, and the reader's page logic and link policy in
-`lib/publications/` — and no source PDF exists yet. Read its build order and
-open decisions before adding a publication collection, route or service; it
-still must not displace the open post-cutover work, and nothing under
-`/publication/` reaches readers without the owner's sign-off.
+migration gate on 3 Oct 2026. Built so far: the path helpers, the reserved
+slug, the reader's page logic and link policy in `lib/publications/`, the
+`publications` collection, and the archive and issue pages — which answer 404
+to every reader until `PUBLICATIONS_LAUNCHED` in `lib/publications/launch.ts`
+is flipped on the owner's sign-off. No source PDF exists yet. Read its build
+order and open decisions before adding a publication collection, route or
+service; it still must not displace the open post-cutover work.
 
 [`docs/INSERTABLE_CONTENT_MODULES.md`](docs/INSERTABLE_CONTENT_MODULES.md)
 records the evaluated architecture for Ghost-style insertable blocks, reusable

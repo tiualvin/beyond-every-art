@@ -15,14 +15,22 @@ post-cutover items open in [`DEPLOYMENT_STATUS.md`](DEPLOYMENT_STATUS.md), and
 nothing under `/publication/` is shown to readers until the owner signs off its
 launch ([open decisions](#open-decisions), item 8).
 
-What is built is groundwork that needs no publication to exist:
+What is built:
 
 - the reserved root slug and the path helpers (`lib/seo/reserved-slugs.ts`,
   `lib/seo/site.ts`);
 - the reader's page logic in `lib/publications/`: how pages pair into spreads
   (`lib/publications/spreads.ts`), what `?page=` means and how a position is
   shown and announced (`lib/publications/navigation.ts`), and which links
-  pulled from a PDF may be rendered (`lib/publications/links.ts`).
+  pulled from a PDF may be rendered (`lib/publications/links.ts`);
+- the `publications` collection (`collections/Publications.ts`), previewable
+  at its landing page, read through `lib/publications/queries.ts`;
+- the archive and landing pages, **closed to readers**: every route under
+  `/publication/` answers 404 until the owner signs off the launch, by way of
+  `PUBLICATIONS_LAUNCHED` in `lib/publications/launch.ts`, and renders for an
+  editor previewing. `tests/publications/launch.test.ts` fails if the switch is
+  turned on, or if a page under `/publication/` stops consulting it, and
+  `e2e/publication.spec.ts` checks a published issue is still a 404.
 
 **No source PDF exists yet.** Development can use a generated sample issue, but
 the first real issue — its page count, file size and image rights — is a
@@ -142,13 +150,13 @@ existing routes are wired:
    embed it in the page), and no dot in an issue slug, which would take that
    issue's reader and transcript out of middleware altogether.
 
-4. **Draft preview.** `PREVIEW_COLLECTIONS` in `lib/preview/live-preview.ts` is
-   `posts`, `pages` and `apps`, and `app/(payload)/api/preview/route.ts`
-   accepts whatever that list names. Adding `publications` needs an explicit
-   branch in `previewTargetPath` mapping it to `publicationPath(slug)`: the
-   function falls through to `postPath` for any collection it does not name, so
-   without the branch preview compiles and opens `/<slug>/`. The landing query
-   must also read drafts when preview mode is on, as `apps/[slug]` does.
+4. **Draft preview — done.** `publications` is in `PREVIEW_COLLECTIONS`
+   (`lib/preview/live-preview.ts`), and `previewTargetPath` maps it to
+   `publicationPath(slug)`. That function used to fall through to `postPath`
+   for any collection it did not name, so a missing branch compiled and
+   previewed at `/<slug>/`; it now names every collection with no default, and
+   an unmapped one is a type error. The landing query reads the draft, as the
+   editor, when preview mode is on.
 
 5. **The reader's own layout.** There is no `app/layout.tsx`; `(frontend)` and
    `(payload)` are separate root layouts, and the frontend one renders the
@@ -479,6 +487,14 @@ the corrected version:
   [`../AGENTS.md`](../AGENTS.md) rules out.
 
 ### `publications`
+
+**Built 7 Oct 2026, in part** (`collections/Publications.ts`): title, slug,
+subtitle, issue number, series, description, cover, publish date, the table of
+contents (section, title and starting page per entry), reading direction,
+whether the first page is the cover, and the SEO fields. The reader modes,
+feature switches, theme fields and source PDF arrive with the reader and the
+processing work that use them, each with its own migration; `unpublishAt` waits
+for a use.
 
 ```ts
 {
@@ -1213,15 +1229,14 @@ could reach stays behind the launch gate until the owner signs it off.
 
 0. **Groundwork — done.** Path helpers, the reserved slug, the reader's page
    logic and link policy in `lib/publications/`, and this document corrected.
-1. **Content model and hidden pages.** The `publications` collection (versions
-   as above, scheduling through `live()`, the cover in `media`), archive and
-   landing routes that answer 404 to readers and preview for editors, the
-   migration, and the tests that list collections by hand — the purge wiring in
-   `tests/cache/purge.test.ts`, the versioned list in
-   `tests/access/roles.test.ts`, the slugged list in
-   `tests/collections/shared-fields.test.ts`. Before it merges: check Pages and
-   Redirects for `/publication`, and run the production crawl comparison, so new
-   URLs cannot hide a migration regression.
+1. **Content model and hidden pages — built.** The `publications` collection
+   (versions as above, scheduling through `live()`, the cover in `media`),
+   archive and landing routes that answer 404 to readers and preview for
+   editors, the migration, and the tests that list collections by hand. The two
+   checks this step first carried — Pages and Redirects for `/publication`, and
+   the production crawl comparison — moved to the launch step: with every route
+   closed, this step adds no URL a crawler can reach, and those checks protect
+   the moment one does.
 2. **Processing.** `publication-pages`, the processing record, the processing
    command on the `migrator` image, page images served per decision 3, and a
    read-only status panel in the admin. Before it runs on the server: the
@@ -1232,8 +1247,12 @@ could reach stays behind the launch gate until the owner signs it off.
    pages, contents, filmstrip, keyboard, `?page=` links, fullscreen, reduced
    motion, announcements, local progress, and the transcript route. Search can
    follow.
-4. **Launch, on the owner's sign-off.** Lift the 404, add the sitemap entries
-   and structured data, and add the navigation entry in code
+4. **Launch, on the owner's sign-off.** First check Pages and the Redirects
+   table for anything at `/publication` (middleware applies a redirect row
+   before any route renders), and run the production crawl comparison, so the
+   new URLs cannot hide a migration regression. Then flip
+   `PUBLICATIONS_LAUNCHED` with its test and the browser spec, add the sitemap
+   entries and structured data, and add the navigation entry in code
    (`lib/content/fallback-nav.ts`). The masthead uses the Header global's links
    only when there are any, and the global is empty in production — so one link
    added there in the admin would replace the whole menu.
