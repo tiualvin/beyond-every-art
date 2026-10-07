@@ -35,12 +35,27 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 }
 
-function IssueEntry({ issue }: { issue: PublicationCard }) {
+/**
+ * Matched to the grid in app/globals.css: one column below about 32rem, two
+ * or three up to 64rem, and at most four tracks of about 15.6rem beyond that.
+ * The lead entry's cover is capped at 20rem beside its text.
+ */
+const COVER_SIZES = '(max-width: 32rem) 100vw, (max-width: 64rem) 45vw, 19rem'
+const LEAD_COVER_SIZES = '(max-width: 32rem) 100vw, 20rem'
+
+function IssueEntry({
+  issue,
+  lead = false,
+}: {
+  issue: PublicationCard
+  /** The newest issue, set out across the row rather than as one card of many. */
+  lead?: boolean
+}) {
   const date = formatDate(issue.publishedAt)
   const meta = [issue.series, issue.issueNumber].filter(Boolean).join(' · ')
 
   return (
-    <li className="issue">
+    <li className={lead ? 'issue issue--lead' : 'issue'}>
       <Link
         href={publicationPath(issue.slug)}
         className="issue__cover"
@@ -54,7 +69,7 @@ function IssueEntry({ issue }: { issue: PublicationCard }) {
             src={thumbnailSrc(issue.cover)}
             alt=""
             fill
-            sizes="(max-width: 40rem) 100vw, (max-width: 64rem) 50vw, 22rem"
+            sizes={lead ? LEAD_COVER_SIZES : COVER_SIZES}
             style={{ objectFit: 'cover' }}
           />
         ) : (
@@ -101,8 +116,8 @@ export default async function PublicationArchivePage() {
 
           {issues.length > 0 ? (
             <ol className="issues" reversed>
-              {issues.map((issue) => (
-                <IssueEntry key={issue.id} issue={issue} />
+              {issues.map((issue, index) => (
+                <IssueEntry key={issue.id} issue={issue} lead={index === 0} />
               ))}
             </ol>
           ) : (

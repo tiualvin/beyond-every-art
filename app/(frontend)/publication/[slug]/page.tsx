@@ -158,7 +158,8 @@ export default async function PublicationIssuePage({
                   alt={issue.cover.alt}
                   width={issue.cover.width ?? 1200}
                   height={issue.cover.height ?? 1600}
-                  sizes="(max-width: 48rem) 100vw, 26rem"
+                  // Capped at 26rem in either layout (app/globals.css).
+                  sizes="(max-width: 30rem) 100vw, 26rem"
                   priority
                 />
               ) : (

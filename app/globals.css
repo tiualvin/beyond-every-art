@@ -5517,6 +5517,34 @@ h1.archive__title {
   gap: 1rem;
 }
 
+/* The newest issue leads the archive across the whole row: with one issue,
+   which is how it launches, a single card in the first of four tracks reads as
+   an empty page rather than a publication. */
+.issue--lead {
+  grid-column: 1 / -1;
+}
+
+.issue--lead .issue__cover {
+  max-width: 26rem;
+}
+
+@media (min-width: 48rem) {
+  .issue--lead {
+    display: grid;
+    grid-template-columns: minmax(14rem, 20rem) minmax(0, 36rem);
+    gap: clamp(1.5rem, 4vw, 3rem);
+    align-items: center;
+  }
+
+  .issue--lead .issue__title {
+    font-size: clamp(1.8rem, 3.2vw, 2.4rem);
+  }
+
+  .issue--lead .issue__description {
+    font-size: 1.05rem;
+  }
+}
+
 .issue__cover {
   position: relative;
   display: block;
@@ -5595,6 +5623,9 @@ h1.archive__title {
 
 .issue-page__cover {
   position: relative;
+  /* In one column the cover would otherwise fill it — wider than on desktop
+     between about 600 and 767px — and push the title below the first screen. */
+  max-width: 26rem;
   overflow: hidden;
   border-radius: var(--radius);
   box-shadow:
