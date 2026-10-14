@@ -182,7 +182,11 @@ module it names, exactly as stored: moving a marker moves the module, and
 leaving one out removes it, which the response always reports. A marker naming
 nothing in the current draft, used twice, or run into a paragraph is refused
 before anything is saved, since saving it would print a literal comment on the
-page.
+page. So is any other HTML comment: Markdown keeps a comment's
+characters, and two live articles printed an agent's
+`<!-- IMAGE PLACEHOLDER: ... -->` notes to readers for two weeks in October 2026. `draftArticle` and `updateArticleMarkdown` refuse one, and the renderer
+drops a paragraph that is only a comment, so one already stored never reaches a
+reader — an editor's preview still shows it.
 
 Three modules have a tool that writes them. `setKeyFactsBlock` replaces an
 article's key facts where they stand, or, if there are none, inserts them

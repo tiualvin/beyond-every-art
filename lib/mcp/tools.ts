@@ -25,7 +25,12 @@ import { isScheduled, SCHEDULE_GRANULARITY_SECONDS } from '../content/schedule'
 import { htmlToPlainText, richTextToPlainText } from '../content/plain-text'
 import { buildPreviewUrl } from '../preview/live-preview'
 import { absoluteUrl, getSiteUrl, postPath } from '../seo/site'
-import { listBlocks, markBlocks, restoreBlocks } from './blocks'
+import {
+  listBlocks,
+  markBlocks,
+  refuseLiteralComments,
+  restoreBlocks,
+} from './blocks'
 import { setFaq, type FaqInputItem } from './faq'
 import { setKeyFacts, type Fact } from './key-facts'
 import { withChildren } from './placement'
@@ -498,11 +503,14 @@ export const mcpTools: McpTool[] = [
         idsForSlugs(req, 'tags', tagSlugs),
       ])
 
+      const content = markdownToLexical(req.payload, 'posts', markdown)
+      refuseLiteralComments(content)
+
       const created = await req.payload.create({
         collection: 'posts',
         data: {
           _status: 'draft',
-          content: markdownToLexical(req.payload, 'posts', markdown),
+          content,
           excerpt,
           metaDescription,
           metaTitle,
