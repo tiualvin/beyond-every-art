@@ -341,12 +341,17 @@ against a real database on 14 Oct 2026, while twenty live articles carried such
 drafts. Taking an article off the site is now something MCP cannot do at all; it
 is done in the admin panel.
 
-**The same completion is why a publish promotes the draft.** This section used to
-warn that publishing through `updatePosts` published the fields the call sent
-over the _old_ live body and left the draft behind. That is not what Payload
-3.90 does, checked against a real database: `updatePosts` with only
-`_status: 'published'` publishes the newest version as it stands, date and all.
-The warning was right for the wrong release and wrong for this one.
+**Which version a publish completes from depends on how it names the
+article.** This section used to warn, flatly, that publishing through
+`updatePosts` published the fields the call sent over the _old_ live body and
+left the draft behind. Checked against Payload 3.90 that is half right. By
+`id`, a write is completed from the newest version, so `updatePosts` with only
+`_status: 'published'` publishes the draft as it stands, date and all — what
+the admin panel's Publish button does. By `where`, Payload's bulk update reads
+the _live row_ instead, so the same call publishes the older text and buries
+the revision under it. MCP now refuses a publish by `where` from any caller who
+could otherwise publish, and says to use `publishArticle`; the e2e suite holds
+both halves.
 
 **`publishArticle` is the way to publish over MCP**, and the one a phone or an
 unattended run should use. `updatePosts` with `_status: 'published'` still

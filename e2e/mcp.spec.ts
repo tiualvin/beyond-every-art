@@ -576,16 +576,19 @@ test.describe('MCP endpoint', () => {
       },
     )
     expect(withBlock).not.toContain('"isError":true')
-    const publish = await callTool(
+    // Published one article at a time: a publish by `where` is completed from
+    // the live row rather than the newest version, so it would have put out
+    // "A first body." and buried the callout — MCP refuses it now.
+    const byWhere = await callTool(
       request,
       fixtures.mcp.adminKey,
       'updatePosts',
-      {
-        _status: 'published',
-        where,
-      },
+      { _status: 'published', where },
     )
-    expect(publish).not.toContain('"isError":true')
+    expect(byWhere).toContain('publishArticle')
+    await callToolJson(request, fixtures.mcp.adminKey, 'publishArticle', {
+      slug,
+    })
 
     // An agent's revision through Markdown: the callout does not survive it.
     await callToolJson(

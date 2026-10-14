@@ -149,11 +149,12 @@ describe('keepMcpWritesInDraft', () => {
     args: Record<string, unknown>,
     payloadAPI: string,
     operation = 'update',
+    role = 'editor',
   ) =>
     keepMcpWritesInDraft({
       args,
       operation,
-      req: { payloadAPI },
+      req: { payloadAPI, user: { role }, context: {} },
     } as never) as Record<string, unknown>
 
   // Payload fills a field a write leaves out from the newest version, so on a
@@ -177,14 +178,31 @@ describe('keepMcpWritesInDraft', () => {
 
   // A publish is left for `refuseMcpPublish` to decide, as before.
   it('leaves an explicit publish to the publish guard', () => {
-    const args = { data: { _status: 'published' } }
+    const args = { data: { _status: 'published' }, id: 186 }
     expect(run(args, 'MCP')).toBe(args)
+    expect(run(args, 'MCP', 'update', 'admin')).toBe(args)
+  })
+
+  // Payload's bulk update completes a write from the live row, not the newest
+  // version, so a publish by `where` puts out the older text and buries the
+  // revision. Checked end to end in e2e/mcp.spec.ts.
+  it('refuses a publish by `where` from a caller who could publish', () => {
+    const args = {
+      data: { _status: 'published' },
+      where: { slug: { equals: 'sfumato' } },
+    }
+
+    expect(() => run(args, 'MCP', 'update', 'admin')).toThrow(/publishArticle/)
+    // One who could not is refused by `refuseMcpPublish`, in its own words.
+    expect(run(args, 'MCP', 'update', 'editor')).toBe(args)
   })
 
   it('changes nothing outside MCP, or for anything but an update', () => {
     const args = { data: { _status: 'draft' } }
+    const publish = { data: { _status: 'published' }, where: {} }
     for (const api of ['local', 'REST', 'GraphQL']) {
       expect(run(args, api)).toBe(args)
+      expect(run(publish, api, 'update', 'admin')).toBe(publish)
     }
     expect(run(args, 'MCP', 'create')).toBe(args)
   })

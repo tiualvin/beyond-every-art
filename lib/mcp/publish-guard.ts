@@ -131,7 +131,8 @@ export const refuseMcpPublish: CollectionBeforeChangeHook = ({ data, req }) => {
 }
 
 /**
- * An MCP write that is not a publish is a draft save, whatever the call asked.
+ * An MCP write that is not a publish is a draft save, whatever the call asked;
+ * and a publish goes one article at a time.
  *
  * Payload fills every field a write leaves out from the article's newest
  * version — `_status` among them. When the newest version is a draft sitting
@@ -161,9 +162,30 @@ export const keepMcpWritesInDraft: CollectionBeforeOperationHook = ({
 }) => {
   if (operation !== 'update' || req.payloadAPI !== 'MCP') return args
 
-  const update = args as { data?: { _status?: unknown }; draft?: boolean }
+  const update = args as {
+    data?: { _status?: unknown }
+    draft?: boolean
+    id?: unknown
+  }
   if (update.draft === true) return args
-  if (update.data?._status === 'published') return args
+
+  if (update.data?._status === 'published') {
+    // A publish by `where` rather than by id is completed from the *live row*,
+    // not the newest version — Payload's bulk update reads the main table —
+    // so it publishes the older text and quietly buries the newer draft. By id
+    // it promotes the newest version, as the admin panel does. Refused for a
+    // caller who could publish; one who could not is left to
+    // `refuseMcpPublish`, whose refusal says why.
+    if (update.id === undefined && mayPublishThrough(req)) {
+      throw new Error(
+        'Publish one article at a time, by id or slug, with `publishArticle`. ' +
+          'A publish by `where` is completed from the live version rather ' +
+          'than the newest draft, so it would publish older text and discard ' +
+          'the revision.',
+      )
+    }
+    return args
+  }
 
   return { ...args, draft: true }
 }
