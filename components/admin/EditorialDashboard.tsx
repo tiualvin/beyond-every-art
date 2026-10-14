@@ -5,7 +5,8 @@
 // none of it was reachable without knowing which filter to build by hand:
 // articles published without a date, pieces waiting on a scheduled moment,
 // published work with no excerpt or no cover, documents the Ghost import left
-// in conflict.
+// in conflict — and edits saved over a live article that nobody published,
+// which no list view can show at all (`lib/content/editorial-status.ts`).
 //
 // Each row is a count and a link into the list view already filtered to exactly
 // those documents, so noticing a problem and opening it are the same click.
@@ -22,6 +23,11 @@
 import type { Payload, TypedUser, Where } from 'payload'
 
 import { OPEN_REVIEW_STATES } from '../../fields/review'
+import {
+  findUnpublishedWork,
+  type PendingArticle,
+  type UnpublishedWork,
+} from '../../lib/content/editorial-status'
 import { notScheduled } from '../../lib/content/schedule'
 
 type Props = {
@@ -86,6 +92,26 @@ async function count(
   }
 }
 
+/** The same, for unpublished work; a failed read shows no rows rather than a broken screen. */
+async function unpublishedWork(
+  payload: Payload,
+  user?: TypedUser | null,
+): Promise<UnpublishedWork> {
+  try {
+    return await findUnpublishedWork(payload, { user })
+  } catch {
+    return {
+      liveWithChanges: [],
+      scheduledWithChanges: [],
+      draftsPastTheirDate: [],
+    }
+  }
+}
+
+/** A list view of exactly these posts. */
+const listOf = (articles: PendingArticle[]): string =>
+  listUrl('posts', { id: { in: articles.map((article) => article.id) } })
+
 export async function EditorialDashboard({ payload, user }: Props) {
   const now = new Date()
   const future: Where = {
@@ -109,6 +135,7 @@ export async function EditorialDashboard({ payload, user }: Props) {
     troubled,
     awaitingRead,
     agentWritten,
+    unpublished,
   ] = await Promise.all([
     count(payload, 'posts', future, user),
     count(payload, 'posts', undated, user),
@@ -160,9 +187,24 @@ export async function EditorialDashboard({ payload, user }: Props) {
       },
       user,
     ),
+    unpublishedWork(payload, user),
   ])
 
   const rows: Row[] = [
+    {
+      label: 'live, with changes nobody published',
+      hint: 'Readers still see the published version; the newer draft goes nowhere until somebody publishes it. Check each and publish it, or restore the published version.',
+      count: unpublished.liveWithChanges.length,
+      href: listOf(unpublished.liveWithChanges),
+      tone: 'wrong' as const,
+    },
+    {
+      label: 'drafts past their date',
+      hint: 'A date on a draft schedules nothing — only a published article waits for its date. Give each a date ahead and publish it.',
+      count: unpublished.draftsPastTheirDate.length,
+      href: listOf(unpublished.draftsPastTheirDate),
+      tone: 'wrong' as const,
+    },
     {
       label: 'published with no date',
       hint: 'These sort above every dated article on the site. Give each one a publish date.',
@@ -184,6 +226,13 @@ export async function EditorialDashboard({ payload, user }: Props) {
       hint: 'Published, waiting for the date to arrive. Nothing wakes up to release them — they appear once the page cache turns over.',
       count: scheduled,
       href: listUrl('posts', future),
+      tone: 'waiting' as const,
+    },
+    {
+      label: 'scheduled, with changes nobody published',
+      hint: 'These go out on their date as last published, not as drafted. Publish the draft if it should be what goes out.',
+      count: unpublished.scheduledWithChanges.length,
+      href: listOf(unpublished.scheduledWithChanges),
       tone: 'waiting' as const,
     },
     {
