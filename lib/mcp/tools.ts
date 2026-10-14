@@ -20,8 +20,10 @@ import { z } from 'zod'
 
 import { FAQ_BLOCK, KEY_FACTS_MAX_ITEMS } from '../../blocks/schema'
 import { toArticleBody } from '../content/body'
+import { isScheduled, SCHEDULE_GRANULARITY_SECONDS } from '../content/schedule'
 import { htmlToPlainText, richTextToPlainText } from '../content/plain-text'
 import { buildPreviewUrl } from '../preview/live-preview'
+import { absoluteUrl, getSiteUrl, postPath } from '../seo/site'
 import { listBlocks, markBlocks, restoreBlocks } from './blocks'
 import { setFaq, type FaqInputItem } from './faq'
 import { setKeyFacts, type Fact } from './key-facts'
@@ -36,6 +38,7 @@ import {
   type MarkdownCollection,
 } from './markdown'
 import { decodeImageUpload, vetImageBytes } from './upload'
+import { mayPublishThrough } from './publish-guard'
 import { MAX_AGENT_UPLOAD_BYTES } from '../security/uploads'
 import {
   fetchPublicBytes,
@@ -321,6 +324,108 @@ function parentID(parent: unknown): unknown {
   return typeof parent === 'object' && parent !== null
     ? (parent as { id?: unknown }).id
     : parent
+}
+
+/** Where a post stands with readers: what its live row says, now. */
+type LiveState = 'live' | 'scheduled' | 'unpublished'
+
+/**
+ * The live row — what the site serves — as opposed to the newest version.
+ *
+ * `findArticle` reads the newest version, which is the right thing to revise
+ * and the wrong thing to ask "is this on the site?" of: a draft saved over a
+ * live article reads as a draft there. Read with the caller's own access.
+ */
+async function readLiveRow(
+  req: PayloadRequest,
+  id: number | string,
+  now: Date = new Date(),
+): Promise<{
+  state: LiveState
+  publishedAt: string | null
+  doc: Record<string, unknown> | null
+}> {
+  const { docs } = await req.payload.find({
+    collection: COLLECTION,
+    depth: 0,
+    draft: false,
+    limit: 1,
+    overrideAccess: false,
+    req,
+    user: req.user,
+    where: { id: { equals: id } },
+  })
+  const doc = (docs[0] as unknown as Record<string, unknown>) ?? null
+  if (!doc || doc._status !== 'published') {
+    return { state: 'unpublished', publishedAt: null, doc }
+  }
+  const publishedAt =
+    typeof doc.publishedAt === 'string' && doc.publishedAt
+      ? doc.publishedAt
+      : null
+  return {
+    state: isScheduled('published', publishedAt, now) ? 'scheduled' : 'live',
+    publishedAt,
+    doc,
+  }
+}
+
+/** Payload's own bookkeeping, never sent back in a write. */
+const SYSTEM_FIELDS = new Set([
+  'id',
+  'createdAt',
+  'updatedAt',
+  'deletedAt',
+  '_status',
+])
+
+/** Written by the save itself; never a change a reader would see. */
+const NOT_READER_FACING = new Set(['_status', 'lastEditedBy'])
+
+/**
+ * What publishing may not change on an article that is already live.
+ *
+ * The address, and where search engines are told the original lives. Either
+ * changes something crawlers have cached, which `AGENTS.md` keeps for a person
+ * to decide — and a slug change also needs a redirect, which only the admin
+ * panel can add.
+ */
+const FIXED_WHILE_LIVE = ['slug', 'canonicalURL'] as const
+
+/** An ISO 8601 time that names its offset, so "20:00" cannot mean two things. */
+const ZONED_TIME =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$/i
+
+/**
+ * `publishAt` as a time, or undefined when the call left it out.
+ *
+ * Only "now" or a moment ahead. A date in the past would put an article out
+ * backdated — filed below newer work in every listing and the feed — which is
+ * an editorial decision about history, made in the admin panel.
+ */
+export function resolvePublishAt(
+  value: string | undefined,
+  now: Date = new Date(),
+): string | undefined {
+  if (value === undefined) return undefined
+  const trimmed = value.trim()
+  if (trimmed.toLowerCase() === 'now') return now.toISOString()
+  if (!ZONED_TIME.test(trimmed)) {
+    throw new Error(
+      '`publishAt` must be "now" or an ISO 8601 time with its offset, such ' +
+        'as 2026-11-04T20:00:00Z.',
+    )
+  }
+  const at = Date.parse(trimmed)
+  if (!Number.isFinite(at))
+    throw new Error(`\`publishAt\` is not a time: ${value}`)
+  if (at <= now.getTime()) {
+    throw new Error(
+      `\`publishAt\` (${trimmed}) has passed. Pass "now" to publish today, or ` +
+        'a time ahead to schedule. Backdating is done in the admin panel.',
+    )
+  }
+  return new Date(at).toISOString()
 }
 
 export const mcpTools: McpTool[] = [
@@ -1338,6 +1443,175 @@ export const mcpTools: McpTool[] = [
           'The https address of the image. Must be publicly reachable: ' +
             'private, loopback and link-local addresses are refused, at every ' +
             'redirect.',
+        ),
+    },
+  },
+  {
+    description:
+      'Publish an article as its newest version — the latest draft, exactly as ' +
+      '`readArticleMarkdown` shows it — or schedule it. Leave `publishAt` out to ' +
+      "keep the article's date: a live article is updated in place, a scheduled " +
+      'one keeps its slot. For an article that is not live yet, pass "now" or a ' +
+      'time ahead, such as 2026-11-04T20:00:00Z, to publish or schedule it. A ' +
+      "live article's date, address and canonical URL are never changed here — " +
+      'moving the date ahead would take its page off the site. Refused unless ' +
+      'the key belongs to an administrator, or the connector was granted ' +
+      'publishing. Pass `dryRun: true` first: it says what would go out, when, ' +
+      'and whether this key may publish, and writes nothing.',
+    handler: async (args: Record<string, unknown>, req: PayloadRequest) => {
+      const {
+        dryRun = false,
+        publishAt,
+        ...target
+      } = args as {
+        dryRun?: boolean
+        id?: string
+        publishAt?: string
+        slug?: string
+      }
+      const now = new Date()
+
+      // The newest version, whole: what the admin panel's Publish button
+      // sends. Payload would complete a partial write from it anyway; sending
+      // it is what makes the result checkable before anything is written.
+      const draft = (await findArticle(
+        req,
+        COLLECTION,
+        target,
+      )) as unknown as Record<string, unknown>
+      const id = draft.id as number | string
+      const live = await readLiveRow(req, id, now)
+      const requested = resolvePublishAt(publishAt, now)
+
+      if (live.state === 'live') {
+        if (requested !== undefined) {
+          throw new Error(
+            `This article has been live since ${live.publishedAt ?? 'it was published'}, ` +
+              'and its date is not moved here: a date ahead would take its page ' +
+              'off the site until then, and "now" would re-date it to the top of ' +
+              'every listing. Leave `publishAt` out to publish its changes in ' +
+              'place, or change the date in the admin panel.',
+          )
+        }
+        const moved = FIXED_WHILE_LIVE.filter((field) =>
+          differs(live.doc?.[field], draft[field]),
+        )
+        if (moved.length) {
+          throw new Error(
+            `The draft changes this live article's ${moved.join(' and ')}, ` +
+              'which moves what crawlers have cached. Put it back with ' +
+              '`updatePosts`, or publish from the admin panel, where a redirect ' +
+              'can be added at the same time.',
+          )
+        }
+      }
+
+      const draftDate =
+        typeof draft.publishedAt === 'string' && draft.publishedAt
+          ? draft.publishedAt
+          : null
+      const publishedAt =
+        live.state === 'live' ? live.publishedAt : (requested ?? draftDate)
+
+      if (
+        live.state !== 'live' &&
+        requested === undefined &&
+        draftDate &&
+        Date.parse(draftDate) <= now.getTime()
+      ) {
+        throw new Error(
+          `This article is not live, and the date it carries (${draftDate}) ` +
+            'has passed. Published as it is, it would go out backdated — below ' +
+            'newer articles in every listing and in the feed. Pass ' +
+            '`publishAt: "now"` to publish it today, or a time ahead to ' +
+            'schedule it.',
+        )
+      }
+
+      const data: Record<string, unknown> = Object.fromEntries(
+        Object.entries(draft).filter(([field]) => !SYSTEM_FIELDS.has(field)),
+      )
+      data._status = 'published'
+      // Left out when there is none: `stampPublishedAt` dates it on publish.
+      if (publishedAt) data.publishedAt = publishedAt
+      else delete data.publishedAt
+
+      const goesOut =
+        publishedAt && Date.parse(publishedAt) > now.getTime()
+          ? 'scheduled'
+          : 'live'
+      const slug = String(draft.slug ?? '')
+      const described = {
+        id,
+        slug,
+        title: draft.title,
+        before: live.state,
+        after: goesOut,
+        publishedAt: publishedAt ?? now.toISOString(),
+        url: absoluteUrl(postPath(slug), getSiteUrl()),
+        // What readers will see change. Null for an article never published,
+        // where all of it is new. `lastEditedBy` is bookkeeping, not content.
+        changes:
+          live.state !== 'unpublished' && live.doc
+            ? Object.keys(data).filter(
+                (field) =>
+                  !NOT_READER_FACING.has(field) &&
+                  differs(live.doc![field], data[field]),
+              )
+            : null,
+      }
+
+      if (dryRun) {
+        return text({
+          ...described,
+          dryRun: true,
+          mayPublish: mayPublishThrough(req),
+        })
+      }
+
+      // `refuseMcpPublish` decides here, on the same rule `mayPublish` read.
+      const updated = (await req.payload.update({
+        collection: COLLECTION,
+        data,
+        depth: 0,
+        draft: false,
+        id,
+        overrideAccess: false,
+        req,
+        user: req.user as TypedUser,
+      })) as unknown as Record<string, unknown>
+
+      const finalDate =
+        typeof updated.publishedAt === 'string'
+          ? updated.publishedAt
+          : described.publishedAt
+      return text({
+        ...described,
+        dryRun: false,
+        publishedAt: finalDate,
+        status: updated._status,
+        appears:
+          goesOut === 'scheduled'
+            ? `On ${finalDate}, within ${SCHEDULE_GRANULARITY_SECONDS / 60} minutes. Nothing else needs to happen.`
+            : `Now, within ${SCHEDULE_GRANULARITY_SECONDS / 60} minutes at most as cached pages turn over.`,
+      })
+    },
+    name: 'publishArticle',
+    parameters: {
+      ...targetShape,
+      dryRun: z
+        .boolean()
+        .optional()
+        .describe(
+          'Say what would go out, when, and whether this key may publish; write nothing.',
+        ),
+      publishAt: z
+        .string()
+        .optional()
+        .describe(
+          'Only for an article that is not live yet: "now", or an ISO 8601 ' +
+            'time with its offset, such as 2026-11-04T20:00:00Z. Left out, the ' +
+            'article keeps the date it has.',
         ),
     },
   },

@@ -25,6 +25,7 @@
 import type {
   CollectionBeforeChangeHook,
   CollectionBeforeOperationHook,
+  PayloadRequest,
 } from 'payload'
 
 export type PublishAttempt = {
@@ -79,24 +80,40 @@ export function mayPublish({
   return role === 'admin'
 }
 
-export const refuseMcpPublish: CollectionBeforeChangeHook = ({ data, req }) => {
+/** The request half of a publish attempt: who is asking, and through what. */
+function attemptFrom(req: PayloadRequest): Omit<PublishAttempt, 'nextStatus'> {
   // Set by `overrideAuth` when the bearer token resolved to an OAuth grant.
   // `req.context` is the request-scoped bag Payload threads through to hooks,
   // and the MCP tools pass their `req` straight into `payload.create` and
   // `payload.update`, so it arrives here intact.
-  const viaOAuth =
-    (req.context as { mcpViaOAuth?: unknown } | undefined)?.mcpViaOAuth === true
+  const context = req.context as
+    { mcpViaOAuth?: unknown; mcpGrantMayPublish?: unknown } | undefined
 
-  const grantMayPublish =
-    (req.context as { mcpGrantMayPublish?: unknown } | undefined)
-      ?.mcpGrantMayPublish === true
-
-  const allowed = mayPublish({
-    nextStatus: (data as { _status?: unknown })?._status,
+  return {
     payloadAPI: req.payloadAPI,
     role: (req.user as { role?: string } | null | undefined)?.role,
-    viaOAuth,
-    grantMayPublish,
+    viaOAuth: context?.mcpViaOAuth === true,
+    grantMayPublish: context?.mcpGrantMayPublish === true,
+  }
+}
+
+/**
+ * Whether this request could publish, asked before trying.
+ *
+ * The same rule `refuseMcpPublish` enforces, so a tool can tell its caller up
+ * front — a dry run from a phone should not have to attempt a publish to find
+ * out the connector was never granted one.
+ */
+export function mayPublishThrough(req: PayloadRequest): boolean {
+  return mayPublish({ ...attemptFrom(req), nextStatus: 'published' })
+}
+
+export const refuseMcpPublish: CollectionBeforeChangeHook = ({ data, req }) => {
+  const attempt = attemptFrom(req)
+  const { viaOAuth } = attempt
+  const allowed = mayPublish({
+    ...attempt,
+    nextStatus: (data as { _status?: unknown })?._status,
   })
 
   if (!allowed) {

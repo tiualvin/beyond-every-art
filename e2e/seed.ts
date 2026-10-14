@@ -260,6 +260,7 @@ async function upsertKeyedUser(
       setTableBlock: true,
       uploadMedia: true,
       uploadMediaFromUrl: true,
+      publishArticle: true,
     },
   }
 

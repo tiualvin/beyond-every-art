@@ -121,6 +121,10 @@ hand.
 `setKeyFactsBlock`, `setFAQBlock` and `setTableBlock` write the draft body and
 nothing else — what `updateArticleMarkdown` already does — so an existing key
 gets them exactly where it already had `updateArticleMarkdown`.
+`publishArticle` is an update to a post, which `updatePosts` with
+`_status: 'published'` already was, so an existing key gets it where it had
+`posts.update`. That widens nobody's authority: whether the publish lands is
+still `refuseMcpPublish`'s decision.
 
 ### Tools
 
@@ -131,19 +135,20 @@ all.
 
 Written for this project, because the generated ones cannot do the job:
 
-| Tool                    | Does                                                                                                                                                                                                               |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `draftArticle`          | Creates a post from Markdown, always as a draft. Resolves tag and author slugs, refuses unknown ones. The `ghostID` is autofilled by the collection.                                                               |
-| `readArticleMarkdown`   | Reads a post back as Markdown, including the draft body, with each module as a marker line and its contents in `blocks`. Says so when the page renders from `legacyHTML`.                                          |
-| `listArticleVersions`   | Lists a post's saved versions, newest first — id, time, title, status and a 100-character snippet each, never a body.                                                                                              |
-| `readArticleVersion`    | Reads one saved version in exactly the shape `readArticleMarkdown` returns the draft. Read-only.                                                                                                                   |
-| `restoreArticleVersion` | Reverts a post's body, or its whole article, to a saved version — as a draft, overwriting rather than merging. Has a dry run and an undo.                                                                          |
-| `updateArticleMarkdown` | Replaces a body from Markdown, saved as a draft. Puts each marked module back as it was; reports which were kept and which removed.                                                                                |
-| `setKeyFactsBlock`      | Sets an article's key facts card — label and value pairs — in place, or under a named body heading. Saved as a draft; the rest of the body is untouched.                                                           |
-| `setFAQBlock`           | Sets an article's FAQ — questions with Markdown answers — in place, under a named body heading, or in place of a Markdown FAQ section. Saved as a draft; the rest of the body is untouched.                        |
-| `setTableBlock`         | Sets a comparison table — caption, header row, rows with inline-Markdown cells — by key, in a named section, or read from the Markdown table under a heading. Saved as a draft; the rest of the body is untouched. |
-| `uploadMedia`           | Adds an image to the Media library from base64 and returns its id, for `updatePosts` to set as a `featuredImage`.                                                                                                  |
-| `uploadMediaFromUrl`    | The same, from an https address the server fetches itself. The only one of the two that works from a phone or a scheduled run.                                                                                     |
+| Tool                    | Does                                                                                                                                                                                                                                                                               |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `draftArticle`          | Creates a post from Markdown, always as a draft. Resolves tag and author slugs, refuses unknown ones. The `ghostID` is autofilled by the collection.                                                                                                                               |
+| `readArticleMarkdown`   | Reads a post back as Markdown, including the draft body, with each module as a marker line and its contents in `blocks`. Says so when the page renders from `legacyHTML`.                                                                                                          |
+| `listArticleVersions`   | Lists a post's saved versions, newest first — id, time, title, status and a 100-character snippet each, never a body.                                                                                                                                                              |
+| `readArticleVersion`    | Reads one saved version in exactly the shape `readArticleMarkdown` returns the draft. Read-only.                                                                                                                                                                                   |
+| `restoreArticleVersion` | Reverts a post's body, or its whole article, to a saved version — as a draft, overwriting rather than merging. Has a dry run and an undo.                                                                                                                                          |
+| `updateArticleMarkdown` | Replaces a body from Markdown, saved as a draft. Puts each marked module back as it was; reports which were kept and which removed.                                                                                                                                                |
+| `setKeyFactsBlock`      | Sets an article's key facts card — label and value pairs — in place, or under a named body heading. Saved as a draft; the rest of the body is untouched.                                                                                                                           |
+| `setFAQBlock`           | Sets an article's FAQ — questions with Markdown answers — in place, under a named body heading, or in place of a Markdown FAQ section. Saved as a draft; the rest of the body is untouched.                                                                                        |
+| `setTableBlock`         | Sets a comparison table — caption, header row, rows with inline-Markdown cells — by key, in a named section, or read from the Markdown table under a heading. Saved as a draft; the rest of the body is untouched.                                                                 |
+| `uploadMedia`           | Adds an image to the Media library from base64 and returns its id, for `updatePosts` to set as a `featuredImage`.                                                                                                                                                                  |
+| `uploadMediaFromUrl`    | The same, from an https address the server fetches itself. The only one of the two that works from a phone or a scheduled run.                                                                                                                                                     |
+| `publishArticle`        | Publishes a post as its newest version, in place, or schedules one that is not live — `"now"` or a zoned time ahead. Never moves a live article's date, slug or canonical URL; refuses to backdate. Has a dry run. Needs an administrator's key or a connector granted publishing. |
 
 ### Modules in a body
 
@@ -298,8 +303,8 @@ document's id, and `updatePosts` sets it as `featuredImage`.
 On a published article that second call lands as a **draft** over the live
 version, like every other MCP write that is not a publish — see
 [Publishing](#publishing-and-what-a-write-may-not-do). The picture reaches
-readers when the article is next published, by an administrator's key or from
-the admin panel. (This paragraph used to say the call was refused outright on a
+readers when the article is next published, by `publishArticle` or from the
+admin panel. (This paragraph used to say the call was refused outright on a
 published post. That was true of an article with no pending draft, by accident
 of how Payload fills `_status`, and false of one with a pending draft, where the
 same call took the article off the site.)
@@ -339,6 +344,22 @@ over the _old_ live body and left the draft behind. That is not what Payload
 3.90 does, checked against a real database: `updatePosts` with only
 `_status: 'published'` publishes the newest version as it stands, date and all.
 The warning was right for the wrong release and wrong for this one.
+
+**`publishArticle` is the way to publish over MCP**, and the one a phone or an
+unattended run should use. `updatePosts` with `_status: 'published'` still
+works and does the same thing at its core, but it will just as readily publish a
+never-published draft whose date passed weeks ago — backdated, below everything
+newer — or move a live article's date ahead and so take its page off the site.
+`publishArticle` refuses both, keeps a live article's date, slug and canonical
+URL as they are, and answers in terms of readers: whether the article was live,
+scheduled or unpublished before, which it is now, its address, and which fields
+changed. `dryRun: true` says all of that, and whether the key may publish at
+all, without writing — which is what makes it usable from a phone, where the
+admin panel's Live Preview is not to hand.
+
+Scheduling is the same call with a time: `publishAt: "2026-11-04T20:00:00Z"` on
+an article that is not live. The time must name its offset; `"20:00"` means a
+different moment on every server.
 
 ### Version history
 
