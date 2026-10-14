@@ -1,7 +1,7 @@
 import { readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type { CollectionConfig, FieldAccess } from 'payload'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { Posts } from '../../collections/Posts'
 import { findField } from '../support/fields'
@@ -11,10 +11,33 @@ import {
   isAuthenticated,
   isEditor,
   ownedPosts,
+  pagesRead,
   postsRead,
   publishedOrEditors,
   versionsOf,
 } from '../../access/roles'
+
+// `notScheduled()` reads the clock, so the rules are compared at a fixed moment.
+const NOW = new Date('2026-10-14T16:00:00.000Z')
+const onTheSite = [
+  { _status: { equals: 'published' } },
+  {
+    or: [
+      { publishedAt: { less_than_equal: NOW.toISOString() } },
+      { publishedAt: { exists: false } },
+    ],
+  },
+  { deletedAt: { exists: false } },
+]
+
+beforeEach(() => {
+  vi.useFakeTimers()
+  vi.setSystemTime(NOW)
+})
+
+afterEach(() => {
+  vi.useRealTimers()
+})
 
 describe('role checks', () => {
   const admin = { id: 1, role: 'admin' as const }
@@ -64,10 +87,7 @@ describe('role checks', () => {
   it('exposes published content while retaining owner draft access', async () => {
     // Members-only and paid posts stay gated: published alone is not enough.
     const publiclyReadable = {
-      and: [
-        { _status: { equals: 'published' } },
-        { visibility: { equals: 'public' } },
-      ],
+      and: [...onTheSite, { visibility: { equals: 'public' } }],
     }
     expect(await postsRead({ req: { user: null } } as never)).toEqual(
       publiclyReadable,
@@ -79,6 +99,41 @@ describe('role checks', () => {
     expect(
       await publishedOrEditors({ req: { user: author } } as never),
     ).toEqual({ _status: { equals: 'published' } })
+  })
+
+  // A forged `Authorization` header reaches the API on the CMS hostname as an
+  // anonymous caller. With `_status` as the only condition, that caller read
+  // every scheduled post weeks early — 58 of them, checked on 14 Oct 2026 — and
+  // anything trashed after publication. The rule now matches what the site
+  // serves; `publicationsReadFor` has applied the same conditions since #204.
+  it('withholds scheduled and trashed posts and pages from readers', async () => {
+    for (const user of [null, author]) {
+      const posts = (await postsRead({ req: { user } } as never)) as {
+        and?: unknown[]
+        or?: Array<{ and?: unknown[] }>
+      }
+      const readable = posts.and ?? posts.or?.[0]?.and
+      for (const condition of onTheSite) {
+        expect(readable).toContainEqual(condition)
+      }
+
+      expect(await pagesRead({ req: { user } } as never)).toEqual({
+        and: onTheSite,
+      })
+    }
+    expect(await pagesRead({ req: { user: editor } } as never)).toBe(true)
+  })
+
+  it('reads the clock on every request, not once at boot', async () => {
+    const first = JSON.stringify(
+      await pagesRead({ req: { user: null } } as never),
+    )
+    vi.setSystemTime(new Date(NOW.getTime() + 60_000))
+    const later = JSON.stringify(
+      await pagesRead({ req: { user: null } } as never),
+    )
+
+    expect(later).not.toBe(first)
   })
 
   it('keeps raw legacy HTML out of author hands', async () => {
@@ -114,6 +169,17 @@ describe('version history access', () => {
         {
           and: [
             { 'version._status': { equals: 'published' } },
+            {
+              or: [
+                {
+                  'version.publishedAt': {
+                    less_than_equal: NOW.toISOString(),
+                  },
+                },
+                { 'version.publishedAt': { exists: false } },
+              ],
+            },
+            { 'version.deletedAt': { exists: false } },
             { 'version.visibility': { equals: 'public' } },
           ],
         },

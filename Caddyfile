@@ -204,10 +204,13 @@
 # not stop anyone who reads this file.
 #
 # What still holds behind it is the part that matters: Payload's own access
-# control. `postsRead` in access/roles.ts answers an anonymous or unauthenticated
-# caller with published, public documents only, so a forged header buys the same
-# listing the website already renders — not drafts, not members-only bodies, not
-# members, billing, or users.
+# control. `postsRead` and `pagesRead` in access/roles.ts answer an anonymous or
+# unauthenticated caller with what the site itself would serve — published,
+# dated today or earlier, not in the trash, and for posts, public — so a forged
+# header buys the same listing the website already renders: not drafts, not
+# scheduled posts, not members-only bodies, not members, billing, or users.
+# Until 14 Oct 2026 the date was not part of that rule, and this paragraph said
+# the same thing while a forged header read every scheduled post in full.
 #
 # What does *not* hold is the second thing this block was written for. The
 # unpaginated read and the request volume it describes reach Postgres before
