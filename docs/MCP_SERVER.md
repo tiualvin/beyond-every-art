@@ -295,15 +295,14 @@ a `Content-Type: image/png` on a downloaded SVG buys nothing.
 Uploading is one call; attaching is the next one. Either tool returns the new
 document's id, and `updatePosts` sets it as `featuredImage`.
 
-That second call only works on a **draft**. Payload sends a document's existing
-`_status` with every update, so an editor-bound key updating an already
-published post trips `refuseMcpPublish` — the write carries
-`_status: 'published'` even though it is not changing it, and the guard cannot
-tell the difference. This is the guard working rather than a bug to route
-around: an agent that could edit live articles is the thing it exists to
-prevent, and illustrating one is still an edit to something readers are
-looking at. Illustrate drafts over MCP; change a published article in the admin
-panel.
+On a published article that second call lands as a **draft** over the live
+version, like every other MCP write that is not a publish — see
+[Publishing](#publishing-and-what-a-write-may-not-do). The picture reaches
+readers when the article is next published, by an administrator's key or from
+the admin panel. (This paragraph used to say the call was refused outright on a
+published post. That was true of an article with no pending draft, by accident
+of how Payload fills `_status`, and false of one with a pending draft, where the
+same call took the article off the site.)
 
 Uploads are marked `aiGenerated` unless the call says otherwise. This
 publication writes about specific works and materials, so which pictures are
@@ -314,19 +313,32 @@ photograph is a false claim about a work of art. Set `credit` as well when the
 distinction should reach the reader rather than only an editor, because that is
 the line the article page actually renders.
 
-### Publishing, and one sharp edge
+### Publishing, and what a write may not do
 
 An editor-bound key cannot publish: `refuseMcpPublish` rejects any MCP write
 that sets `_status: 'published'` unless the key's user is an administrator.
 Everything that is not MCP — the admin panel, REST, GraphQL, seeds, the Ghost
 importer — is untouched.
 
-The sharp edge is Payload's, not this project's: publishing through `updatePosts`
-publishes **the fields that call sends**, not the pending draft body. An admin
-key that publishes a post whose draft was written by `updateArticleMarkdown`
-will publish the older body and leave the revision sitting in the versions
-table. Publish from the admin panel, where the draft is promoted and Live
-Preview shows what is going out.
+**Every other MCP write is a draft save, whatever the call asked for.**
+`keepMcpWritesInDraft` sets `draft: true` on any MCP update that is not an
+explicit publish, before Payload decides which row it lands on. The reason is
+Payload's: a write is completed from the article's _newest version_, `_status`
+included, so on a live article whose newest version is an unpublished draft, a
+call that set one field and no `draft` flag — the plugin's `updatePosts`
+defaults it to false — wrote the live row as a draft and took the article off
+the site. No key needed publishing rights to do it, and `refuseMcpPublish`, which
+guards the step _to_ published, could not see a step away from it. Reproduced
+against a real database on 14 Oct 2026, while twenty live articles carried such
+drafts. Taking an article off the site is now something MCP cannot do at all; it
+is done in the admin panel.
+
+**The same completion is why a publish promotes the draft.** This section used to
+warn that publishing through `updatePosts` published the fields the call sent
+over the _old_ live body and left the draft behind. That is not what Payload
+3.90 does, checked against a real database: `updatePosts` with only
+`_status: 'published'` publishes the newest version as it stands, date and all.
+The warning was right for the wrong release and wrong for this one.
 
 ### Version history
 

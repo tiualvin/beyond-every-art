@@ -23,7 +23,10 @@ import { contentEditor } from '../lib/content/editor'
 import { stampPublishedAt } from '../lib/content/publish-date'
 import { purgeOnChange, purgeOnDelete } from '../lib/cache/purge'
 import { recordMcpWrite } from '../lib/mcp/audit'
-import { refuseMcpPublish } from '../lib/mcp/publish-guard'
+import {
+  keepMcpWritesInDraft,
+  refuseMcpPublish,
+} from '../lib/mcp/publish-guard'
 import { buildPreviewUrl } from '../lib/preview/live-preview'
 import { indexNowOnChange, indexNowOnDelete } from '../lib/seo/indexnow'
 import { postPath } from '../lib/seo/site'
@@ -57,6 +60,10 @@ export const Posts: CollectionConfig = {
   // still there to restore.
   trash: true,
   hooks: {
+    // Before anything else decides which row a write lands on: over MCP, only
+    // an explicit publish may touch the live one. See the hook for the
+    // unpublish this prevents.
+    beforeOperation: [keepMcpWritesInDraft],
     beforeChange: [
       ({ data, operation, req }) => {
         // `req.user` is a union now that the MCP plugin adds its own auth

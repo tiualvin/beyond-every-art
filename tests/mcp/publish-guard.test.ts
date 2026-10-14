@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { mayPublish } from '../../lib/mcp/publish-guard'
+import { Posts } from '../../collections/Posts'
+import { keepMcpWritesInDraft, mayPublish } from '../../lib/mcp/publish-guard'
 
 describe('mayPublish', () => {
   it('refuses an editor key publishing through MCP', () => {
@@ -140,5 +141,55 @@ describe('mayPublish', () => {
         role: undefined,
       }),
     ).toBe(false)
+  })
+})
+
+describe('keepMcpWritesInDraft', () => {
+  const run = (
+    args: Record<string, unknown>,
+    payloadAPI: string,
+    operation = 'update',
+  ) =>
+    keepMcpWritesInDraft({
+      args,
+      operation,
+      req: { payloadAPI },
+    } as never) as Record<string, unknown>
+
+  // Payload fills a field a write leaves out from the newest version, so on a
+  // live article with an unpublished revision on top, setting one field with
+  // no `draft` flag wrote the live row as a draft and the article left the
+  // site. Reproduced against a real database on 14 Oct 2026.
+  it('saves an MCP write that is not a publish as a draft', () => {
+    expect(run({ data: { featuredImage: 5 } }, 'MCP')).toMatchObject({
+      draft: true,
+    })
+    expect(
+      run({ data: { featuredImage: 5 }, draft: false }, 'MCP'),
+    ).toMatchObject({ draft: true })
+  })
+
+  it('cannot be used to take an article off the site', () => {
+    expect(run({ data: { _status: 'draft' } }, 'MCP')).toMatchObject({
+      draft: true,
+    })
+  })
+
+  // A publish is left for `refuseMcpPublish` to decide, as before.
+  it('leaves an explicit publish to the publish guard', () => {
+    const args = { data: { _status: 'published' } }
+    expect(run(args, 'MCP')).toBe(args)
+  })
+
+  it('changes nothing outside MCP, or for anything but an update', () => {
+    const args = { data: { _status: 'draft' } }
+    for (const api of ['local', 'REST', 'GraphQL']) {
+      expect(run(args, api)).toBe(args)
+    }
+    expect(run(args, 'MCP', 'create')).toBe(args)
+  })
+
+  it('runs on Posts before anything decides which row a write lands on', () => {
+    expect(Posts.hooks?.beforeOperation).toContain(keepMcpWritesInDraft)
   })
 })

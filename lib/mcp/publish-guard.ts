@@ -22,7 +22,10 @@
 // `/oauth/register` is open to anyone. `docs/MCP_OAUTH.md` records the
 // reversal and what it costs.
 
-import type { CollectionBeforeChangeHook } from 'payload'
+import type {
+  CollectionBeforeChangeHook,
+  CollectionBeforeOperationHook,
+} from 'payload'
 
 export type PublishAttempt = {
   /** Which API the write arrived through. */
@@ -108,4 +111,42 @@ export const refuseMcpPublish: CollectionBeforeChangeHook = ({ data, req }) => {
   }
 
   return data
+}
+
+/**
+ * An MCP write that is not a publish is a draft save, whatever the call asked.
+ *
+ * Payload fills every field a write leaves out from the article's newest
+ * version — `_status` among them. When the newest version is a draft sitting
+ * over a live article, which is what every agent revision of a published post
+ * is, a write that sets one field and no `draft` flag writes the *live row* with
+ * `_status: 'draft'`, and the article leaves the site. The plugin's
+ * `updatePosts` defaults `draft` to false, so setting a featured image or a tag
+ * the obvious way was enough. `refuseMcpPublish` could not see it: it guards
+ * the step *to* published, and this was a step away from it, by any key.
+ * Reproduced against a real database on 14 Oct 2026 with an editor key setting
+ * only an excerpt, while twenty live articles carried exactly such drafts.
+ *
+ * So the one MCP write that touches the live row is an explicit publish, which
+ * `refuseMcpPublish` then decides. Everything else — an image, tags, a date, an
+ * explicit `_status: 'draft'` — lands as a draft over the live article, which
+ * is what drafting means. Taking an article off the site is a person's
+ * decision, made in the admin panel.
+ *
+ * A `beforeOperation` hook because that is the last point the `draft` argument
+ * can still be changed: `beforeChange` sees the data after Payload has already
+ * decided which row the write goes to.
+ */
+export const keepMcpWritesInDraft: CollectionBeforeOperationHook = ({
+  args,
+  operation,
+  req,
+}) => {
+  if (operation !== 'update' || req.payloadAPI !== 'MCP') return args
+
+  const update = args as { data?: { _status?: unknown }; draft?: boolean }
+  if (update.draft === true) return args
+  if (update.data?._status === 'published') return args
+
+  return { ...args, draft: true }
 }
