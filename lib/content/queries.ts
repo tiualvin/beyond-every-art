@@ -7,10 +7,11 @@ import { live, publishedStatus } from '@/lib/content/schedule'
 import { isSubjectTag } from '@/lib/content/topics'
 import { ARCHIVE_PAGE_SIZE } from '@/lib/content/pagination'
 import { toArticleBody, type ArticleBody } from '@/lib/content/body'
+import { withholdUnpublishedLinks } from '@/lib/content/withheld-links'
 import { readingTimeMinutes } from '@/lib/format'
 import { getPayloadClient } from '@/lib/payload'
 import type { PreviewUser } from '@/lib/preview/session'
-import { appPath, postPath } from '@/lib/seo/site'
+import { appPath, getSiteUrl, postPath } from '@/lib/seo/site'
 
 export type NavLink = { label: string; url: string }
 
@@ -813,6 +814,48 @@ function toPostDetail(doc: RawContentDoc, preview: boolean): PostDetail {
   }
 }
 
+/**
+ * Slugs of posts and pages that exist but are not on the site: never published,
+ * or published with a date still ahead. A body's links to these render as text
+ * until they go live — see `lib/content/withheld-links.ts`.
+ *
+ * Read inside the cached article and page reads rather than cached on its own,
+ * so the two can never disagree about a moment: whatever turns a page's cache
+ * over re-reads this with it. Fails open — an error here leaves links as they
+ * are, which is what the site did before this existed.
+ */
+async function readWithheldSlugs(): Promise<ReadonlySet<string>> {
+  try {
+    const payload = await getPayloadClient()
+    const notLive: Where = {
+      or: [
+        { _status: { equals: 'draft' } },
+        { publishedAt: { greater_than: new Date().toISOString() } },
+      ],
+    }
+    const [posts, pages] = await Promise.all(
+      (['posts', 'pages'] as const).map((collection) =>
+        payload.find({
+          collection,
+          overrideAccess: true,
+          depth: 0,
+          pagination: false,
+          limit: 0,
+          where: notLive,
+          select: { slug: true },
+        }),
+      ),
+    )
+    return new Set(
+      [...posts.docs, ...pages.docs]
+        .map((doc) => (doc as { slug?: unknown }).slug)
+        .filter((slug): slug is string => typeof slug === 'string' && !!slug),
+    )
+  } catch {
+    return new Set()
+  }
+}
+
 async function readPostBySlug(
   slug: string,
   options: { draft?: boolean; user?: PreviewUser | null } = {},
@@ -836,7 +879,17 @@ async function readPostBySlug(
     })
     const doc = result.docs[0] as RawContentDoc | undefined
     if (!doc?.slug) return null
-    return toPostDetail(doc, Boolean(options.draft))
+    const detail = toPostDetail(doc, Boolean(options.draft))
+    // A preview keeps every link: the editor is deciding what goes out.
+    if (options.draft) return detail
+    return {
+      ...detail,
+      body: withholdUnpublishedLinks(
+        detail.body,
+        await readWithheldSlugs(),
+        getSiteUrl(),
+      ),
+    }
   } catch {
     return null
   }
@@ -969,7 +1022,13 @@ async function readPageBySlug(
       // Pages are never gated, so the members-only marker does nothing here —
       // but an editor who dropped one on a page should still see it sitting
       // there doing nothing, rather than have it silently vanish in preview.
-      body: toArticleBody(doc, { preview: Boolean(options.draft) }),
+      body: options.draft
+        ? toArticleBody(doc, { preview: true })
+        : withholdUnpublishedLinks(
+            toArticleBody(doc),
+            await readWithheldSlugs(),
+            getSiteUrl(),
+          ),
       publishedAt: doc.publishedAt ?? null,
       updatedAt: doc.updatedAt ?? null,
       image: toMediaImage(doc.featuredImage),
@@ -986,7 +1045,9 @@ async function readPageBySlug(
 const getPublishedPageBySlug = cachedRead(
   'page-by-slug',
   (slug: string) => readPageBySlug(slug),
-  [CONTENT_TAGS.pages, CONTENT_TAGS.media],
+  // Posts too: a page's links to posts that are not live yet render as text,
+  // and publishing one of them has to turn the link back on.
+  [CONTENT_TAGS.pages, CONTENT_TAGS.posts, CONTENT_TAGS.media],
 )
 
 /**

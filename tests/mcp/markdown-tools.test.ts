@@ -102,6 +102,110 @@ async function call(
   return JSON.parse(result.content[0].text) as Record<string, unknown>
 }
 
+describe('HTML comments in Markdown', () => {
+  // Markdown keeps a comment's characters and the page prints them: two live
+  // articles showed `<!-- IMAGE PLACEHOLDER ... -->` notes for two weeks.
+  const markdown =
+    'Before.\n\n<!-- IMAGE PLACEHOLDER: alt="A studio" | prompt: "A painter\'s studio" -->\n\nAfter.'
+
+  it('refuses a revision that would print one', async () => {
+    const { req, payload } = await mcpRequest({
+      id: 1,
+      content: body(paragraph('A body.')),
+    })
+
+    await expect(
+      call('updateArticleMarkdown', { id: '1', markdown }, req),
+    ).rejects.toThrow(/HTML comments print as text/)
+    expect(payload.update).not.toHaveBeenCalled()
+  })
+
+  it('refuses a new article that would print one', async () => {
+    const { req } = await mcpRequest({ id: 1 })
+
+    await expect(
+      call('draftArticle', { markdown, slug: 'x', title: 'X' }, req),
+    ).rejects.toThrow(/uploadMediaFromUrl/)
+  })
+
+  it('still takes a block marker, which is the one comment with a meaning', async () => {
+    const { req } = await mcpRequest({
+      id: 1,
+      content: body(paragraph('A body.'), block('keyFacts', facts)),
+    })
+
+    const result = await call(
+      'updateArticleMarkdown',
+      {
+        id: '1',
+        markdown:
+          'Revised.\n\n<!-- block:keyFacts:65f0c0ffee0000000000abcd -->',
+      },
+      req,
+    )
+
+    expect(result.blocks).toMatchObject({ removed: [] })
+  })
+})
+
+describe('what a draft-only write says about readers', () => {
+  // On 7 Oct 2026 an agent revised twenty live articles, was told
+  // `status: 'draft'` each time, and stopped there. The reply now says whether
+  // readers have the change.
+  it('says a revision of a live article has not reached readers', async () => {
+    const { req } = await mcpRequest({
+      id: 1,
+      _status: 'published',
+      publishedAt: '2026-10-01T16:00:00.000Z',
+      content: body(paragraph('A body.')),
+    })
+
+    const result = await call(
+      'updateArticleMarkdown',
+      { id: '1', markdown: 'A revised body.' },
+      req,
+    )
+
+    expect(result).toMatchObject({ readers: 'live', status: 'draft' })
+    expect(result.note).toMatch(/readers still see the published version/)
+  })
+
+  it('says a scheduled article goes out as last published', async () => {
+    const { req } = await mcpRequest({
+      id: 1,
+      _status: 'published',
+      publishedAt: '2099-01-01T16:00:00.000Z',
+      content: body(paragraph('A body.')),
+    })
+
+    const result = await call(
+      'updateArticleMarkdown',
+      { id: '1', markdown: 'A revised body.' },
+      req,
+    )
+
+    expect(result).toMatchObject({ readers: 'scheduled' })
+    expect(result.note).toMatch(/goes out then as last published/)
+  })
+
+  it('adds nothing for an article that was never published', async () => {
+    const { req } = await mcpRequest({
+      id: 1,
+      _status: 'draft',
+      content: body(paragraph('A body.')),
+    })
+
+    const result = await call(
+      'updateArticleMarkdown',
+      { id: '1', markdown: 'A revised body.' },
+      req,
+    )
+
+    expect(result).toMatchObject({ readers: 'unpublished' })
+    expect(result).not.toHaveProperty('note')
+  })
+})
+
 describe('reading and revising a body as Markdown', () => {
   it('reads the draft with its relationships left as ids', async () => {
     const { req, payload } = await mcpRequest({

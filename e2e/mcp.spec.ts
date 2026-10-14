@@ -167,6 +167,8 @@ test.describe('MCP endpoint', () => {
         'setFAQBlock',
         'setTableBlock',
         'uploadMedia',
+        'publishArticle',
+        'editorialStatus',
         'findPosts',
       ]),
     )
@@ -574,16 +576,19 @@ test.describe('MCP endpoint', () => {
       },
     )
     expect(withBlock).not.toContain('"isError":true')
-    const publish = await callTool(
+    // Published one article at a time: a publish by `where` is completed from
+    // the live row rather than the newest version, so it would have put out
+    // "A first body." and buried the callout — MCP refuses it now.
+    const byWhere = await callTool(
       request,
       fixtures.mcp.adminKey,
       'updatePosts',
-      {
-        _status: 'published',
-        where,
-      },
+      { _status: 'published', where },
     )
-    expect(publish).not.toContain('"isError":true')
+    expect(byWhere).toContain('publishArticle')
+    await callToolJson(request, fixtures.mcp.adminKey, 'publishArticle', {
+      slug,
+    })
 
     // An agent's revision through Markdown: the callout does not survive it.
     await callToolJson(
@@ -754,6 +759,154 @@ test.describe('MCP endpoint', () => {
       expect(result, url).toContain('"isError":true')
       expect(result, url).not.toContain('sourceUrl')
     }
+  })
+
+  // The state twenty live articles were in on 14 Oct 2026: an agent's
+  // revision saved as a draft over a published article, nobody publishing it.
+  // Three things have to hold. The revision must not reach readers until it is
+  // published; no MCP write short of a publish may take the article off the
+  // site (one that set a single field with no `draft` flag used to); and the
+  // revision must be publishable over MCP, by a key allowed to publish.
+  test("publishes an agent's revision of a live article in place, and only that way", async ({
+    request,
+  }) => {
+    const slug = `e2e-mcp-publish-${Date.now()}-${Math.floor(Math.random() * 1e6)}`
+    const liveDoc = async () => {
+      const response = await request.get(
+        `/api/posts/?where[slug][equals]=${slug}&depth=0`,
+      )
+      return (
+        (await response.json()) as { docs: Array<Record<string, unknown>> }
+      ).docs[0]
+    }
+
+    await callToolJson(request, fixtures.mcp.editorKey, 'draftArticle', {
+      markdown: 'The body readers first saw.',
+      slug,
+      title: 'E2E MCP Published Revision',
+    })
+    const first = await callToolJson(
+      request,
+      fixtures.mcp.adminKey,
+      'publishArticle',
+      { publishAt: 'now', slug },
+    )
+    expect(first).toMatchObject({ after: 'live', status: 'published' })
+    const { publishedAt } = first as { publishedAt: string }
+
+    await callToolJson(
+      request,
+      fixtures.mcp.editorKey,
+      'updateArticleMarkdown',
+      {
+        markdown: 'The revised body.',
+        slug,
+      },
+    )
+    // A one-field write with no `draft` flag, the way `updatePosts` defaults.
+    const touched = await callTool(
+      request,
+      fixtures.mcp.editorKey,
+      'updatePosts',
+      {
+        excerpt: 'Set by an agent.',
+        where: JSON.stringify({ slug: { equals: slug } }),
+      },
+    )
+    expect(touched).not.toContain('"isError":true')
+
+    const meanwhile = await liveDoc()
+    expect(meanwhile?._status).toBe('published')
+    expect(JSON.stringify(meanwhile?.content)).toContain(
+      'The body readers first saw.',
+    )
+
+    const refused = await callTool(
+      request,
+      fixtures.mcp.editorKey,
+      'publishArticle',
+      { slug },
+    )
+    expect(refused).toContain('administrator')
+
+    const preview = await callToolJson(
+      request,
+      fixtures.mcp.adminKey,
+      'publishArticle',
+      { dryRun: true, slug },
+    )
+    expect(preview).toMatchObject({
+      before: 'live',
+      dryRun: true,
+      mayPublish: true,
+    })
+    expect(preview.changes).toEqual(
+      expect.arrayContaining(['content', 'excerpt']),
+    )
+
+    const published = await callToolJson(
+      request,
+      fixtures.mcp.adminKey,
+      'publishArticle',
+      { slug },
+    )
+    expect(published).toMatchObject({ after: 'live', publishedAt })
+
+    const after = await liveDoc()
+    expect(after?._status).toBe('published')
+    expect(after?.publishedAt).toBe(publishedAt)
+    expect(after?.excerpt).toBe('Set by an agent.')
+    expect(JSON.stringify(after?.content)).toContain('The revised body.')
+  })
+
+  test('reports a revision nobody published, and stops once it is', async ({
+    request,
+  }) => {
+    const slug = `e2e-mcp-status-${Date.now()}-${Math.floor(Math.random() * 1e6)}`
+    const pending = async () => {
+      const status = (await callToolJson(
+        request,
+        fixtures.mcp.editorKey,
+        'editorialStatus',
+        {},
+      )) as {
+        savedButNotOut: { liveWithChanges: Array<{ slug: string }> }
+        wentLive: { articles: Array<{ slug: string }> }
+      }
+      return {
+        pending: status.savedButNotOut.liveWithChanges.some(
+          (article) => article.slug === slug,
+        ),
+        live: status.wentLive.articles.some((article) => article.slug === slug),
+      }
+    }
+
+    await callToolJson(request, fixtures.mcp.editorKey, 'draftArticle', {
+      markdown: 'First.',
+      slug,
+      title: 'E2E MCP Status',
+    })
+    await callToolJson(request, fixtures.mcp.adminKey, 'publishArticle', {
+      publishAt: 'now',
+      slug,
+    })
+    expect(await pending()).toEqual({ live: true, pending: false })
+
+    await callToolJson(
+      request,
+      fixtures.mcp.editorKey,
+      'updateArticleMarkdown',
+      {
+        markdown: 'Second.',
+        slug,
+      },
+    )
+    expect(await pending()).toEqual({ live: true, pending: true })
+
+    await callToolJson(request, fixtures.mcp.adminKey, 'publishArticle', {
+      slug,
+    })
+    expect(await pending()).toEqual({ live: true, pending: false })
   })
 
   test('refuses an editor key trying to publish', async ({ request }) => {

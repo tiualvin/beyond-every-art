@@ -15,14 +15,22 @@
 // refactor of this file, not a config change.
 
 import type { MCPPluginConfig } from '@payloadcms/plugin-mcp'
-import type { PayloadRequest, TypedUser } from 'payload'
+import type { PayloadRequest, TypedUser, Where } from 'payload'
 import { z } from 'zod'
 
 import { FAQ_BLOCK, KEY_FACTS_MAX_ITEMS } from '../../blocks/schema'
 import { toArticleBody } from '../content/body'
+import { findUnpublishedWork } from '../content/editorial-status'
+import { isScheduled, SCHEDULE_GRANULARITY_SECONDS } from '../content/schedule'
 import { htmlToPlainText, richTextToPlainText } from '../content/plain-text'
 import { buildPreviewUrl } from '../preview/live-preview'
-import { listBlocks, markBlocks, restoreBlocks } from './blocks'
+import { absoluteUrl, getSiteUrl, postPath } from '../seo/site'
+import {
+  listBlocks,
+  markBlocks,
+  refuseLiteralComments,
+  restoreBlocks,
+} from './blocks'
 import { setFaq, type FaqInputItem } from './faq'
 import { setKeyFacts, type Fact } from './key-facts'
 import { withChildren } from './placement'
@@ -36,6 +44,7 @@ import {
   type MarkdownCollection,
 } from './markdown'
 import { decodeImageUpload, vetImageBytes } from './upload'
+import { mayPublishThrough } from './publish-guard'
 import { MAX_AGENT_UPLOAD_BYTES } from '../security/uploads'
 import {
   fetchPublicBytes,
@@ -323,6 +332,145 @@ function parentID(parent: unknown): unknown {
     : parent
 }
 
+/** Where a post stands with readers: what its live row says, now. */
+type LiveState = 'live' | 'scheduled' | 'unpublished'
+
+/**
+ * The live row — what the site serves — as opposed to the newest version.
+ *
+ * `findArticle` reads the newest version, which is the right thing to revise
+ * and the wrong thing to ask "is this on the site?" of: a draft saved over a
+ * live article reads as a draft there. Read with the caller's own access.
+ */
+async function readLiveRow(
+  req: PayloadRequest,
+  id: number | string,
+  now: Date = new Date(),
+): Promise<{
+  state: LiveState
+  publishedAt: string | null
+  doc: Record<string, unknown> | null
+}> {
+  const { docs } = await req.payload.find({
+    collection: COLLECTION,
+    depth: 0,
+    draft: false,
+    limit: 1,
+    overrideAccess: false,
+    req,
+    user: req.user,
+    where: { id: { equals: id } },
+  })
+  const doc = (docs[0] as unknown as Record<string, unknown>) ?? null
+  if (!doc || doc._status !== 'published') {
+    return { state: 'unpublished', publishedAt: null, doc }
+  }
+  const publishedAt =
+    typeof doc.publishedAt === 'string' && doc.publishedAt
+      ? doc.publishedAt
+      : null
+  return {
+    state: isScheduled('published', publishedAt, now) ? 'scheduled' : 'live',
+    publishedAt,
+    doc,
+  }
+}
+
+/**
+ * What the caller of a draft-only write needs to know about readers.
+ *
+ * These tools answered every write with `status: 'draft'`, which is true of the
+ * newest version and says nothing about the page. On a live article it means
+ * readers do not get the change — and on 7 Oct 2026 an agent took that answer
+ * as the end of the job twenty times over, leaving live articles with
+ * revisions nobody published. So the reply now says what readers see, and,
+ * where it matters, what would get the change to them.
+ */
+async function whatReadersSee(
+  req: PayloadRequest,
+  id: number | string,
+): Promise<{ readers: LiveState; note?: string }> {
+  const live = await readLiveRow(req, id)
+  if (live.state === 'live') {
+    return {
+      readers: 'live',
+      note:
+        'Saved as a draft over a live article: readers still see the ' +
+        'published version. The change reaches them when it is published ' +
+        'again — `publishArticle`, which needs an administrator key or a ' +
+        'connector granted publishing, or Publish in the admin panel.',
+    }
+  }
+  if (live.state === 'scheduled') {
+    return {
+      readers: 'scheduled',
+      note:
+        `Saved as a draft over an article scheduled for ${live.publishedAt}. ` +
+        'It goes out then as last published, without this change, unless ' +
+        'it is published again before then; `publishArticle` keeps its slot.',
+    }
+  }
+  return { readers: 'unpublished' }
+}
+
+/** Payload's own bookkeeping, never sent back in a write. */
+const SYSTEM_FIELDS = new Set([
+  'id',
+  'createdAt',
+  'updatedAt',
+  'deletedAt',
+  '_status',
+])
+
+/** Written by the save itself; never a change a reader would see. */
+const NOT_READER_FACING = new Set(['_status', 'lastEditedBy'])
+
+/**
+ * What publishing may not change on an article that is already live.
+ *
+ * The address, and where search engines are told the original lives. Either
+ * changes something crawlers have cached, which `AGENTS.md` keeps for a person
+ * to decide — and a slug change also needs a redirect, which only the admin
+ * panel can add.
+ */
+const FIXED_WHILE_LIVE = ['slug', 'canonicalURL'] as const
+
+/** An ISO 8601 time that names its offset, so "20:00" cannot mean two things. */
+const ZONED_TIME =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$/i
+
+/**
+ * `publishAt` as a time, or undefined when the call left it out.
+ *
+ * Only "now" or a moment ahead. A date in the past would put an article out
+ * backdated — filed below newer work in every listing and the feed — which is
+ * an editorial decision about history, made in the admin panel.
+ */
+export function resolvePublishAt(
+  value: string | undefined,
+  now: Date = new Date(),
+): string | undefined {
+  if (value === undefined) return undefined
+  const trimmed = value.trim()
+  if (trimmed.toLowerCase() === 'now') return now.toISOString()
+  if (!ZONED_TIME.test(trimmed)) {
+    throw new Error(
+      '`publishAt` must be "now" or an ISO 8601 time with its offset, such ' +
+        'as 2026-11-04T20:00:00Z.',
+    )
+  }
+  const at = Date.parse(trimmed)
+  if (!Number.isFinite(at))
+    throw new Error(`\`publishAt\` is not a time: ${value}`)
+  if (at <= now.getTime()) {
+    throw new Error(
+      `\`publishAt\` (${trimmed}) has passed. Pass "now" to publish today, or ` +
+        'a time ahead to schedule. Backdating is done in the admin panel.',
+    )
+  }
+  return new Date(at).toISOString()
+}
+
 export const mcpTools: McpTool[] = [
   {
     description:
@@ -355,11 +503,14 @@ export const mcpTools: McpTool[] = [
         idsForSlugs(req, 'tags', tagSlugs),
       ])
 
+      const content = markdownToLexical(req.payload, 'posts', markdown)
+      refuseLiteralComments(content)
+
       const created = await req.payload.create({
         collection: 'posts',
         data: {
           _status: 'draft',
-          content: markdownToLexical(req.payload, 'posts', markdown),
+          content,
           excerpt,
           metaDescription,
           metaTitle,
@@ -668,6 +819,7 @@ export const mcpTools: McpTool[] = [
         }),
         status: 'draft',
         undo: replaced ? String(replaced.id) : null,
+        ...(await whatReadersSee(req, id)),
       })
     },
     name: 'restoreArticleVersion',
@@ -737,6 +889,7 @@ export const mcpTools: McpTool[] = [
         }),
         slug: updated.slug,
         status: 'draft',
+        ...(await whatReadersSee(req, updated.id)),
       })
     },
     name: 'updateArticleMarkdown',
@@ -808,6 +961,7 @@ export const mcpTools: McpTool[] = [
         removedTable: result.removedTable,
         slug: updated.slug,
         status: 'draft',
+        ...(await whatReadersSee(req, updated.id)),
       })
     },
     name: 'setKeyFactsBlock',
@@ -936,6 +1090,7 @@ export const mcpTools: McpTool[] = [
         replacedSection: result.replacedSection,
         slug: updated.slug,
         status: 'draft',
+        ...(await whatReadersSee(req, updated.id)),
       })
     },
     name: 'setFAQBlock',
@@ -1071,6 +1226,7 @@ export const mcpTools: McpTool[] = [
         removedTable: result.removedTable,
         slug: updated.slug,
         status: 'draft',
+        ...(await whatReadersSee(req, updated.id)),
         table: {
           columns: result.columns,
           key: result.key,
@@ -1338,6 +1494,279 @@ export const mcpTools: McpTool[] = [
           'The https address of the image. Must be publicly reachable: ' +
             'private, loopback and link-local addresses are refused, at every ' +
             'redirect.',
+        ),
+    },
+  },
+  {
+    description:
+      'Publish an article as its newest version — the latest draft, exactly as ' +
+      '`readArticleMarkdown` shows it — or schedule it. Leave `publishAt` out to ' +
+      "keep the article's date: a live article is updated in place, a scheduled " +
+      'one keeps its slot. For an article that is not live yet, pass "now" or a ' +
+      'time ahead, such as 2026-11-04T20:00:00Z, to publish or schedule it. A ' +
+      "live article's date, address and canonical URL are never changed here — " +
+      'moving the date ahead would take its page off the site. Refused unless ' +
+      'the key belongs to an administrator, or the connector was granted ' +
+      'publishing. Pass `dryRun: true` first: it says what would go out, when, ' +
+      'and whether this key may publish, and writes nothing.',
+    handler: async (args: Record<string, unknown>, req: PayloadRequest) => {
+      const {
+        dryRun = false,
+        publishAt,
+        ...target
+      } = args as {
+        dryRun?: boolean
+        id?: string
+        publishAt?: string
+        slug?: string
+      }
+      const now = new Date()
+
+      // The newest version, whole: what the admin panel's Publish button
+      // sends. Payload would complete a partial write from it anyway; sending
+      // it is what makes the result checkable before anything is written.
+      const draft = (await findArticle(
+        req,
+        COLLECTION,
+        target,
+      )) as unknown as Record<string, unknown>
+      const id = draft.id as number | string
+      const live = await readLiveRow(req, id, now)
+      const requested = resolvePublishAt(publishAt, now)
+
+      if (live.state === 'live') {
+        if (requested !== undefined) {
+          throw new Error(
+            `This article has been live since ${live.publishedAt ?? 'it was published'}, ` +
+              'and its date is not moved here: a date ahead would take its page ' +
+              'off the site until then, and "now" would re-date it to the top of ' +
+              'every listing. Leave `publishAt` out to publish its changes in ' +
+              'place, or change the date in the admin panel.',
+          )
+        }
+        const moved = FIXED_WHILE_LIVE.filter((field) =>
+          differs(live.doc?.[field], draft[field]),
+        )
+        if (moved.length) {
+          throw new Error(
+            `The draft changes this live article's ${moved.join(' and ')}, ` +
+              'which moves what crawlers have cached. Put it back with ' +
+              '`updatePosts`, or publish from the admin panel, where a redirect ' +
+              'can be added at the same time.',
+          )
+        }
+      }
+
+      const draftDate =
+        typeof draft.publishedAt === 'string' && draft.publishedAt
+          ? draft.publishedAt
+          : null
+      const publishedAt =
+        live.state === 'live' ? live.publishedAt : (requested ?? draftDate)
+
+      if (
+        live.state !== 'live' &&
+        requested === undefined &&
+        draftDate &&
+        Date.parse(draftDate) <= now.getTime()
+      ) {
+        throw new Error(
+          `This article is not live, and the date it carries (${draftDate}) ` +
+            'has passed. Published as it is, it would go out backdated — below ' +
+            'newer articles in every listing and in the feed. Pass ' +
+            '`publishAt: "now"` to publish it today, or a time ahead to ' +
+            'schedule it.',
+        )
+      }
+
+      const data: Record<string, unknown> = Object.fromEntries(
+        Object.entries(draft).filter(([field]) => !SYSTEM_FIELDS.has(field)),
+      )
+      data._status = 'published'
+      // Left out when there is none: `stampPublishedAt` dates it on publish.
+      if (publishedAt) data.publishedAt = publishedAt
+      else delete data.publishedAt
+
+      const goesOut =
+        publishedAt && Date.parse(publishedAt) > now.getTime()
+          ? 'scheduled'
+          : 'live'
+      const slug = String(draft.slug ?? '')
+      const described = {
+        id,
+        slug,
+        title: draft.title,
+        before: live.state,
+        after: goesOut,
+        publishedAt: publishedAt ?? now.toISOString(),
+        url: absoluteUrl(postPath(slug), getSiteUrl()),
+        // What readers will see change. Null for an article never published,
+        // where all of it is new. `lastEditedBy` is bookkeeping, not content.
+        changes:
+          live.state !== 'unpublished' && live.doc
+            ? Object.keys(data).filter(
+                (field) =>
+                  !NOT_READER_FACING.has(field) &&
+                  differs(live.doc![field], data[field]),
+              )
+            : null,
+      }
+
+      if (dryRun) {
+        return text({
+          ...described,
+          dryRun: true,
+          mayPublish: mayPublishThrough(req),
+        })
+      }
+
+      // `refuseMcpPublish` decides here, on the same rule `mayPublish` read.
+      const updated = (await req.payload.update({
+        collection: COLLECTION,
+        data,
+        depth: 0,
+        draft: false,
+        id,
+        overrideAccess: false,
+        req,
+        user: req.user as TypedUser,
+      })) as unknown as Record<string, unknown>
+
+      const finalDate =
+        typeof updated.publishedAt === 'string'
+          ? updated.publishedAt
+          : described.publishedAt
+      return text({
+        ...described,
+        dryRun: false,
+        publishedAt: finalDate,
+        status: updated._status,
+        appears:
+          goesOut === 'scheduled'
+            ? `On ${finalDate}, within ${SCHEDULE_GRANULARITY_SECONDS / 60} minutes. Nothing else needs to happen.`
+            : `Now, within ${SCHEDULE_GRANULARITY_SECONDS / 60} minutes at most as cached pages turn over.`,
+      })
+    },
+    name: 'publishArticle',
+    parameters: {
+      ...targetShape,
+      dryRun: z
+        .boolean()
+        .optional()
+        .describe(
+          'Say what would go out, when, and whether this key may publish; write nothing.',
+        ),
+      publishAt: z
+        .string()
+        .optional()
+        .describe(
+          'Only for an article that is not live yet: "now", or an ISO 8601 ' +
+            'time with its offset, such as 2026-11-04T20:00:00Z. Left out, the ' +
+            'article keeps the date it has.',
+        ),
+    },
+  },
+  {
+    description:
+      'Where the publishing schedule stands, read-only. Lists what is ' +
+      'scheduled in the next `days` (default 14) and what went live in the ' +
+      'last `days`, each with its address and time; and, separately, work ' +
+      'that is saved but not out: live articles whose newest version is a ' +
+      'draft nobody published (readers still see the published one), ' +
+      'scheduled articles in the same state (they go out as last published), ' +
+      'and drafts carrying a date that has passed (a date on a draft ' +
+      'schedules nothing). Use it to check a schedule went out as planned, and ' +
+      'before choosing a slot with `publishArticle`.',
+    handler: async (args: Record<string, unknown>, req: PayloadRequest) => {
+      const { days = 14 } = args as { days?: number }
+      const now = new Date()
+      const span = days * 24 * 60 * 60 * 1000
+      const siteUrl = getSiteUrl()
+
+      const listed = async (where: Where, sort: string) => {
+        const { docs, totalDocs } = await req.payload.find({
+          collection: COLLECTION,
+          depth: 0,
+          limit: 100,
+          overrideAccess: false,
+          req,
+          select: { publishedAt: true, slug: true, title: true },
+          sort,
+          user: req.user,
+          where,
+        })
+        return {
+          articles: (docs as unknown as Array<Record<string, unknown>>).map(
+            (doc) => ({
+              id: doc.id,
+              publishedAt: doc.publishedAt ?? null,
+              slug: doc.slug,
+              title: doc.title,
+              url: absoluteUrl(postPath(String(doc.slug ?? '')), siteUrl),
+            }),
+          ),
+          total: totalDocs,
+        }
+      }
+
+      const published: Where = { _status: { equals: 'published' } }
+      const [scheduled, wentLive, unpublished] = await Promise.all([
+        listed(
+          {
+            and: [
+              published,
+              { publishedAt: { greater_than: now.toISOString() } },
+              {
+                publishedAt: {
+                  less_than_equal: new Date(now.getTime() + span).toISOString(),
+                },
+              },
+            ],
+          },
+          'publishedAt',
+        ),
+        listed(
+          {
+            and: [
+              published,
+              { publishedAt: { less_than_equal: now.toISOString() } },
+              {
+                publishedAt: {
+                  greater_than: new Date(now.getTime() - span).toISOString(),
+                },
+              },
+            ],
+          },
+          '-publishedAt',
+        ),
+        findUnpublishedWork(req.payload, {
+          now,
+          user: req.user as TypedUser,
+        }),
+      ])
+
+      return text({
+        now: now.toISOString(),
+        days,
+        // How late a scheduled article may appear after its time: nothing
+        // wakes up to release it; cached pages turn over.
+        releaseWithinMinutes: SCHEDULE_GRANULARITY_SECONDS / 60,
+        scheduled,
+        wentLive,
+        savedButNotOut: unpublished,
+      })
+    },
+    name: 'editorialStatus',
+    parameters: {
+      days: z
+        .number()
+        .int()
+        .min(1)
+        .max(90)
+        .optional()
+        .describe(
+          'How far ahead to list scheduled articles, and how far back to list ' +
+            'ones that went live. Defaults to 14; at most 90.',
         ),
     },
   },

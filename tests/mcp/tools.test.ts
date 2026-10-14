@@ -24,7 +24,7 @@ describe('nativeGhostID', () => {
 })
 
 describe('mcpTools', () => {
-  it('exposes the drafting loop: create, read back, look back, revise, add facts, FAQs and tables, illustrate', () => {
+  it('exposes the drafting loop: create, read back, look back, revise, add facts, FAQs and tables, illustrate, publish, check the schedule', () => {
     expect(mcpTools.map((tool) => tool.name)).toEqual([
       'draftArticle',
       'readArticleMarkdown',
@@ -37,6 +37,8 @@ describe('mcpTools', () => {
       'setTableBlock',
       'uploadMedia',
       'uploadMediaFromUrl',
+      'publishArticle',
+      'editorialStatus',
     ])
   })
 
@@ -388,6 +390,16 @@ describe('restoreArticleVersion', () => {
         version: saved,
       }),
       findVersions: () => ({ docs: [{ id: 950 }], totalDocs: 3 }),
+      // The live row: published, and on the site.
+      find: () => ({
+        docs: [
+          {
+            ...current,
+            _status: 'published',
+            publishedAt: '2026-09-20T09:00:00.000Z',
+          },
+        ],
+      }),
       ...(update ? { update } : {}),
     })
 
@@ -451,7 +463,12 @@ describe('restoreArticleVersion', () => {
       status: 'draft',
       // The draft this replaced, which restores the restore.
       undo: '950',
+      // `status: 'draft'` is true of the newest version and says nothing about
+      // the page. On a live article the reply says readers do not have it.
+      readers: 'live',
     })
+    expect(result.note).toMatch(/readers still see the published version/)
+    expect(result.note).toContain('publishArticle')
   })
 
   it('never carries the URL, the paywall or ownership back, even for the whole article', async () => {

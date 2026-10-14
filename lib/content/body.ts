@@ -153,6 +153,22 @@ export function paywallIndex(nodes: BodyNode[]): number {
   return nodes.findIndex(isPaywallNode)
 }
 
+/** A paragraph whose whole text is an HTML comment: `<!-- ... -->`. */
+const WHOLE_COMMENT = /^<!--[\s\S]*-->$/
+
+/**
+ * True for a paragraph that is nothing but an HTML comment.
+ *
+ * Markdown converts `<!-- ... -->` to a paragraph of those literal characters,
+ * which the page then prints. Two live articles showed an agent's
+ * `<!-- IMAGE PLACEHOLDER: ... -->` notes to readers for two weeks in October
+ * 2026. No reader is ever meant to see one, so a reader never does; an editor
+ * previewing still sees it, which is how it gets noticed and removed.
+ */
+export function isCommentParagraph(node: BodyNode): boolean {
+  return node.type === 'paragraph' && WHOLE_COMMENT.test(nodeText(node).trim())
+}
+
 /**
  * The body of a document, as the thing that renders it needs to see it.
  *
@@ -170,6 +186,9 @@ export function toArticleBody(
   if (!isEmptyRichText(doc.content)) {
     const source = doc.content as BodyRoot
     let children = stripLeadingTitleNode(source.root?.children ?? [], doc.title)
+    if (!preview) {
+      children = children.filter((node) => !isCommentParagraph(node))
+    }
 
     // The editor's own cut wins over the character count. It is an explicit
     // decision about where the piece stops being free, and a heuristic that

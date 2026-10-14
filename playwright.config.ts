@@ -170,6 +170,21 @@ export default defineConfig({
   },
   expect: { timeout: 10_000 },
   timeout: 30_000,
+  /**
+   * The whole run, enforced by the runner rather than by a worker. The suite
+   * takes under a minute, and a per-test timeout only fires if the worker
+   * running the test is still able to notice it. On 14 Oct 2026 one was not:
+   * run 38602923534 went silent 36 seconds in with one worker and its browser
+   * still alive, sat there until the job's own 20-minute limit cancelled it,
+   * and left nothing behind — a cancelled job skips the `if: failure()`
+   * upload, and the `github` reporter prints nothing until the end. The same
+   * build passed three times out of three locally.
+   *
+   * Ten minutes is past anything a working run needs, retries included, and
+   * leaves the job time to upload the report: a failure then names the tests
+   * that were interrupted instead of a silent cancellation naming none.
+   */
+  globalTimeout: process.env.CI ? 10 * 60_000 : undefined,
   projects: [
     {
       name: 'chromium',

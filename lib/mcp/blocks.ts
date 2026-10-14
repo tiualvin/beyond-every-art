@@ -279,6 +279,7 @@ export function restoreBlocks(
       )
     }
   }
+  refuseLiteralComments({ ...converted, root: { ...converted.root, children } })
 
   const removed = [...existing]
     .filter(([key]) => !kept.some((ref) => ref.key === key))
@@ -288,5 +289,33 @@ export function restoreBlocks(
     state: { ...converted, root: { ...converted.root, children } },
     kept,
     removed,
+  }
+}
+
+/** An HTML comment opening, wherever it sits in a paragraph's text. */
+const COMMENT_OPEN = /<!--/
+
+/**
+ * Refuses a body that would print an HTML comment as text.
+ *
+ * Markdown has no comments the editor understands: `<!-- ... -->` converts to
+ * a paragraph holding those exact characters, and the page prints them. Two
+ * live articles carried an agent's `<!-- IMAGE PLACEHOLDER: alt=... |
+ * prompt: ... -->` notes as visible text for two weeks in October 2026 — notes
+ * to itself about pictures it meant to add later. Block markers are the one
+ * comment-shaped line with a meaning here, and they are swapped for their
+ * modules before this runs, so anything left is text a reader would see.
+ */
+export function refuseLiteralComments(state: EditorState): void {
+  for (const node of state.root.children) {
+    if (isBlockNode(node)) continue
+    const text = textOf(node as LexicalNode)
+    if (!COMMENT_OPEN.test(text)) continue
+    throw new Error(
+      'HTML comments print as text in an article body — Markdown keeps the ' +
+        `characters, and the page shows them. Found: "${quoted(text)}". ` +
+        'Remove it. To place an image, upload it with uploadMediaFromUrl and ' +
+        'put `![media:<id>]()` on its own line where it belongs.',
+    )
   }
 }

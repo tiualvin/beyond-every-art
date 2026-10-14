@@ -121,6 +121,12 @@ hand.
 `setKeyFactsBlock`, `setFAQBlock` and `setTableBlock` write the draft body and
 nothing else — what `updateArticleMarkdown` already does — so an existing key
 gets them exactly where it already had `updateArticleMarkdown`.
+`publishArticle` is an update to a post, which `updatePosts` with
+`_status: 'published'` already was, so an existing key gets it where it had
+`posts.update`. That widens nobody's authority: whether the publish lands is
+still `refuseMcpPublish`'s decision.
+`editorialStatus` reads titles, addresses and dates of posts the key can already
+read, so an existing key gets it where it had `posts.find`.
 
 ### Tools
 
@@ -131,19 +137,21 @@ all.
 
 Written for this project, because the generated ones cannot do the job:
 
-| Tool                    | Does                                                                                                                                                                                                               |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `draftArticle`          | Creates a post from Markdown, always as a draft. Resolves tag and author slugs, refuses unknown ones. The `ghostID` is autofilled by the collection.                                                               |
-| `readArticleMarkdown`   | Reads a post back as Markdown, including the draft body, with each module as a marker line and its contents in `blocks`. Says so when the page renders from `legacyHTML`.                                          |
-| `listArticleVersions`   | Lists a post's saved versions, newest first — id, time, title, status and a 100-character snippet each, never a body.                                                                                              |
-| `readArticleVersion`    | Reads one saved version in exactly the shape `readArticleMarkdown` returns the draft. Read-only.                                                                                                                   |
-| `restoreArticleVersion` | Reverts a post's body, or its whole article, to a saved version — as a draft, overwriting rather than merging. Has a dry run and an undo.                                                                          |
-| `updateArticleMarkdown` | Replaces a body from Markdown, saved as a draft. Puts each marked module back as it was; reports which were kept and which removed.                                                                                |
-| `setKeyFactsBlock`      | Sets an article's key facts card — label and value pairs — in place, or under a named body heading. Saved as a draft; the rest of the body is untouched.                                                           |
-| `setFAQBlock`           | Sets an article's FAQ — questions with Markdown answers — in place, under a named body heading, or in place of a Markdown FAQ section. Saved as a draft; the rest of the body is untouched.                        |
-| `setTableBlock`         | Sets a comparison table — caption, header row, rows with inline-Markdown cells — by key, in a named section, or read from the Markdown table under a heading. Saved as a draft; the rest of the body is untouched. |
-| `uploadMedia`           | Adds an image to the Media library from base64 and returns its id, for `updatePosts` to set as a `featuredImage`.                                                                                                  |
-| `uploadMediaFromUrl`    | The same, from an https address the server fetches itself. The only one of the two that works from a phone or a scheduled run.                                                                                     |
+| Tool                    | Does                                                                                                                                                                                                                                                                                   |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `draftArticle`          | Creates a post from Markdown, always as a draft. Resolves tag and author slugs, refuses unknown ones. The `ghostID` is autofilled by the collection.                                                                                                                                   |
+| `readArticleMarkdown`   | Reads a post back as Markdown, including the draft body, with each module as a marker line and its contents in `blocks`. Says so when the page renders from `legacyHTML`.                                                                                                              |
+| `listArticleVersions`   | Lists a post's saved versions, newest first — id, time, title, status and a 100-character snippet each, never a body.                                                                                                                                                                  |
+| `readArticleVersion`    | Reads one saved version in exactly the shape `readArticleMarkdown` returns the draft. Read-only.                                                                                                                                                                                       |
+| `restoreArticleVersion` | Reverts a post's body, or its whole article, to a saved version — as a draft, overwriting rather than merging. Has a dry run and an undo.                                                                                                                                              |
+| `updateArticleMarkdown` | Replaces a body from Markdown, saved as a draft. Puts each marked module back as it was; reports which were kept and which removed.                                                                                                                                                    |
+| `setKeyFactsBlock`      | Sets an article's key facts card — label and value pairs — in place, or under a named body heading. Saved as a draft; the rest of the body is untouched.                                                                                                                               |
+| `setFAQBlock`           | Sets an article's FAQ — questions with Markdown answers — in place, under a named body heading, or in place of a Markdown FAQ section. Saved as a draft; the rest of the body is untouched.                                                                                            |
+| `setTableBlock`         | Sets a comparison table — caption, header row, rows with inline-Markdown cells — by key, in a named section, or read from the Markdown table under a heading. Saved as a draft; the rest of the body is untouched.                                                                     |
+| `uploadMedia`           | Adds an image to the Media library from base64 and returns its id, for `updatePosts` to set as a `featuredImage`.                                                                                                                                                                      |
+| `uploadMediaFromUrl`    | The same, from an https address the server fetches itself. The only one of the two that works from a phone or a scheduled run.                                                                                                                                                         |
+| `publishArticle`        | Publishes a post as its newest version, in place, or schedules one that is not live — `"now"` or a zoned time ahead. Never moves a live article's date, slug or canonical URL; refuses to backdate. Has a dry run. Needs an administrator's key or a connector granted publishing.     |
+| `editorialStatus`       | Read-only. What is scheduled in the next days and what went live in the last, each with its address; and what is saved but not out — live or scheduled articles whose newest version is an unpublished draft, and drafts whose date has passed. The same lists as the admin dashboard. |
 
 ### Modules in a body
 
@@ -174,7 +182,11 @@ module it names, exactly as stored: moving a marker moves the module, and
 leaving one out removes it, which the response always reports. A marker naming
 nothing in the current draft, used twice, or run into a paragraph is refused
 before anything is saved, since saving it would print a literal comment on the
-page.
+page. So is any other HTML comment: Markdown keeps a comment's
+characters, and two live articles printed an agent's
+`<!-- IMAGE PLACEHOLDER: ... -->` notes to readers for two weeks in October 2026. `draftArticle` and `updateArticleMarkdown` refuse one, and the renderer
+drops a paragraph that is only a comment, so one already stored never reaches a
+reader — an editor's preview still shows it.
 
 Three modules have a tool that writes them. `setKeyFactsBlock` replaces an
 article's key facts where they stand, or, if there are none, inserts them
@@ -295,15 +307,14 @@ a `Content-Type: image/png` on a downloaded SVG buys nothing.
 Uploading is one call; attaching is the next one. Either tool returns the new
 document's id, and `updatePosts` sets it as `featuredImage`.
 
-That second call only works on a **draft**. Payload sends a document's existing
-`_status` with every update, so an editor-bound key updating an already
-published post trips `refuseMcpPublish` — the write carries
-`_status: 'published'` even though it is not changing it, and the guard cannot
-tell the difference. This is the guard working rather than a bug to route
-around: an agent that could edit live articles is the thing it exists to
-prevent, and illustrating one is still an edit to something readers are
-looking at. Illustrate drafts over MCP; change a published article in the admin
-panel.
+On a published article that second call lands as a **draft** over the live
+version, like every other MCP write that is not a publish — see
+[Publishing](#publishing-and-what-a-write-may-not-do). The picture reaches
+readers when the article is next published, by `publishArticle` or from the
+admin panel. (This paragraph used to say the call was refused outright on a
+published post. That was true of an article with no pending draft, by accident
+of how Payload fills `_status`, and false of one with a pending draft, where the
+same call took the article off the site.)
 
 Uploads are marked `aiGenerated` unless the call says otherwise. This
 publication writes about specific works and materials, so which pictures are
@@ -314,19 +325,72 @@ photograph is a false claim about a work of art. Set `credit` as well when the
 distinction should reach the reader rather than only an editor, because that is
 the line the article page actually renders.
 
-### Publishing, and one sharp edge
+### Publishing, and what a write may not do
 
 An editor-bound key cannot publish: `refuseMcpPublish` rejects any MCP write
 that sets `_status: 'published'` unless the key's user is an administrator.
 Everything that is not MCP — the admin panel, REST, GraphQL, seeds, the Ghost
 importer — is untouched.
 
-The sharp edge is Payload's, not this project's: publishing through `updatePosts`
-publishes **the fields that call sends**, not the pending draft body. An admin
-key that publishes a post whose draft was written by `updateArticleMarkdown`
-will publish the older body and leave the revision sitting in the versions
-table. Publish from the admin panel, where the draft is promoted and Live
-Preview shows what is going out.
+**Every other MCP write is a draft save, whatever the call asked for.**
+`keepMcpWritesInDraft` sets `draft: true` on any MCP update that is not an
+explicit publish, before Payload decides which row it lands on. The reason is
+Payload's: a write is completed from the article's _newest version_, `_status`
+included, so on a live article whose newest version is an unpublished draft, a
+call that set one field and no `draft` flag — the plugin's `updatePosts`
+defaults it to false — wrote the live row as a draft and took the article off
+the site. No key needed publishing rights to do it, and `refuseMcpPublish`, which
+guards the step _to_ published, could not see a step away from it. Reproduced
+against a real database on 14 Oct 2026, while twenty live articles carried such
+drafts. Taking an article off the site is now something MCP cannot do at all; it
+is done in the admin panel.
+
+**Which version a publish completes from depends on how it names the
+article.** This section used to warn, flatly, that publishing through
+`updatePosts` published the fields the call sent over the _old_ live body and
+left the draft behind. Checked against Payload 3.90 that is half right. By
+`id`, a write is completed from the newest version, so `updatePosts` with only
+`_status: 'published'` publishes the draft as it stands, date and all — what
+the admin panel's Publish button does. By `where`, Payload's bulk update reads
+the _live row_ instead, so the same call publishes the older text and buries
+the revision under it. MCP now refuses a publish by `where` from any caller who
+could otherwise publish, and says to use `publishArticle`; the e2e suite holds
+both halves.
+
+**`publishArticle` is the way to publish over MCP**, and the one a phone or an
+unattended run should use. `updatePosts` with `_status: 'published'` still
+works and does the same thing at its core, but it will just as readily publish a
+never-published draft whose date passed weeks ago — backdated, below everything
+newer — or move a live article's date ahead and so take its page off the site.
+`publishArticle` refuses both, keeps a live article's date, slug and canonical
+URL as they are, and answers in terms of readers: whether the article was live,
+scheduled or unpublished before, which it is now, its address, and which fields
+changed. `dryRun: true` says all of that, and whether the key may publish at
+all, without writing — which is what makes it usable from a phone, where the
+admin panel's Live Preview is not to hand.
+
+Scheduling is the same call with a time: `publishAt: "2026-11-04T20:00:00Z"` on
+an article that is not live. The time must name its offset; `"20:00"` means a
+different moment on every server.
+
+**Every draft-only write says what readers see.** `updateArticleMarkdown`,
+the three block tools and `restoreArticleVersion` used to answer
+`status: 'draft'` and nothing else — true of the newest version, silent about
+the page. On 7 Oct 2026 an agent revised twenty live articles, read that answer
+twenty times as the end of the job, and left every revision unpublished. Their
+replies now carry `readers` — `live`, `scheduled` or `unpublished`, read from
+the live row — and, for the first two, a `note` saying readers do not have the
+change and what would get it to them.
+
+**`editorialStatus` is how to check on it afterwards.** It lists what is
+scheduled ahead and what went live recently, each with its address, and the
+work that is saved but not out — the state twenty live articles sat in for a
+week without anyone being able to see it. It reads through
+`lib/content/editorial-status.ts`, the function behind the admin dashboard's
+rows, so a phone and the dashboard cannot disagree. Nothing wakes up at a
+scheduled time; a scheduled article appears once cached pages turn over, within
+`releaseWithinMinutes` of it, and a scheduled run that wants to confirm a slot
+went out should check after that.
 
 ### Version history
 

@@ -100,6 +100,29 @@ Three constraints they share:
    decision. A CMS that argues with an editor working alone is one they learn to
    route around.
 
+## Two meanings of "draft"
+
+A post has a live row, which is what the site serves, and a history of versions.
+The newest version is what the edit screen shows and what any `draft: true`
+read returns. **Saving a draft over a published article writes a version and
+leaves the live row alone**, so the article stays on the site, unchanged, while
+the edit screen and every draft-mode read call it a draft.
+
+That cost a week in October 2026. Twenty live articles carried agent edits saved
+on 5 and 7 Oct that nobody published; read through the version table they looked
+like twenty scheduled posts that had failed to go out, and the dashboard — which
+counted live rows only — could not tell either story. The one article that really
+had never gone out was a draft with a date on it, which schedules nothing: only a
+_published_ article waits for its date.
+
+`lib/content/editorial-status.ts` sorts the newest versions that are drafts into
+the three states that mean different things to a reader: live with an
+unpublished edit, scheduled with one (it will go out as last published, not as
+drafted), and never published with a date that has passed. The dashboard shows
+each as a row, linked to a list of exactly those posts, and the
+`editorialStatus` MCP tool returns the same lists from the same function, so a
+phone and the admin cannot disagree.
+
 ## The import map
 
 `payload generate:importmap` writes `importMap.js`. This project tracks

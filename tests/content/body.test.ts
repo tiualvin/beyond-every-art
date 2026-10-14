@@ -7,6 +7,7 @@ import {
   SIGNUP_BLOCK,
 } from '../../blocks/schema'
 import {
+  isCommentParagraph,
   stripLeadingTitleNode,
   toArticleBody,
   toTeaserNodes,
@@ -342,5 +343,51 @@ describe('the members-only cut', () => {
     expect(
       toArticleBody({ content: editorState(block(PAYWALL_BLOCK)) }),
     ).toEqual({ kind: 'empty' })
+  })
+})
+
+describe('HTML comments in a body', () => {
+  // An agent's notes to itself, which the page printed as text on two live
+  // articles for two weeks in October 2026.
+  const placeholder = paragraph(
+    text(
+      '<!-- IMAGE PLACEHOLDER: alt="Rubin\'s vase" | prompt: "A clean black-and-white illusion" -->',
+    ),
+  )
+  const doc = {
+    content: {
+      root: {
+        type: 'root',
+        children: [
+          paragraph(text('Before.')),
+          placeholder,
+          paragraph(text('After.')),
+        ],
+      },
+    },
+  }
+  const children = (body: ReturnType<typeof toArticleBody>) =>
+    body.kind === 'lexical' ? body.content.root.children : []
+
+  it('never shows a reader a paragraph that is only a comment', () => {
+    expect(children(toArticleBody(doc))).toEqual([
+      paragraph(text('Before.')),
+      paragraph(text('After.')),
+    ])
+  })
+
+  it('shows it to an editor previewing the draft, so it gets removed', () => {
+    expect(children(toArticleBody(doc, { preview: true }))).toContainEqual(
+      placeholder,
+    )
+  })
+
+  it('leaves a paragraph that only mentions one', () => {
+    expect(
+      isCommentParagraph(
+        paragraph(text('Markdown writes a comment as <!-- like this -->.')),
+      ),
+    ).toBe(false)
+    expect(isCommentParagraph(placeholder)).toBe(true)
   })
 })

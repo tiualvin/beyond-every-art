@@ -99,4 +99,4 @@ export function isScheduled(
  * minute should know the site is not promising the minute. Stated here as a
  * number so the admin can say it in words rather than leaving it folklore.
  */
-export { CONTENT_TTL_SECONDS as SCHEDULE_GRANULARITY_SECONDS } from '../cache/content'
+export { CONTENT_TTL_SECONDS as SCHEDULE_GRANULARITY_SECONDS } from '../cache/ttl'
