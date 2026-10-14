@@ -371,6 +371,43 @@ async function readLiveRow(
   }
 }
 
+/**
+ * What the caller of a draft-only write needs to know about readers.
+ *
+ * These tools answered every write with `status: 'draft'`, which is true of the
+ * newest version and says nothing about the page. On a live article it means
+ * readers do not get the change — and on 7 Oct 2026 an agent took that answer
+ * as the end of the job twenty times over, leaving live articles with
+ * revisions nobody published. So the reply now says what readers see, and,
+ * where it matters, what would get the change to them.
+ */
+async function whatReadersSee(
+  req: PayloadRequest,
+  id: number | string,
+): Promise<{ readers: LiveState; note?: string }> {
+  const live = await readLiveRow(req, id)
+  if (live.state === 'live') {
+    return {
+      readers: 'live',
+      note:
+        'Saved as a draft over a live article: readers still see the ' +
+        'published version. The change reaches them when it is published ' +
+        'again — `publishArticle`, which needs an administrator key or a ' +
+        'connector granted publishing, or Publish in the admin panel.',
+    }
+  }
+  if (live.state === 'scheduled') {
+    return {
+      readers: 'scheduled',
+      note:
+        `Saved as a draft over an article scheduled for ${live.publishedAt}. ` +
+        'It goes out then as last published, without this change, unless ' +
+        'it is published again before then; `publishArticle` keeps its slot.',
+    }
+  }
+  return { readers: 'unpublished' }
+}
+
 /** Payload's own bookkeeping, never sent back in a write. */
 const SYSTEM_FIELDS = new Set([
   'id',
@@ -774,6 +811,7 @@ export const mcpTools: McpTool[] = [
         }),
         status: 'draft',
         undo: replaced ? String(replaced.id) : null,
+        ...(await whatReadersSee(req, id)),
       })
     },
     name: 'restoreArticleVersion',
@@ -843,6 +881,7 @@ export const mcpTools: McpTool[] = [
         }),
         slug: updated.slug,
         status: 'draft',
+        ...(await whatReadersSee(req, updated.id)),
       })
     },
     name: 'updateArticleMarkdown',
@@ -914,6 +953,7 @@ export const mcpTools: McpTool[] = [
         removedTable: result.removedTable,
         slug: updated.slug,
         status: 'draft',
+        ...(await whatReadersSee(req, updated.id)),
       })
     },
     name: 'setKeyFactsBlock',
@@ -1042,6 +1082,7 @@ export const mcpTools: McpTool[] = [
         replacedSection: result.replacedSection,
         slug: updated.slug,
         status: 'draft',
+        ...(await whatReadersSee(req, updated.id)),
       })
     },
     name: 'setFAQBlock',
@@ -1177,6 +1218,7 @@ export const mcpTools: McpTool[] = [
         removedTable: result.removedTable,
         slug: updated.slug,
         status: 'draft',
+        ...(await whatReadersSee(req, updated.id)),
         table: {
           columns: result.columns,
           key: result.key,

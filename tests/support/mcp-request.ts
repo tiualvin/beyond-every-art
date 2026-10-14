@@ -52,18 +52,35 @@ function sanitizedCollections(): Promise<Payload['collections']> {
  *
  * `update` merges the written data into the stored document, so a test can
  * call one tool after another and see the second read what the first wrote.
+ *
+ * Two copies are kept, as Payload keeps them: the newest version, which every
+ * read sees unless it asks for `draft: false`, and the live row, which only a
+ * write without `draft` reaches. A draft saved over a published article leaves
+ * the live row as it was — the difference the tools now report on.
  */
 export async function mcpRequest(initial: Doc) {
   let doc: Doc = { ...initial }
+  let live: Doc = { ...initial }
 
   const payload = {
     collections: await sanitizedCollections(),
     findByID: vi.fn(async () => doc),
-    find: vi.fn(async () => ({ docs: [doc] })),
-    update: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
-      doc = { ...doc, ...data }
-      return doc
-    }),
+    find: vi.fn(async (args?: { draft?: boolean }) => ({
+      docs: [args?.draft === false ? live : doc],
+    })),
+    update: vi.fn(
+      async ({
+        data,
+        draft,
+      }: {
+        data: Record<string, unknown>
+        draft?: boolean
+      }) => {
+        doc = { ...doc, ...data }
+        if (!draft) live = { ...doc }
+        return doc
+      },
+    ),
   }
 
   const req = {

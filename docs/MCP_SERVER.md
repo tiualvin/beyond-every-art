@@ -364,6 +364,15 @@ Scheduling is the same call with a time: `publishAt: "2026-11-04T20:00:00Z"` on
 an article that is not live. The time must name its offset; `"20:00"` means a
 different moment on every server.
 
+**Every draft-only write says what readers see.** `updateArticleMarkdown`,
+the three block tools and `restoreArticleVersion` used to answer
+`status: 'draft'` and nothing else — true of the newest version, silent about
+the page. On 7 Oct 2026 an agent revised twenty live articles, read that answer
+twenty times as the end of the job, and left every revision unpublished. Their
+replies now carry `readers` — `live`, `scheduled` or `unpublished`, read from
+the live row — and, for the first two, a `note` saying readers do not have the
+change and what would get it to them.
+
 **`editorialStatus` is how to check on it afterwards.** It lists what is
 scheduled ahead and what went live recently, each with its address, and the
 work that is saved but not out — the state twenty live articles sat in for a
