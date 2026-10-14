@@ -23,16 +23,11 @@ export const CONTENT_TAGS = {
 
 export type ContentTag = (typeof CONTENT_TAGS)[keyof typeof CONTENT_TAGS]
 
-/**
- * How long a cached read survives without being purged.
- *
- * On-demand purging is what keeps the site current; this is the backstop for
- * the case where it does not run — a document written straight to the database,
- * a hook that threw, a deploy mid-write. Ten minutes is short enough that
- * nobody is left looking at yesterday's archive and long enough that a crawler
- * working through 117 URLs does not re-query for each one.
- */
-export const CONTENT_TTL_SECONDS = 600
+// Kept in its own module so that reading it does not load `next/cache`; see
+// `ttl.ts`. Re-exported here, where every caller has always found it.
+import { CONTENT_TTL_SECONDS } from './ttl'
+
+export { CONTENT_TTL_SECONDS }
 
 /**
  * Wraps a read so its result is shared between requests.
