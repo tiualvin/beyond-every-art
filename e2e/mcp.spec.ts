@@ -168,6 +168,7 @@ test.describe('MCP endpoint', () => {
         'setTableBlock',
         'uploadMedia',
         'publishArticle',
+        'editorialStatus',
         'findPosts',
       ]),
     )
@@ -853,6 +854,56 @@ test.describe('MCP endpoint', () => {
     expect(after?.publishedAt).toBe(publishedAt)
     expect(after?.excerpt).toBe('Set by an agent.')
     expect(JSON.stringify(after?.content)).toContain('The revised body.')
+  })
+
+  test('reports a revision nobody published, and stops once it is', async ({
+    request,
+  }) => {
+    const slug = `e2e-mcp-status-${Date.now()}-${Math.floor(Math.random() * 1e6)}`
+    const pending = async () => {
+      const status = (await callToolJson(
+        request,
+        fixtures.mcp.editorKey,
+        'editorialStatus',
+        {},
+      )) as {
+        savedButNotOut: { liveWithChanges: Array<{ slug: string }> }
+        wentLive: { articles: Array<{ slug: string }> }
+      }
+      return {
+        pending: status.savedButNotOut.liveWithChanges.some(
+          (article) => article.slug === slug,
+        ),
+        live: status.wentLive.articles.some((article) => article.slug === slug),
+      }
+    }
+
+    await callToolJson(request, fixtures.mcp.editorKey, 'draftArticle', {
+      markdown: 'First.',
+      slug,
+      title: 'E2E MCP Status',
+    })
+    await callToolJson(request, fixtures.mcp.adminKey, 'publishArticle', {
+      publishAt: 'now',
+      slug,
+    })
+    expect(await pending()).toEqual({ live: true, pending: false })
+
+    await callToolJson(
+      request,
+      fixtures.mcp.editorKey,
+      'updateArticleMarkdown',
+      {
+        markdown: 'Second.',
+        slug,
+      },
+    )
+    expect(await pending()).toEqual({ live: true, pending: true })
+
+    await callToolJson(request, fixtures.mcp.adminKey, 'publishArticle', {
+      slug,
+    })
+    expect(await pending()).toEqual({ live: true, pending: false })
   })
 
   test('refuses an editor key trying to publish', async ({ request }) => {

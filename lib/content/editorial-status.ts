@@ -31,6 +31,7 @@ import { isScheduled } from './schedule'
 
 export type PendingArticle = {
   id: number | string
+  /** The address readers use: the live row's, where there is one. */
   slug: string
   title: string
   /**
@@ -106,13 +107,15 @@ export async function findUnpublishedWork(
     depth: 0,
     limit: 0,
     pagination: false,
-    select: { publishedAt: true },
+    select: { publishedAt: true, slug: true },
     where: livePublished,
   })
-  const liveDate = new Map(
+  // The live row's date and address: what readers see, which a draft may
+  // since have changed.
+  const liveRow = new Map(
     (published.docs as unknown as Raw[]).map((doc) => [
       String(doc.id),
-      asString(doc.publishedAt),
+      { publishedAt: asString(doc.publishedAt), slug: asString(doc.slug) },
     ]),
   )
 
@@ -123,21 +126,24 @@ export async function findUnpublishedWork(
   }
 
   for (const doc of drafts) {
-    const article = (publishedAt: string | null): PendingArticle => ({
+    const article = (
+      publishedAt: string | null,
+      slug = asString(doc.slug),
+    ): PendingArticle => ({
       id: doc.id,
-      slug: asString(doc.slug) ?? '',
+      slug: slug ?? '',
       title: asString(doc.title) ?? asString(doc.slug) ?? String(doc.id),
       publishedAt,
       savedAt: asString(doc.updatedAt),
     })
 
-    const key = String(doc.id)
-    if (liveDate.has(key)) {
-      const date = liveDate.get(key) ?? null
-      if (isScheduled('published', date, now)) {
-        work.scheduledWithChanges.push(article(date))
+    const live = liveRow.get(String(doc.id))
+    if (live) {
+      const entry = article(live.publishedAt, live.slug ?? asString(doc.slug))
+      if (isScheduled('published', live.publishedAt, now)) {
+        work.scheduledWithChanges.push(entry)
       } else {
-        work.liveWithChanges.push(article(date))
+        work.liveWithChanges.push(entry)
       }
       continue
     }

@@ -79,7 +79,12 @@ const latest: Doc[] = [
   { id: 164, _status: 'published', slug: 'composers', title: 'Composers' },
 ]
 const live: Doc[] = [
-  { id: 186, _status: 'published', publishedAt: '2026-10-08T22:00:00.000Z' },
+  {
+    id: 186,
+    _status: 'published',
+    slug: 'sfumato',
+    publishedAt: '2026-10-08T22:00:00.000Z',
+  },
   { id: 300, _status: 'published', publishedAt: '2026-10-30T16:00:00.000Z' },
   { id: 212, _status: 'draft', publishedAt: null },
   { id: 400, _status: 'draft', publishedAt: null },
@@ -97,6 +102,18 @@ describe('findUnpublishedWork', () => {
       300,
     ])
     expect(work.draftsPastTheirDate.map((article) => article.id)).toEqual([212])
+  })
+
+  it('names a live article by the address readers use, not the draft', async () => {
+    const renamed = latest.map((doc) =>
+      doc.id === 186 ? { ...doc, slug: 'sfumato-renamed-in-draft' } : doc,
+    )
+    const { payload } = payloadWith({ latest: renamed, live })
+
+    const [article] = (await findUnpublishedWork(payload, { now: NOW }))
+      .liveWithChanges
+
+    expect(article.slug).toBe('sfumato')
   })
 
   it('reports the date readers see, and when the draft was saved', async () => {

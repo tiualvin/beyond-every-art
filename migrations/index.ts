@@ -23,6 +23,7 @@ import * as migration_20260928_012336_add_set_faq_block_capability from './20260
 import * as migration_20260928_080021_add_set_table_block_capability from './20260928_080021_add_set_table_block_capability';
 import * as migration_20261007_035208_add_publications from './20261007_035208_add_publications';
 import * as migration_20261014_163920_add_publish_article_capability from './20261014_163920_add_publish_article_capability';
+import * as migration_20261014_164402_add_editorial_status_capability from './20261014_164402_add_editorial_status_capability';
 
 export const migrations = [
   {
@@ -148,6 +149,11 @@ export const migrations = [
   {
     up: migration_20261014_163920_add_publish_article_capability.up,
     down: migration_20261014_163920_add_publish_article_capability.down,
-    name: '20261014_163920_add_publish_article_capability'
+    name: '20261014_163920_add_publish_article_capability',
+  },
+  {
+    up: migration_20261014_164402_add_editorial_status_capability.up,
+    down: migration_20261014_164402_add_editorial_status_capability.down,
+    name: '20261014_164402_add_editorial_status_capability'
   },
 ];

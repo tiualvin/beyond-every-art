@@ -15,11 +15,12 @@
 // refactor of this file, not a config change.
 
 import type { MCPPluginConfig } from '@payloadcms/plugin-mcp'
-import type { PayloadRequest, TypedUser } from 'payload'
+import type { PayloadRequest, TypedUser, Where } from 'payload'
 import { z } from 'zod'
 
 import { FAQ_BLOCK, KEY_FACTS_MAX_ITEMS } from '../../blocks/schema'
 import { toArticleBody } from '../content/body'
+import { findUnpublishedWork } from '../content/editorial-status'
 import { isScheduled, SCHEDULE_GRANULARITY_SECONDS } from '../content/schedule'
 import { htmlToPlainText, richTextToPlainText } from '../content/plain-text'
 import { buildPreviewUrl } from '../preview/live-preview'
@@ -1612,6 +1613,110 @@ export const mcpTools: McpTool[] = [
           'Only for an article that is not live yet: "now", or an ISO 8601 ' +
             'time with its offset, such as 2026-11-04T20:00:00Z. Left out, the ' +
             'article keeps the date it has.',
+        ),
+    },
+  },
+  {
+    description:
+      'Where the publishing schedule stands, read-only. Lists what is ' +
+      'scheduled in the next `days` (default 14) and what went live in the ' +
+      'last `days`, each with its address and time; and, separately, work ' +
+      'that is saved but not out: live articles whose newest version is a ' +
+      'draft nobody published (readers still see the published one), ' +
+      'scheduled articles in the same state (they go out as last published), ' +
+      'and drafts carrying a date that has passed (a date on a draft ' +
+      'schedules nothing). Use it to check a schedule went out as planned, and ' +
+      'before choosing a slot with `publishArticle`.',
+    handler: async (args: Record<string, unknown>, req: PayloadRequest) => {
+      const { days = 14 } = args as { days?: number }
+      const now = new Date()
+      const span = days * 24 * 60 * 60 * 1000
+      const siteUrl = getSiteUrl()
+
+      const listed = async (where: Where, sort: string) => {
+        const { docs, totalDocs } = await req.payload.find({
+          collection: COLLECTION,
+          depth: 0,
+          limit: 100,
+          overrideAccess: false,
+          req,
+          select: { publishedAt: true, slug: true, title: true },
+          sort,
+          user: req.user,
+          where,
+        })
+        return {
+          articles: (docs as unknown as Array<Record<string, unknown>>).map(
+            (doc) => ({
+              id: doc.id,
+              publishedAt: doc.publishedAt ?? null,
+              slug: doc.slug,
+              title: doc.title,
+              url: absoluteUrl(postPath(String(doc.slug ?? '')), siteUrl),
+            }),
+          ),
+          total: totalDocs,
+        }
+      }
+
+      const published: Where = { _status: { equals: 'published' } }
+      const [scheduled, wentLive, unpublished] = await Promise.all([
+        listed(
+          {
+            and: [
+              published,
+              { publishedAt: { greater_than: now.toISOString() } },
+              {
+                publishedAt: {
+                  less_than_equal: new Date(now.getTime() + span).toISOString(),
+                },
+              },
+            ],
+          },
+          'publishedAt',
+        ),
+        listed(
+          {
+            and: [
+              published,
+              { publishedAt: { less_than_equal: now.toISOString() } },
+              {
+                publishedAt: {
+                  greater_than: new Date(now.getTime() - span).toISOString(),
+                },
+              },
+            ],
+          },
+          '-publishedAt',
+        ),
+        findUnpublishedWork(req.payload, {
+          now,
+          user: req.user as TypedUser,
+        }),
+      ])
+
+      return text({
+        now: now.toISOString(),
+        days,
+        // How late a scheduled article may appear after its time: nothing
+        // wakes up to release it; cached pages turn over.
+        releaseWithinMinutes: SCHEDULE_GRANULARITY_SECONDS / 60,
+        scheduled,
+        wentLive,
+        savedButNotOut: unpublished,
+      })
+    },
+    name: 'editorialStatus',
+    parameters: {
+      days: z
+        .number()
+        .int()
+        .min(1)
+        .max(90)
+        .optional()
+        .describe(
+          'How far ahead to list scheduled articles, and how far back to list ' +
+            'ones that went live. Defaults to 14; at most 90.',
         ),
     },
   },

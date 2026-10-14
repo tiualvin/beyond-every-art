@@ -119,7 +119,9 @@ _published_ article waits for its date.
 the three states that mean different things to a reader: live with an
 unpublished edit, scheduled with one (it will go out as last published, not as
 drafted), and never published with a date that has passed. The dashboard shows
-each as a row, linked to a list of exactly those posts.
+each as a row, linked to a list of exactly those posts, and the
+`editorialStatus` MCP tool returns the same lists from the same function, so a
+phone and the admin cannot disagree.
 
 ## The import map
 

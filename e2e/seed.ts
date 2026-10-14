@@ -261,6 +261,7 @@ async function upsertKeyedUser(
       uploadMedia: true,
       uploadMediaFromUrl: true,
       publishArticle: true,
+      editorialStatus: true,
     },
   }
 
