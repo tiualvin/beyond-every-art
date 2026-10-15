@@ -15,8 +15,12 @@ import { describe, expect, it } from 'vitest'
  * Removing one: when the package that pulls the vulnerable version ships a
  * release that requires the patched one, delete the override and this entry,
  * reinstall, and confirm `pnpm audit --prod` stays clean.
+ *
+ * A `floor` of null marks an override that removes a dependency outright
+ * (`"-"`), for an advisory with no fixed version to raise it to. Its test is
+ * that the package resolves nowhere in the tree.
  */
-const OVERRIDES: Record<string, { floor: string; reason: string }> = {
+const OVERRIDES: Record<string, { floor: string | null; reason: string }> = {
   'brace-expansion@1': {
     floor: '1.1.18',
     reason:
@@ -108,6 +112,30 @@ const OVERRIDES: Record<string, { floor: string; reason: string }> = {
       'directly at this version already; next pulled an older copy alongside ' +
       'it, so the override aligns the tree on the one that is actually used.',
   },
+  // braces has a high-severity advisory with no patched release at all
+  // (GHSA-vfj7-8cjw-p6xm: stack exhaustion on deeply nested patterns, every
+  // version through 3.0.3). It reached production by two paths, and each is
+  // closed where it starts rather than by pinning braces. The red Audit this
+  // left from 3 Oct 2026 had stopped meaning anything — a real new advisory
+  // would have looked the same.
+  'sass@1.77.4>chokidar': {
+    floor: '4.0.0',
+    reason:
+      '@payloadcms/next pins sass 1.77.4 exactly, whose chokidar 3 pulls ' +
+      'braces. chokidar 4 dropped braces, and sass itself moved to it in ' +
+      '1.79. sass only requires chokidar from its CLI (`sass.js`, for ' +
+      '`--watch`); the library entry Next and Payload load never does, so ' +
+      'nothing here runs the watcher this changes.',
+  },
+  '@payloadcms/plugin-cloud-storage>find-node-modules': {
+    floor: null,
+    reason:
+      'Declared by @payloadcms/plugin-cloud-storage and never imported by ' +
+      'it — nothing in its dist references the package — yet it pulls ' +
+      'findup-sync → micromatch → braces into production. Removed rather ' +
+      'than raised, because every release of that chain still depends on ' +
+      'braces.',
+  },
   undici: {
     floor: '7.29.1',
     reason:
@@ -186,32 +214,44 @@ describe('pnpm overrides', () => {
   // disagree, someone edited package.json without reinstalling, and the tree CI
   // builds is not the tree that was reviewed.
   it('has been installed, not just declared', () => {
+    const escape = (value: string) =>
+      value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     for (const [name, range] of Object.entries(configured)) {
-      // YAML quotes a key containing `>`, and one starting with `@` — a
-      // scoped package name.
-      const quoted =
-        name.includes('>') || name.startsWith('@') ? `'${name}'` : name
-      expect(lockfile).toContain(`\n  ${quoted}: ${range}`)
+      // pnpm quotes a key or value only where YAML needs it — a key starting
+      // with `@` (a scoped package name) always, one containing `>` only
+      // sometimes, and the bare `-` of a removal — so either form is accepted.
+      const key = `'?${escape(name)}'?`
+      const value = `'?${escape(range)}'?`
+      expect(lockfile).toMatch(new RegExp(`\\n  ${key}: ${value}\\n`))
     }
   })
 
-  it.each(Object.entries(OVERRIDES))(
-    'holds %s above its advisory floor',
-    (name, { floor }) => {
-      const { name: target, major } = overrideTarget(name)
-      // A major-scoped override answers for its own line only; the other line
-      // has its own entry and its own floor.
-      const versions = resolvedVersions(target).filter(
-        (version) => major === null || version.split('.')[0] === major,
-      )
-
-      expect(versions.length).toBeGreaterThan(0)
-      for (const version of versions) {
-        expect(
-          isAtLeast(version, floor),
-          `${target}@${version} is below the ${floor} this override exists to enforce`,
-        ).toBe(true)
-      }
+  it.each(Object.entries(OVERRIDES).filter(([, { floor }]) => floor === null))(
+    'keeps %s out of the tree entirely',
+    (name) => {
+      const { name: target } = overrideTarget(name)
+      expect(resolvedVersions(target)).toEqual([])
     },
   )
+
+  it.each(
+    Object.entries(OVERRIDES).flatMap(([name, { floor }]) =>
+      floor === null ? [] : [[name, { floor }] as const],
+    ),
+  )('holds %s above its advisory floor', (name, { floor }) => {
+    const { name: target, major } = overrideTarget(name)
+    // A major-scoped override answers for its own line only; the other line
+    // has its own entry and its own floor.
+    const versions = resolvedVersions(target).filter(
+      (version) => major === null || version.split('.')[0] === major,
+    )
+
+    expect(versions.length).toBeGreaterThan(0)
+    for (const version of versions) {
+      expect(
+        isAtLeast(version, floor),
+        `${target}@${version} is below the ${floor} this override exists to enforce`,
+      ).toBe(true)
+    }
+  })
 })
