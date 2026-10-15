@@ -6,6 +6,13 @@ updates:
       interval: weekly
     open-pull-requests-limit: 5
     groups:
+      # Before `dev-dependencies`, because Dependabot files a package under the
+      # first group that matches. `eslint-config-next` is a dev dependency, so
+      # without this it went into that group while `next` went out on its own:
+      # #205 and #206 (Oct 2026) each moved one half, and each failed CI alone,
+      # because tests/scripts/eslint-major.test.ts holds the two level.
+      next:
+        patterns: ['next', 'eslint-config-next', '@next/*']
       payload:
         patterns: ['payload', '@payloadcms/*']
       react:
