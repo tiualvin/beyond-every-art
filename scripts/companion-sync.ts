@@ -21,12 +21,17 @@
 //     neither. Everything else in those blocks — the font stacks built on
 //     next/font variables, the plate gradient, layout lengths — is omitted and
 //     named in the file, so an omission is visible rather than silent.
+//   - `reserved-slugs.ts`, from `RESERVED_ROOT_SLUGS` in
+//     `lib/seo/reserved-slugs.ts`. A one-segment link on the site is an article
+//     unless an application route owns the segment; the app opens articles
+//     itself and sends everything else to the browser.
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import { BLOCK_SLUGS } from '../blocks/schema'
+import { RESERVED_ROOT_SLUGS } from '../lib/seo/reserved-slugs'
 
 /** Where the generated files live, relative to the repository root. */
 export const GENERATED_DIR = 'apps/companion/src/generated'
@@ -49,6 +54,17 @@ export function renderBlockSlugs(slugs: readonly string[]): string {
     '] as const',
     '',
     'export type BlockSlug = (typeof BLOCK_SLUGS)[number]',
+    '',
+  ].join('\n')
+}
+
+export function renderReservedSlugs(slugs: readonly string[]): string {
+  return [
+    header('`RESERVED_ROOT_SLUGS` in lib/seo/reserved-slugs.ts'),
+    '/** First path segments that belong to a website route, never an article. */',
+    'export const RESERVED_ROOT_SLUGS = [',
+    ...slugs.map((slug) => `  ${JSON.stringify(slug)},`),
+    '] as const',
     '',
   ].join('\n')
 }
@@ -243,6 +259,10 @@ export function renderCompanionFiles(root: string): GeneratedFile[] {
     {
       path: `${GENERATED_DIR}/block-slugs.ts`,
       contents: renderBlockSlugs(BLOCK_SLUGS),
+    },
+    {
+      path: `${GENERATED_DIR}/reserved-slugs.ts`,
+      contents: renderReservedSlugs(RESERVED_ROOT_SLUGS),
     },
     {
       path: `${GENERATED_DIR}/brand-tokens.ts`,

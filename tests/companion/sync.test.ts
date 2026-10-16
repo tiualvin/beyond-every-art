@@ -13,6 +13,7 @@ import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { BLOCK_SLUGS } from '../../blocks/schema'
+import { RESERVED_ROOT_SLUGS } from '../../lib/seo/reserved-slugs'
 import {
   readRootProperties,
   renderCompanionFiles,
@@ -42,6 +43,15 @@ describe('generated companion files', () => {
       generated.path.endsWith('block-slugs.ts'),
     )
     for (const slug of BLOCK_SLUGS) {
+      expect(file?.contents).toContain(JSON.stringify(slug))
+    }
+  })
+
+  it('carries every reserved root slug', () => {
+    const file = renderCompanionFiles(root).find((generated) =>
+      generated.path.endsWith('reserved-slugs.ts'),
+    )
+    for (const slug of RESERVED_ROOT_SLUGS) {
       expect(file?.contents).toContain(JSON.stringify(slug))
     }
   })
