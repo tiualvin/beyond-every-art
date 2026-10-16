@@ -112,11 +112,14 @@ describe.each(implementations)('the %s library', (_, open) => {
       expect(saved[0]?.post).not.toHaveProperty('body')
     })
 
-    it('replaces the saved copy with a newer one', async () => {
+    it('replaces the saved copy with a newer one, keeping its date', async () => {
       await store.saveArticle(first)
+      const [before] = await store.listSaved()
       await store.saveArticle({ ...first, title: 'Updated' })
       expect((await store.getSaved(first.slug))?.title).toBe('Updated')
-      expect(await store.listSaved()).toHaveLength(1)
+      const after = await store.listSaved()
+      expect(after).toHaveLength(1)
+      expect(after[0]?.savedAt).toBe(before?.savedAt)
     })
 
     it('removes one', async () => {

@@ -42,7 +42,10 @@ export interface LibraryStore {
   listSaved(): Promise<SavedArticle[]>
   /** The full article, readable with no network; null if not saved. */
   getSaved(slug: string): Promise<PostDetail | null>
-  /** Saves, or replaces the saved copy with a newer one. */
+  /**
+   * Saves, or replaces the saved copy with a newer one. Replacing keeps the
+   * date it was first saved, so refreshing a copy does not reorder the list.
+   */
   saveArticle(post: PostDetail): Promise<void>
   removeSaved(slug: string): Promise<void>
 

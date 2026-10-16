@@ -49,7 +49,10 @@ export function createMemoryLibraryStore(
       return entry ? clone(entry.post) : null
     },
     async saveArticle(post) {
-      saved.set(post.slug, { post: clone(post), savedAt: now().toISOString() })
+      saved.set(post.slug, {
+        post: clone(post),
+        savedAt: saved.get(post.slug)?.savedAt ?? now().toISOString(),
+      })
     },
     async removeSaved(slug) {
       saved.delete(slug)

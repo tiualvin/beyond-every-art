@@ -161,8 +161,7 @@ export function createSqliteLibraryStore(
     async saveArticle(post: PostDetail) {
       await db.runAsync(
         `INSERT INTO saved_articles (slug, summary, post, saved_at) VALUES (?, ?, ?, ?)
-         ON CONFLICT(slug) DO UPDATE SET
-           summary = excluded.summary, post = excluded.post, saved_at = excluded.saved_at`,
+         ON CONFLICT(slug) DO UPDATE SET summary = excluded.summary, post = excluded.post`,
         post.slug,
         JSON.stringify(summaryOf(post)),
         JSON.stringify(post),

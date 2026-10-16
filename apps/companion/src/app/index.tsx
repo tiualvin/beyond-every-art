@@ -1,9 +1,6 @@
-import { Text, View } from 'react-native'
+import { Redirect } from 'expo-router'
 
+/** The app opens on Today. */
 export default function Index() {
-  return (
-    <View>
-      <Text>Beyond Every Art</Text>
-    </View>
-  )
+  return <Redirect href="/today" />
 }
