@@ -6,6 +6,7 @@ export const RESERVED_ROOT_SLUGS = [
   ".well-known",
   "admin",
   "api",
+  "app-api",
   "apps",
   "author",
   "csp-report",

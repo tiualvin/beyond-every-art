@@ -96,9 +96,13 @@ so the allowlist never understates the real surface.
 owner lifted its gate on 16 Oct 2026 for scaffolding only: reader accounts,
 sign-in, purchases, push, server-side bookmarks, store records and any new
 Payload collection or field stay gated, each waiting on its own dated decision.
-Read it before adding anything under `apps/`, or anything a mobile client
-reads. Like the publication system, it must not displace the open
-post-cutover work.
+The read-only content API the app reads, `/app-api/v1/`, is built and answers
+404 everywhere until `APP_API_ENABLED=1`, which only `playwright.config.ts`
+sets; switching it on in production is the owner's call. Its contract lives in
+`lib/app-api/contract.ts` and the app's copy is generated from it. Read the
+document before adding anything under `apps/`, anything a mobile client reads,
+or any field to an API answer. Like the publication system, it must not
+displace the open post-cutover work.
 
 ## Edge protection — closed 18 Sep 2026
 

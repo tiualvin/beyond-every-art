@@ -21,6 +21,8 @@
 //     neither. Everything else in those blocks — the font stacks built on
 //     next/font variables, the plate gradient, layout lengths — is omitted and
 //     named in the file, so an omission is visible rather than silent.
+//   - `contract.ts`, from `lib/app-api/contract.ts`, verbatim: the content
+//     API's schemas, which the website serves and the app validates against.
 //   - `reserved-slugs.ts`, from `RESERVED_ROOT_SLUGS` in
 //     `lib/seo/reserved-slugs.ts`. A one-segment link on the site is an article
 //     unless an application route owns the segment; the app opens articles
@@ -56,6 +58,11 @@ export function renderBlockSlugs(slugs: readonly string[]): string {
     'export type BlockSlug = (typeof BLOCK_SLUGS)[number]',
     '',
   ].join('\n')
+}
+
+/** The content contract, as the app's copy of it. Verbatim below the header. */
+export function renderContract(source: string): string {
+  return `${header('lib/app-api/contract.ts')}\n${source}`
 }
 
 export function renderReservedSlugs(slugs: readonly string[]): string {
@@ -259,6 +266,12 @@ export function renderCompanionFiles(root: string): GeneratedFile[] {
     {
       path: `${GENERATED_DIR}/block-slugs.ts`,
       contents: renderBlockSlugs(BLOCK_SLUGS),
+    },
+    {
+      path: `${GENERATED_DIR}/contract.ts`,
+      contents: renderContract(
+        readFileSync(join(root, 'lib/app-api/contract.ts'), 'utf8'),
+      ),
     },
     {
       path: `${GENERATED_DIR}/reserved-slugs.ts`,

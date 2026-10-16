@@ -73,6 +73,7 @@ describe('reserved root slugs', () => {
     expect(isReservedRootSlug('author')).toBe(true)
     expect(isReservedRootSlug('tag')).toBe(true)
     expect(isReservedRootSlug('publication')).toBe(true)
+    expect(isReservedRootSlug('app-api')).toBe(true)
     expect(isReservedRootSlug('an-essay-on-blue')).toBe(false)
   })
 

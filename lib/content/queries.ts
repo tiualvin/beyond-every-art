@@ -710,6 +710,14 @@ export type PostDetail = {
   title: string
   excerpt: string
   body: ArticleBody
+  /** The homepage's lead-tier flag, as listings carry it. */
+  featured: boolean
+  /**
+   * Minutes, counted from the whole document the way a listing card counts
+   * them — so a gated post says the same here as in the archive, rather than
+   * the length of its teaser.
+   */
+  readingTime: number
   publishedAt: string | null
   updatedAt: string | null
   authors: AuthorSummary[]
@@ -766,6 +774,7 @@ export type SlugRef = { slug: string; updatedAt: string | null }
 type RawContentDoc = {
   slug?: string
   title?: string
+  featured?: boolean
   excerpt?: string
   content?: unknown
   legacyHTML?: string
@@ -800,6 +809,8 @@ function toPostDetail(doc: RawContentDoc, preview: boolean): PostDetail {
     title: doc.title ?? doc.slug ?? '',
     excerpt: doc.excerpt ?? '',
     body: toArticleBody(doc, { restricted, preview }),
+    featured: Boolean(doc.featured),
+    readingTime: readingTimeMinutes(estimateWordCount(doc)),
     publishedAt: doc.publishedAt ?? null,
     updatedAt: doc.updatedAt ?? null,
     authors: toAuthorSummaries(doc.authors),
@@ -1239,6 +1250,76 @@ export const getTagsWithCounts = cachedRead(
   'tags-with-counts',
   readTagsWithCounts,
   [CONTENT_TAGS.posts, CONTENT_TAGS.tags],
+)
+
+// --- Authors index --------------------------------------------------------
+
+export type AuthorCard = {
+  name: string
+  slug: string
+  bio: string | null
+  image: MediaImage | null
+  postCount: number
+}
+
+/**
+ * Every author with at least one live post behind them, most published first.
+ *
+ * The site has no authors index — a byline links straight to the author's
+ * archive — so this exists for the companion app's content API, the same
+ * shape as `readTagsWithCounts` and for the same reason it counts: an author
+ * whose only posts are drafts or scheduled is not someone a reader can
+ * browse to yet. One count per author, on a list that is a handful long and
+ * cached with the rest.
+ */
+async function readAuthorsWithCounts(): Promise<AuthorCard[]> {
+  try {
+    const payload = await getPayloadClient()
+    const authors = await payload.find({
+      collection: 'authors',
+      overrideAccess: true,
+      // One level, so the portrait arrives as a media record with its sizes.
+      depth: 1,
+      pagination: false,
+      limit: 0,
+      select: { name: true, slug: true, bio: true, profileImage: true },
+    })
+
+    const results: AuthorCard[] = []
+    for (const author of authors.docs as Array<{
+      id?: string | number
+      name?: string
+      slug?: string
+      bio?: string | null
+      profileImage?: unknown
+    }>) {
+      if (!author.slug || !author.name) continue
+      const count = await payload.count({
+        collection: 'posts',
+        overrideAccess: true,
+        where: { and: [{ authors: { in: [author.id] } }, live()] },
+      })
+      results.push({
+        name: author.name,
+        slug: author.slug,
+        bio: author.bio?.trim() || null,
+        image: toMediaImage(author.profileImage),
+        postCount: count.totalDocs,
+      })
+    }
+
+    return results
+      .filter((author) => author.postCount > 0)
+      .sort((a, b) => b.postCount - a.postCount || a.name.localeCompare(b.name))
+  } catch {
+    return []
+  }
+}
+
+export const getAuthorsWithCounts = cachedRead(
+  'authors-with-counts',
+  readAuthorsWithCounts,
+  [CONTENT_TAGS.posts, CONTENT_TAGS.authors, CONTENT_TAGS.media],
 )
 
 // --- Apps -----------------------------------------------------------------

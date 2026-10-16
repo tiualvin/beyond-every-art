@@ -8,7 +8,10 @@ decide.
 
 The app lives in [`apps/companion/`](../apps/companion/package.json). It is a
 scaffold: it builds, it is tested against the real content contract, and it
-reads articles offline. It is not a store-ready product.
+reads articles offline. It is not a store-ready product. The read-only content
+API it reads from is built into the website under `/app-api/v1/`, and is
+**switched off**: every path answers 404 until the owner decides otherwise
+([Switching the API on](#switching-the-api-on)).
 
 ## The decision
 
@@ -145,6 +148,7 @@ from tracked sources only:
 | `block-slugs.ts`    | `BLOCK_SLUGS` in `blocks/schema.ts`                   |
 | `brand-tokens.ts`   | the two top-level `:root` blocks of `app/globals.css` |
 | `reserved-slugs.ts` | `RESERVED_ROOT_SLUGS` in `lib/seo/reserved-slugs.ts`  |
+| `contract.ts`       | `lib/app-api/contract.ts`, verbatim                   |
 
 **Brand tokens are colours only, as literal hex.** React Native has no `var()`
 and no `color-mix()`, so both are resolved by the sync: `--color-rule`, 26%
@@ -181,10 +185,22 @@ content at all, and says on Today and Read that it is showing sample content.
 Fixture images are on a `.invalid` host and never load; the reader shows a
 brand plate in their place.
 
-**Against a website.** Set `EXPO_PUBLIC_API_BASE_URL` to a website serving the
-content API — a local `pnpm dev` with the API switched on, never production
-until the owner says so — and `EXPO_PUBLIC_SITE_URL` to the same origin, so
-links to its articles open in the app:
+**Against a local website.** Start the website with the API switched on and
+bound to an address the phone can reach, against a development database (never
+production data). `NEXT_PUBLIC_SITE_URL` must be that same address: the server
+builds every article and image URL in an answer from it, and the `.env.example`
+value, `localhost`, means the phone itself — every image would fail and every
+article link would open in the browser.
+
+```bash
+# in the repository root, with .env pointing at a local database
+NEXT_PUBLIC_SITE_URL=http://192.168.1.20:3000 APP_API_ENABLED=1 \
+pnpm exec next dev --hostname 0.0.0.0 --port 3000
+```
+
+Then point the app at it: `EXPO_PUBLIC_API_BASE_URL` at the website, and
+`EXPO_PUBLIC_SITE_URL` at the same origin so links to its articles open in the
+app — all three the same:
 
 ```bash
 EXPO_PUBLIC_API_BASE_URL=http://192.168.1.20:3000 \
@@ -192,17 +208,19 @@ EXPO_PUBLIC_SITE_URL=http://192.168.1.20:3000 \
 pnpm start
 ```
 
-The website's endpoint does not exist yet. Until it does, fixtures are the
-only source.
+Never production, until the owner switches the API on there.
 
 ## The API contract
 
-The contract is zod schemas with inferred types, in
-[`apps/companion/src/api/contract.ts`](../apps/companion/src/api/contract.ts).
-It imports nothing but `zod/v4`, which both sides of the repository have —
-the website's zod 3.25 ships zod 4 at that subpath — so it can move to the
-website unchanged when the endpoint is built, and the app's copy can be
-generated from it under the same drift test.
+The contract is zod schemas with inferred types. Its home is the website, in
+[`lib/app-api/contract.ts`](../lib/app-api/contract.ts), because the website is
+what keeps it: the routes parse every answer through it, and
+[`tests/app-api/contract.test.ts`](../tests/app-api/contract.test.ts) holds it to
+`blocks/schema.ts` and the website's search length. The app's copy,
+`apps/companion/src/generated/contract.ts`, is written by `pnpm companion:sync`
+and checked by the same drift test as the other generated files. The contract
+imports nothing but `zod/v4`, which both sides of the repository have — the
+website's zod 3.25 ships zod 4 at that subpath — so the copy is verbatim.
 
 Every path is under `/app-api/v1/` and ends in `/`; the website's
 `trailingSlash: true` would otherwise answer each call with a 308.
@@ -248,6 +266,101 @@ predates. Before validating a body the client runs `markUnsupported`, which
 replaces any unknown type with an `unsupported` marker, so one new node costs
 that node rather than the article. A known type with the wrong shape still
 fails validation — that is a broken server, not a newer one.
+
+### The server side
+
+Seven `GET` routes under [`app/app-api/v1/`](../app/app-api/v1/posts/route.ts),
+one per row of the table above. Six read through the reader the website's own
+page uses — `getPublishedPosts`, `getPostBySlug`, `getPostsByTag`,
+`getPostsByAuthor`, `getTagsWithCounts` and `searchPosts` in
+`lib/content/queries.ts` — so `live()`, the teaser cut, the withheld links and
+the ten-minute content cache apply exactly as they do on the site. The seventh,
+`getAuthorsWithCounts`, is new: the website has no authors index, so it was
+added beside `getTagsWithCounts`, in its shape, counting live posts only and
+cached the same way. Nothing here queries Payload's REST API, and nothing
+re-implements a rule the website already has.
+
+**Two allow-lists stand between a document and a response.**
+[`lib/app-api/project.ts`](../lib/app-api/project.ts) builds every body node
+and block from named keys only; a media document, an internal link's target
+and a block's relationship fields contribute exactly what the contract names
+and nothing else. Then each route parses its answer through its contract
+schema on the way out, which drops any key nobody listed — so a field added to
+a reader type later cannot reach a client by being passed along, and a value
+that breaks the contract is a 500 on the server rather than a broken client.
+[`tests/app-api/project.test.ts`](../tests/app-api/project.test.ts) feeds the
+projection a depth-2 document whose links, uploads and relationships are full
+of fields that must not leave, and fails if any does.
+
+Internal links are resolved here, to a slug and an absolute slashed `href`, and
+only when the target is live; a link to a draft or a scheduled post arrives as
+its text. The website's own renderer does not yet do this for Lexical links an
+editor made with the internal-link option — it renders them as `#` — which is
+a website issue, recorded rather than fixed here because the fix changes
+crawled HTML.
+
+**What it costs a stranger to ask**, all in
+[`lib/app-api/http.ts`](../lib/app-api/http.ts) and each route:
+
+- **The switch.** Unless `APP_API_ENABLED=1`, every path answers 404 to every
+  method before anything is read, counted or cached. `middleware.ts` answers
+  for the whole prefix, because Next implements `OPTIONS` and a 405 for
+  methods a route does not export without asking the handler; each handler
+  checks again for itself. Only `playwright.config.ts` sets it.
+- **Rate limits per source address:** 120 reads and 30 searches a minute, the
+  second separate because a search is a scan keyed on the text sent
+  (`RATE_LIMIT_APP_API_PER_MINUTE`, `RATE_LIMIT_APP_API_SEARCH_PER_MINUTE`).
+  Per container, like every limiter here: Cloudflare is the first line.
+- **Slugs** are checked for shape before any read, and a well-formed slug that
+  misses spends the same per-source allowance the page routes spend
+  (`lib/security/slug-requests.ts`), so guessing through the API and through
+  the website draws on one budget.
+- **Pages:** `limit` is capped at 24 rather than refused, `page` and `limit`
+  must be plain positive integers, and `page` stops at 1000, which bounds the
+  cache keys a caller can mint.
+- **Search** goes through the website's `normaliseSearchTerm`: trimmed,
+  collapsed, cut to 64 characters.
+- **Headers.** Answers are `Cache-Control: public, max-age=300,
+stale-while-revalidate=300` — half the content cache's lifetime each, so a
+  client is never further behind than the website can be. Errors are
+  `no-store`. Everything carries `X-Robots-Tag: noindex`.
+
+`app-api` is a reserved root slug (`lib/seo/reserved-slugs.ts`), added with the
+routes, so no post or page can be published at the API's path. Nothing else
+crawler-facing changed: the sitemap does not list the API, and `robots.txt`
+does not mention it — a `Disallow` line is a crawler-facing change, and the
+`noindex` header already keeps answers out of results.
+
+[`tests/app-api/routes.test.ts`](../tests/app-api/routes.test.ts) covers each of
+those against mocked readers, and [`e2e/app-api.spec.ts`](../e2e/app-api.spec.ts)
+covers the real readers against a seeded database: slashed URLs, a gated post
+cut to its teaser, a draft that answers like a slug never used, and every
+answer unchanged by its schema. In CI a second server from the same build runs
+with the switch off, and the spec shows every path, and `OPTIONS`, `POST` and
+`DELETE`, answering 404 there.
+
+### Switching the API on
+
+The owner's decision, and the only thing that makes the app useful outside a
+development machine. Before setting `APP_API_ENABLED=1` in production:
+
+1. **Cloudflare challenges.** Bot Fight Mode, Browser Integrity Check and any
+   managed challenge answer a non-browser client with an HTML page the app
+   cannot solve. Exempt `/app-api/` from each with a configuration or WAF
+   skip rule, scoped to that path and nothing wider.
+2. **An edge rate limit**, optionally: a WAF rate-limiting rule on
+   `/app-api/` puts a bound in front of the per-container limiters, which
+   reset on every deploy.
+3. **Edge caching**, optionally: Cloudflare does not cache JSON by default. A
+   cache rule for `/app-api/v1/` that respects the origin's `Cache-Control`,
+   with the query string in the cache key, takes repeat reads off the origin;
+   without one, every read reaches the content cache in the container.
+4. **Set the variable** in the production environment file and redeploy.
+   Verify from outside: `/app-api/v1/posts/` answers JSON with
+   `X-Robots-Tag: noindex`, and an unslashed path answers 308.
+
+Switching it off again is unsetting the variable and redeploying; nothing is
+stored, so there is nothing to clean up.
 
 ## The native renderer
 
@@ -350,7 +463,7 @@ article read yesterday usually opens on a train today.
 app's own Node and pnpm, then typechecks, lints, checks formatting, tests,
 exports the iOS and Android bundles and checks where their modules came from.
 It is path-filtered to `apps/companion/**`, the sync script and the website
-sources the sync reads. It is **not** in the website deploy job's `needs`, and
+sources the sync reads, the contract among them. It is **not** in the website deploy job's `needs`, and
 must not be: a red app build is never a reason to hold a website fix. Whether a
 generated file is current is checked by `ci.yml`'s `checks` job, on every push.
 
@@ -429,7 +542,8 @@ publish both files.
 - [ ] **Offline policy for gated posts** — today a members-only or
       subscriber-only post can be saved, and the saved copy is the teaser the
       website shows; is that the rule?
-- [ ] **Enabling the content API** in production.
+- [ ] **Enabling the content API** in production, after the Cloudflare
+      steps in [Switching the API on](#switching-the-api-on).
 - [ ] **The dark palette** — adopt, change or drop the proposal.
 - [ ] **The workspace migration** — when to move to the pnpm + Turborepo
       workspace with the website in `apps/web`.

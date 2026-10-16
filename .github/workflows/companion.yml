@@ -21,6 +21,7 @@ on:
       - 'blocks/schema.ts'
       - 'app/globals.css'
       - 'lib/seo/reserved-slugs.ts'
+      - 'lib/app-api/contract.ts'
       - '.github/workflows/companion.yml'
   push:
     branches: [main, work]
@@ -30,6 +31,7 @@ on:
       - 'blocks/schema.ts'
       - 'app/globals.css'
       - 'lib/seo/reserved-slugs.ts'
+      - 'lib/app-api/contract.ts'
       - '.github/workflows/companion.yml'
 permissions:
   contents: read
