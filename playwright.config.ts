@@ -57,6 +57,9 @@ const rateLimitOverrides = {
   // `privacy-and-redirects.spec.ts` and the preview specs drive /api/preview
   // from the same address as everything else.
   RATE_LIMIT_PREVIEW_PER_MINUTE: '10000',
+  // `app-api.spec.ts` reads the content API from the same address as the rest.
+  RATE_LIMIT_APP_API_PER_MINUTE: '10000',
+  RATE_LIMIT_APP_API_SEARCH_PER_MINUTE: '10000',
 }
 
 /**
@@ -122,6 +125,44 @@ const analyticsEnvironment = {
   NEXT_PUBLIC_GA_ID: 'G-E2ETEST0000',
 }
 
+/**
+ * The companion app's content API answers 404 to every path unless this is
+ * set, and nothing but this file sets it: the owner decides when production
+ * gets it (docs/COMPANION_APP.md). On here for the same reason MCP is above —
+ * a spec asserting against a switched-off endpoint would pass while proving
+ * nothing.
+ */
+const appApiEnvironment = {
+  APP_API_ENABLED: '1',
+}
+
+/**
+ * A second server from the same build with the content API switched off, so
+ * `app-api.spec.ts` can show that off means off over real HTTP rather than only
+ * in a unit test. CI only: it serves the standalone bundle, which a local dev
+ * run has not built, and two `next dev` processes would share one `.next`.
+ *
+ * The flag is set to empty rather than left out, because Playwright starts
+ * the server with this process's environment underneath — a shell that
+ * happened to export APP_API_ENABLED=1 would otherwise switch it on here too.
+ * The spec repeats the origin rather than importing this file.
+ */
+const APP_API_OFF_PORT = '3001'
+const appApiOffServer = {
+  command: 'node .next/standalone/server.js',
+  env: {
+    HOSTNAME: '127.0.0.1',
+    NODE_ENV: 'production',
+    PORT: APP_API_OFF_PORT,
+    APP_API_ENABLED: '',
+    ...storageEnvironment,
+    ...rateLimitOverrides,
+  },
+  url: `http://127.0.0.1:${APP_API_OFF_PORT}/health/`,
+  reuseExistingServer: false,
+  timeout: 120_000,
+}
+
 const productionServer = {
   command: 'node .next/standalone/server.js',
   env: {
@@ -129,6 +170,7 @@ const productionServer = {
     NODE_ENV: 'production',
     PORT: '3000',
     ...mcpEnvironment,
+    ...appApiEnvironment,
     ...storageEnvironment,
     ...indexNowEnvironment,
     ...analyticsEnvironment,
@@ -139,6 +181,7 @@ const developmentServer = {
   command: 'pnpm exec next dev --hostname 127.0.0.1 --port 3000',
   env: {
     ...mcpEnvironment,
+    ...appApiEnvironment,
     ...storageEnvironment,
     ...indexNowEnvironment,
     ...analyticsEnvironment,
@@ -192,11 +235,14 @@ export default defineConfig({
     },
   ],
   webServer: startsLocalServer
-    ? {
-        ...(process.env.CI ? productionServer : developmentServer),
-        url: `${localOrigin}/health/`,
-        reuseExistingServer: !process.env.CI,
-        timeout: 120_000,
-      }
+    ? [
+        {
+          ...(process.env.CI ? productionServer : developmentServer),
+          url: `${localOrigin}/health/`,
+          reuseExistingServer: !process.env.CI,
+          timeout: 120_000,
+        },
+        ...(process.env.CI ? [appApiOffServer] : []),
+      ]
     : undefined,
 })
