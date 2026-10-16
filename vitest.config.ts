@@ -21,6 +21,8 @@ export default defineConfig({
     coverage: { reporter: ['text', 'json'] },
     // Playwright specs have their own runner; importing them through Vitest
     // executes Playwright's test declarations outside its configured context.
-    exclude: [...configDefaults.exclude, '.claude/**', 'e2e/**'],
+    // The companion app's tests are Jest tests with a React Native preset, run
+    // from inside `apps/companion`; Vitest would try to execute them here.
+    exclude: [...configDefaults.exclude, '.claude/**', 'apps/**', 'e2e/**'],
   },
 })
