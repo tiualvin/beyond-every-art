@@ -2,7 +2,7 @@
 
 import { BRAND_COLORS } from '../../generated/brand-tokens'
 import { contrastRatio, mix } from '../colour'
-import { PALETTES, paletteFor, type Palette } from '../palette'
+import { PALETTES, inverseOf, paletteFor, type Palette } from '../palette'
 import { chromeTreatment } from '../chrome'
 
 const AA_TEXT = 4.5
@@ -12,6 +12,8 @@ const variants: [string, Palette][] = [
   ['light, increased contrast', paletteFor('light', true)],
   ['dark', paletteFor('dark', false)],
   ['dark, increased contrast', paletteFor('dark', true)],
+  ['inverse of light', inverseOf(paletteFor('light', false))],
+  ['inverse of dark', inverseOf(paletteFor('dark', false))],
 ]
 
 describe.each(variants)('the %s palette', (_, palette) => {

@@ -77,6 +77,26 @@ function withIncreasedContrast(palette: Palette): Palette {
   }
 }
 
+/**
+ * The palette for content set on the inverse surface — the website's dark
+ * callout — so text inside it is light on dark in either scheme.
+ */
+export function inverseOf(palette: Palette): Palette {
+  return {
+    ...palette,
+    background: palette.inverse,
+    surface: palette.inverse,
+    text: palette.onInverse,
+    muted: mix(palette.onInverse, palette.inverse, 0.75),
+    // Links stay underlined, so they need not be a different colour here.
+    accent: palette.onInverse,
+    line: mix(palette.onInverse, palette.inverse, 0.2),
+    rule: mix(palette.onInverse, palette.inverse, 0.35),
+    inverse: palette.background,
+    onInverse: palette.text,
+  }
+}
+
 export function paletteFor(scheme: Scheme, increaseContrast: boolean): Palette {
   const base = scheme === 'dark' ? dark : light
   return increaseContrast ? withIncreasedContrast(base) : base

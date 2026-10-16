@@ -6,7 +6,7 @@ import {
   useAccessibilityPreferences,
   type AccessibilityPreferences,
 } from './accessibility'
-import { paletteFor, type Palette, type Scheme } from './palette'
+import { inverseOf, paletteFor, type Palette, type Scheme } from './palette'
 
 export type Theme = {
   scheme: Scheme
@@ -54,6 +54,18 @@ export function StaticTheme({
     [scheme, preferences],
   )
   return <ThemeContext.Provider value={theme}>{children}</ThemeContext.Provider>
+}
+
+/** Children drawn on the inverse surface: light text on dark, either way round. */
+export function InverseTheme({ children }: { children: ReactNode }) {
+  const theme = useContext(ThemeContext)
+  const inverse = useMemo(
+    () => ({ ...theme, palette: inverseOf(theme.palette) }),
+    [theme],
+  )
+  return (
+    <ThemeContext.Provider value={inverse}>{children}</ThemeContext.Provider>
+  )
 }
 
 export const useTheme = () => useContext(ThemeContext)
