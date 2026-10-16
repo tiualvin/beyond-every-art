@@ -70,6 +70,41 @@ updates:
       - dependency-name: 'zod'
         update-types: ['version-update:semver-major']
 
+  # The companion app (docs/COMPANION_APP.md): its own lockfile, so its own
+  # entry, and one grouped pull request a week rather than one per package.
+  #
+  # Expo-managed packages are ignored outright. The SDK decides their versions
+  # together — React, React Native, every expo-* module, jest-expo — and moving
+  # one alone produces a build `npx expo install --check` rejects. They move on
+  # an SDK upgrade, with `npx expo install --fix`, which is a deliberate change
+  # rather than a weekly one.
+  #
+  # ESLint is held on 9 for the reason the website's is: the plugins in
+  # eslint-config-expo do not accept 10.
+  - package-ecosystem: npm
+    directory: /apps/companion
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 2
+    groups:
+      companion:
+        patterns: ['*']
+    ignore:
+      - dependency-name: 'expo'
+      - dependency-name: 'expo-*'
+      - dependency-name: '@expo/*'
+      - dependency-name: 'jest-expo'
+      - dependency-name: 'eslint-config-expo'
+      - dependency-name: 'react'
+      - dependency-name: 'react-dom'
+      - dependency-name: 'react-native'
+      - dependency-name: 'react-native-*'
+      - dependency-name: '@react-native/*'
+      - dependency-name: '@types/react'
+      - dependency-name: 'typescript'
+      - dependency-name: 'eslint'
+        update-types: ['version-update:semver-major']
+
   - package-ecosystem: github-actions
     directory: /
     schedule:

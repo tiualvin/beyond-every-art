@@ -1,0 +1,8 @@
+.expo/
+coverage/
+dist/
+node_modules/
+pnpm-lock.yaml
+# Written by `pnpm companion:sync` in the repository root and checked there for
+# drift. Reformatting it here would make a clean sync look like a change.
+/src/generated/

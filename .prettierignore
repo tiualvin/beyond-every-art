@@ -13,3 +13,8 @@ docs/GHOST_TO_PAYLOAD_HANDOFF_WITH_APP_STRATEGY.md
 /docs/assets/redesign-prototypes/
 AGENTS.md
 /.claude/
+# The companion app formats itself with its own config and its own Prettier.
+# Anchored with a leading slash on purpose: `.prettierignore` has gitignore
+# semantics, so an unanchored `apps/` would also match the live route
+# `app/(frontend)/apps/` and silently drop it from `format:check`.
+/apps/

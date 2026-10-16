@@ -92,6 +92,14 @@ collection allowlist, adding an MCP tool, or changing any agent-facing write
 path into Payload — and keep the plugin allowlist and the custom tools in step,
 so the allowlist never understates the real surface.
 
+[`docs/COMPANION_APP.md`](docs/COMPANION_APP.md) records the companion app. The
+owner lifted its gate on 16 Oct 2026 for scaffolding only: reader accounts,
+sign-in, purchases, push, server-side bookmarks, store records and any new
+Payload collection or field stay gated, each waiting on its own dated decision.
+Read it before adding anything under `apps/`, or anything a mobile client
+reads. Like the publication system, it must not displace the open
+post-cutover work.
+
 ## Edge protection — closed 18 Sep 2026
 
 Cloudflare proxies every hostname, certificates issue over DNS-01, and the

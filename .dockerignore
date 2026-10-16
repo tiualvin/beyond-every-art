@@ -10,6 +10,12 @@ ghost-export
 *.dump
 *.sql
 
+# The companion app. Nothing in the website's images uses it, and `COPY . .`
+# would otherwise bake its sources — and any `node_modules` installed beside
+# them — into the migrator and builder layers. Patterns here are anchored to
+# the context root, so this does not reach `app/(frontend)/apps/`.
+apps
+
 # The rest of what `.gitignore` keeps out of the repository as private, and the
 # run output operators write into the checkout on the VPS. The `migrate` stage
 # is `COPY . .`, so anything in the checkout that is not listed here is baked
