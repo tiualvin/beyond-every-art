@@ -43,7 +43,8 @@
     "validate:redirects": "tsx scripts/validate-redirects.ts",
     "reconcile:billing": "tsx scripts/reconcile-billing.ts",
     "backup:db": "tsx scripts/backup-database.ts",
-    "restore:db": "tsx scripts/restore-database.ts"
+    "restore:db": "tsx scripts/restore-database.ts",
+    "companion:sync": "tsx scripts/companion-sync.ts"
   },
   "dependencies": {
     "@payloadcms/db-postgres": "3.90.2",
