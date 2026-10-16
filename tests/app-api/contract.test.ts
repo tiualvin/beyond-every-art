@@ -10,6 +10,7 @@ import {
   apiPaths,
 } from '../../lib/app-api/contract'
 import { MAX_SEARCH_TERM_LENGTH } from '../../lib/content/queries'
+import { isReservedRootSlug } from '../../lib/seo/reserved-slugs'
 
 describe('the content contract', () => {
   it('describes exactly the blocks the website renders', () => {
@@ -37,5 +38,12 @@ describe('the content contract', () => {
         new URL(path, `https://example.com${API_PREFIX}`).pathname,
       ).toMatch(/\/$/)
     }
+  })
+
+  it('serves under a reserved root segment', () => {
+    // Otherwise a post could be published at the API's own path.
+    const [root] = API_PREFIX.split('/').filter(Boolean)
+    expect(root).toBeDefined()
+    expect(isReservedRootSlug(root ?? '')).toBe(true)
   })
 })

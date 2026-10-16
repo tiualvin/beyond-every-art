@@ -15,6 +15,11 @@ export const RESERVED_ROOT_SLUGS = [
   '.well-known',
   'admin',
   'api',
+  // The companion app's read-only content API (`app/app-api/`,
+  // docs/COMPANION_APP.md). Reserved with its routes even while it answers 404
+  // to everyone: a post published under this slug would collide the day the
+  // owner switches it on.
+  'app-api',
   'apps',
   'author',
   'csp-report',

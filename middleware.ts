@@ -7,6 +7,12 @@ import {
   TOO_MANY_REQUESTS_BODY,
   tooManyRequestsInit,
 } from '@/lib/security/rate-limit'
+import {
+  appApiEnabled,
+  isAppApiPath,
+  NOT_FOUND_BODY,
+  UNCACHED_HEADERS,
+} from '@/lib/app-api/switch'
 import { forwardedOrigin, internalOrigin } from '@/lib/security/origins'
 import { legacyGhostRedirect } from '@/lib/seo/ghost-urls'
 import { isAuthorized, parseBasicAuth } from '@/lib/seo/indexing'
@@ -214,6 +220,19 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
         },
       })
     }
+  }
+
+  // The companion app's content API, switched off: 404 to every method on
+  // every path under it. The handlers check the switch themselves, but they
+  // export only GET, and Next implements OPTIONS (204, with an Allow header)
+  // and a 405 for every other method without asking them — so an endpoint
+  // that is off would still answer as one that exists. After the staging gate,
+  // so a staging deploy asks for credentials here as it does everywhere else.
+  if (isAppApiPath(request.nextUrl.pathname) && !appApiEnabled()) {
+    return NextResponse.json(NOT_FOUND_BODY, {
+      status: 404,
+      headers: UNCACHED_HEADERS,
+    })
   }
 
   // The built-in rules for the Ghost URL shapes this site does not serve —
