@@ -1,0 +1,66 @@
+name: Companion app
+# The companion app's own checks, in their own workflow (docs/COMPANION_APP.md).
+#
+# Separate from ci.yml for the reason the app is separate from the website: it
+# has its own lockfile, its own Node (Expo SDK 58 needs 22.13 or later, the
+# website runs on 20) and nothing in it reaches a production image. It is not
+# in the deploy job's `needs` and must not be: a red app build is never a
+# reason to hold a website fix, and the website deploys on every push to main
+# regardless of which files changed.
+#
+# Path-filtered, unlike ci.yml, because nothing outside these paths can change
+# the app's result. The website sources it reads are the ones
+# `pnpm companion:sync` generates from; whether its generated files are current
+# is checked by ci.yml's `checks` job (tests/companion/sync.test.ts), which runs
+# on every push anyway.
+on:
+  pull_request:
+    paths:
+      - 'apps/companion/**'
+      - 'scripts/companion-sync.ts'
+      - 'blocks/schema.ts'
+      - 'app/globals.css'
+      - 'lib/seo/reserved-slugs.ts'
+      - '.github/workflows/companion.yml'
+  push:
+    branches: [main, work]
+    paths:
+      - 'apps/companion/**'
+      - 'scripts/companion-sync.ts'
+      - 'blocks/schema.ts'
+      - 'app/globals.css'
+      - 'lib/seo/reserved-slugs.ts'
+      - '.github/workflows/companion.yml'
+permissions:
+  contents: read
+jobs:
+  app:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/companion
+    steps:
+      - uses: actions/checkout@v4
+      # The app pins its own pnpm in its own package.json. Reading it from
+      # there keeps this job and a contributor's machine on the same version.
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: apps/companion/package.json
+          run_install: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: apps/companion/.nvmrc
+          cache: pnpm
+          cache-dependency-path: apps/companion/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm format:check
+      - run: pnpm test --ci
+      # The JavaScript bundles for both platforms, as a store build would make
+      # them. No native toolchain is needed for this, and no simulator runs.
+      - run: pnpm export
+      # Every module in those bundles came from this project, not from the
+      # repository root's node_modules.
+      - run: pnpm export:check
