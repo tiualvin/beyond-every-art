@@ -28,6 +28,12 @@ export const type = {
     fontSize: 22,
     lineHeight: 31,
   },
+  /** The opening quotation mark over a block quotation. */
+  quoteMark: {
+    fontFamily: familyFor('serif', { italic: true }),
+    fontSize: 40,
+    lineHeight: 40,
+  },
   meta: { fontFamily: familyFor('sans'), fontSize: 14, lineHeight: 20 },
   label: {
     fontFamily: familyFor('sans', { bold: true }),

@@ -20,6 +20,7 @@ import { BlockView } from './blocks'
 import { warnUnsupported } from './diagnostics'
 import { ReaderImage } from './image'
 import { InlineNodes } from './inline'
+import { QuoteFrame, quoteText } from './quote'
 
 const HEADING_VARIANT: Record<HeadingNode['tag'], TypeVariant> = {
   h1: 'title',
@@ -65,11 +66,11 @@ function BodyNodeView({ node }: { node: BodyNode }) {
       )
     case 'quote':
       return (
-        <View style={styles.quote}>
-          <Txt variant="quote">
-            <InlineNodes nodes={node.children} face="serif" />
+        <QuoteFrame>
+          <Txt variant="quote" style={quoteText}>
+            <InlineNodes nodes={node.children} face="serif" italic />
           </Txt>
-        </View>
+        </QuoteFrame>
       )
     case 'list':
       return <ListView list={node} depth={0} />
@@ -147,7 +148,6 @@ function ListView({ list, depth }: { list: ListNode; depth: number }) {
 const styles = StyleSheet.create({
   paragraph: { marginBottom: space.md },
   heading: { marginTop: space.md, marginBottom: space.sm },
-  quote: { marginVertical: space.md, paddingHorizontal: space.md },
   rule: { height: StyleSheet.hairlineWidth, marginVertical: space.lg },
   list: { marginBottom: space.md, gap: space.xs },
   nestedList: { marginTop: space.xs, marginBottom: 0 },

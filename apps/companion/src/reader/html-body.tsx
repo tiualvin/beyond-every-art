@@ -22,6 +22,7 @@ import {
   type HtmlNode,
 } from './html'
 import { useOpenLink } from './link-context'
+import { QuoteFrame, quoteText, useInQuote } from './quote'
 
 type InlineStyle = {
   bold: boolean
@@ -40,6 +41,9 @@ const PLAIN: InlineStyle = {
   code: false,
   small: false,
 }
+
+/** Where a quotation's text starts: italic, before any markup inside it. */
+const QUOTED: InlineStyle = { ...PLAIN, italic: true }
 
 const HEADINGS: Record<string, TypeVariant> = {
   h1: 'title',
@@ -61,14 +65,18 @@ export function HtmlBody({ html, base }: { html: string; base: string }) {
 /** A container's children, as runs of inline content between blocks. */
 function Children({
   nodes,
-  variant = 'body',
+  variant,
   spaced = true,
 }: {
   nodes: HtmlNode[]
+  /** Defaults to body text, or to the quotation's style inside one. */
   variant?: TypeVariant
   /** Paragraph spacing after each run; off inside list items and table cells. */
   spaced?: boolean
 }) {
+  // Ghost wraps a quotation's text in paragraphs, so the quotation's style has
+  // to reach runs drawn several elements further down.
+  const quoted = useInQuote()
   const parts: React.ReactNode[] = []
   let run: HtmlNode[] = []
 
@@ -77,10 +85,17 @@ function Children({
       parts.push(
         <Txt
           key={`run-${parts.length}`}
-          variant={variant}
-          style={spaced ? styles.paragraph : undefined}
+          variant={variant ?? (quoted ? 'quote' : 'body')}
+          style={[
+            spaced && !quoted ? styles.paragraph : undefined,
+            quoted ? quoteText : undefined,
+          ]}
         >
-          <InlineRun nodes={trimRun(run)} inherited={PLAIN} />
+          <InlineRun
+            nodes={trimRun(run)}
+            inherited={quoted ? QUOTED : PLAIN}
+            face={quoted ? 'serif' : 'sans'}
+          />
         </Txt>,
       )
     }
@@ -150,9 +165,9 @@ function BlockElement({ element }: { element: HtmlElement }) {
       return <Children nodes={element.children} />
     case 'blockquote':
       return (
-        <View style={styles.quote}>
-          <Children nodes={element.children} variant="quote" />
-        </View>
+        <QuoteFrame>
+          <Children nodes={element.children} />
+        </QuoteFrame>
       )
     case 'figure':
       return (
@@ -365,8 +380,8 @@ function InlineRun({
 
 const styles = StyleSheet.create({
   paragraph: { marginBottom: space.md },
+  /** Paragraphs within a quotation, close enough to read as one passage. */
   heading: { marginTop: space.md, marginBottom: space.sm },
-  quote: { marginVertical: space.md, paddingHorizontal: space.md },
   figure: { marginVertical: space.sm },
   caption: { marginTop: space.xs, marginBottom: space.md },
   image: { width: '100%', overflow: 'hidden', borderRadius: 2 },

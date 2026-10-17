@@ -14,11 +14,19 @@ export type Face = 'serif' | 'sans'
 
 const has = (format: number, bit: number) => (format & bit) === bit
 
-/** The style a Lexical format sum asks for, in a given face. */
+/**
+ * The style a Lexical format sum asks for, in a given face.
+ *
+ * `italic` is the run's surroundings: text inside a quotation is italic
+ * whether or not its own format says so. Each run names its own font family,
+ * and a custom family has no synthetic italic, so a run that does not ask for
+ * the italic family here is drawn upright however its parent is set.
+ */
 export function formatStyle(
   format: number,
   face: Face,
   codeBackground: string,
+  italic = false,
 ): TextStyle {
   const decorations = [
     has(format, TEXT_FORMAT.underline) ? 'underline' : null,
@@ -33,7 +41,7 @@ export function formatStyle(
       : {
           fontFamily: familyFor(face, {
             bold: has(format, TEXT_FORMAT.bold),
-            italic: has(format, TEXT_FORMAT.italic),
+            italic: italic || has(format, TEXT_FORMAT.italic),
           }),
         }),
     ...(decorations.length
@@ -53,9 +61,12 @@ export function formatStyle(
 export function InlineNodes({
   nodes,
   face = 'sans',
+  italic = false,
 }: {
   nodes: InlineNode[]
   face?: Face
+  /** Set the whole run in italic, as a quotation is. */
+  italic?: boolean
 }) {
   const { palette } = useTheme()
   const openLink = useOpenLink()
@@ -74,7 +85,7 @@ export function InlineNodes({
             return (
               <Text
                 key={index}
-                style={formatStyle(node.format, face, palette.line)}
+                style={formatStyle(node.format, face, palette.line, italic)}
               >
                 {node.text}
               </Text>
@@ -89,7 +100,11 @@ export function InlineNodes({
                 style={linkStyle}
                 onPress={() => openLink(node.href)}
               >
-                <InlineNodes nodes={node.children} face={face} />
+                <InlineNodes
+                  nodes={node.children}
+                  face={face}
+                  italic={italic}
+                />
               </Text>
             )
           case 'internalLink':
@@ -100,7 +115,11 @@ export function InlineNodes({
                 style={linkStyle}
                 onPress={() => openArticle(node.slug, node.href)}
               >
-                <InlineNodes nodes={node.children} face={face} />
+                <InlineNodes
+                  nodes={node.children}
+                  face={face}
+                  italic={italic}
+                />
               </Text>
             )
           case 'unsupported':

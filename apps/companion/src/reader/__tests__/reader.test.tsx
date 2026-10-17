@@ -1,6 +1,7 @@
 // The native renderer, against the fixtures the API contract is tested with.
 
 import { fireEvent, screen } from '@testing-library/react-native'
+import { StyleSheet } from 'react-native'
 
 import {
   BodyNodeSchema,
@@ -22,6 +23,7 @@ import { GATED_MARKERS, fixturePosts } from '../../fixtures/posts'
 import { TEST_SITE, renderReader } from '../../test/render'
 import { Article } from '../article'
 import { resetUnsupportedWarnings } from '../diagnostics'
+import { HtmlBody } from '../html-body'
 import { LexicalNodes } from '../lexical'
 
 const asReceived = (slug: string): PostDetail => {
@@ -212,6 +214,82 @@ describe('rich text', () => {
     expect(screen.getByText('4.')).toBeTruthy()
     expect(screen.getByLabelText('Done')).toBeTruthy()
     expect(screen.getByLabelText('Not done')).toBeTruthy()
+  })
+})
+
+describe('quotations', () => {
+  // Each run of text names its own font family, and a custom family has no
+  // synthetic italic: a run that does not ask for the italic family is drawn
+  // upright, whatever the quotation around it is set in. Both kinds of article
+  // once drew their quotations upright — rich text in the heading weight.
+  const familyOf = (words: string) =>
+    StyleSheet.flatten(screen.getByText(words).props.style).fontFamily
+
+  it('sets a rich-text quotation in the serif italic', async () => {
+    await renderReader(
+      <LexicalNodes
+        nodes={[
+          node({
+            type: 'quote',
+            children: [text('Plain words, '), text('and bold ones', 1)],
+          }),
+        ]}
+      />,
+    )
+    expect(familyOf('Plain words, ')).toBe('PlayfairDisplay_400Regular_Italic')
+    expect(familyOf('and bold ones')).toBe('PlayfairDisplay_600SemiBold_Italic')
+  })
+
+  it('sets a migrated quotation in the serif italic, paragraphs and all', async () => {
+    await renderReader(
+      <HtmlBody
+        html="<blockquote>Bare words.</blockquote><blockquote><p>A paragraph, <strong>strong</strong>.</p></blockquote>"
+        base={`${TEST_SITE}/a-post/`}
+      />,
+    )
+    expect(familyOf('Bare words.')).toBe('PlayfairDisplay_400Regular_Italic')
+    expect(familyOf('A paragraph, ')).toBe('PlayfairDisplay_400Regular_Italic')
+    expect(familyOf('strong')).toBe('PlayfairDisplay_600SemiBold_Italic')
+  })
+
+  it('leaves the text around a quotation as it was', async () => {
+    await renderReader(
+      <HtmlBody
+        html="<p>Before.</p><blockquote>Inside.</blockquote><p>After.</p>"
+        base={`${TEST_SITE}/a-post/`}
+      />,
+    )
+    expect(familyOf('Before.')).toBe('Inter_400Regular')
+    expect(familyOf('After.')).toBe('Inter_400Regular')
+  })
+
+  it('is read as its words, not announced as a summary', async () => {
+    // TalkBack reads a "summary" container and then its text again.
+    await renderReader(
+      <LexicalNodes
+        nodes={[node({ type: 'quote', children: [text('Quoted words.')] })]}
+      />,
+    )
+    let ancestor = screen.getByText('Quoted words.').parent
+    while (ancestor) {
+      expect(ancestor.props.accessibilityRole).not.toBe('summary')
+      ancestor = ancestor.parent
+    }
+  })
+
+  it('spaces a migrated quotation’s paragraphs by the frame, not by margins', async () => {
+    // A trailing margin on the last paragraph pushed the closing rule away.
+    await renderReader(
+      <HtmlBody
+        html="<blockquote><p>First.</p><p>Last.</p></blockquote>"
+        base={`${TEST_SITE}/a-post/`}
+      />,
+    )
+    for (const words of ['First.', 'Last.']) {
+      let node = screen.getByText(words)
+      while (node.parent && node.parent.type === node.type) node = node.parent
+      expect(StyleSheet.flatten(node.props.style)?.marginBottom).toBeUndefined()
+    }
   })
 })
 
