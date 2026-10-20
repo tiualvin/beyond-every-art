@@ -5,6 +5,7 @@
 // a gated post to its teaser and unlinked links to unpublished posts; doing any
 // of that again here would only be a chance to disagree with it.
 
+import { createContext, useContext } from 'react'
 import { StyleSheet, View } from 'react-native'
 
 import type {
@@ -20,6 +21,7 @@ import { BlockView } from './blocks'
 import { warnUnsupported } from './diagnostics'
 import { ReaderImage } from './image'
 import { InlineNodes } from './inline'
+import { QuoteFrame, quoteText } from './quote'
 
 const HEADING_VARIANT: Record<HeadingNode['tag'], TypeVariant> = {
   h1: 'title',
@@ -28,6 +30,26 @@ const HEADING_VARIANT: Record<HeadingNode['tag'], TypeVariant> = {
   h4: 'h4',
   h5: 'h5',
   h6: 'h6',
+}
+
+/**
+ * Whether these nodes sit inside a box of their own — a callout, an accordion
+ * panel, an answer. In the article's flow every paragraph carries the space
+ * after it; inside a box that space would sit inside the box's own padding,
+ * one paragraph's worth deeper at the bottom than at the top. So contained
+ * nodes drop their own margins and the container spaces them.
+ */
+const Contained = createContext(false)
+
+/** Rich text inside a box: spaced by the box, not by trailing margins. */
+export function ContainedNodes({ nodes }: { nodes: BodyNode[] }) {
+  return (
+    <Contained.Provider value>
+      <View style={styles.contained}>
+        <LexicalNodes nodes={nodes} />
+      </View>
+    </Contained.Provider>
+  )
 }
 
 export function LexicalNodes({ nodes }: { nodes: BodyNode[] }) {
@@ -42,11 +64,12 @@ export function LexicalNodes({ nodes }: { nodes: BodyNode[] }) {
 
 function BodyNodeView({ node }: { node: BodyNode }) {
   const { palette } = useTheme()
+  const contained = useContext(Contained)
 
   switch (node.type) {
     case 'paragraph':
       return node.children.length === 0 ? null : (
-        <Txt style={styles.paragraph}>
+        <Txt style={contained ? undefined : styles.paragraph}>
           <InlineNodes nodes={node.children} />
         </Txt>
       )
@@ -55,24 +78,24 @@ function BodyNodeView({ node }: { node: BodyNode }) {
         <Txt
           variant={HEADING_VARIANT[node.tag]}
           accessibilityRole="header"
-          style={styles.heading}
+          style={contained ? undefined : styles.heading}
         >
           <InlineNodes
             nodes={node.children}
-            face={['h5', 'h6'].includes(node.tag) ? 'sans' : 'serif'}
+            variant={HEADING_VARIANT[node.tag]}
           />
         </Txt>
       )
     case 'quote':
       return (
-        <View style={styles.quote}>
-          <Txt variant="quote">
-            <InlineNodes nodes={node.children} face="serif" />
+        <QuoteFrame>
+          <Txt variant="quote" style={quoteText}>
+            <InlineNodes nodes={node.children} variant="quote" />
           </Txt>
-        </View>
+        </QuoteFrame>
       )
     case 'list':
-      return <ListView list={node} depth={0} />
+      return <ListView list={node} depth={0} contained={contained} />
     case 'horizontalrule':
       return (
         <View
@@ -101,9 +124,23 @@ function markerFor(
   return '•'
 }
 
-function ListView({ list, depth }: { list: ListNode; depth: number }) {
+function ListView({
+  list,
+  depth,
+  contained = false,
+}: {
+  list: ListNode
+  depth: number
+  contained?: boolean
+}) {
   return (
-    <View style={[styles.list, depth > 0 && styles.nestedList]}>
+    <View
+      style={[
+        styles.list,
+        contained && styles.containedList,
+        depth > 0 && styles.nestedList,
+      ]}
+    >
       {list.children.map((item, index) => {
         const inline = item.children.filter(
           (child): child is InlineNode => child.type !== 'list',
@@ -147,9 +184,10 @@ function ListView({ list, depth }: { list: ListNode; depth: number }) {
 const styles = StyleSheet.create({
   paragraph: { marginBottom: space.md },
   heading: { marginTop: space.md, marginBottom: space.sm },
-  quote: { marginVertical: space.md, paddingHorizontal: space.md },
   rule: { height: StyleSheet.hairlineWidth, marginVertical: space.lg },
-  list: { marginBottom: space.md, gap: space.xs },
+  list: { marginBottom: space.md, gap: space.sm },
+  containedList: { marginBottom: 0 },
+  contained: { gap: space.sm + space.xs },
   nestedList: { marginTop: space.xs, marginBottom: 0 },
   item: { flexDirection: 'row', gap: space.sm },
   marker: { minWidth: 22, textAlign: 'right' },

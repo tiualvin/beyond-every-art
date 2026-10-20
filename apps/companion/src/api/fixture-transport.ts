@@ -17,7 +17,15 @@ import {
   type PostDetail,
   type PostSummary,
 } from './contract'
-import { FIXTURE_AUTHOR, fixturePosts } from '../fixtures/posts'
+import { fixturePosts } from '../fixtures/posts'
+import { showcasePosts } from '../fixtures/showcase'
+
+/**
+ * Which posts the fixtures serve: `modules`, the test cases every block and
+ * edge case is checked against, or `showcase`, sample articles that look like
+ * the journal's for preview builds (fixtures/showcase.ts).
+ */
+export type FixtureSet = 'modules' | 'showcase'
 
 /** The origin the fixture transport answers on. It does not resolve. */
 export const FIXTURE_ORIGIN = 'https://fixtures.invalid'
@@ -52,11 +60,25 @@ const positiveInteger = (value: string | null, fallback: number) => {
   return /^\d+$/.test(value) && Number(value) > 0 ? Number(value) : null
 }
 
-export function createFixtureTransport(siteUrl: string): Transport {
-  const posts = fixturePosts(siteUrl).sort((a, b) =>
+export function createFixtureTransport(
+  siteUrl: string,
+  set: FixtureSet = 'modules',
+): Transport {
+  const source = set === 'showcase' ? showcasePosts : fixturePosts
+  const posts = source(siteUrl).sort((a, b) =>
     (b.publishedAt ?? '').localeCompare(a.publishedAt ?? ''),
   )
   const summaries = posts.map(toSummary)
+
+  /** Everyone with a byline in the set, once each. */
+  const authors = [
+    ...new Map(
+      posts
+        .flatMap((post) => post.authors)
+        .filter((author) => author.slug)
+        .map((author) => [author.slug!, author]),
+    ).values(),
+  ]
 
   const tagsWithCounts = () => {
     const counts = new Map<
@@ -139,18 +161,17 @@ export function createFixtureTransport(siteUrl: string): Transport {
 
     if (resource === 'authors' && slug === undefined) {
       return respond(200, {
-        authors: [
-          {
-            ...FIXTURE_AUTHOR,
-            postCount: byAuthor(FIXTURE_AUTHOR.slug!).length,
-          },
-        ],
+        authors: authors.map((author) => ({
+          ...author,
+          postCount: byAuthor(author.slug!).length,
+        })),
       })
     }
 
     if (resource === 'authors') {
-      if (slug !== FIXTURE_AUTHOR.slug) return notFound()
-      return respond(200, { author: FIXTURE_AUTHOR, posts: byAuthor(slug) })
+      const author = authors.find((candidate) => candidate.slug === slug)
+      if (!author) return notFound()
+      return respond(200, { author, posts: byAuthor(author.slug!) })
     }
 
     if (resource === 'search' && slug === undefined) {

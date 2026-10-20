@@ -7,14 +7,19 @@
 // block element breaks the run and draws itself. Whitespace collapses the way
 // a browser collapses it, except inside `pre`.
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Image } from 'expo-image'
 import { StyleSheet, Text, View, type TextStyle } from 'react-native'
 
-import { familyFor } from '../theme/fonts'
 import { Txt } from '../theme/text'
 import { useTheme } from '../theme/theme'
-import { space, type, type TypeVariant } from '../theme/typography'
+import {
+  MONOSPACE,
+  TYPE_SPECS,
+  familyOf,
+  space,
+  type TypeVariant,
+} from '../theme/typography'
 import {
   BLOCK_ELEMENTS,
   parseHtml,
@@ -22,6 +27,8 @@ import {
   type HtmlNode,
 } from './html'
 import { useOpenLink } from './link-context'
+import { PlateWash } from './plate'
+import { QuoteFrame, quoteText, useInQuote } from './quote'
 
 type InlineStyle = {
   bold: boolean
@@ -61,14 +68,19 @@ export function HtmlBody({ html, base }: { html: string; base: string }) {
 /** A container's children, as runs of inline content between blocks. */
 function Children({
   nodes,
-  variant = 'body',
+  variant,
   spaced = true,
 }: {
   nodes: HtmlNode[]
+  /** Defaults to body text, or to the quotation's style inside one. */
   variant?: TypeVariant
   /** Paragraph spacing after each run; off inside list items and table cells. */
   spaced?: boolean
 }) {
+  // Ghost wraps a quotation's text in paragraphs, so the quotation's style has
+  // to reach runs drawn several elements further down.
+  const quoted = useInQuote()
+  const role: TypeVariant = variant ?? (quoted ? 'quote' : 'body')
   const parts: React.ReactNode[] = []
   let run: HtmlNode[] = []
 
@@ -77,10 +89,13 @@ function Children({
       parts.push(
         <Txt
           key={`run-${parts.length}`}
-          variant={variant}
-          style={spaced ? styles.paragraph : undefined}
+          variant={role}
+          style={[
+            spaced && !quoted ? styles.paragraph : undefined,
+            quoted ? quoteText : undefined,
+          ]}
         >
-          <InlineRun nodes={trimRun(run)} inherited={PLAIN} />
+          <InlineRun nodes={trimRun(run)} inherited={PLAIN} variant={role} />
         </Txt>,
       )
     }
@@ -138,7 +153,7 @@ function BlockElement({ element }: { element: HtmlElement }) {
           <InlineRun
             nodes={trimRun(element.children)}
             inherited={PLAIN}
-            face={['h5', 'h6'].includes(element.name) ? 'sans' : 'serif'}
+            variant={HEADINGS[element.name] ?? 'h2'}
           />
         </Txt>
       )
@@ -150,9 +165,9 @@ function BlockElement({ element }: { element: HtmlElement }) {
       return <Children nodes={element.children} />
     case 'blockquote':
       return (
-        <View style={styles.quote}>
-          <Children nodes={element.children} variant="quote" />
-        </View>
+        <QuoteFrame>
+          <Children nodes={element.children} />
+        </QuoteFrame>
       )
     case 'figure':
       return (
@@ -163,11 +178,16 @@ function BlockElement({ element }: { element: HtmlElement }) {
     case 'figcaption':
       return (
         <Txt variant="meta" tone="muted" style={styles.caption}>
-          <InlineRun nodes={trimRun(element.children)} inherited={PLAIN} />
+          <InlineRun
+            nodes={trimRun(element.children)}
+            inherited={PLAIN}
+            variant="meta"
+          />
         </Txt>
       )
     case 'img':
-      return <HtmlImage element={element} />
+      // Keyed by source, so a failure belongs to one picture (see image.tsx).
+      return <HtmlImage key={element.attrs.src} element={element} />
     case 'hr':
       return (
         <View
@@ -178,7 +198,7 @@ function BlockElement({ element }: { element: HtmlElement }) {
       )
     case 'pre':
       return (
-        <View style={[styles.pre, { backgroundColor: palette.line }]}>
+        <View style={[styles.pre, { backgroundColor: palette.code }]}>
           <Txt variant="code">{textOf(element)}</Txt>
         </View>
       )
@@ -236,18 +256,27 @@ function List({ element }: { element: HtmlElement }) {
   )
 }
 
+/**
+ * A migrated image, in the same three states as every other: loading on the
+ * quiet `line` colour, the plate wash if it fails, and its own ratio — from
+ * the markup's size attributes, or the picture once it loads — rather than a
+ * crop. Ghost often omitted the attributes.
+ */
 function HtmlImage({ element }: { element: HtmlElement }) {
   const { palette } = useTheme()
+  const [failed, setFailed] = useState(false)
+  const [measured, setMeasured] = useState<number | null>(null)
   const width = Number(element.attrs.width)
   const height = Number(element.attrs.height)
+  const known = width > 0 && height > 0 ? width / height : null
   const alt = element.attrs.alt?.trim() ?? ''
   return (
     <View
       style={[
         styles.image,
         {
-          aspectRatio: width > 0 && height > 0 ? width / height : 3 / 2,
-          backgroundColor: palette.plate[1],
+          aspectRatio: known ?? measured ?? 3 / 2,
+          backgroundColor: palette.line,
         },
       ]}
       accessible={alt.length > 0}
@@ -255,13 +284,24 @@ function HtmlImage({ element }: { element: HtmlElement }) {
       accessibilityLabel={alt || undefined}
       importantForAccessibility={alt ? 'yes' : 'no-hide-descendants'}
     >
-      <Image
-        source={{ uri: element.attrs.src }}
-        style={StyleSheet.absoluteFill}
-        contentFit="cover"
-        cachePolicy="disk"
-        accessible={false}
-      />
+      {failed ? (
+        <PlateWash />
+      ) : (
+        <Image
+          source={{ uri: element.attrs.src }}
+          style={StyleSheet.absoluteFill}
+          contentFit="contain"
+          cachePolicy="disk"
+          transition={0}
+          accessible={false}
+          testID="reader-image"
+          onLoad={(event) => {
+            const { width: w, height: h } = event.source
+            if (!known && w > 0 && h > 0) setMeasured(w / h)
+          }}
+          onError={() => setFailed(true)}
+        />
+      )}
     </View>
   )
 }
@@ -270,19 +310,25 @@ function textOf(node: HtmlNode): string {
   return node.type === 'text' ? node.text : node.children.map(textOf).join('')
 }
 
+/**
+ * A run's style, from the markup around it and the role it sits in. The family
+ * comes from the role — a run in a heading at the heading's weight, a run in a
+ * quotation in its italic — because each run names its own.
+ */
 function styleFor(
   inline: InlineStyle,
-  face: 'serif' | 'sans',
+  variant: TypeVariant,
   codeBackground: string,
 ): TextStyle {
+  const spec = TYPE_SPECS[variant]
   const decorations = [
     inline.underline ? 'underline' : null,
     inline.strike ? 'line-through' : null,
   ].filter(Boolean)
   return {
     fontFamily: inline.code
-      ? type.code.fontFamily
-      : familyFor(face, { bold: inline.bold, italic: inline.italic }),
+      ? MONOSPACE
+      : familyOf(spec, { bold: inline.bold, italic: inline.italic }),
     ...(inline.code ? { backgroundColor: codeBackground } : {}),
     ...(decorations.length
       ? {
@@ -291,7 +337,7 @@ function styleFor(
           ) as TextStyle['textDecorationLine'],
         }
       : {}),
-    ...(inline.small ? { fontSize: 14 } : {}),
+    ...(inline.small ? { fontSize: Math.round(spec.size * 0.82) } : {}),
   }
 }
 
@@ -299,11 +345,11 @@ function styleFor(
 function InlineRun({
   nodes,
   inherited,
-  face = 'sans',
+  variant,
 }: {
   nodes: HtmlNode[]
   inherited: InlineStyle
-  face?: 'serif' | 'sans'
+  variant: TypeVariant
 }) {
   const { palette } = useTheme()
   const openLink = useOpenLink()
@@ -314,7 +360,10 @@ function InlineRun({
         if (node.type === 'text') {
           const text = node.text.replace(/\s+/g, ' ')
           return text ? (
-            <Text key={index} style={styleFor(inherited, face, palette.line)}>
+            <Text
+              key={index}
+              style={styleFor(inherited, variant, palette.code)}
+            >
               {text}
             </Text>
           ) : null
@@ -345,7 +394,11 @@ function InlineRun({
               style={{ color: palette.accent, textDecorationLine: 'underline' }}
               onPress={() => openLink(href)}
             >
-              <InlineRun nodes={node.children} inherited={style} face={face} />
+              <InlineRun
+                nodes={node.children}
+                inherited={style}
+                variant={variant}
+              />
             </Text>
           )
         }
@@ -355,7 +408,7 @@ function InlineRun({
             key={index}
             nodes={node.children}
             inherited={style}
-            face={face}
+            variant={variant}
           />
         )
       })}
@@ -365,8 +418,8 @@ function InlineRun({
 
 const styles = StyleSheet.create({
   paragraph: { marginBottom: space.md },
+  /** Paragraphs within a quotation, close enough to read as one passage. */
   heading: { marginTop: space.md, marginBottom: space.sm },
-  quote: { marginVertical: space.md, paddingHorizontal: space.md },
   figure: { marginVertical: space.sm },
   caption: { marginTop: space.xs, marginBottom: space.md },
   image: { width: '100%', overflow: 'hidden', borderRadius: 2 },

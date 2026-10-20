@@ -12,11 +12,17 @@ export function Screen({
   refreshing,
   onRefresh,
   bottomInset = 0,
+  spacing = 'compact',
 }: {
   children: ReactNode
   refreshing?: boolean
   onRefresh?: () => void
   bottomInset?: number
+  /**
+   * `sections` puts 48pt between the screen's top-level groups, so a screen
+   * reads as distinct sections rather than one stream at one gap.
+   */
+  spacing?: 'sections' | 'compact'
 }) {
   const { palette } = useTheme()
   return (
@@ -36,7 +42,14 @@ export function Screen({
         ) : undefined
       }
     >
-      <View style={styles.column}>{children}</View>
+      <View
+        style={[
+          styles.column,
+          { gap: spacing === 'sections' ? space.xxl : space.md },
+        ]}
+      >
+        {children}
+      </View>
     </ScrollView>
   )
 }
@@ -47,6 +60,5 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: MAX_CONTENT_WIDTH,
     alignSelf: 'center',
-    gap: space.md,
   },
 })

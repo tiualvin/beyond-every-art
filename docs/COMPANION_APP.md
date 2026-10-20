@@ -177,9 +177,26 @@ pnpm export && pnpm export:check   # the iOS and Android bundles, and where thei
 
 **Against fixtures — the default.** With no API configured the app serves
 bundled fixtures from an in-process mock of the API, makes no request for
-content at all, and says on Today and Read that it is showing sample content.
-Fixture images are on a `.invalid` host and never load; the reader shows a
-brand plate in their place.
+content at all, and marks Today with a small "Preview · sample articles"
+badge. Two sets, chosen with `EXPO_PUBLIC_FIXTURE_SET`:
+
+- `showcase`, the default: nine hand-written sample articles in the journal's
+  range — pigments, materials, conservation, technique — so a preview build
+  and its screenshots look like the product
+  ([`fixtures/showcase.ts`](../apps/companion/src/fixtures/showcase.ts)). None of
+  it is production content and its claims stay general. The badge is on Today
+  only, so an article opened from another tab has to read as a sample on its
+  own: the byline is a stand-in, "Sample author", and nothing is signed or
+  credited with the publication's name.
+- `modules`: the test cases — every block, link kind, unknown node and seeded
+  edge case the reader handles. The tests use this set.
+
+```bash
+EXPO_PUBLIC_FIXTURE_SET=modules pnpm start
+```
+
+Fixture images are on a `.invalid` host and never load: a lead or body image
+shows the website's plate wash in its place, and a list thumbnail drops out.
 
 **Against a website.** Set `EXPO_PUBLIC_API_BASE_URL` to a website serving the
 content API — a local `pnpm dev` with the API switched on, never production
@@ -256,7 +273,10 @@ node and block is drawn with native views.
 
 **Rich text** renders headings, paragraphs (every Lexical format), lists
 (nested, numbered from any start, and checklists a screen reader announces),
-quotes, horizontal rules, images and links. Each of the 15 blocks has an
+quotations, horizontal rules, images and links. A quotation is set the way the
+website's `.prose blockquote` sets one — centred serif italic between two
+hairlines under a burgundy opening mark — in rich text and migrated HTML
+alike. Each of the 15 blocks has an
 explicit renderer, typed as a record over the generated block slugs, so a
 block the website adds is a compile error in the app until somebody decides
 how it renders on a phone:
@@ -322,27 +342,94 @@ either way. Reading an article tries the network first, refreshes a saved copy
 with what the website now says, and falls back to the saved copy offline,
 telling the reader which copy they have. Separately, the query cache persists
 successful content reads (not searches, not the library) for a week, so an
-article read yesterday usually opens on a train today.
+article read yesterday usually opens on a train today. The cache pauses network
+reads while the device is offline; the library's reads and writes are marked as
+local so they never wait for a connection they do not use.
 
 ## Design
 
-- **Brand.** Paper, ink and burgundy from the generated tokens, Playfair Display
-  and Inter bundled from `@expo-google-fonts` one weight per file. Every text
-  pairing in every palette is held to WCAG AA by a test.
-- **Dark appearance — a PROPOSAL.** The website has no dark palette. The app's
-  is derived rather than invented — every colour a brand token or a mix of two
-  — and waits on the owner (checklist below).
+The target is the website's own: its tokens, its concept boards and the HTML
+prototypes in [`WEBSITE_VISUAL_DIRECTION.md`](WEBSITE_VISUAL_DIRECTION.md) and
+[`WEBSITE_REDESIGN_PROTOTYPES.md`](WEBSITE_REDESIGN_PROTOTYPES.md), read through
+iOS's and Android's own conventions. A review against those references on 17 Oct
+2026 found the first scaffold "a well-built prototype of a reading app, not a
+magazine": the website's colours and faces without its composition. Phase 1 of
+the fixes is in; what remains is listed at the end of this section.
+
+- **Brand.** Paper, ink and burgundy from the generated tokens; Playfair Display
+  and Inter bundled from `@expo-google-fonts`, one weight per file. Every text
+  pairing in every palette is held to WCAG AA by a test, including text, muted
+  and links on the `code` tint behind inline code and highlights.
+- **Type is a set of roles**, not sizes
+  ([`theme/typography.ts`](../apps/companion/src/theme/typography.ts)). Three
+  Playfair weights do the work: semibold for what leads a screen, medium for
+  headlines in a list, regular for a standfirst and quotations. The editorial
+  ladder steps by about a fifth (body 17, h3 20, h2 24, title 28, display 34),
+  and a test holds each of those levels at least 15% above the next; h4 shares
+  body's size and is told apart by face, and interface text (12 to 15pt) sits
+  below the ladder. Headings are set slightly tight as on the website, and an
+  article's title is never smaller than its own teaser. A small uppercase
+  `section` label names list groups only — `PRODUCT.md` rules out an eyebrow
+  over every title.
+- **Space and rules group a screen.** Sections sit 48pt apart, each opened by
+  its label standing on a 1pt rule; rows are divided from each other by
+  hairlines. A list row leads with its headline and keeps its topic quiet in
+  the footer beside the date; only the lead carries a burgundy kicker. Rich
+  text inside a box, a quotation included, is spaced by the box rather than by
+  trailing margins. The topic chips scroll under the screen's edge.
+- **Controls are the platform's shape.** Buttons, chips and search fields are
+  capsules; content surfaces keep the website's 2pt edge. A quiet action is a
+  burgundy tint, never an outline in body ink. Text fields have a border at 3:1
+  against the page (WCAG 1.4.11). A control ripples on Android or dims
+  elsewhere, never both, and the ripple is clipped to the capsule by a parent
+  view, since Android draws it to the pressable's own rectangle. A call to
+  action inside an article sets its label as the website's `.button` does —
+  small, uppercase, tracked — while interface buttons stay in sentence case.
+- **Images have three states.** Loading sits on the quiet `line` colour. A
+  failed lead or body image shows the website's plate wash, the same 148°
+  gradient as `--plate-wash` (drawn with `expo-linear-gradient`); a failed list
+  thumbnail leaves the row, and a credit leaves with its picture. Body images
+  keep their own ratio, from the server or from the picture once loaded, rather
+  than a crop. What a picture learned while loading belongs to that source: a
+  row reused for another article starts again.
+- **Honest, without the roadmap.** Empty states say what will appear and, where
+  there is a next step, offer it — Library's leads to Read, Studio's starts a
+  palette — and a failed read offers Try again. The interface does not describe
+  the app's plans, with one exception that waits on the owner: a members-only
+  article says memberships are not open yet (`MembershipNotice`), since the
+  alternative is an article that stops without saying why. Colour of the day is
+  the colour itself, named on it in ink or paper, from the mid-tone pigments.
+- **Dark appearance — a PROPOSAL, corrected.** The website has no dark palette.
+  The app's is derived rather than invented: brand tokens, mixes of two, and
+  burgundy's own hue lifted for the accent (`#d18592`), because mixing burgundy
+  toward paper drains it into mauve. The button is the website's on-dark one
+  (paper fill, burgundy-deep label) and a dark callout stays dark (`#2d1217`).
+  It waits on the owner (checklist below).
 - **Liquid Glass**, only on navigation chrome: the native tab bar (drawn by iOS
   26 itself) and the reader's floating actions, which use `expo-glass-effect`
   only when the build and the device's API both support it and the reader has
   not turned on Reduce Transparency. Otherwise a solid surface with a hairline.
-- **Android** gets its own treatment: a Material tab bar and an elevated tonal
-  surface in the brand's colours, not an imitation of Apple's material.
-- **Accessibility.** Dynamic Type everywhere (nothing turns font scaling off),
-  44-point touch targets, Reduce Motion (nothing animates), Reduce
-  Transparency, and Increase Contrast or Android's high-contrast text, which
-  switch to a stronger palette. Every control has a label and a role; nothing
-  depends on hover or translucency alone.
+- **Android** gets its own treatment: a Material tab bar, an elevated tonal
+  surface in the brand's colours, ripples on controls and 48dp targets, not an
+  imitation of Apple's material.
+- **Accessibility.** Dynamic Type everywhere, each role along its own iOS text
+  style's curve (headlines grow like headlines, body like body; Android caps
+  headline growth at 1.6×), 44pt touch targets on iOS and 48dp on Android,
+  Reduce Motion (nothing animates), Reduce Transparency, and Increase Contrast or
+  Android's high-contrast text, which switch to a stronger palette. Every control
+  has a label and a role; nothing depends on hover or translucency alone.
+
+**Not yet** — the rest of the review, in order:
+
+1. **The article page.** The website's opening (drop cap, burgundy section
+   headings, a split byline), its block treatments ported one for one in place of
+   the remaining outlined boxes, an ending (author, topics, more in the same
+   topic), a native toolbar for Save and Share in place of the floating action
+   pill, and a full-screen image viewer.
+2. **A front page and an identity.** A cover lead on Today with the wordmark,
+   one dark or burgundy band per scroll, topic tiles in Explore, a single Saved
+   list with swipe actions, a reading-settings sheet, and the app icon and splash
+   (checklist below).
 
 ## CI
 
@@ -430,6 +517,13 @@ publish both files.
       subscriber-only post can be saved, and the saved copy is the teaser the
       website shows; is that the rule?
 - [ ] **Enabling the content API** in production.
-- [ ] **The dark palette** — adopt, change or drop the proposal.
+- [ ] **The dark palette** — adopt, change or drop the proposal, as corrected
+      on 20 Oct 2026 (a rose accent, a light button, a dark callout); or ship
+      light only for v1.
+- [ ] **Showcase content** — preview builds carry hand-written sample
+      articles. Bundling real published posts and their images instead is a
+      choice about image rights (`STOCK_IMAGERY.md`) and production data.
+- [ ] **Control shape** — capsules for controls, the platform convention, with
+      the website's 2pt edge kept for content; or the 2pt edge everywhere.
 - [ ] **The workspace migration** — when to move to the pnpm + Turborepo
       workspace with the website in `apps/web`.

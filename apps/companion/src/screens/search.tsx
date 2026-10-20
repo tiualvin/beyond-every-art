@@ -8,7 +8,7 @@ import { EmptyState, ErrorState, Loading } from '../components/states'
 import { useSearch } from '../data/hooks'
 import { familyFor } from '../theme/fonts'
 import { useTheme } from '../theme/theme'
-import { MIN_TOUCH, space } from '../theme/typography'
+import { CAPSULE, MIN_TOUCH, space } from '../theme/typography'
 
 /** The value, once it has stopped changing for `ms`. */
 export function useDebounced<T>(value: T, ms: number): T {
@@ -42,7 +42,7 @@ export function SearchScreen({ debounceMs = 300 }: { debounceMs?: number }) {
           styles.input,
           {
             color: palette.text,
-            borderColor: palette.rule,
+            borderColor: palette.field,
             backgroundColor: palette.surface,
           },
         ]}
@@ -59,7 +59,9 @@ export function SearchScreen({ debounceMs = 300 }: { debounceMs?: number }) {
       ) : search.data.posts.length === 0 ? (
         <EmptyState title={`Nothing matches “${search.data.query}”`} />
       ) : (
-        search.data.posts.map((post) => <PostRow key={post.slug} post={post} />)
+        search.data.posts.map((post, index) => (
+          <PostRow key={post.slug} post={post} divider={index > 0} />
+        ))
       )}
     </Screen>
   )
@@ -68,9 +70,9 @@ export function SearchScreen({ debounceMs = 300 }: { debounceMs?: number }) {
 const styles = StyleSheet.create({
   input: {
     minHeight: MIN_TOUCH,
-    paddingHorizontal: space.md,
+    paddingHorizontal: space.md + space.xs,
     borderWidth: 1,
-    borderRadius: 2,
+    borderRadius: CAPSULE,
     fontFamily: familyFor('sans'),
     fontSize: 17,
   },

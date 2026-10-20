@@ -1,21 +1,24 @@
 import { useRouter } from 'expo-router'
-import { Pressable, StyleSheet, View } from 'react-native'
+import { Pressable, StyleSheet } from 'react-native'
 
 import { Screen } from '../components/screen'
-import { EmptyState, ErrorState, Loading } from '../components/states'
+import { Section } from '../components/section'
+import { ErrorState, Loading } from '../components/states'
 import { useAuthors, useTags } from '../data/hooks'
 import { Txt } from '../theme/text'
 import { useTheme } from '../theme/theme'
-import { MIN_TOUCH, space } from '../theme/typography'
+import { space } from '../theme/typography'
 
 function Row({
   title,
   detail,
   onPress,
+  divider,
 }: {
   title: string
   detail: string
   onPress: () => void
+  divider: boolean
 }) {
   const { palette } = useTheme()
   return (
@@ -25,11 +28,11 @@ function Row({
       onPress={onPress}
       style={({ pressed }) => [
         styles.row,
-        { borderColor: palette.line },
+        divider && [styles.divided, { borderColor: palette.line }],
         pressed && styles.pressed,
       ]}
     >
-      <Txt variant="label" style={styles.flex}>
+      <Txt variant="rowTitle" style={styles.flex}>
         {title}
       </Txt>
       <Txt variant="meta" tone="muted">
@@ -43,9 +46,8 @@ const articles = (count: number) =>
   `${count} ${count === 1 ? 'article' : 'articles'}`
 
 /**
- * Topics and authors: what the website has collections for today. Artists,
- * artworks, pigments and the rest arrive with their collections, and until
- * then the screen says so instead of showing anything made up.
+ * Topics and authors: what the website has collections for today. Nothing
+ * here is made up to fill the screen, and nothing announces what might come.
  */
 export function ExploreScreen() {
   const router = useRouter()
@@ -53,19 +55,17 @@ export function ExploreScreen() {
   const authors = useAuthors()
 
   return (
-    <Screen>
-      <View>
-        <Txt variant="h3" accessibilityRole="header">
-          Topics
-        </Txt>
+    <Screen spacing="sections">
+      <Section label="Topics">
         {tags.isPending ? (
           <Loading label="Loading topics" />
         ) : tags.isError ? (
           <ErrorState error={tags.error} onRetry={() => tags.refetch()} />
         ) : (
-          tags.data.tags.map((tag) => (
+          tags.data.tags.map((tag, index) => (
             <Row
               key={tag.slug}
+              divider={index > 0}
               title={tag.name}
               detail={articles(tag.postCount)}
               onPress={() =>
@@ -77,11 +77,8 @@ export function ExploreScreen() {
             />
           ))
         )}
-      </View>
-      <View>
-        <Txt variant="h3" accessibilityRole="header">
-          Authors
-        </Txt>
+      </Section>
+      <Section label="Authors">
         {authors.isPending ? (
           <Loading label="Loading authors" />
         ) : authors.isError ? (
@@ -89,9 +86,10 @@ export function ExploreScreen() {
         ) : (
           authors.data.authors
             .filter((author) => author.slug)
-            .map((author) => (
+            .map((author, index) => (
               <Row
                 key={author.slug}
+                divider={index > 0}
                 title={author.name}
                 detail={articles(author.postCount)}
                 onPress={() =>
@@ -103,24 +101,20 @@ export function ExploreScreen() {
               />
             ))
         )}
-      </View>
-      <EmptyState
-        title="More to explore later"
-        body="Artists, artworks, pigments, materials and exhibitions will appear here once the website has collections for them."
-      />
+      </Section>
     </Screen>
   )
 }
 
 const styles = StyleSheet.create({
   row: {
-    minHeight: MIN_TOUCH,
+    minHeight: 56,
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.sm,
-    paddingVertical: space.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingVertical: space.md - 2,
   },
+  divided: { borderTopWidth: StyleSheet.hairlineWidth },
   flex: { flex: 1 },
   pressed: { opacity: 0.7 },
 })

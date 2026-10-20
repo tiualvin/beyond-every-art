@@ -51,10 +51,18 @@ export function nameOf(hex: string): string {
   )
 }
 
-/** One pigment colour per day, in turn, the same for everyone on that UTC date. */
-export function pigmentOfTheDay(date: Date): NamedColour {
+/**
+ * The pigments a day's colour is drawn from: the mid-tones. The two "deep"
+ * tokens are near-black shades the website uses for type on a pigment, and
+ * as a whole field they read as a dark slab rather than as a colour.
+ */
+export const DAILY_COLOURS: NamedColour[] = PIGMENTS.filter(
+  (pigment) => !/deep/i.test(pigment.name),
+)
+
+/** One colour per day, in turn, the same for everyone on that UTC date. */
+export function colourOfTheDay(date: Date): NamedColour {
   const day = Math.floor(date.getTime() / 86_400_000)
-  return PIGMENTS[
-    ((day % PIGMENTS.length) + PIGMENTS.length) % PIGMENTS.length
-  ]!
+  const count = DAILY_COLOURS.length
+  return DAILY_COLOURS[((day % count) + count) % count]!
 }

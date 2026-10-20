@@ -117,9 +117,6 @@ export function ArticleScreen({ slug }: { slug: string }) {
         contentContainerStyle={styles.page}
       >
         <ErrorState error={read.error} onRetry={() => read.refetch()} />
-        <Txt tone="muted">
-          Articles you save for offline open without a connection.
-        </Txt>
       </ScrollView>
     )
   }

@@ -38,7 +38,6 @@ export function MembershipNotice({ visibility }: { visibility: Visibility }) {
         styles.notice,
         { borderColor: palette.rule, backgroundColor: palette.surface },
       ]}
-      accessibilityRole="summary"
     >
       <Txt variant="kicker" tone="accent">
         {visibility === 'paid' ? 'Subscribers only' : 'Members only'}
@@ -79,7 +78,7 @@ export function Article({ post }: { post: PostDetail }) {
             {kicker}
           </Txt>
         ) : null}
-        <Txt variant="title" accessibilityRole="header">
+        <Txt variant="display" accessibilityRole="header">
           {post.title}
         </Txt>
         {post.excerpt ? (

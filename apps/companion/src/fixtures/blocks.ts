@@ -268,6 +268,20 @@ export const imageFixture: BodyNode = {
 }
 
 /**
+ * The callout's dark tone, which `blockFixtures` (one fixture per block type)
+ * does not carry: the dark palette once inverted it into a near-white slab,
+ * and nothing drew one to notice.
+ */
+export const darkCalloutFixture: BodyNode = block({
+  blockType: 'callout',
+  emoji: null,
+  tone: 'dark',
+  content: [
+    paragraph(text('A dark callout, which stays dark in either appearance.')),
+  ],
+})
+
+/**
  * A block type the app has never heard of. Raw, as a newer server might send
  * it: it is not a valid `BodyNode` until `markUnsupported` has seen it.
  */

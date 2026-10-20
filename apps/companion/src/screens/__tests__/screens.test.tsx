@@ -1,5 +1,6 @@
 // The tabs and the reader, against the fixtures, with the real router.
 
+import { onlineManager } from '@tanstack/react-query'
 import { useLocalSearchParams } from 'expo-router'
 import {
   cleanup,
@@ -7,16 +8,19 @@ import {
   renderRouter,
   screen,
   waitFor,
+  within,
 } from 'expo-router/testing-library'
 import type { ReactNode } from 'react'
+import { StyleSheet } from 'react-native'
 
 import { ApiError } from '../../api/client'
 import type { Services } from '../../data/services'
 import { PIGMENT_COLORS } from '../../generated/brand-tokens'
 import { TestProviders, testLinks, testServices } from '../../test/app'
+import { PALETTES } from '../../theme/palette'
 import { TEST_SITE } from '../../test/render'
 import { ArticleScreen } from '../article'
-import { pigmentOfTheDay } from '../colours'
+import { DAILY_COLOURS, colourOfTheDay } from '../colours'
 import { ExploreScreen } from '../explore'
 import { LibraryScreen } from '../library'
 import { ReadScreen } from '../read'
@@ -60,21 +64,48 @@ const offline = new ApiError(
 describe('Today', () => {
   const morning = new Date('2026-10-16T08:00:00Z')
 
-  it('leads with the featured article, and says the content is sample content', async () => {
+  it('leads with the featured article, and marks the build as a preview', async () => {
     await show(() => <TodayScreen now={() => morning} />)
     expect(
       await screen.findByText('Fixture: every module the reader renders'),
     ).toBeTruthy()
-    expect(screen.getByText(/Sample content/)).toBeTruthy()
+    expect(
+      screen.getByLabelText('Preview build, showing sample articles'),
+    ).toBeTruthy()
+  })
+
+  it('says nothing about a preview when it is reading the website', async () => {
+    await show(() => <TodayScreen now={() => morning} />, {
+      services: testServices({ usingFixtures: false }),
+    })
+    await screen.findByText('Fixture: every module the reader renders')
+    expect(
+      screen.queryByLabelText('Preview build, showing sample articles'),
+    ).toBeNull()
   })
 
   it('shows a colour from the brand’s pigments, and claims nothing about it', async () => {
     await show(() => <TodayScreen now={() => morning} />)
-    const pigment = pigmentOfTheDay(morning)
-    expect(Object.values(PIGMENT_COLORS)).toContain(pigment.hex)
-    expect(await screen.findByText(pigment.name)).toBeTruthy()
-    expect(screen.getByText(pigment.hex.toUpperCase())).toBeTruthy()
-    expect(screen.getByText(/which is not built yet/)).toBeTruthy()
+    const colour = colourOfTheDay(morning)
+    expect(Object.values(PIGMENT_COLORS)).toContain(colour.hex)
+    expect(await screen.findByText(colour.name)).toBeTruthy()
+    expect(screen.getByText(colour.hex.toUpperCase())).toBeTruthy()
+    expect(
+      screen.getByLabelText(`Colour of the day: ${colour.name}`),
+    ).toBeTruthy()
+    // Nothing about what the app might do one day.
+    expect(screen.queryByText(/not built yet|Pigments collection/)).toBeNull()
+  })
+
+  it('draws the day’s colour from the mid-tones, never the near-black shades', () => {
+    expect(DAILY_COLOURS.map((colour) => colour.name)).toEqual([
+      'Cadmium',
+      'Viridian',
+    ])
+    const week = Array.from({ length: 7 }, (_, day) =>
+      colourOfTheDay(new Date(Date.UTC(2026, 9, 16 + day))),
+    )
+    expect(new Set(week.map((colour) => colour.name)).size).toBe(2)
   })
 
   it('opens the lead article in the reader', async () => {
@@ -104,6 +135,27 @@ describe('Read', () => {
     await show(ReadScreen)
     expect(await screen.findByText(/Members$/)).toBeTruthy()
   })
+
+  it('leads each row with its headline, and keeps the topic in the footer', async () => {
+    await show(ReadScreen)
+    const title = await screen.findByText(
+      'Fixture: every module the reader renders',
+    )
+    const row = within(
+      screen.getByLabelText(/^Fixture: every module the reader renders\./),
+    )
+    const words = row.getAllByText(/.+/).map((node) => node.props.children)
+    expect(words[0]).toBe(title.props.children)
+    expect(words.indexOf('Reading')).toBeGreaterThan(0)
+  })
+
+  it('stands each section label on its own rule', async () => {
+    await show(ReadScreen)
+    const label = await screen.findByText('Newest')
+    const header = label.parent!
+    expect(header.children[0]).toBe(label)
+    expect(header.children).toHaveLength(2)
+  })
 })
 
 describe('Search', () => {
@@ -132,14 +184,11 @@ describe('Search', () => {
 })
 
 describe('Explore', () => {
-  it('shows topics and authors, and says what is not here yet', async () => {
+  it('shows topics and authors, and no roadmap', async () => {
     await show(ExploreScreen)
     expect(await screen.findByText('Conservation')).toBeTruthy()
     expect(await screen.findByText('Fixture Editor')).toBeTruthy()
-    expect(screen.getByText('More to explore later')).toBeTruthy()
-    expect(
-      screen.getByText(/once the website has collections for them/),
-    ).toBeTruthy()
+    expect(screen.queryByText(/More to explore|once the website/)).toBeNull()
   })
 })
 
@@ -147,6 +196,12 @@ describe('Studio', () => {
   it('builds a palette from the brand and keeps it on the device', async () => {
     const { services } = await show(StudioScreen)
     expect(await screen.findByText('No palettes yet')).toBeTruthy()
+    // Making a palette is what the screen is for: the primary fill, not a tint.
+    expect(
+      StyleSheet.flatten(
+        screen.getByRole('button', { name: 'New palette' }).props.style,
+      ).backgroundColor,
+    ).toBe(PALETTES.light.button)
 
     await fireEvent.press(screen.getByText('New palette'))
     expect(screen.getByLabelText('Remove Burgundy')).toBeTruthy()
@@ -163,6 +218,18 @@ describe('Studio', () => {
     expect(stored?.colours).toContain(PIGMENT_COLORS.viridianDeep)
   })
 
+  it('still starts a palette, and tries again, when the saved ones fail to load', async () => {
+    const services = testServices()
+    jest
+      .spyOn(services.library, 'listPalettes')
+      .mockRejectedValueOnce(new Error('Storage is unavailable'))
+    await show(StudioScreen, { services })
+    expect(await screen.findByText('Couldn’t load this')).toBeTruthy()
+    expect(screen.getByText('New palette')).toBeTruthy()
+    await fireEvent.press(screen.getByText('Try again'))
+    expect(await screen.findByText('No palettes yet')).toBeTruthy()
+  })
+
   it('refuses a colour that is not six hex digits', async () => {
     await show(StudioScreen)
     await fireEvent.press(await screen.findByText('New palette'))
@@ -173,10 +240,29 @@ describe('Studio', () => {
 })
 
 describe('Library', () => {
-  it('says what to do when it is empty', async () => {
-    await show(LibraryScreen)
+  it('says what to do when it is empty, and offers the way there', async () => {
+    const rendered = await show(LibraryScreen)
     expect(await screen.findByText('Nothing saved yet')).toBeTruthy()
     expect(screen.getByText('No bookmarks yet')).toBeTruthy()
+    await fireEvent.press(screen.getByText('Find something to read'))
+    await waitFor(() => expect(rendered.getPathname()).toBe('/read'))
+  })
+
+  it('opens what is on this device with the network gone', async () => {
+    // The query cache pauses reads while the device is offline. Everything
+    // here is local, and once waited for a network it never needed.
+    const services = testServices()
+    const post = await services.api.getPost('fixture-migrated-article')
+    if (!post) throw new Error('The migrated fixture is missing.')
+    await services.library.saveArticle(post)
+    await services.library.addBookmark(post)
+    onlineManager.setOnline(false)
+    try {
+      await show(LibraryScreen, { services })
+      expect(await screen.findAllByText(post.title)).toHaveLength(2)
+    } finally {
+      onlineManager.setOnline(true)
+    }
   })
 
   it('warns when nothing will survive a restart', async () => {
@@ -227,7 +313,8 @@ describe('the reader', () => {
       },
       initialUrl: '/article/fixture-every-module',
     })
-    expect(await screen.findByText(/could not reach the website/)).toBeTruthy()
+    expect(await screen.findByText(/Check your connection/)).toBeTruthy()
+    expect(screen.getByText('Couldn’t load this')).toBeTruthy()
   })
 
   it('bookmarks an article for the Library', async () => {

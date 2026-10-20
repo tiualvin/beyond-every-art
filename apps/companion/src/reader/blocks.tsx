@@ -18,7 +18,7 @@ import { InverseTheme, useTheme } from '../theme/theme'
 import { MIN_TOUCH, space } from '../theme/typography'
 import { ReaderImage } from './image'
 import { InlineNodes } from './inline'
-import { LexicalNodes } from './lexical'
+import { ContainedNodes, LexicalNodes } from './lexical'
 import { useOpenExternal, useOpenLink } from './link-context'
 
 type Renderers = {
@@ -70,7 +70,7 @@ function Accordion({
           </Pressable>
           {open[index] ? (
             <View style={styles.panelBody}>
-              <LexicalNodes nodes={item.content} />
+              <ContainedNodes nodes={item.content} />
             </View>
           ) : null}
         </View>
@@ -160,6 +160,7 @@ function Signup({
       {fields.body ? <Txt tone="muted">{fields.body}</Txt> : null}
       <Button
         label="Sign up on the website"
+        editorial
         hint="Opens the newsletter page in your browser"
         onPress={() => openExternal(fields.href)}
         style={styles.cardAction}
@@ -188,7 +189,7 @@ function Callout({
             borderColor: palette.line,
             borderWidth: 1,
           }
-  const content = <LexicalNodes nodes={fields.content} />
+  const content = <ContainedNodes nodes={fields.content} />
   return (
     <View style={[styles.block, styles.callout, tone]}>
       {fields.emoji ? (
@@ -226,6 +227,7 @@ function ActionButton({
       <Button
         label={fields.label}
         variant={fields.variant}
+        editorial
         onPress={() => openLink(fields.href)}
       />
     </View>
@@ -280,7 +282,12 @@ function Bookmark({
       ]}
     >
       {fields.image ? (
-        <ReaderImage media={fields.image} size="card" showCredit={false} />
+        <ReaderImage
+          media={fields.image}
+          size="card"
+          showCredit={false}
+          fallback="hide"
+        />
       ) : null}
       <Txt variant="label">{fields.title}</Txt>
       {fields.description ? (
@@ -365,7 +372,7 @@ function Faq({
           <Txt variant="h5" accessibilityRole="header">
             {item.question}
           </Txt>
-          <LexicalNodes nodes={item.answer} />
+          <ContainedNodes nodes={item.answer} />
         </View>
       ))}
     </View>
@@ -451,7 +458,7 @@ function ComparisonTable({
             {fields.rowHeader ? (
               <Txt variant="meta" tone="muted">{`${fields.rowHeader}: `}</Txt>
             ) : null}
-            <InlineNodes nodes={row.label} />
+            <InlineNodes nodes={row.label} variant="label" />
           </Txt>
           {fields.columns.map((column, columnIndex) => {
             const cell = row.cells[columnIndex] ?? []
@@ -540,7 +547,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: space.sm,
   },
-  panelBody: { paddingBottom: space.sm },
+  panelBody: { paddingBottom: space.md },
   flex: { flex: 1 },
   centered: { textAlign: 'center' },
   largeQuote: { fontSize: 28, lineHeight: 36 },
@@ -559,7 +566,7 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.7 },
   row: { flexDirection: 'row', gap: space.sm },
   number: { minWidth: 22 },
-  faqItem: { marginTop: space.sm },
+  faqItem: { marginTop: space.md, gap: space.sm },
   featureItem: { marginTop: space.sm, gap: space.xs },
   tableRow: {
     borderTopWidth: StyleSheet.hairlineWidth,

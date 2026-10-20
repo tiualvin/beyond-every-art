@@ -21,6 +21,7 @@ import {
   text,
   unknownBlockFixture,
   unknownNodeFixture,
+  darkCalloutFixture,
 } from './blocks'
 
 export const FIXTURE_AUTHOR: Author = {
@@ -130,6 +131,7 @@ function everyModuleBody(siteUrl: string): unknown[] {
     { type: 'horizontalrule' },
     imageFixture,
     ...Object.values(blocks),
+    darkCalloutFixture,
     unknownBlockFixture,
     unknownNodeFixture,
     paragraph(text('The last paragraph, after every module.')),
