@@ -19,6 +19,21 @@ RUN pnpm install --frozen-lockfile
 # own database. This stage keeps the full dependency tree and sources instead,
 # and skips `pnpm build` because a migration never renders a page.
 FROM base AS migrator
+# Poppler and qpdf, for publication processing (`scripts/process-publication.ts`
+# reads a PDF's pages, words and links with them and draws each page). Here and
+# not in `base`, which would rebuild the dependency and builder stages for a
+# package neither uses; and above the cache-busting step below, so the install is
+# cached across deploys instead of rerun on every one. All are packaged for
+# aarch64, the server's architecture.
+#
+# The fonts are not optional. A PDF may name one of the fourteen standard fonts
+# — Helvetica, Times, Courier — without embedding it, and the base image has no
+# fonts at all, so Poppler drew every such word as nothing: the first run in
+# this image produced pages of blank panels while the text layer read fine.
+# URW's base-35 set is the metric-compatible stand-in Poppler looks for.
+# tests/publications/processing/tools.test.ts checks a drawn page has ink, and
+# CI runs it inside this image.
+RUN apk add --no-cache poppler-utils qpdf font-urw-base35
 COPY --from=dependencies /app/node_modules ./node_modules
 # Busts the layer cache for the source copy below, once per commit.
 #

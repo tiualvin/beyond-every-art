@@ -127,6 +127,28 @@ describe.skipIf(!installed)('the PDF tools, on the generated sample', () => {
     )
   })
 
+  it('draws the words, not only the shapes around them', async () => {
+    // The sample sets its text in Helvetica without embedding it, as some
+    // exports do. With no fonts installed Poppler draws such words as nothing
+    // and says so only on stderr: the first run in the Alpine image produced
+    // pages of blank panels while the text layer read fine. So look for ink
+    // where the heading sits — on the pale panel, 12% in and 6.5% down.
+    const info = await inspectPdf(sample)
+    const png = await renderPage(sample, info.pages[1]!, 400, directory)
+    const { width, height } = await sharp(png).metadata()
+    const heading = await sharp(png)
+      .extract({
+        left: Math.round(width * 0.12),
+        top: Math.round(height * 0.065),
+        width: Math.round(width * 0.3),
+        height: Math.round(height * 0.025),
+      })
+      .greyscale()
+      .stats()
+    // The panel alone is about 235; a drawn letter is near black.
+    expect(heading.channels[0]!.min).toBeLessThan(100)
+  })
+
   it('reads a file with only an owner password, and says it is encrypted', async () => {
     const locked = join(directory, 'owner.pdf')
     execFileSync('qpdf', [
