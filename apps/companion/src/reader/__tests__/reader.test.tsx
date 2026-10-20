@@ -432,6 +432,18 @@ describe('gated posts', () => {
     ).toBeTruthy()
   })
 
+  it('lets a screen reader read the notice once, as its words', async () => {
+    // A "summary" container is announced and then read again by TalkBack.
+    await renderReader(
+      <Article post={asReceived('e2e-members-conservation-notes')} />,
+    )
+    let ancestor = screen.getByText('Members only').parent
+    while (ancestor) {
+      expect(ancestor.props.accessibilityRole).not.toBe('summary')
+      ancestor = ancestor.parent
+    }
+  })
+
   it('offers nothing to buy and nowhere to sign in', async () => {
     await renderReader(
       <Article post={asReceived('fixture-subscriber-teaser')} />,

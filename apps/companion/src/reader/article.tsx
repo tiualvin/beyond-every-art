@@ -38,7 +38,6 @@ export function MembershipNotice({ visibility }: { visibility: Visibility }) {
         styles.notice,
         { borderColor: palette.rule, backgroundColor: palette.surface },
       ]}
-      accessibilityRole="summary"
     >
       <Txt variant="kicker" tone="accent">
         {visibility === 'paid' ? 'Subscribers only' : 'Members only'}
