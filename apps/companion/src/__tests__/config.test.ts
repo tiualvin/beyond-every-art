@@ -7,7 +7,13 @@ describe('app configuration', () => {
     expect(readConfig(undefined)).toEqual({
       apiBaseUrl: null,
       siteUrl: DEFAULT_SITE_URL,
+      fixtureSet: 'showcase',
     })
+  })
+
+  it('serves the module fixtures when asked, and the showcase otherwise', () => {
+    expect(readConfig({ fixtureSet: 'modules' }).fixtureSet).toBe('modules')
+    expect(readConfig({ fixtureSet: 'everything' }).fixtureSet).toBe('showcase')
   })
 
   it('reads a configured website, without its trailing slash', () => {
@@ -19,13 +25,18 @@ describe('app configuration', () => {
     ).toEqual({
       apiBaseUrl: 'http://localhost:3000',
       siteUrl: 'http://localhost:3000',
+      fixtureSet: 'showcase',
     })
   })
 
   it('falls back to the safe default for a value it cannot use', () => {
     expect(
       readConfig({ apiBaseUrl: 'ftp://example.com', siteUrl: 'not a url' }),
-    ).toEqual({ apiBaseUrl: null, siteUrl: DEFAULT_SITE_URL })
+    ).toEqual({
+      apiBaseUrl: null,
+      siteUrl: DEFAULT_SITE_URL,
+      fixtureSet: 'showcase',
+    })
   })
 })
 
@@ -45,7 +56,8 @@ describe('app.config.ts', () => {
     expect(appConfig.extra).not.toHaveProperty('eas')
   })
 
-  it('reads fixtures unless an API is configured', () => {
+  it('reads fixtures unless an API is configured, the sample articles by default', () => {
     expect(appConfig.extra?.apiBaseUrl).toBeNull()
+    expect(appConfig.extra?.fixtureSet).toBe('showcase')
   })
 })

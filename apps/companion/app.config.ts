@@ -17,6 +17,13 @@ const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim() || null
 const siteUrl =
   process.env.EXPO_PUBLIC_SITE_URL?.trim() || 'https://www.beyondeveryart.com'
 
+/**
+ * Which sample articles the app shows with no API: `showcase`, the default,
+ * written to look like the journal's; or `modules`, the test cases that carry
+ * every block and edge case the reader handles.
+ */
+const fixtureSet = process.env.EXPO_PUBLIC_FIXTURE_SET?.trim() || 'showcase'
+
 const config: ExpoConfig = {
   name: 'Beyond Every Art',
   slug: 'beyond-every-art-companion',
@@ -42,7 +49,7 @@ const config: ExpoConfig = {
   ],
   // No `extra.eas.projectId`: there is no EAS project, and creating one waits
   // on the owner (docs/COMPANION_APP.md, owner checklist).
-  extra: { apiBaseUrl, siteUrl },
+  extra: { apiBaseUrl, siteUrl, fixtureSet },
 }
 
 export default config

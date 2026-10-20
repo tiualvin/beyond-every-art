@@ -13,5 +13,8 @@ export const api = appConfig.apiBaseUrl
     })
   : createApiClient({
       baseUrl: FIXTURE_ORIGIN,
-      transport: createFixtureTransport(appConfig.siteUrl),
+      transport: createFixtureTransport(
+        appConfig.siteUrl,
+        appConfig.fixtureSet,
+      ),
     })
