@@ -39,6 +39,14 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Poppler and qpdf, which publication processing runs. The tests in
+      # tests/publications/processing/tools.test.ts call the real binaries, and
+      # fail here rather than skip if these are missing, so a removed line
+      # cannot turn them into tests of nothing.
+      - name: Install the PDF tools
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends poppler-utils qpdf
       # These four run first, and the order is load-bearing. `payload-types.ts`
       # is generated and gitignored, and any Payload CLI command that boots the
       # config writes it — so a step below that touches Payload would leave the
