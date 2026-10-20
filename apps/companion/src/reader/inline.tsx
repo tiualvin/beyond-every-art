@@ -87,7 +87,7 @@ export function InlineNodes({
             return (
               <Text
                 key={index}
-                style={formatStyle(node.format, variant, palette.line)}
+                style={formatStyle(node.format, variant, palette.code)}
               >
                 {node.text}
               </Text>

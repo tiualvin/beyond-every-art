@@ -358,7 +358,8 @@ the fixes is in; what remains is listed at the end of this section.
 
 - **Brand.** Paper, ink and burgundy from the generated tokens; Playfair Display
   and Inter bundled from `@expo-google-fonts`, one weight per file. Every text
-  pairing in every palette is held to WCAG AA by a test.
+  pairing in every palette is held to WCAG AA by a test, including text, muted
+  and links on the `code` tint behind inline code and highlights.
 - **Type is a set of roles**, not sizes
   ([`theme/typography.ts`](../apps/companion/src/theme/typography.ts)). Three
   Playfair weights do the work: semibold for what leads a screen, medium for

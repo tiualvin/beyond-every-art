@@ -28,6 +28,10 @@ describe.each(variants)('the %s palette', (_, palette) => {
     ['onButton', 'button'],
     ['onTonal', 'tonal'],
     ['onInverse', 'inverse'],
+    // Inline code and highlights carry any of the three, a link included.
+    ['text', 'code'],
+    ['muted', 'code'],
+    ['accent', 'code'],
   ] as const)('%s on %s meets AA for body text', (foreground, background) => {
     expect(
       contrastRatio(palette[foreground], palette[background]),

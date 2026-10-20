@@ -36,6 +36,13 @@ export type Palette = {
    * to be (WCAG 1.4.11), where `rule` and `line` are decorative.
    */
   field: string
+  /**
+   * Behind inline code, a highlight and a preformatted block: a tint every
+   * text colour reads on at AA, links included. Not `line`, which is
+   * decorative, fails muted text in light, and turns into a rule when the
+   * reader asks for more contrast.
+   */
+  code: string
   /** Hairlines; decorative, never the only sign of anything. */
   line: string
   /** Stronger dividers. */
@@ -60,6 +67,7 @@ const light: Palette = {
   tonal: mix(brand.burgundy, brand.paper, 0.1),
   onTonal: brand.burgundy,
   field: mix(brand.ink, brand.paper, 0.5),
+  code: mix(brand.line, brand.paper, 0.5),
   line: brand.line,
   rule: brand.rule,
   inverse: brand.dark,
@@ -95,6 +103,7 @@ const dark: Palette = {
   tonal: mix(brand.onDark, brand.dark, 0.12),
   onTonal: brand.onDark,
   field: mix(brand.onDark, brand.dark, 0.45),
+  code: mix(brand.onDark, brand.dark, 0.1),
   line: mix(brand.onDark, brand.dark, 0.16),
   rule: mix(brand.onDark, brand.dark, 0.34),
   inverse: darkWell,
@@ -128,6 +137,7 @@ export function inverseOf(palette: Palette): Palette {
     tonal: mix(palette.onInverse, palette.inverse, 0.14),
     onTonal: palette.onInverse,
     field: mix(palette.onInverse, palette.inverse, 0.5),
+    code: mix(palette.onInverse, palette.inverse, 0.1),
     line: mix(palette.onInverse, palette.inverse, 0.2),
     rule: mix(palette.onInverse, palette.inverse, 0.35),
     inverse: palette.background,

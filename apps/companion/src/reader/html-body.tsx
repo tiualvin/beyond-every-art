@@ -198,7 +198,7 @@ function BlockElement({ element }: { element: HtmlElement }) {
       )
     case 'pre':
       return (
-        <View style={[styles.pre, { backgroundColor: palette.line }]}>
+        <View style={[styles.pre, { backgroundColor: palette.code }]}>
           <Txt variant="code">{textOf(element)}</Txt>
         </View>
       )
@@ -362,7 +362,7 @@ function InlineRun({
           return text ? (
             <Text
               key={index}
-              style={styleFor(inherited, variant, palette.line)}
+              style={styleFor(inherited, variant, palette.code)}
             >
               {text}
             </Text>
