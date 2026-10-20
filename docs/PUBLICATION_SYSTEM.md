@@ -1308,8 +1308,8 @@ AI-assisted text descriptions, and AI-assisted table-of-contents generation.
 
 ## Open decisions
 
-Revised 3 Oct 2026. Each is the owner's call; the recommendation is the
-default if nobody objects.
+Revised 3 Oct 2026; 3, 4 and 6 decided 20 Oct 2026, each as recommended. Each
+is the owner's call; the recommendation is the default if nobody objects.
 
 0. **Start before migration sign-off — decided 3 Oct 2026: yes.** Recorded in
    [`AUTONOMOUS_WORKSTREAMS.md`](AUTONOMOUS_WORKSTREAMS.md).
@@ -1321,7 +1321,7 @@ default if nobody objects.
    to upload limits, no bucket CORS. Later: uploads from the admin straight to
    R2 through a second `s3Storage` instance, as described under
    [`publication-assets`](#publication-assets).
-3. **Where page images are served from.** (A) Through Payload like other media:
+3. **Where page images are served from — decided 20 Oct 2026: (A).** (A) Through Payload like other media:
    a Caddy exception for the new path, the robots and allowlist changes that
    travel with it, year-long immutable caching and content-hashed names. No new
    bucket, domain or credential. (B) A separate public R2 bucket on its own
@@ -1332,8 +1332,8 @@ default if nobody objects.
    Recommended: A for the first version, B if the server shows the load. Either
    way, an unpublished issue's page images can be fetched by anyone holding the
    exact URL.
-4. **Where processing runs.** Recommended: an on-demand command in the
-   `migrator` image with a memory limit, as above. Alternatives: an always-on
+4. **Where processing runs — decided 20 Oct 2026: an on-demand command in the
+   `migrator` image** with a memory limit, as above. The alternatives were an always-on
    worker on the job queue, with the costs listed under
    [Deployment](#deployment); or processing off the server — the owner's
    machine, or a manually triggered GitHub Actions run — writing to R2 and the
@@ -1342,10 +1342,11 @@ default if nobody objects.
    print-resolution reproductions of artwork photography, which may be licensed
    for print only. Recommended default: no PDF download and a capped zoom size
    until the rights for an issue are confirmed.
-6. **Protecting source PDFs.** R2 replication, a copy in a second bucket, or the
-   owner keeps the originals off the server, written into
-   [`BACKUP_AND_RESTORE.md`](BACKUP_AND_RESTORE.md). Required before the first
-   real PDF is stored.
+6. **Protecting source PDFs — decided 20 Oct 2026: the owner keeps the
+   originals off the server**, written into
+   [`BACKUP_AND_RESTORE.md`](BACKUP_AND_RESTORE.md). The copy in R2 is what the
+   processing command reads, not a backup; the page images are rebuilt from it.
+   R2 replication and a second bucket were the alternatives.
 7. **Transcripts of reprinted articles.** Index the transcript with a link to
    the original, canonicalise it to the post, or keep it out of the index. A
    ranking decision on migrated URLs, so the owner's.
