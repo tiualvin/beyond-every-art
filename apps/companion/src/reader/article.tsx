@@ -79,7 +79,7 @@ export function Article({ post }: { post: PostDetail }) {
             {kicker}
           </Txt>
         ) : null}
-        <Txt variant="title" accessibilityRole="header">
+        <Txt variant="display" accessibilityRole="header">
           {post.title}
         </Txt>
         {post.excerpt ? (

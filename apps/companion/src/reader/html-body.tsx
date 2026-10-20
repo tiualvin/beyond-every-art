@@ -11,10 +11,15 @@ import { useMemo } from 'react'
 import { Image } from 'expo-image'
 import { StyleSheet, Text, View, type TextStyle } from 'react-native'
 
-import { familyFor } from '../theme/fonts'
 import { Txt } from '../theme/text'
 import { useTheme } from '../theme/theme'
-import { space, type, type TypeVariant } from '../theme/typography'
+import {
+  MONOSPACE,
+  TYPE_SPECS,
+  familyOf,
+  space,
+  type TypeVariant,
+} from '../theme/typography'
 import {
   BLOCK_ELEMENTS,
   parseHtml,
@@ -41,9 +46,6 @@ const PLAIN: InlineStyle = {
   code: false,
   small: false,
 }
-
-/** Where a quotation's text starts: italic, before any markup inside it. */
-const QUOTED: InlineStyle = { ...PLAIN, italic: true }
 
 const HEADINGS: Record<string, TypeVariant> = {
   h1: 'title',
@@ -77,6 +79,7 @@ function Children({
   // Ghost wraps a quotation's text in paragraphs, so the quotation's style has
   // to reach runs drawn several elements further down.
   const quoted = useInQuote()
+  const role: TypeVariant = variant ?? (quoted ? 'quote' : 'body')
   const parts: React.ReactNode[] = []
   let run: HtmlNode[] = []
 
@@ -85,17 +88,13 @@ function Children({
       parts.push(
         <Txt
           key={`run-${parts.length}`}
-          variant={variant ?? (quoted ? 'quote' : 'body')}
+          variant={role}
           style={[
             spaced && !quoted ? styles.paragraph : undefined,
             quoted ? quoteText : undefined,
           ]}
         >
-          <InlineRun
-            nodes={trimRun(run)}
-            inherited={quoted ? QUOTED : PLAIN}
-            face={quoted ? 'serif' : 'sans'}
-          />
+          <InlineRun nodes={trimRun(run)} inherited={PLAIN} variant={role} />
         </Txt>,
       )
     }
@@ -153,7 +152,7 @@ function BlockElement({ element }: { element: HtmlElement }) {
           <InlineRun
             nodes={trimRun(element.children)}
             inherited={PLAIN}
-            face={['h5', 'h6'].includes(element.name) ? 'sans' : 'serif'}
+            variant={HEADINGS[element.name] ?? 'h2'}
           />
         </Txt>
       )
@@ -178,7 +177,11 @@ function BlockElement({ element }: { element: HtmlElement }) {
     case 'figcaption':
       return (
         <Txt variant="meta" tone="muted" style={styles.caption}>
-          <InlineRun nodes={trimRun(element.children)} inherited={PLAIN} />
+          <InlineRun
+            nodes={trimRun(element.children)}
+            inherited={PLAIN}
+            variant="meta"
+          />
         </Txt>
       )
     case 'img':
@@ -285,19 +288,25 @@ function textOf(node: HtmlNode): string {
   return node.type === 'text' ? node.text : node.children.map(textOf).join('')
 }
 
+/**
+ * A run's style, from the markup around it and the role it sits in. The family
+ * comes from the role — a run in a heading at the heading's weight, a run in a
+ * quotation in its italic — because each run names its own.
+ */
 function styleFor(
   inline: InlineStyle,
-  face: 'serif' | 'sans',
+  variant: TypeVariant,
   codeBackground: string,
 ): TextStyle {
+  const spec = TYPE_SPECS[variant]
   const decorations = [
     inline.underline ? 'underline' : null,
     inline.strike ? 'line-through' : null,
   ].filter(Boolean)
   return {
     fontFamily: inline.code
-      ? type.code.fontFamily
-      : familyFor(face, { bold: inline.bold, italic: inline.italic }),
+      ? MONOSPACE
+      : familyOf(spec, { bold: inline.bold, italic: inline.italic }),
     ...(inline.code ? { backgroundColor: codeBackground } : {}),
     ...(decorations.length
       ? {
@@ -306,7 +315,7 @@ function styleFor(
           ) as TextStyle['textDecorationLine'],
         }
       : {}),
-    ...(inline.small ? { fontSize: 14 } : {}),
+    ...(inline.small ? { fontSize: Math.round(spec.size * 0.82) } : {}),
   }
 }
 
@@ -314,11 +323,11 @@ function styleFor(
 function InlineRun({
   nodes,
   inherited,
-  face = 'sans',
+  variant,
 }: {
   nodes: HtmlNode[]
   inherited: InlineStyle
-  face?: 'serif' | 'sans'
+  variant: TypeVariant
 }) {
   const { palette } = useTheme()
   const openLink = useOpenLink()
@@ -329,7 +338,10 @@ function InlineRun({
         if (node.type === 'text') {
           const text = node.text.replace(/\s+/g, ' ')
           return text ? (
-            <Text key={index} style={styleFor(inherited, face, palette.line)}>
+            <Text
+              key={index}
+              style={styleFor(inherited, variant, palette.line)}
+            >
               {text}
             </Text>
           ) : null
@@ -360,7 +372,11 @@ function InlineRun({
               style={{ color: palette.accent, textDecorationLine: 'underline' }}
               onPress={() => openLink(href)}
             >
-              <InlineRun nodes={node.children} inherited={style} face={face} />
+              <InlineRun
+                nodes={node.children}
+                inherited={style}
+                variant={variant}
+              />
             </Text>
           )
         }
@@ -370,7 +386,7 @@ function InlineRun({
             key={index}
             nodes={node.children}
             inherited={style}
-            face={face}
+            variant={variant}
           />
         )
       })}

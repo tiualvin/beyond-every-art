@@ -50,9 +50,9 @@ export function PostRow({ post }: { post: PostSummary }) {
             {post.tags[0].name}
           </Txt>
         ) : null}
-        <Txt variant="h4">{post.title}</Txt>
+        <Txt variant="rowTitle">{post.title}</Txt>
         {post.excerpt ? (
-          <Txt variant="meta" tone="muted" numberOfLines={3}>
+          <Txt variant="summary" tone="muted" numberOfLines={3}>
             {post.excerpt}
           </Txt>
         ) : null}

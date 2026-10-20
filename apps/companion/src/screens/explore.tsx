@@ -29,7 +29,7 @@ function Row({
         pressed && styles.pressed,
       ]}
     >
-      <Txt variant="label" style={styles.flex}>
+      <Txt variant="rowTitle" style={styles.flex}>
         {title}
       </Txt>
       <Txt variant="meta" tone="muted">
@@ -55,7 +55,7 @@ export function ExploreScreen() {
   return (
     <Screen>
       <View>
-        <Txt variant="h3" accessibilityRole="header">
+        <Txt variant="section" tone="muted" accessibilityRole="header">
           Topics
         </Txt>
         {tags.isPending ? (
@@ -79,7 +79,7 @@ export function ExploreScreen() {
         )}
       </View>
       <View>
-        <Txt variant="h3" accessibilityRole="header">
+        <Txt variant="section" tone="muted" accessibilityRole="header">
           Authors
         </Txt>
         {authors.isPending ? (

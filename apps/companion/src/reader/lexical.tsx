@@ -60,7 +60,7 @@ function BodyNodeView({ node }: { node: BodyNode }) {
         >
           <InlineNodes
             nodes={node.children}
-            face={['h5', 'h6'].includes(node.tag) ? 'sans' : 'serif'}
+            variant={HEADING_VARIANT[node.tag]}
           />
         </Txt>
       )
@@ -68,7 +68,7 @@ function BodyNodeView({ node }: { node: BodyNode }) {
       return (
         <QuoteFrame>
           <Txt variant="quote" style={quoteText}>
-            <InlineNodes nodes={node.children} face="serif" italic />
+            <InlineNodes nodes={node.children} variant="quote" />
           </Txt>
         </QuoteFrame>
       )

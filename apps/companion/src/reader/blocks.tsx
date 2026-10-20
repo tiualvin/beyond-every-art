@@ -451,7 +451,7 @@ function ComparisonTable({
             {fields.rowHeader ? (
               <Txt variant="meta" tone="muted">{`${fields.rowHeader}: `}</Txt>
             ) : null}
-            <InlineNodes nodes={row.label} />
+            <InlineNodes nodes={row.label} variant="label" />
           </Txt>
           {fields.columns.map((column, columnIndex) => {
             const cell = row.cells[columnIndex] ?? []

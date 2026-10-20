@@ -31,7 +31,7 @@ export function LibraryScreen() {
         </Notice>
       )}
       <View style={{ gap: space.xs }}>
-        <Txt variant="h3" accessibilityRole="header">
+        <Txt variant="section" tone="muted" accessibilityRole="header">
           Saved for offline
         </Txt>
         {saved.isPending ? (
@@ -57,7 +57,7 @@ export function LibraryScreen() {
         )}
       </View>
       <View style={{ gap: space.xs }}>
-        <Txt variant="h3" accessibilityRole="header">
+        <Txt variant="section" tone="muted" accessibilityRole="header">
           Bookmarks
         </Txt>
         {bookmarks.isPending ? (

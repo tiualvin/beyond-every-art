@@ -54,7 +54,7 @@ function ReadHeader() {
       </Pressable>
       {tags.data && tags.data.tags.length > 0 ? (
         <View style={styles.topics}>
-          <Txt variant="h4" accessibilityRole="header">
+          <Txt variant="section" tone="muted" accessibilityRole="header">
             Topics
           </Txt>
           <ScrollView
@@ -77,7 +77,7 @@ function ReadHeader() {
           </ScrollView>
         </View>
       ) : null}
-      <Txt variant="h3" accessibilityRole="header">
+      <Txt variant="section" tone="muted" accessibilityRole="header">
         Newest
       </Txt>
     </View>

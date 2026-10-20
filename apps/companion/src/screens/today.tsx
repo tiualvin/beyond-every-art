@@ -88,7 +88,7 @@ export function TodayScreen({ now = () => new Date() }: { now?: () => Date }) {
       <PigmentCard date={now()} />
       {latest.length > 0 ? (
         <View>
-          <Txt variant="h3" accessibilityRole="header">
+          <Txt variant="section" tone="muted" accessibilityRole="header">
             Latest
           </Txt>
           {latest.map((post) => (

@@ -21,7 +21,7 @@ export function Loading({ label = 'Loading' }: { label?: string }) {
 export function EmptyState({ title, body }: { title: string; body?: string }) {
   return (
     <View style={styles.box}>
-      <Txt variant="h4" accessibilityRole="header">
+      <Txt variant="emptyTitle" accessibilityRole="header">
         {title}
       </Txt>
       {body ? <Txt tone="muted">{body}</Txt> : null}
@@ -51,7 +51,7 @@ export function ErrorState({
 }) {
   return (
     <View style={styles.box} accessibilityRole="alert">
-      <Txt variant="h4">Not loaded</Txt>
+      <Txt variant="emptyTitle">Not loaded</Txt>
       <Txt tone="muted">{describeError(error)}</Txt>
       {onRetry ? (
         <Button
