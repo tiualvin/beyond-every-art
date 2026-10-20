@@ -1,7 +1,8 @@
 // Every pairing of text and background the app draws, held to WCAG AA.
 
 import { BRAND_COLORS } from '../../generated/brand-tokens'
-import { contrastRatio, mix } from '../colour'
+import { DAILY_COLOURS } from '../../screens/colours'
+import { contrastRatio, mix, readableOn } from '../colour'
 import { PALETTES, inverseOf, paletteFor, type Palette } from '../palette'
 import { chromeTreatment } from '../chrome'
 
@@ -65,6 +66,17 @@ describe('increased contrast', () => {
       )
     }
   })
+})
+
+describe('the colour of the day', () => {
+  // Its name, hex and label sit on the colour itself, the label at 12pt.
+  it.each(DAILY_COLOURS.map((colour) => [colour.name, colour.hex]))(
+    'sets its text on %s at AA',
+    (_, hex) => {
+      const ink = readableOn(hex, BRAND_COLORS.onDark, BRAND_COLORS.ink)
+      expect(contrastRatio(ink, hex)).toBeGreaterThanOrEqual(AA_TEXT)
+    },
+  )
 })
 
 describe('colour arithmetic', () => {

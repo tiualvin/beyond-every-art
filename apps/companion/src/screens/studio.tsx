@@ -212,9 +212,41 @@ function PaletteRow({ item, onEdit }: { item: Palette; onEdit: () => void }) {
   )
 }
 
+/** A palette as one strip of adjoining bars: how it will look, at a glance. */
+export function PaletteStrip({ colours }: { colours: string[] }) {
+  const { palette } = useTheme()
+  return (
+    <View
+      // An edge of its own: the strip often starts with paper, which would
+      // otherwise vanish into the page and leave the strip looking shifted.
+      style={[styles.strip, { borderColor: palette.rule }]}
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel={`A palette of ${colours.map(nameOf).join(', ')}`}
+    >
+      {colours.map((colour, index) => (
+        <View
+          key={`${colour}-${index}`}
+          style={[styles.bar, { backgroundColor: colour }]}
+        />
+      ))}
+    </View>
+  )
+}
+
 export function StudioScreen() {
   const palettes = usePalettes()
   const [draft, setDraft] = useState<Draft | null>(null)
+  const start = () => setDraft({ name: '', colours: STARTER_PALETTE })
+  // Making a palette never depends on reading the saved ones.
+  const newPalette = (
+    <Button
+      key="new"
+      label="New palette"
+      onPress={start}
+      style={styles.start}
+    />
+  )
 
   return (
     <Screen>
@@ -222,38 +254,47 @@ export function StudioScreen() {
         <Editor draft={draft} onDone={() => setDraft(null)} />
       ) : (
         <>
-          <Txt tone="muted">
-            Build palettes from the colours of the Beyond Every Art palette or
-            your own. They are kept on this device.
-          </Txt>
-          <Button
-            label="New palette"
-            onPress={() => setDraft({ name: '', colours: STARTER_PALETTE })}
-            style={styles.start}
-          />
           {palettes.isPending ? (
             <Loading label="Loading palettes" />
           ) : palettes.isError ? (
-            <ErrorState error={palettes.error} />
+            [
+              newPalette,
+              <ErrorState
+                key="error"
+                error={palettes.error}
+                onRetry={() => palettes.refetch()}
+              />,
+            ]
           ) : palettes.data.length === 0 ? (
-            <EmptyState
-              title="No palettes yet"
-              body="A new palette starts from the brand’s paper, ink and burgundy, with two pigments."
-            />
-          ) : (
-            palettes.data.map((item) => (
-              <PaletteRow
-                key={item.id}
-                item={item}
-                onEdit={() =>
-                  setDraft({
-                    id: item.id,
-                    name: item.name,
-                    colours: item.colours,
-                  })
-                }
+            <>
+              <PaletteStrip colours={STARTER_PALETTE} />
+              <EmptyState
+                title="No palettes yet"
+                body="Build palettes from the brand’s colours or your own, kept on this device. A new one starts from paper, ink and burgundy, with two pigments."
+                action={{
+                  label: 'New palette',
+                  onPress: start,
+                  variant: 'primary',
+                }}
               />
-            ))
+            </>
+          ) : (
+            [
+              newPalette,
+              ...palettes.data.map((item) => (
+                <PaletteRow
+                  key={item.id}
+                  item={item}
+                  onEdit={() =>
+                    setDraft({
+                      id: item.id,
+                      name: item.name,
+                      colours: item.colours,
+                    })
+                  }
+                />
+              )),
+            ]
           )}
         </>
       )}
@@ -283,6 +324,14 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
   flex: { flex: 1 },
   start: { alignSelf: 'flex-start' },
+  strip: {
+    flexDirection: 'row',
+    height: 96,
+    borderRadius: 2,
+    borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+  },
+  bar: { flex: 1 },
   paletteRow: {
     gap: space.sm,
     paddingTop: space.md,

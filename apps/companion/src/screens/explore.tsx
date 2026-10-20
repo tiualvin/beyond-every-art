@@ -3,7 +3,7 @@ import { Pressable, StyleSheet } from 'react-native'
 
 import { Screen } from '../components/screen'
 import { Section } from '../components/section'
-import { EmptyState, ErrorState, Loading } from '../components/states'
+import { ErrorState, Loading } from '../components/states'
 import { useAuthors, useTags } from '../data/hooks'
 import { Txt } from '../theme/text'
 import { useTheme } from '../theme/theme'
@@ -46,9 +46,8 @@ const articles = (count: number) =>
   `${count} ${count === 1 ? 'article' : 'articles'}`
 
 /**
- * Topics and authors: what the website has collections for today. Artists,
- * artworks, pigments and the rest arrive with their collections, and until
- * then the screen says so instead of showing anything made up.
+ * Topics and authors: what the website has collections for today. Nothing
+ * here is made up to fill the screen, and nothing announces what might come.
  */
 export function ExploreScreen() {
   const router = useRouter()
@@ -103,10 +102,6 @@ export function ExploreScreen() {
             ))
         )}
       </Section>
-      <EmptyState
-        title="More to explore later"
-        body="Artists, artworks, pigments, materials and exhibitions will appear here once the website has collections for them."
-      />
     </Screen>
   )
 }

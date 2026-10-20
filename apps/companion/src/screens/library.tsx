@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router'
 import { View } from 'react-native'
 
 import { PostRow } from '../components/post-row'
@@ -15,6 +16,7 @@ import { Button } from '../theme/button'
 
 /** What the reader keeps, on this device: saved articles and bookmarks. */
 export function LibraryScreen() {
+  const router = useRouter()
   const { libraryPersistent } = useServices()
   const saved = useSavedArticles()
   const bookmarks = useBookmarks()
@@ -36,6 +38,10 @@ export function LibraryScreen() {
           <EmptyState
             title="Nothing saved yet"
             body="Save an article from its page to read it without a connection."
+            action={{
+              label: 'Find something to read',
+              onPress: () => router.navigate('/read'),
+            }}
           />
         ) : (
           saved.data.map(({ post }, index) => (

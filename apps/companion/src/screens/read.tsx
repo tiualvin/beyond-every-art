@@ -10,7 +10,6 @@ import { Capsule, pressedStyle } from '../theme/button'
 import { Txt } from '../theme/text'
 import { useTheme } from '../theme/theme'
 import { CAPSULE, MIN_TOUCH, space } from '../theme/typography'
-import { FixtureNotice } from './today'
 
 export function Chip({
   label,
@@ -46,7 +45,6 @@ function ReadHeader() {
   const tags = useTags()
   return (
     <View style={styles.header}>
-      <FixtureNotice />
       <Pressable
         accessibilityRole="search"
         accessibilityLabel="Search articles"
