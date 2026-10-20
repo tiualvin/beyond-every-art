@@ -2,7 +2,7 @@
 
 import { BRAND_COLORS } from '../../generated/brand-tokens'
 import { DAILY_COLOURS } from '../../screens/colours'
-import { contrastRatio, mix, readableOn } from '../colour'
+import { contrastRatio, hexToRgb, mix, readableOn, tone } from '../colour'
 import { PALETTES, inverseOf, paletteFor, type Palette } from '../palette'
 import { chromeTreatment } from '../chrome'
 
@@ -53,6 +53,50 @@ describe('the light palette', () => {
       muted: BRAND_COLORS.muted,
       accent: BRAND_COLORS.burgundy,
     })
+  })
+})
+
+describe('the dark palette (proposed)', () => {
+  const dark = paletteFor('dark', false)
+  const hueOf = (hex: string) => {
+    const [r, g, b] = hexToRgb(hex).map((channel) => channel / 255) as [
+      number,
+      number,
+      number,
+    ]
+    const max = Math.max(r, g, b)
+    const delta = max - Math.min(r, g, b)
+    return (60 * (((g - b) / delta + 6) % 6) + 360) % 360
+  }
+
+  it('keeps burgundy’s hue in its accent, rather than draining it into mauve', () => {
+    expect(hueOf(dark.accent)).toBeCloseTo(hueOf(BRAND_COLORS.burgundy), 0)
+    expect(dark.accent).toBe(tone(BRAND_COLORS.burgundy, 0.67, 0.45))
+  })
+
+  it.each([
+    ['light', paletteFor('light', false)],
+    ['light, increased contrast', paletteFor('light', true)],
+    ['dark', dark],
+    ['dark, increased contrast', paletteFor('dark', true)],
+  ] as const)(
+    'draws the %s button at 3:1 against the page, so it reads as a control',
+    (_, palette) => {
+      expect(
+        contrastRatio(palette.button, palette.background),
+      ).toBeGreaterThanOrEqual(3)
+    },
+  )
+
+  it('keeps a dark callout dark, darker than the text on the page', () => {
+    expect(contrastRatio(dark.inverse, dark.text)).toBeGreaterThan(10)
+    expect(contrastRatio(dark.onInverse, dark.inverse)).toBeGreaterThanOrEqual(
+      AA_TEXT,
+    )
+  })
+
+  it('ends the plate wash short of the page, so a missing image keeps an edge', () => {
+    expect(dark.plate[2]).not.toBe(dark.background)
   })
 })
 

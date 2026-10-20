@@ -3,12 +3,13 @@
 // Light is the website: paper, ink and burgundy, as generated from
 // app/globals.css. Dark is a PROPOSAL for the owner's review — the website has
 // no dark palette — and it is derived rather than invented: every colour in it
-// is a brand token or a mix of two, so it stays the same family. Each palette
-// has an increased-contrast variant for readers who ask the system for one.
+// is a brand token, a mix of two, or (the accent) burgundy's own hue lifted to
+// read on a dark page, so it stays the same family. Each palette has an
+// increased-contrast variant for readers who ask the system for one.
 // tests/palette.test.ts holds every text pairing to WCAG AA.
 
 import { BRAND_COLORS as brand } from '../generated/brand-tokens'
-import { mix } from './colour'
+import { mix, tone } from './colour'
 
 export type Palette = {
   /** The page. */
@@ -66,23 +67,39 @@ const light: Palette = {
   plate: [brand.burgundy, brand.burgundyDeep, brand.dark],
 }
 
-/** PROPOSED: not on the website, and waiting on the owner. */
+/**
+ * The dark callout and the dark plate's last stop: burgundy-deep sunk into
+ * the dark page, so a dark surface still has an edge against it.
+ */
+const darkWell = mix(brand.burgundyDeep, brand.dark, 0.45)
+
+/**
+ * PROPOSED: not on the website, and waiting on the owner.
+ *
+ * Corrected from the first proposal, which derived everything by mixing and
+ * came out muddy: the accent was burgundy mixed halfway to paper, a dusty
+ * mauve; the button kept its burgundy fill at 1.68:1 against the page, the
+ * dimmest thing on the screen; and the dark callout inverted to a near-white
+ * slab, the brightest. Now the accent keeps burgundy's hue (a dusty rose,
+ * 6.7:1), the button is the website's on-dark button (.button--on-dark: paper
+ * fill, burgundy-deep label), and a dark callout stays dark.
+ */
 const dark: Palette = {
   background: brand.dark,
   surface: mix(brand.onDark, brand.dark, 0.06),
   text: brand.onDark,
   muted: mix(brand.onDark, brand.dark, 0.68),
-  accent: mix(brand.burgundy, brand.paper, 0.5),
-  button: brand.burgundy,
-  onButton: brand.onDark,
+  accent: tone(brand.burgundy, 0.67, 0.45),
+  button: brand.onDark,
+  onButton: brand.burgundyDeep,
   tonal: mix(brand.onDark, brand.dark, 0.12),
   onTonal: brand.onDark,
   field: mix(brand.onDark, brand.dark, 0.45),
   line: mix(brand.onDark, brand.dark, 0.16),
   rule: mix(brand.onDark, brand.dark, 0.34),
-  inverse: brand.surface,
-  onInverse: brand.ink,
-  plate: [brand.burgundy, brand.burgundyDeep, brand.dark],
+  inverse: darkWell,
+  onInverse: brand.onDark,
+  plate: [brand.burgundy, brand.burgundyDeep, darkWell],
 }
 
 /** Muted text pulled halfway to the body text, and the rule doing the line's job. */
