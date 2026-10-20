@@ -86,12 +86,21 @@ export function useSearch(query: string) {
 }
 
 // --- Library -----------------------------------------------------------
+//
+// Everything in the library is on the device, so its reads and writes run
+// whether or not there is a network. The query cache pauses a read while the
+// device is offline unless told otherwise (online.ts tells it when), and the
+// library used to wait for a connection it never uses: offline, the saved
+// articles meant for reading without one sat behind a spinner.
+
+const LOCAL = { networkMode: 'always' } as const
 
 export function useBookmarks() {
   const { library } = useServices()
   return useQuery({
     queryKey: keys.bookmarks,
     queryFn: () => library.listBookmarks(),
+    ...LOCAL,
   })
 }
 
@@ -100,12 +109,17 @@ export function useIsBookmarked(slug: string) {
   return useQuery({
     queryKey: keys.bookmarked(slug),
     queryFn: () => library.isBookmarked(slug),
+    ...LOCAL,
   })
 }
 
 export function useSavedArticles() {
   const { library } = useServices()
-  return useQuery({ queryKey: keys.saved, queryFn: () => library.listSaved() })
+  return useQuery({
+    queryKey: keys.saved,
+    queryFn: () => library.listSaved(),
+    ...LOCAL,
+  })
 }
 
 export function useIsSaved(slug: string) {
@@ -113,6 +127,7 @@ export function useIsSaved(slug: string) {
   return useQuery({
     queryKey: keys.isSaved(slug),
     queryFn: async () => (await library.getSaved(slug)) !== null,
+    ...LOCAL,
   })
 }
 
@@ -121,8 +136,7 @@ function useLibraryMutation<T>(run: (input: T) => Promise<unknown>) {
   const client = useQueryClient()
   return useMutation({
     mutationFn: run,
-    // Local writes do not wait for a network that is not involved.
-    networkMode: 'always',
+    ...LOCAL,
     onSuccess: () => client.invalidateQueries({ queryKey: keys.library }),
   })
 }
@@ -167,6 +181,7 @@ export function usePalettes() {
   return useQuery({
     queryKey: keys.palettes,
     queryFn: () => library.listPalettes(),
+    ...LOCAL,
   })
 }
 

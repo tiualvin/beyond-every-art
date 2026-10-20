@@ -342,7 +342,9 @@ either way. Reading an article tries the network first, refreshes a saved copy
 with what the website now says, and falls back to the saved copy offline,
 telling the reader which copy they have. Separately, the query cache persists
 successful content reads (not searches, not the library) for a week, so an
-article read yesterday usually opens on a train today.
+article read yesterday usually opens on a train today. The cache pauses network
+reads while the device is offline; the library's reads and writes are marked as
+local so they never wait for a connection they do not use.
 
 ## Design
 

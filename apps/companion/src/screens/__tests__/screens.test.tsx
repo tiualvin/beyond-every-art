@@ -1,5 +1,6 @@
 // The tabs and the reader, against the fixtures, with the real router.
 
+import { onlineManager } from '@tanstack/react-query'
 import { useLocalSearchParams } from 'expo-router'
 import {
   cleanup,
@@ -245,6 +246,23 @@ describe('Library', () => {
     expect(screen.getByText('No bookmarks yet')).toBeTruthy()
     await fireEvent.press(screen.getByText('Find something to read'))
     await waitFor(() => expect(rendered.getPathname()).toBe('/read'))
+  })
+
+  it('opens what is on this device with the network gone', async () => {
+    // The query cache pauses reads while the device is offline. Everything
+    // here is local, and once waited for a network it never needed.
+    const services = testServices()
+    const post = await services.api.getPost('fixture-migrated-article')
+    if (!post) throw new Error('The migrated fixture is missing.')
+    await services.library.saveArticle(post)
+    await services.library.addBookmark(post)
+    onlineManager.setOnline(false)
+    try {
+      await show(LibraryScreen, { services })
+      expect(await screen.findAllByText(post.title)).toHaveLength(2)
+    } finally {
+      onlineManager.setOnline(true)
+    }
   })
 
   it('warns when nothing will survive a restart', async () => {
