@@ -82,6 +82,11 @@ describe(
     it('keeps the object key column either way', async () => {
       const off = await uploadColumns({ S3_BUCKET: '', S3_ENDPOINT: '' })
       expect(off.media).toContain('_objectKey')
+      // Page images use a storage prefix too, which is a column of its own
+      // (collections/PublicationPageImages.ts).
+      expect(off['publication-page-images']).toEqual(
+        expect.arrayContaining(['_objectKey', 'prefix']),
+      )
     })
   },
 )

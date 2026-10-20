@@ -39,3 +39,25 @@ export function publicationsReadFor(launched: boolean): Access {
 export const publicationsRead: Access = publicationsReadFor(
   PUBLICATIONS_LAUNCHED,
 )
+
+/**
+ * Page images a request may read.
+ *
+ * Before launch, editors only — the files and the listing alike. After it, a
+ * file is served to anyone holding its URL, and the listing stays with
+ * editors. Gating each file on its issue being live would cost a Postgres
+ * query on every image request Cloudflare does not answer, and buy little:
+ * the names are 128-bit hashes nothing links to until the reader does, and an
+ * edge cache serves whatever it holds to anyone with the URL regardless
+ * (`docs/PUBLICATION_SYSTEM.md`, open decision 3, accepts this). The listing is
+ * different — it would hand out every name at once, drafts' included — so
+ * `isReadingStaticFile` is what separates the two.
+ */
+export function publicationPageImagesReadFor(launched: boolean): Access {
+  return ({ req, isReadingStaticFile }) =>
+    isEditor(req.user) || (launched && Boolean(isReadingStaticFile))
+}
+
+export const publicationPageImagesRead: Access = publicationPageImagesReadFor(
+  PUBLICATIONS_LAUNCHED,
+)
