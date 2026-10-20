@@ -25,9 +25,10 @@ import { BoldFeatureClient as BoldFeatureClient_e70f5e05f09f93e00b997edb1ef0c864
 import { ItalicFeatureClient as ItalicFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { SearchPreview as SearchPreview_90dc079ae30fcc0c41ba8ebe2c510c59 } from '../../../components/admin/SearchPreview'
 import { PublishReadiness as PublishReadiness_c2eff868e042eeca54e4c4d0f269a6b7 } from '../../../components/admin/PublishReadiness'
+import { ProcessingStatus as ProcessingStatus_0cc68a550a523591a535a62f86baac88 } from '../../../components/admin/ProcessingStatus'
 import { EditorialDashboard as EditorialDashboard_7159b68b12eabee670cd54ce9954b477 } from '../../../components/admin/EditorialDashboard'
-import { S3ClientUploadHandler as S3ClientUploadHandler_f97aa6c64367fa259c5bc0567239ef24 } from '@payloadcms/storage-s3/client'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
+import { S3ClientUploadHandler as S3ClientUploadHandler_f97aa6c64367fa259c5bc0567239ef24 } from '@payloadcms/storage-s3/client'
 
 /** @type import('payload').ImportMap */
 export const importMap = {
@@ -85,10 +86,12 @@ export const importMap = {
     SearchPreview_90dc079ae30fcc0c41ba8ebe2c510c59,
   '/components/admin/PublishReadiness#PublishReadiness':
     PublishReadiness_c2eff868e042eeca54e4c4d0f269a6b7,
+  '/components/admin/ProcessingStatus#ProcessingStatus':
+    ProcessingStatus_0cc68a550a523591a535a62f86baac88,
   '/components/admin/EditorialDashboard#EditorialDashboard':
     EditorialDashboard_7159b68b12eabee670cd54ce9954b477,
-  '@payloadcms/storage-s3/client#S3ClientUploadHandler':
-    S3ClientUploadHandler_f97aa6c64367fa259c5bc0567239ef24,
   '@payloadcms/next/rsc#CollectionCards':
     CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1,
+  '@payloadcms/storage-s3/client#S3ClientUploadHandler':
+    S3ClientUploadHandler_f97aa6c64367fa259c5bc0567239ef24,
 }

@@ -73,7 +73,7 @@ search result above it. **Migration holds the read-only import fields.**
 
 ## The custom components
 
-Four, all under `components/admin/`. Each is small, and each exists because a
+Five, all under `components/admin/`. Each is small, and each exists because a
 fact the database already held was not reachable without knowing which filter to
 build by hand.
 
@@ -83,6 +83,12 @@ build by hand.
 | `PublishReadiness`   | Post sidebar             | What is missing, while it is cheap to fix |
 | `SearchPreview`      | Search & sharing tab     | What this looks like in a search result   |
 | `MediaUsage`         | Media edit view          | What breaks if this image goes            |
+| `ProcessingStatus`   | Publication sidebar      | Where this issue's PDF processing stands  |
+
+`ProcessingStatus` only reports. Processing runs from a command on the server
+(`scripts/process-publication.ts`), never from the edit view, which autosaves
+every 800 ms; the panel shows the newest run as of the page load and says what to
+run when there is none.
 
 Three constraints they share:
 
@@ -156,7 +162,7 @@ theme regardless of specificity — that is how a light palette once turned the
 dark admin beige — and `tests/design/admin-theme.test.ts` fails if one comes
 back.
 
-It is deliberately shallow: it styles this project's four components. It reaches into no vendor internals, because a
+It is deliberately shallow: it styles this project's five components. It reaches into no vendor internals, because a
 selector aimed at Payload's markup is a thing that breaks on an upgrade for no
 reader-visible gain. The palette tokens are copied from `app/globals.css` rather
 than imported — that file is the public site's stylesheet and pulling it in here

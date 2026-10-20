@@ -121,6 +121,18 @@ export const Publications: CollectionConfig = {
       admin: { description: 'The front cover, as a reader would see it.' },
     },
     {
+      // Where this issue's PDF processing stands. Read-only: processing runs
+      // from a command on the server, never from this screen, which autosaves.
+      name: 'processing',
+      type: 'ui',
+      admin: {
+        position: 'sidebar',
+        components: {
+          Field: '/components/admin/ProcessingStatus#ProcessingStatus',
+        },
+      },
+    },
+    {
       name: 'publishedAt',
       label: 'Publish date',
       type: 'date',

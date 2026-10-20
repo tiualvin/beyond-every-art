@@ -50,7 +50,7 @@ module.
 
 [`docs/EDITORIAL_ADMIN.md`](docs/EDITORIAL_ADMIN.md) covers the admin panel as a
 place people work: how the Post and Page edit views are arranged and why the
-tabs are unnamed, the four custom components under `components/admin/` and the
+tabs are unnamed, the five custom components under `components/admin/` and the
 three constraints they share, and the import-map trap that has blanked the admin
 once already. Read it before changing the shape of an edit screen or adding an
 admin component — and note the rule it records the hard way: anything that reads
