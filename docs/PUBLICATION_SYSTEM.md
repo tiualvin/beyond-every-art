@@ -35,7 +35,17 @@ What is built:
   read an issue through Payload before launch — the CMS hostname forwards any
   `/api` request carrying an `Authorization` header, so the routes alone were
   not enough — and after launch gives readers only what the site would show.
-  Version history is editors-only.
+  Version history is editors-only;
+- processing (built 20 Oct 2026): `pnpm publications:process`
+  (`scripts/process-publication.ts`, run on the server as the `publications`
+  Compose service) turns a PDF into one page record per page
+  (`publication-pages`), a WebP image of each page with two smaller sizes
+  (`publication-page-images`), the page's words with their positions, and its
+  links, classified and unapproved; every run is recorded in
+  `publication-runs`, and the Publication edit view shows the newest
+  (`components/admin/ProcessingStatus.tsx`). The PDF work is in
+  `lib/publications/processing/`; `lib/publications/sample-pdf.ts` writes the
+  sample it is tested on. See [Processing an issue](#processing-an-issue).
 
 **No source PDF exists yet.** Development can use a generated sample issue, but
 the first real issue — its page count, file size and image rights — is a
@@ -569,6 +579,16 @@ Visits, Exhibition Guides, Conservation Reports, Special Editions.
 
 ### `publication-pages`
 
+**Built 20 Oct 2026, in part** (`collections/PublicationPages.ts`): the fields
+the processing command owns — page number, status and error, displayed width and
+height in points, the page image, the text, the words with their positions
+(`words`), the links found (`links`, each unapproved), and which file, rendition
+and run drew it — with the unique index on issue and page number. Hotspots, the
+accessible label and approved links are the editor's, and arrive with the editor
+that sets them. Read through the API by editors only: the reader renders on the
+server and needs no public endpoint for an unpublished issue's text to leak
+through.
+
 One Payload document per page. Do **not** store hundreds of pages in a single
 array field on the publication document.
 
@@ -625,6 +645,15 @@ error, start and finish times, page count, and the rendition version the
 reader should use. The publication points at its ready run, or the reader asks
 for the latest ready run — either keeps worker writes off the versioned
 document.
+
+**Built 20 Oct 2026** as `publication-runs` (`collections/PublicationRuns.ts`);
+the reader will ask for the latest ready run. Page images are a collection of
+their own, `publication-page-images`: one upload per page, which Payload
+resizes into the `thumbnail` and `medium` sizes, named after a hash of its bytes
+and its issue, and stored in R2 under the `publication-pages/` prefix so no page
+can share a key with a media file. There is no `publication-assets` collection
+yet: under open decision 2's default the source PDF arrives by R2 key, not as an
+upload.
 
 ### `publication-assets`
 
@@ -879,6 +908,15 @@ this one. Both packages install on the Alpine base with `apk add`. If renderer
 tests run against the real binaries, the CI `checks` job needs them installed
 too, or those tests silently exercise only mocks.
 
+**Fonts are part of the tooling.** The Alpine base has none, and a PDF may
+name Helvetica, Times or Courier without embedding them; Poppler then draws
+those words as nothing, says so only on stderr, and the text layer still reads
+fine. The first run in the built image produced exactly that — pages of blank
+panels — so the `migrator` stage installs `font-urw-base35`, the
+metric-compatible set Poppler substitutes, and a test that a drawn page has ink
+runs in CI both on the runner and inside the image, against the Poppler and
+qpdf versions production installs.
+
 Every extracted link goes through `lib/publications/links.ts` before it is
 stored, and is stored unapproved ([Links, extracted or typed](#links-extracted-or-typed)).
 
@@ -887,7 +925,10 @@ stored, and is stored unapproved ([Links, extracted or typed](#links-extracted-o
 outside the web container — with `poppler-utils` and `qpdf` added to that stage
 and a memory limit of its own. No new image, no always-on service, and no job
 queue to secure. An always-on worker comes later, if publishing cadence
-justifies it; [Deployment](#deployment) has what that costs here.
+justifies it; [Deployment](#deployment) has what that costs here. Built 20 Oct
+2026 as the `publications` service in `docker-compose.yml`, which runs the
+`migrate` service's image under the explicit name `beyond-every-art-migrator`, so
+the deploy's existing `docker compose build migrate` refreshes both.
 
 **If Payload's jobs queue is used**, four things are not optional:
 
@@ -926,6 +967,51 @@ links, creating records, building manifest, ready, failed.
 
 Show percentage complete, the current page being processed, total pages, start
 time, completion time, error details, and a retry action.
+
+**Built 20 Oct 2026, with fewer states.** A run records `downloading`,
+`validating`, `extracting-links`, `processing-pages`, `cleaning-up`, then
+`ready` or `failed` (`lib/publications/processing/plan.ts`). Each page is drawn,
+stored, read for text and written in one pass, so "rendering", "generating
+images", "extracting text" and "creating records" are one state; there is no
+queue, so nothing is ever "queued"; and the manifest is built when the reader
+renders, so there is nothing to build here. The panel in the Publication
+sidebar shows the newest run's state, progress, current page, page count,
+times, and the error, with a rejected file named in an editor's terms. It has
+no retry button — the retry is running the command again, which resumes.
+
+### Processing an issue
+
+On the server, after a deploy has built the image:
+
+1. Create the publication in the admin.
+2. Copy the PDF into the media bucket under `publication-sources/` — from the
+   Cloudflare dashboard, or with rclone — and keep the original
+   ([open decision](#open-decisions) 6).
+3. Run, from the deploy directory:
+
+   ```sh
+   docker compose run --rm publications \
+     --publication <slug> --source-key publication-sources/<file>.pdf
+   ```
+
+   `--dry-run` fetches and checks the file and writes nothing; `--pages 3,5-7`
+   redraws those pages; `--all` redraws every page. Before a real issue exists,
+   `--publication sample-issue --sample 8 --create` processes the generated
+   sample into a draft made for it.
+
+Running it again is always safe. A page already drawn from the same file is
+skipped, so a run that stopped resumes; a run left marked as processing by a
+container that was killed is failed after fifteen minutes without progress,
+and until then a second run refuses to start. A file that needs a password,
+is not a PDF, or exceeds the limits in `plan.ts` (500 pages, 500 MB) ends the
+run with the reason and leaves the issue's existing pages alone. Deleting a
+publication for good, from the trash, deletes its pages, runs and page images;
+the PDF in `publication-sources/` stays.
+
+Before the first run on the server: the pending reboot, a build-cache prune, and
+a measurement of free memory with the stack running, which is what
+`PUBLICATION_PROCESS_MEMORY_LIMIT` (default 1g) has to fit inside. Keep runs
+clear of the 02:30, 03:00 and Sunday 04:00 jobs and of deploys.
 
 ## Reader manifest
 
@@ -1244,12 +1330,19 @@ could reach stays behind the launch gate until the owner signs it off.
    the production crawl comparison — moved to the launch step: with every route
    closed, this step adds no URL a crawler can reach, and those checks protect
    the moment one does.
-2. **Processing.** `publication-pages`, the processing record, the processing
-   command on the `migrator` image, page images served per decision 3, and a
-   read-only status panel in the admin. Before it runs on the server: the
-   pending reboot, the build-cache cleanup, a measured free-memory baseline, and
-   decision 6 in place. A generated sample PDF stands in until a real issue
-   exists.
+2. **Processing — built 20 Oct 2026.** `publication-pages`, the processing
+   record, the processing command on the `migrator` image, page images stored
+   per decision 3, and a read-only status panel in the admin. Before it runs on
+   the server: the pending reboot, the build-cache cleanup and a measured
+   free-memory baseline ([Processing an issue](#processing-an-issue)); decision 6
+   is in place. A generated sample PDF stands in until a real issue exists.
+   What moved to step 3: the public hostname's Caddy exception for
+   `/api/publication-page-images/file/*`. Until a page shows page images there
+   is nothing to test it with, and until launch nobody but an editor can fetch
+   one, which an editor already does on the CMS hostname. The `robots.txt` line
+   waits for launch, and with it a question for the owner: whether search
+   engines should index magazine pages whose images may be licensed for print
+   only (decision 5).
 3. **Reader and transcript, together.** Desktop spreads and mobile single
    pages, contents, filmstrip, keyboard, `?page=` links, fullscreen, reduced
    motion, announcements, local progress, and the transcript route. Search can
@@ -1316,9 +1409,10 @@ is the owner's call; the recommendation is the default if nobody objects.
 1. **The first issue — open.** No source PDF exists. Its page count, file size,
    image rights and date size decisions 2 to 5. Development uses a generated
    sample; a real issue is a precondition for launch.
-2. **How the source PDF gets in.** Recommended: the owner copies it into R2
-   (dashboard or rclone) and the processing command reads it by key — no change
-   to upload limits, no bucket CORS. Later: uploads from the admin straight to
+2. **How the source PDF gets in.** Recommended, and what is built: the owner
+   copies it into R2 under `publication-sources/` (dashboard or rclone) and the
+   processing command reads it by key — no change to upload limits, no bucket
+   CORS. Later: uploads from the admin straight to
    R2 through a second `s3Storage` instance, as described under
    [`publication-assets`](#publication-assets).
 3. **Where page images are served from — decided 20 Oct 2026: (A).** (A) Through Payload like other media:

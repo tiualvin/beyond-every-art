@@ -34,9 +34,12 @@ landing pages, the full-screen reader, PDF processing worker, interactive
 hotspots, transcripts, and first-party analytics. The owner lifted its
 migration gate on 3 Oct 2026. Built so far: the path helpers, the reserved
 slug, the reader's page logic and link policy in `lib/publications/`, the
-`publications` collection, and the archive and issue pages — which answer 404
+`publications` collection, the archive and issue pages — which answer 404
 to every reader until `PUBLICATIONS_LAUNCHED` in `lib/publications/launch.ts`
-is flipped on the owner's sign-off. No source PDF exists yet. Read its build
+is flipped on the owner's sign-off — and processing: `pnpm
+publications:process` turns a PDF into page records and page images, run on the
+server as the `publications` Compose service. No source PDF exists yet; a
+generated sample stands in. Read its build
 order and open decisions before adding a publication collection, route or
 service; it still must not displace the open post-cutover work.
 
