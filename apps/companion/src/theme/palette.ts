@@ -23,6 +23,18 @@ export type Palette = {
   /** A filled button. */
   button: string
   onButton: string
+  /**
+   * A quiet control: the secondary button and topic chips. A tint, not an
+   * outline — an outline in body ink was the strongest edge on any screen,
+   * and it sat on the least important actions.
+   */
+  tonal: string
+  onTonal: string
+  /**
+   * A text field's border: 3:1 against the page, as a control's boundary has
+   * to be (WCAG 1.4.11), where `rule` and `line` are decorative.
+   */
+  field: string
   /** Hairlines; decorative, never the only sign of anything. */
   line: string
   /** Stronger dividers. */
@@ -44,6 +56,9 @@ const light: Palette = {
   accent: brand.burgundy,
   button: brand.burgundy,
   onButton: brand.surface,
+  tonal: mix(brand.burgundy, brand.paper, 0.1),
+  onTonal: brand.burgundy,
+  field: mix(brand.ink, brand.paper, 0.5),
   line: brand.line,
   rule: brand.rule,
   inverse: brand.dark,
@@ -60,6 +75,9 @@ const dark: Palette = {
   accent: mix(brand.burgundy, brand.paper, 0.5),
   button: brand.burgundy,
   onButton: brand.onDark,
+  tonal: mix(brand.onDark, brand.dark, 0.12),
+  onTonal: brand.onDark,
+  field: mix(brand.onDark, brand.dark, 0.45),
   line: mix(brand.onDark, brand.dark, 0.16),
   rule: mix(brand.onDark, brand.dark, 0.34),
   inverse: brand.surface,
@@ -90,6 +108,9 @@ export function inverseOf(palette: Palette): Palette {
     muted: mix(palette.onInverse, palette.inverse, 0.75),
     // Links stay underlined, so they need not be a different colour here.
     accent: palette.onInverse,
+    tonal: mix(palette.onInverse, palette.inverse, 0.14),
+    onTonal: palette.onInverse,
+    field: mix(palette.onInverse, palette.inverse, 0.5),
     line: mix(palette.onInverse, palette.inverse, 0.2),
     rule: mix(palette.onInverse, palette.inverse, 0.35),
     inverse: palette.background,

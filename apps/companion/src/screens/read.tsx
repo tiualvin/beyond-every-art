@@ -6,9 +6,10 @@ import { MAX_CONTENT_WIDTH } from '../components/screen'
 import { SectionHeader } from '../components/section'
 import { EmptyState, ErrorState, Loading } from '../components/states'
 import { usePostsFeed, useTags } from '../data/hooks'
+import { Capsule, pressedStyle } from '../theme/button'
 import { Txt } from '../theme/text'
 import { useTheme } from '../theme/theme'
-import { MIN_TOUCH, space } from '../theme/typography'
+import { CAPSULE, MIN_TOUCH, space } from '../theme/typography'
 import { FixtureNotice } from './today'
 
 export function Chip({
@@ -20,17 +21,22 @@ export function Chip({
 }) {
   const { palette } = useTheme()
   return (
-    <Pressable
-      accessibilityRole="link"
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.chip,
-        { borderColor: palette.rule, backgroundColor: palette.surface },
-        pressed && styles.pressed,
-      ]}
-    >
-      <Txt variant="label">{label}</Txt>
-    </Pressable>
+    <Capsule>
+      <Pressable
+        accessibilityRole="link"
+        onPress={onPress}
+        android_ripple={{ color: `${palette.onTonal}33` }}
+        style={({ pressed }) => [
+          styles.chip,
+          { backgroundColor: palette.tonal },
+          pressedStyle(pressed),
+        ]}
+      >
+        <Txt variant="label" style={{ color: palette.onTonal }}>
+          {label}
+        </Txt>
+      </Pressable>
+    </Capsule>
   )
 }
 
@@ -47,7 +53,7 @@ function ReadHeader() {
         onPress={() => router.push('/read/search')}
         style={({ pressed }) => [
           styles.search,
-          { borderColor: palette.rule, backgroundColor: palette.surface },
+          { borderColor: palette.field, backgroundColor: palette.surface },
           pressed && styles.pressed,
         ]}
       >
@@ -59,6 +65,7 @@ function ReadHeader() {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
+            style={styles.chipRow}
             contentContainerStyle={styles.chips}
           >
             {tags.data.tags.map((tag) => (
@@ -133,18 +140,19 @@ const styles = StyleSheet.create({
   search: {
     minHeight: MIN_TOUCH,
     justifyContent: 'center',
-    paddingHorizontal: space.md,
+    paddingHorizontal: space.md + space.xs,
     borderWidth: 1,
-    borderRadius: 2,
+    borderRadius: CAPSULE,
   },
   topics: { gap: space.sm },
-  chips: { gap: space.sm },
+  // The row scrolls under the screen's edge rather than stopping short of it,
+  // so a cut-off chip says there is more; it starts and ends on the margin.
+  chipRow: { marginHorizontal: -space.md },
+  chips: { gap: space.sm, paddingHorizontal: space.md },
   chip: {
     minHeight: MIN_TOUCH,
     justifyContent: 'center',
     paddingHorizontal: space.md,
-    borderWidth: 1,
-    borderRadius: 999,
   },
   pressed: { opacity: 0.7 },
 })

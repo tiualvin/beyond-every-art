@@ -160,6 +160,7 @@ function Signup({
       {fields.body ? <Txt tone="muted">{fields.body}</Txt> : null}
       <Button
         label="Sign up on the website"
+        editorial
         hint="Opens the newsletter page in your browser"
         onPress={() => openExternal(fields.href)}
         style={styles.cardAction}
@@ -226,6 +227,7 @@ function ActionButton({
       <Button
         label={fields.label}
         variant={fields.variant}
+        editorial
         onPress={() => openLink(fields.href)}
       />
     </View>

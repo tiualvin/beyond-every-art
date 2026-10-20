@@ -12,7 +12,7 @@ import { Button } from '../theme/button'
 import { familyFor } from '../theme/fonts'
 import { Txt } from '../theme/text'
 import { useTheme } from '../theme/theme'
-import { MIN_TOUCH, space } from '../theme/typography'
+import { CAPSULE, MIN_TOUCH, space } from '../theme/typography'
 import { STARTER_PALETTE, STUDIO_COLOURS, nameOf } from './colours'
 
 type Draft = { id?: string; name: string; colours: string[] }
@@ -101,7 +101,7 @@ function Editor({ draft, onDone }: { draft: Draft; onDone: () => void }) {
     styles.input,
     {
       color: palette.text,
-      borderColor: palette.rule,
+      borderColor: palette.field,
       backgroundColor: palette.surface,
     },
   ]
@@ -265,9 +265,9 @@ const styles = StyleSheet.create({
   editor: { gap: space.md },
   input: {
     minHeight: MIN_TOUCH,
-    paddingHorizontal: space.md,
+    paddingHorizontal: space.md + space.xs,
     borderWidth: 1,
-    borderRadius: 2,
+    borderRadius: CAPSULE,
     fontFamily: familyFor('sans'),
     fontSize: 17,
   },

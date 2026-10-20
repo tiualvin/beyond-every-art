@@ -148,6 +148,19 @@ const SPECS = {
     line: 20,
     ramp: 'subheadline',
   },
+  /**
+   * A call to action inside an article, as the website sets its `.button`:
+   * small, uppercase and tracked. Interface buttons stay in sentence case.
+   */
+  action: {
+    face: 'sans',
+    strong: true,
+    size: 13,
+    line: 18,
+    tracking: 1.3,
+    upper: true,
+    ramp: 'footnote',
+  },
   /** The topic over an article's title. */
   kicker: {
     face: 'sans',
@@ -229,8 +242,11 @@ export const type = Object.fromEntries(
  */
 export const HEADLINE_MAX_SCALE = 1.6
 
-/** The smallest a touch target gets, in points. */
-export const MIN_TOUCH = 44
+/** The smallest a touch target gets: Apple's 44pt, Material's 48dp. */
+export const MIN_TOUCH = Platform.select({ android: 48, default: 44 })
+
+/** A control's shape: a capsule, as both platforms draw buttons and chips. */
+export const CAPSULE = 999
 
 export const space = {
   xs: 4,

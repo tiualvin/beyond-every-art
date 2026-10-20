@@ -25,12 +25,22 @@ describe.each(variants)('the %s palette', (_, palette) => {
     ['accent', 'background'],
     ['accent', 'surface'],
     ['onButton', 'button'],
+    ['onTonal', 'tonal'],
     ['onInverse', 'inverse'],
   ] as const)('%s on %s meets AA for body text', (foreground, background) => {
     expect(
       contrastRatio(palette[foreground], palette[background]),
     ).toBeGreaterThanOrEqual(AA_TEXT)
   })
+
+  it.each(['background', 'surface'] as const)(
+    'draws a text field’s border at 3:1 against the %s',
+    (background) => {
+      expect(
+        contrastRatio(palette.field, palette[background]),
+      ).toBeGreaterThanOrEqual(3)
+    },
+  )
 })
 
 describe('the light palette', () => {
