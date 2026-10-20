@@ -7,7 +7,7 @@
 // block element breaks the run and draws itself. Whitespace collapses the way
 // a browser collapses it, except inside `pre`.
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Image } from 'expo-image'
 import { StyleSheet, Text, View, type TextStyle } from 'react-native'
 
@@ -27,6 +27,7 @@ import {
   type HtmlNode,
 } from './html'
 import { useOpenLink } from './link-context'
+import { PlateWash } from './plate'
 import { QuoteFrame, quoteText, useInQuote } from './quote'
 
 type InlineStyle = {
@@ -185,7 +186,8 @@ function BlockElement({ element }: { element: HtmlElement }) {
         </Txt>
       )
     case 'img':
-      return <HtmlImage element={element} />
+      // Keyed by source, so a failure belongs to one picture (see image.tsx).
+      return <HtmlImage key={element.attrs.src} element={element} />
     case 'hr':
       return (
         <View
@@ -254,18 +256,27 @@ function List({ element }: { element: HtmlElement }) {
   )
 }
 
+/**
+ * A migrated image, in the same three states as every other: loading on the
+ * quiet `line` colour, the plate wash if it fails, and its own ratio — from
+ * the markup's size attributes, or the picture once it loads — rather than a
+ * crop. Ghost often omitted the attributes.
+ */
 function HtmlImage({ element }: { element: HtmlElement }) {
   const { palette } = useTheme()
+  const [failed, setFailed] = useState(false)
+  const [measured, setMeasured] = useState<number | null>(null)
   const width = Number(element.attrs.width)
   const height = Number(element.attrs.height)
+  const known = width > 0 && height > 0 ? width / height : null
   const alt = element.attrs.alt?.trim() ?? ''
   return (
     <View
       style={[
         styles.image,
         {
-          aspectRatio: width > 0 && height > 0 ? width / height : 3 / 2,
-          backgroundColor: palette.plate[1],
+          aspectRatio: known ?? measured ?? 3 / 2,
+          backgroundColor: palette.line,
         },
       ]}
       accessible={alt.length > 0}
@@ -273,13 +284,24 @@ function HtmlImage({ element }: { element: HtmlElement }) {
       accessibilityLabel={alt || undefined}
       importantForAccessibility={alt ? 'yes' : 'no-hide-descendants'}
     >
-      <Image
-        source={{ uri: element.attrs.src }}
-        style={StyleSheet.absoluteFill}
-        contentFit="cover"
-        cachePolicy="disk"
-        accessible={false}
-      />
+      {failed ? (
+        <PlateWash />
+      ) : (
+        <Image
+          source={{ uri: element.attrs.src }}
+          style={StyleSheet.absoluteFill}
+          contentFit="contain"
+          cachePolicy="disk"
+          transition={0}
+          accessible={false}
+          testID="reader-image"
+          onLoad={(event) => {
+            const { width: w, height: h } = event.source
+            if (!known && w > 0 && h > 0) setMeasured(w / h)
+          }}
+          onError={() => setFailed(true)}
+        />
+      )}
     </View>
   )
 }

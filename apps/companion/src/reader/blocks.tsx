@@ -282,7 +282,12 @@ function Bookmark({
       ]}
     >
       {fields.image ? (
-        <ReaderImage media={fields.image} size="card" showCredit={false} />
+        <ReaderImage
+          media={fields.image}
+          size="card"
+          showCredit={false}
+          fallback="hide"
+        />
       ) : null}
       <Txt variant="label">{fields.title}</Txt>
       {fields.description ? (

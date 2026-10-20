@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native'
 
 import type { PostSummary } from '../api/contract'
 import { formatDate } from '../format'
-import { ReaderImage } from '../reader/image'
+import { aspectRatioOf, ReaderImage } from '../reader/image'
 import { Txt } from '../theme/text'
 import { useTheme } from '../theme/theme'
 import { space } from '../theme/typography'
@@ -77,12 +77,27 @@ export function PostRow({
         </View>
       </View>
       {post.image ? (
-        <View style={styles.thumb}>
-          <ReaderImage media={post.image} size="card" showCredit={false} />
-        </View>
+        <ReaderImage
+          media={post.image}
+          size="card"
+          showCredit={false}
+          fallback="hide"
+          bare
+          ratio={1}
+          style={styles.thumb}
+        />
       ) : null}
     </Pressable>
   )
+}
+
+/**
+ * A lead image's frame: its own shape, within reason. A tall portrait would
+ * push the headline off the screen and a panorama would shrink to a strip, so
+ * the frame stays between 4:5 and 16:9 and the picture fills it.
+ */
+export function leadRatio(ratio: number): number {
+  return Math.min(16 / 9, Math.max(4 / 5, ratio))
 }
 
 /** The article a screen leads with. */
@@ -96,7 +111,12 @@ export function LeadCard({ post }: { post: PostSummary }) {
       style={({ pressed }) => [styles.lead, pressed && styles.pressed]}
     >
       {post.image ? (
-        <ReaderImage media={post.image} size="card" showCredit={false} />
+        <ReaderImage
+          media={post.image}
+          showCredit={false}
+          bare
+          ratio={leadRatio(aspectRatioOf(post.image))}
+        />
       ) : null}
       {post.tags[0] ? (
         <Txt variant="kicker" tone="accent">
@@ -132,7 +152,7 @@ const styles = StyleSheet.create({
     columnGap: space.sm + space.xs,
     marginTop: space.xs,
   },
-  thumb: { width: 96 },
+  thumb: { width: 80 },
   lead: { gap: space.sm },
   pressed: { opacity: 0.7 },
 })
