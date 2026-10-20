@@ -3,6 +3,7 @@ import { FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native'
 
 import { PostRow } from '../components/post-row'
 import { MAX_CONTENT_WIDTH } from '../components/screen'
+import { SectionHeader } from '../components/section'
 import { EmptyState, ErrorState, Loading } from '../components/states'
 import { usePostsFeed, useTags } from '../data/hooks'
 import { Txt } from '../theme/text'
@@ -54,9 +55,7 @@ function ReadHeader() {
       </Pressable>
       {tags.data && tags.data.tags.length > 0 ? (
         <View style={styles.topics}>
-          <Txt variant="section" tone="muted" accessibilityRole="header">
-            Topics
-          </Txt>
+          <SectionHeader label="Topics" />
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -77,9 +76,7 @@ function ReadHeader() {
           </ScrollView>
         </View>
       ) : null}
-      <Txt variant="section" tone="muted" accessibilityRole="header">
-        Newest
-      </Txt>
+      <SectionHeader label="Newest" style={styles.newest} />
     </View>
   )
 }
@@ -96,7 +93,9 @@ export function ReadScreen() {
       contentContainerStyle={styles.list}
       data={posts}
       keyExtractor={(post) => post.slug}
-      renderItem={({ item }) => <PostRow post={item} />}
+      renderItem={({ item, index }) => (
+        <PostRow post={item} divider={index > 0} />
+      )}
       ListHeaderComponent={ReadHeader}
       ListEmptyComponent={
         feed.isPending ? (
@@ -129,7 +128,8 @@ const styles = StyleSheet.create({
     maxWidth: MAX_CONTENT_WIDTH,
     alignSelf: 'center',
   },
-  header: { gap: space.md, paddingTop: space.md, paddingBottom: space.sm },
+  header: { gap: space.lg, paddingTop: space.md },
+  newest: { marginTop: space.lg },
   search: {
     minHeight: MIN_TOUCH,
     justifyContent: 'center',

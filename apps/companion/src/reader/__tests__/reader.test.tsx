@@ -293,6 +293,33 @@ describe('quotations', () => {
   })
 })
 
+describe('spacing inside a box', () => {
+  // A paragraph in the article's flow carries the space after it. Inside a
+  // callout that space would sit inside the callout's own padding, so the box
+  // was a paragraph deeper at the bottom than at the top.
+  const marginOf = (words: string) => {
+    let node = screen.getByText(words)
+    while (node.parent && node.parent.type === node.type) node = node.parent
+    return StyleSheet.flatten(node.props.style)?.marginBottom
+  }
+
+  it('drops a paragraph’s own margin inside a callout, and keeps it in the flow', async () => {
+    const fixtures = blockFixtures(TEST_SITE)
+    await renderReader(
+      <LexicalNodes
+        nodes={[
+          node(paragraph(text('A paragraph in the flow.'))),
+          node(fixtures.callout),
+        ]}
+      />,
+    )
+    expect(marginOf('A paragraph in the flow.')).toBeGreaterThan(0)
+    expect(
+      marginOf('An aside, set apart from the argument it sits beside.'),
+    ).toBeUndefined()
+  })
+})
+
 describe('content the app does not know', () => {
   it('renders nothing for an unknown block or node, and does not crash', async () => {
     const { toJSON } = await renderReader(

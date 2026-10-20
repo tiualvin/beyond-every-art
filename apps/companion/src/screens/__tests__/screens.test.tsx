@@ -7,6 +7,7 @@ import {
   renderRouter,
   screen,
   waitFor,
+  within,
 } from 'expo-router/testing-library'
 import type { ReactNode } from 'react'
 
@@ -103,6 +104,27 @@ describe('Read', () => {
   it('marks a gated article in the list', async () => {
     await show(ReadScreen)
     expect(await screen.findByText(/Members$/)).toBeTruthy()
+  })
+
+  it('leads each row with its headline, and keeps the topic in the footer', async () => {
+    await show(ReadScreen)
+    const title = await screen.findByText(
+      'Fixture: every module the reader renders',
+    )
+    const row = within(
+      screen.getByLabelText(/^Fixture: every module the reader renders\./),
+    )
+    const words = row.getAllByText(/.+/).map((node) => node.props.children)
+    expect(words[0]).toBe(title.props.children)
+    expect(words.indexOf('Reading')).toBeGreaterThan(0)
+  })
+
+  it('stands each section label on its own rule', async () => {
+    await show(ReadScreen)
+    const label = await screen.findByText('Newest')
+    const header = label.parent!
+    expect(header.children[0]).toBe(label)
+    expect(header.children).toHaveLength(2)
   })
 })
 

@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native'
 import type { PostSummary } from '../api/contract'
 import { LeadCard, PostRow } from '../components/post-row'
 import { Screen } from '../components/screen'
+import { Section } from '../components/section'
 import { EmptyState, ErrorState, Loading, Notice } from '../components/states'
 import { usePostsFeed } from '../data/hooks'
 import { useServices } from '../data/services'
@@ -74,7 +75,11 @@ export function TodayScreen({ now = () => new Date() }: { now?: () => Date }) {
   const latest = posts.filter((post) => post !== lead).slice(0, 3)
 
   return (
-    <Screen refreshing={feed.isRefetching} onRefresh={() => feed.refetch()}>
+    <Screen
+      spacing="sections"
+      refreshing={feed.isRefetching}
+      onRefresh={() => feed.refetch()}
+    >
       <FixtureNotice />
       {feed.isPending ? (
         <Loading label="Loading today’s article" />
@@ -87,14 +92,11 @@ export function TodayScreen({ now = () => new Date() }: { now?: () => Date }) {
       )}
       <PigmentCard date={now()} />
       {latest.length > 0 ? (
-        <View>
-          <Txt variant="section" tone="muted" accessibilityRole="header">
-            Latest
-          </Txt>
-          {latest.map((post) => (
-            <PostRow key={post.slug} post={post} />
+        <Section label="Latest">
+          {latest.map((post, index) => (
+            <PostRow key={post.slug} post={post} divider={index > 0} />
           ))}
-        </View>
+        </Section>
       ) : null}
     </Screen>
   )

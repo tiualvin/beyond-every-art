@@ -57,8 +57,8 @@ function Archive({
         <EmptyState title="Nothing filed here yet" />
       ) : (
         <View>
-          {query.data.posts.map((post) => (
-            <PostRow key={post.slug} post={post} />
+          {query.data.posts.map((post, index) => (
+            <PostRow key={post.slug} post={post} divider={index > 0} />
           ))}
         </View>
       )}

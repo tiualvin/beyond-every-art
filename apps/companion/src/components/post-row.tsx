@@ -29,8 +29,22 @@ export function postMeta(post: PostSummary): string {
     .join(' · ')
 }
 
-/** One article in a list. The whole row is the link. */
-export function PostRow({ post }: { post: PostSummary }) {
+/**
+ * One article in a list. The whole row is the link. Rows are divided from
+ * each other, not from the section rule above the first: pass
+ * `divider={false}` for the first row.
+ *
+ * The headline leads. The topic sits quietly in the footer beside the date,
+ * not in burgundy above every headline: a coloured kicker on each row made a
+ * list a column of red labels, and only the lead keeps one.
+ */
+export function PostRow({
+  post,
+  divider = true,
+}: {
+  post: PostSummary
+  divider?: boolean
+}) {
   const router = useRouter()
   const { palette } = useTheme()
   return (
@@ -40,25 +54,27 @@ export function PostRow({ post }: { post: PostSummary }) {
       onPress={() => router.push(articleRoute(post.slug))}
       style={({ pressed }) => [
         styles.row,
-        { borderColor: palette.line },
+        divider && [styles.divided, { borderColor: palette.line }],
         pressed && styles.pressed,
       ]}
     >
       <View style={styles.text}>
-        {post.tags[0] ? (
-          <Txt variant="kicker" tone="accent">
-            {post.tags[0].name}
-          </Txt>
-        ) : null}
         <Txt variant="rowTitle">{post.title}</Txt>
         {post.excerpt ? (
           <Txt variant="summary" tone="muted" numberOfLines={3}>
             {post.excerpt}
           </Txt>
         ) : null}
-        <Txt variant="meta" tone="muted">
-          {postMeta(post)}
-        </Txt>
+        <View style={styles.footer}>
+          {post.tags[0] ? (
+            <Txt variant="section" tone="muted">
+              {post.tags[0].name}
+            </Txt>
+          ) : null}
+          <Txt variant="meta" tone="muted">
+            {postMeta(post)}
+          </Txt>
+        </View>
       </View>
       {post.image ? (
         <View style={styles.thumb}>
@@ -104,10 +120,18 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     gap: space.md,
-    paddingVertical: space.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingVertical: space.md + 2,
   },
+  divided: { borderTopWidth: StyleSheet.hairlineWidth },
   text: { flex: 1, gap: space.xs },
+  // Wraps under a large text size rather than squeezing the date.
+  footer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'baseline',
+    columnGap: space.sm + space.xs,
+    marginTop: space.xs,
+  },
   thumb: { width: 96 },
   lead: { gap: space.sm },
   pressed: { opacity: 0.7 },

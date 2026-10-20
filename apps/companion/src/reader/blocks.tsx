@@ -18,7 +18,7 @@ import { InverseTheme, useTheme } from '../theme/theme'
 import { MIN_TOUCH, space } from '../theme/typography'
 import { ReaderImage } from './image'
 import { InlineNodes } from './inline'
-import { LexicalNodes } from './lexical'
+import { ContainedNodes, LexicalNodes } from './lexical'
 import { useOpenExternal, useOpenLink } from './link-context'
 
 type Renderers = {
@@ -70,7 +70,7 @@ function Accordion({
           </Pressable>
           {open[index] ? (
             <View style={styles.panelBody}>
-              <LexicalNodes nodes={item.content} />
+              <ContainedNodes nodes={item.content} />
             </View>
           ) : null}
         </View>
@@ -188,7 +188,7 @@ function Callout({
             borderColor: palette.line,
             borderWidth: 1,
           }
-  const content = <LexicalNodes nodes={fields.content} />
+  const content = <ContainedNodes nodes={fields.content} />
   return (
     <View style={[styles.block, styles.callout, tone]}>
       {fields.emoji ? (
@@ -365,7 +365,7 @@ function Faq({
           <Txt variant="h5" accessibilityRole="header">
             {item.question}
           </Txt>
-          <LexicalNodes nodes={item.answer} />
+          <ContainedNodes nodes={item.answer} />
         </View>
       ))}
     </View>
@@ -540,7 +540,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: space.sm,
   },
-  panelBody: { paddingBottom: space.sm },
+  panelBody: { paddingBottom: space.md },
   flex: { flex: 1 },
   centered: { textAlign: 'center' },
   largeQuote: { fontSize: 28, lineHeight: 36 },
@@ -559,7 +559,7 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.7 },
   row: { flexDirection: 'row', gap: space.sm },
   number: { minWidth: 22 },
-  faqItem: { marginTop: space.sm },
+  faqItem: { marginTop: space.md, gap: space.sm },
   featureItem: { marginTop: space.sm, gap: space.xs },
   tableRow: {
     borderTopWidth: StyleSheet.hairlineWidth,

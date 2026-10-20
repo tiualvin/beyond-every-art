@@ -59,7 +59,9 @@ export function SearchScreen({ debounceMs = 300 }: { debounceMs?: number }) {
       ) : search.data.posts.length === 0 ? (
         <EmptyState title={`Nothing matches “${search.data.query}”`} />
       ) : (
-        search.data.posts.map((post) => <PostRow key={post.slug} post={post} />)
+        search.data.posts.map((post, index) => (
+          <PostRow key={post.slug} post={post} divider={index > 0} />
+        ))
       )}
     </Screen>
   )
