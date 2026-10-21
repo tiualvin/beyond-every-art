@@ -17,6 +17,8 @@
 import type { Payload, TypedUser } from 'payload'
 import React from 'react'
 
+import { isStale } from '../../lib/publications/processing/plan'
+
 type Props = {
   payload: Payload
   user?: TypedUser | null
@@ -32,6 +34,7 @@ type Run = {
   currentPage?: number | null
   startedAt?: string | null
   finishedAt?: string | null
+  updatedAt?: string | null
   error?: string | null
   rejection?: string | null
   source?: { kind?: string | null; name?: string | null } | null
@@ -136,7 +139,11 @@ export async function ProcessingStatus({ payload, user, data }: Props) {
   }
 
   const status = run.status ?? 'failed'
-  const active = status !== 'ready' && status !== 'failed'
+  // A run killed at its memory limit, or with its container, never says so.
+  // Past the window the command itself uses to decide a run has stopped, say
+  // it has, rather than "still running" until somebody starts another.
+  const stopped = isStale(run, new Date())
+  const active = status !== 'ready' && status !== 'failed' && !stopped
   const total = run.pageCount ?? null
   const started = when(run.startedAt)
   const finished = when(run.finishedAt)
@@ -144,7 +151,7 @@ export async function ProcessingStatus({ payload, user, data }: Props) {
   return (
     <div className="bea-process">
       <p className="bea-process__heading">
-        {STATUS[status] ?? status}
+        {stopped ? 'Stopped' : (STATUS[status] ?? status)}
         {active && run.progress !== null && run.progress !== undefined
           ? ` — ${run.progress}%`
           : ''}
@@ -176,10 +183,18 @@ export async function ProcessingStatus({ payload, user, data }: Props) {
       {!run.rejection && run.error && (
         <p className="bea-process__error">{run.error}</p>
       )}
+      {stopped && (
+        <p className="bea-process__error">
+          It stopped reporting progress
+          {when(run.updatedAt) ? ` at ${when(run.updatedAt)}` : ''}, at{' '}
+          {run.pagesDone ?? 0} of {total ?? '?'} pages, without finishing — most
+          likely killed at its memory limit or with its container.
+        </p>
+      )}
       <p className="bea-process__note">
         {active
           ? 'Still running. Reload to see how far it has got.'
-          : status === 'failed'
+          : status === 'failed' || stopped
             ? 'Run the command again to retry: pages already drawn from the same file are kept.'
             : 'Readers see none of this until the publication launches.'}
       </p>

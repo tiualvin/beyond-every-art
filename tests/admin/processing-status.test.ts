@@ -42,10 +42,27 @@ describe('ProcessingStatus', () => {
       pagesDone: 4,
       pageCount: 10,
       currentPage: 4,
+      updatedAt: new Date().toISOString(),
     })
     expect(html).toContain('Drawing pages — 40%')
     expect(html).toContain('4 of 10 pages done, last page 4')
     expect(html).toContain('Reload')
+  })
+
+  it('calls a run that stopped reporting stopped, not still running', async () => {
+    // Killed at its memory limit, a run never records that it ended.
+    const html = await render({
+      id: 1,
+      status: 'processing-pages',
+      progress: 40,
+      pagesDone: 4,
+      pageCount: 10,
+      updatedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+    })
+    expect(html).toContain('Stopped')
+    expect(html).toContain('at 4 of 10 pages')
+    expect(html).not.toContain('Still running')
+    expect(html).toContain('Run the command again')
   })
 
   it('names a rejected file in terms an editor can act on', async () => {

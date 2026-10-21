@@ -80,6 +80,8 @@ export type RunOptions = {
   siteUrl?: string
   log?: (line: string) => void
   now?: () => Date
+  /** Told the run's ID as soon as it is recorded, so a signal can close it. */
+  onRun?: (id: number) => void
 }
 
 export type RunReport = {
@@ -285,6 +287,7 @@ export async function processPublication(
       })
       runId = Number(run.id)
       report.run = runId
+      options.onRun?.(runId)
       log(`Run ${runId} started for ${publication.slug}.`)
     }
 

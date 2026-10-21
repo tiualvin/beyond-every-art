@@ -1002,8 +1002,10 @@ On the server, after a deploy has built the image:
 Running it again is always safe. A page already drawn from the same file is
 skipped, so a run that stopped resumes — and a page whose image was deleted is
 drawn again. If the files themselves are lost from R2 while the records survive,
-`--all` is the repair: a forced redraw writes each image back under its name; a run left marked as processing by a
-container that was killed is failed after fifteen minutes without progress,
+`--all` is the repair: a forced redraw writes each image back under its name.
+An interrupted run — Ctrl-C, or `docker compose stop` — records itself as
+failed. One killed outright, at its memory limit, cannot: after fifteen minutes
+without progress the panel calls it stopped and the next run marks it failed,
 and until then a second run refuses to start. A file that needs a password,
 is not a PDF, or exceeds the limits in `plan.ts` (500 pages, 500 MB) ends the
 run with the reason and leaves the issue's existing pages alone. Deleting a

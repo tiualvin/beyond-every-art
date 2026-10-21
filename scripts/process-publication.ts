@@ -22,9 +22,11 @@
 // 800 ms (docs/PUBLICATION_SYSTEM.md, "PDF processing").
 //
 // Safe to rerun. A page already drawn from the same file is skipped, so a run
-// that stopped part way resumes; a run left marked as processing by a killed
-// container is failed after 15 minutes without progress. Prints a JSON report
-// and exits 1 when the run did not end ready.
+// that stopped part way resumes. Interrupted, it records itself as failed; a
+// run killed outright — at its memory limit, say — cannot, and is treated as
+// stopped after 15 minutes without progress: the admin says so, and the next
+// run marks it failed. Prints a JSON report and exits 1 when the run did not
+// end ready.
 
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -229,6 +231,28 @@ async function main(): Promise<void> {
     )
   }
 
+  // Ctrl-C, or `docker compose stop`, would otherwise leave the run recorded
+  // as processing until the next run found it stale. Close it as failed
+  // first; a second signal, or a database that does not answer, still exits.
+  let current: number | null = null
+  const interrupted = (signal: NodeJS.Signals) => {
+    const code = signal === 'SIGINT' ? 130 : 143
+    const exit = () => process.exit(code)
+    console.error(`Stopped by ${signal}.`)
+    if (current === null) return exit()
+    setTimeout(exit, 5000).unref()
+    store
+      .updateRun(payload, current, {
+        status: 'failed',
+        finishedAt: new Date().toISOString(),
+        currentPage: null,
+        error: `Stopped by ${signal} before it finished. Run the command again: pages already drawn from this file are kept.`,
+      })
+      .then(exit, exit)
+  }
+  process.once('SIGINT', interrupted)
+  process.once('SIGTERM', interrupted)
+
   const report = await run.processPublication(payload, {
     publication,
     source,
@@ -236,6 +260,9 @@ async function main(): Promise<void> {
     dryRun: cli.dryRun,
     siteUrl: process.env.NEXT_PUBLIC_SITE_URL,
     log: (line) => console.error(line),
+    onRun: (id) => {
+      current = id
+    },
   })
   console.log(JSON.stringify(report, null, 2))
   if (report.error) process.exitCode = 1
