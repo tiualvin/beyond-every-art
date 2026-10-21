@@ -242,6 +242,9 @@ type QpdfObjects = Record<string, { value?: QpdfValue; stream?: unknown }>
 
 const REF = /^(\d+) (\d+) R$/
 
+/** The most name-tree nodes read from one file: far past any real export. */
+const NAME_TREE_LIMIT = 10_000
+
 /** qpdf's JSON v2 strings: `u:` for text, `b:` for hex bytes. Names keep `/`. */
 function qpdfString(value: QpdfValue): string | null {
   if (typeof value !== 'string') return null
@@ -296,34 +299,62 @@ export function extractLinks(
     if (page.object) pageRefs.set(page.object, index + 1)
   })
 
-  const catalog = dict(
-    Object.values(objects).find((object) => {
-      const value = object.value as Record<string, QpdfValue> | undefined
-      return value && typeof value === 'object' && value['/Type'] === '/Catalog'
-    })?.value ?? null,
-  )
+  // The document catalog is the trailer's /Root. Looking for an object that
+  // calls itself /Type /Catalog instead found the wrong one in a file still
+  // holding an older catalog from an earlier save, and none in a file whose
+  // catalog omits /Type — both of which Poppler and qpdf read without a word —
+  // and every named link to another page was dropped.
+  const trailer = objects['trailer']?.value as
+    Record<string, QpdfValue> | undefined
+  const catalog =
+    dict(trailer?.['/Root'] ?? null) ??
+    dict(
+      Object.values(objects).find((object) => {
+        const value = object.value as Record<string, QpdfValue> | undefined
+        return (
+          value && typeof value === 'object' && value['/Type'] === '/Catalog'
+        )
+      })?.value ?? null,
+    )
 
   // Named destinations live in the catalog's /Names /Dests tree (PDF 1.2+)
-  // or its older /Dests dictionary.
-  const lookupName = (name: string): QpdfValue => {
-    const old = dict(catalog?.['/Dests'])
-    if (old && `/${name}` in old) return old[`/${name}`]
-    const search = (node: QpdfValue, depth: number): QpdfValue => {
+  // or its older /Dests dictionary. The tree is read once, into a map: each
+  // node at most once and no more than NAME_TREE_LIMIT of them, because a
+  // file can list a node among its own kids, and searching such a tree for
+  // each link took longer than any run could wait — a 700-byte PDF hung link
+  // extraction with no timeout able to stop it, since this runs in-process.
+  let named: Map<string, QpdfValue> | null = null
+  const namedDestinations = (): Map<string, QpdfValue> => {
+    if (named) return named
+    const found = new Map<string, QpdfValue>()
+    const seen = new Set<string>()
+    let budget = NAME_TREE_LIMIT
+    const walk = (node: QpdfValue, depth: number) => {
+      if (depth > 32 || budget <= 0) return
+      budget -= 1
+      if (typeof node === 'string' && REF.test(node)) {
+        if (seen.has(node)) return
+        seen.add(node)
+      }
       const entry = dict(node)
-      if (!entry || depth > 32) return null
+      if (!entry) return
       const names = array(entry['/Names'])
       if (names) {
         for (let i = 0; i + 1 < names.length; i += 2) {
-          if (qpdfString(names[i]) === name) return names[i + 1]
+          const key = qpdfString(names[i])
+          if (key !== null && !found.has(key)) found.set(key, names[i + 1])
         }
       }
-      for (const kid of array(entry['/Kids']) ?? []) {
-        const found = search(kid, depth + 1)
-        if (found) return found
-      }
-      return null
+      for (const kid of array(entry['/Kids']) ?? []) walk(kid, depth + 1)
     }
-    return search(dict(catalog?.['/Names'])?.['/Dests'] ?? null, 0)
+    walk(dict(catalog?.['/Names'] ?? null)?.['/Dests'] ?? null, 0)
+    named = found
+    return found
+  }
+  const lookupName = (name: string): QpdfValue => {
+    const old = dict(catalog?.['/Dests'] ?? null)
+    if (old && `/${name}` in old) return old[`/${name}`]
+    return namedDestinations().get(name) ?? null
   }
 
   const destinationPage = (dest: QpdfValue, depth = 0): number | null => {

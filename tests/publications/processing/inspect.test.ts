@@ -335,4 +335,55 @@ describe('extractLinks', () => {
       ),
     ).toEqual([])
   })
+
+  it('finds named destinations through the trailer’s root, not a stray catalog', () => {
+    // A file saved incrementally can still hold its older catalog, and a
+    // catalog may leave out /Type. Both read fine in Poppler and qpdf; the
+    // names have to come from the catalog the trailer points at.
+    const json = (catalog: Record<string, unknown>) => ({
+      version: 2,
+      pages: [{ object: '3 0 R' }, { object: '4 0 R' }],
+      qpdf: [
+        { jsonversion: 2 },
+        {
+          trailer: { value: { '/Root': '7 0 R', '/Size': 9 } },
+          'obj:1 0 R': { value: { '/Type': '/Catalog', '/Pages': '2 0 R' } },
+          'obj:7 0 R': { value: catalog },
+          'obj:8 0 R': { value: { '/Names': ['u:p2', ['4 0 R', '/Fit']] } },
+          'obj:3 0 R': {
+            value: { '/Annots': [link({ '/Dest': 'u:p2' })] },
+          },
+          'obj:4 0 R': { value: {} },
+        },
+      ],
+    })
+    const names = { '/Names': { '/Dests': '8 0 R' } }
+    for (const catalog of [{ '/Type': '/Catalog', ...names }, names]) {
+      expect(
+        extractLinks(json(catalog), PAGES, SITE).map((each) => each.target),
+      ).toEqual([{ kind: 'page', page: 2 }])
+    }
+  })
+
+  it('reads a name tree that lists itself among its kids, and stops', () => {
+    // Searched once per link with no memory of where it had been, eight kids
+    // pointing back at their own node took longer than any run could wait.
+    const started = Date.now()
+    const links = extractLinks(
+      qpdf({
+        '20 0 R': { '/Kids': Array(8).fill('20 0 R') },
+        '3 0 R': {
+          '/Annots': [
+            link({ '/Dest': 'u:nowhere' }),
+            link({ '/Dest': 'u:chapter-2' }),
+          ],
+        },
+        '4 0 R': {},
+      }),
+      PAGES,
+      SITE,
+    )
+    expect(links).toEqual([])
+    expect(Date.now() - started).toBeLessThan(1000)
+  })
 })
