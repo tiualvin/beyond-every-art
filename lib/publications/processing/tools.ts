@@ -9,7 +9,7 @@
 // The binaries come from `poppler-utils` and `qpdf`, installed in the
 // Dockerfile's `migrator` stage and in CI's `checks` job.
 
-import { execFile } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import { join } from 'node:path'
 
 import {
@@ -58,58 +58,103 @@ function tail(text: string, lines = 5): string {
   return text.trim().split(/\r?\n/).slice(-lines).join('\n')
 }
 
-function run(
+/**
+ * How much of a tool's stderr is kept: the end, where the reason for a failure
+ * is. Nothing a tool writes to stderr limits the run — a page Poppler draws
+ * perfectly well can still print a warning for every bad token on it, and an
+ * earlier version failed such pages for writing too much.
+ */
+const STDERR_KEPT = 64 * 1024
+
+/**
+ * Runs one tool and returns its stdout. Exported for its tests; the functions
+ * below are what the rest of processing calls.
+ */
+export function runTool(
   tool: string,
   args: string[],
   options: RunOptions,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile(
-      tool,
-      args,
-      {
-        encoding: 'utf8',
-        timeout: options.timeoutMs,
-        maxBuffer: options.maxBuffer,
-        killSignal: 'SIGKILL',
-        windowsHide: true,
-      },
-      (error, stdout, stderr) => {
-        if (!error) return resolve(stdout)
-        const detail = tail(stderr) || error.message
-        if ('code' in error && error.code === 'ENOENT') {
-          return reject(
-            new ToolFailed(
-              tool,
-              `${tool} is not installed; install poppler-utils and qpdf.`,
-            ),
-          )
-        }
-        if (error.killed) {
-          return reject(
-            new ToolFailed(
-              tool,
-              `${tool} took longer than ${options.timeoutMs} ms.`,
-            ),
-          )
-        }
-        if (
-          'code' in error &&
-          error.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER'
-        ) {
-          return reject(
-            new ToolFailed(
-              tool,
-              `${tool} wrote more than ${options.maxBuffer} bytes.`,
-            ),
-          )
-        }
-        reject(
-          Object.assign(new ToolFailed(tool, `${tool} failed: ${detail}`), {
-            stderr,
-          }),
+    const child = spawn(tool, args, {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    })
+    const out: Buffer[] = []
+    let outBytes = 0
+    let err = ''
+    let settled = false
+    let stopped: ToolFailed | null = null
+    const settle = (finish: () => void) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      finish()
+    }
+    // Settles at once rather than waiting for the pipes to close: a process
+    // the tool started can hold them open after the tool itself is killed.
+    const stop = (reason: ToolFailed) => {
+      if (stopped) return
+      stopped = reason
+      child.kill('SIGKILL')
+      child.stdout.destroy()
+      child.stderr.destroy()
+      settle(() => reject(reason))
+    }
+    const timer = setTimeout(
+      () =>
+        stop(
+          new ToolFailed(
+            tool,
+            `${tool} took longer than ${options.timeoutMs} ms.`,
+          ),
+        ),
+      options.timeoutMs,
+    )
+
+    child.stdout.on('data', (chunk: Buffer) => {
+      outBytes += chunk.length
+      if (outBytes > options.maxBuffer) {
+        stop(
+          new ToolFailed(
+            tool,
+            `${tool} wrote more than ${options.maxBuffer} bytes.`,
+          ),
         )
-      },
+        return
+      }
+      out.push(chunk)
+    })
+    child.stderr.setEncoding('utf8')
+    child.stderr.on('data', (chunk: string) => {
+      err = (err + chunk).slice(-STDERR_KEPT)
+    })
+    child.on('error', (error: NodeJS.ErrnoException) =>
+      settle(() =>
+        reject(
+          error.code === 'ENOENT'
+            ? new ToolFailed(
+                tool,
+                `${tool} is not installed; install poppler-utils and qpdf.`,
+              )
+            : new ToolFailed(tool, `${tool} could not start: ${error.message}`),
+        ),
+      ),
+    )
+    child.on('close', (code, signal) =>
+      settle(() => {
+        if (stopped) return reject(stopped)
+        if (code === 0) return resolve(Buffer.concat(out).toString('utf8'))
+        reject(
+          Object.assign(
+            new ToolFailed(
+              tool,
+              `${tool} failed: ${tail(err) || `exit ${code ?? signal}`}`,
+            ),
+            { stderr: err },
+          ),
+        )
+      }),
     )
   })
 }
@@ -125,10 +170,14 @@ export async function inspectPdf(file: string): Promise<DocumentInfo> {
   let stdout: string
   try {
     // `-l` past the last page is clamped, so one call reads every page.
-    stdout = await run('pdfinfo', ['-f', '1', '-l', '1000000', '-box', file], {
-      timeoutMs: 60_000,
-      maxBuffer: 64 * MiB,
-    })
+    stdout = await runTool(
+      'pdfinfo',
+      ['-f', '1', '-l', '1000000', '-box', file],
+      {
+        timeoutMs: 60_000,
+        maxBuffer: 64 * MiB,
+      },
+    )
   } catch (error) {
     if (
       error instanceof ToolFailed &&
@@ -162,7 +211,7 @@ export async function readPageText(
   page: PageInfo,
 ): Promise<PageText> {
   const n = String(page.number)
-  const xhtml = await run(
+  const xhtml = await runTool(
     'pdftotext',
     ['-f', n, '-l', n, '-bbox-layout', '-cropbox', '-enc', 'UTF-8', file, '-'],
     { timeoutMs: 120_000, maxBuffer: 64 * MiB },
@@ -176,7 +225,7 @@ export async function readLinks(
   pages: PageInfo[],
   siteUrl?: string,
 ): Promise<ExtractedLink[]> {
-  const stdout = await run(
+  const stdout = await runTool(
     'qpdf',
     [
       '--json=2',
@@ -208,7 +257,7 @@ export async function renderPage(
 ): Promise<string> {
   const n = String(page.number)
   const prefix = join(directory, `page-${n.padStart(4, '0')}`)
-  await run(
+  await runTool(
     'pdftoppm',
     [
       '-f',

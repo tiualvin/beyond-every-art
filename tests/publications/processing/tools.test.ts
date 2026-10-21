@@ -12,6 +12,7 @@ import {
   readLinks,
   readPageText,
   renderPage,
+  runTool,
 } from '../../../lib/publications/processing/tools'
 import {
   buildSamplePdf,
@@ -30,6 +31,50 @@ const installed = TOOLS.every((tool) => {
   } catch {
     return false
   }
+})
+
+describe('runTool', () => {
+  const sh = (
+    script: string,
+    options = { timeoutMs: 10_000, maxBuffer: 1024 },
+  ) => runTool('sh', ['-c', script], options)
+
+  it('returns what the tool wrote to stdout', async () => {
+    await expect(sh('printf ok')).resolves.toBe('ok')
+  })
+
+  it('never fails a tool for what it writes to stderr', async () => {
+    // Poppler draws a page with a damaged content stream and warns once per
+    // bad token: megabytes, with exit status 0. Counted against the output
+    // ceiling, that failed a page that had drawn perfectly well.
+    await expect(
+      sh("head -c 3000000 /dev/zero | tr '\\0' w >&2; printf drawn"),
+    ).resolves.toBe('drawn')
+  })
+
+  it('stops a tool that writes more than it may to stdout', async () => {
+    await expect(sh('head -c 4096 /dev/zero')).rejects.toThrow(
+      /wrote more than 1024 bytes/,
+    )
+  })
+
+  it('stops a tool that runs past its time', async () => {
+    await expect(
+      sh('sleep 5', { timeoutMs: 100, maxBuffer: 1024 }),
+    ).rejects.toThrow(/took longer than 100 ms/)
+  })
+
+  it('reports a failure with the end of what the tool said', async () => {
+    await expect(sh('echo first >&2; echo why >&2; exit 2')).rejects.toThrow(
+      /failed: first\nwhy/,
+    )
+  })
+
+  it('says when a tool is not installed', async () => {
+    await expect(
+      runTool('no-such-pdf-tool', [], { timeoutMs: 1000, maxBuffer: 1024 }),
+    ).rejects.toThrow(/not installed/)
+  })
 })
 
 describe('the PDF tools in CI', () => {
