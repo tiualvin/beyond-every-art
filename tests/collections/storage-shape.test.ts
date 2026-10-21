@@ -21,6 +21,18 @@ const R2 = {
   S3_ENDPOINT: 'https://shape-test.invalid',
 }
 
+/**
+ * A column's default, which Postgres stores as part of the column, so two
+ * configurations that differ only in a default still need different
+ * migrations. A function default is applied by Payload, not the database.
+ */
+function withDefault(path: string, field: Field): string {
+  if (!('defaultValue' in field) || field.defaultValue === undefined)
+    return path
+  if (typeof field.defaultValue === 'function') return path
+  return `${path}=${JSON.stringify(field.defaultValue)}`
+}
+
 /** Dotted paths of every field that stores a value, nested ones included. */
 function columns(fields: Field[], parent = ''): string[] {
   return fields.flatMap((field) => {
@@ -38,7 +50,7 @@ function columns(fields: Field[], parent = ''): string[] {
     const path = `${parent}${field.name}`
     return 'fields' in field
       ? [path, ...columns(field.fields, `${path}.`)]
-      : [path]
+      : [withDefault(path, field)]
   })
 }
 
@@ -73,6 +85,9 @@ describe(
   'the storage plugin leaves the schema alone',
   { timeout: 30_000 },
   () => {
+    // Columns and their defaults: the plugin gave page images' `prefix` a
+    // default only when enabled, so a migration generated with R2 on set one
+    // the committed schema lacked.
     it('gives upload collections the same columns with R2 on and off', async () => {
       const off = await uploadColumns({ S3_BUCKET: '', S3_ENDPOINT: '' })
       const on = await uploadColumns(R2)
@@ -82,6 +97,11 @@ describe(
     it('keeps the object key column either way', async () => {
       const off = await uploadColumns({ S3_BUCKET: '', S3_ENDPOINT: '' })
       expect(off.media).toContain('_objectKey')
+      // Page images use a storage prefix too, which is a column of its own
+      // (collections/PublicationPageImages.ts).
+      expect(off['publication-page-images']).toEqual(
+        expect.arrayContaining(['_objectKey', 'prefix="publication-pages"']),
+      )
     })
   },
 )

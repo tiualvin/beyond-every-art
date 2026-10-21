@@ -8,6 +8,7 @@ import { CONTENT_TAGS } from '../lib/cache/content'
 import { purgeOnChange, purgeOnDelete } from '../lib/cache/purge'
 import { stampPublishedAt } from '../lib/content/publish-date'
 import { buildPreviewUrl } from '../lib/preview/live-preview'
+import { removeProcessingOnDelete } from '../lib/publications/processing/store'
 
 /**
  * Issues of the publication — the magazine, journal issues and exhibition
@@ -62,6 +63,11 @@ export const Publications: CollectionConfig = {
     // publishing without one stamps today rather than leaving it undated.
     beforeChange: [stampPublishedAt],
     afterChange: [purgeOnChange(CONTENT_TAGS.publications)],
+    // Deleting an issue for good — emptying it from the trash — takes what
+    // processing made for it: pages, runs and page images. Each points at the
+    // issue through a required column, so without this the delete fails on a
+    // constraint.
+    beforeDelete: [removeProcessingOnDelete],
     afterDelete: [purgeOnDelete(CONTENT_TAGS.publications)],
   },
   versions: { drafts: { autosave: { interval: 800 } }, maxPerDoc: 50 },
@@ -113,6 +119,18 @@ export const Publications: CollectionConfig = {
       type: 'upload',
       relationTo: 'media',
       admin: { description: 'The front cover, as a reader would see it.' },
+    },
+    {
+      // Where this issue's PDF processing stands. Read-only: processing runs
+      // from a command on the server, never from this screen, which autosaves.
+      name: 'processing',
+      type: 'ui',
+      admin: {
+        position: 'sidebar',
+        components: {
+          Field: '/components/admin/ProcessingStatus#ProcessingStatus',
+        },
+      },
     },
     {
       name: 'publishedAt',

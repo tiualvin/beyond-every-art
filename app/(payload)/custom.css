@@ -315,3 +315,69 @@
     border-color: color-mix(in srgb, var(--bea-line) 25%, transparent);
   }
 }
+
+/* --- Publication processing (where this issue's PDF stands) ------------- */
+
+.bea-process {
+  border-block-end: 1px solid var(--bea-line);
+  margin-block-end: 1.25rem;
+  padding-block-end: 1rem;
+}
+
+.bea-process__heading {
+  font-weight: 600;
+  margin: 0 0 0.5rem;
+}
+
+.bea-process__facts {
+  color: var(--bea-muted);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.bea-process__facts li + li {
+  margin-block-start: 0.25rem;
+}
+
+.bea-process__error {
+  color: var(--bea-burgundy);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  margin: 0.65rem 0 0;
+}
+
+.bea-process__note {
+  color: var(--bea-muted);
+  font-size: 0.75rem;
+  line-height: 1.45;
+  margin: 0.65rem 0 0;
+}
+
+.bea-process__command {
+  font-size: 0.75rem;
+  line-height: 1.45;
+  margin: 0.5rem 0 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+:root[data-theme='dark'] .bea-process {
+  border-color: color-mix(in srgb, var(--bea-line) 25%, transparent);
+}
+
+:root[data-theme='dark'] .bea-process__error {
+  color: inherit;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .bea-process {
+    border-color: color-mix(in srgb, var(--bea-line) 25%, transparent);
+  }
+
+  :root:not([data-theme='light']) .bea-process__error {
+    color: inherit;
+  }
+}

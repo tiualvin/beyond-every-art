@@ -16,6 +16,13 @@ import { NewsletterSignups } from './collections/NewsletterSignups'
 import { SignupCampaigns } from './collections/SignupCampaigns'
 import { Pages } from './collections/Pages'
 import { Posts } from './collections/Posts'
+import {
+  PAGE_IMAGE_PREFIX,
+  PUBLICATION_PAGE_IMAGES,
+  PublicationPageImages,
+} from './collections/PublicationPageImages'
+import { PublicationPages } from './collections/PublicationPages'
+import { PublicationRuns } from './collections/PublicationRuns'
 import { Publications } from './collections/Publications'
 import { Redirects } from './collections/Redirects'
 import { Tags } from './collections/Tags'
@@ -119,6 +126,9 @@ export default buildConfig({
     Apps,
     AppWaitlist,
     Publications,
+    PublicationPages,
+    PublicationPageImages,
+    PublicationRuns,
     Redirects,
     Members,
     NewsletterSignups,
@@ -197,7 +207,19 @@ export default buildConfig({
     s3Storage({
       enabled: useR2,
       bucket: process.env.S3_BUCKET ?? '',
-      collections: { media: true },
+      collections: {
+        media: true,
+        // Under their own prefix, so no page image can share a key with a
+        // media file (collections/PublicationPageImages.ts says why). The URL
+        // is given here because a prefixed collection otherwise appends
+        // `?prefix=` to every file URL, and the file route finds the prefix
+        // from the stored document anyway.
+        [PUBLICATION_PAGE_IMAGES]: {
+          prefix: PAGE_IMAGE_PREFIX,
+          generateFileURL: ({ filename }) =>
+            `/api/${PUBLICATION_PAGE_IMAGES}/file/${encodeURIComponent(filename)}`,
+        },
+      },
       config: {
         credentials: {
           accessKeyId: process.env.S3_ACCESS_KEY_ID ?? '',

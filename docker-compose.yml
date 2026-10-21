@@ -243,6 +243,12 @@ services:
   #
   #   docker compose build migrate && docker compose run --rm migrate
   migrate:
+    # Named, so `publications` below can run the same image: the deploy builds
+    # `migrate` on every merge, and a service with a `build:` of its own that
+    # the deploy does not name is built once and runs that image for ever (as
+    # `reconcile` does). Named explicitly rather than left to Compose, whose
+    # default name depends on the checkout's directory.
+    image: beyond-every-art-migrator
     build:
       context: .
       target: migrator
@@ -352,6 +358,54 @@ services:
       DATABASE_URI: ${DATABASE_URI:-postgresql://payload:payload@postgres:5432/beyond_every_art}
       PAYLOAD_SECRET: ${PAYLOAD_SECRET}
       RECONCILE_CRON: ${RECONCILE_CRON:-30 2 * * *}
+
+  # Publication processing: one run, on demand, then gone.
+  #
+  #   docker compose run --rm publications --publication <slug> \
+  #     --source-key publication-sources/<file>.pdf
+  #
+  # Arguments follow the entrypoint, so this is `pnpm publications:process`
+  # with them (scripts/process-publication.ts lists the rest). No always-on
+  # worker and no job queue: the owner decided on an on-demand command
+  # (docs/PUBLICATION_SYSTEM.md, open decision 4).
+  #
+  # Its own memory limit, because drawing a page is the most memory-hungry
+  # thing this site does and the server has about 2 GB free with the stack up.
+  # Measure that before the first real run, and keep runs clear of the 02:30,
+  # 03:00 and Sunday 04:00 jobs and of deploys. The PDF and the pages being
+  # drawn go to the container's own temporary directory, on disk rather than
+  # tmpfs, which would count against the limit; `--rm` discards them.
+  publications:
+    image: beyond-every-art-migrator
+    # Built by `docker compose build migrate`, never pulled: there is no such
+    # image on a registry, and a pull would fail with a less useful message.
+    pull_policy: never
+    # `--require-r2`: without a bucket, page images would be written inside
+    # this container and deleted with it when the run ends, leaving records
+    # that point at nothing. So the service refuses rather than pretends.
+    entrypoint: ['pnpm', 'publications:process', '--require-r2']
+    profiles: ['publications']
+    restart: 'no'
+    logging:
+      driver: json-file
+      options:
+        max-size: ${LOG_MAX_SIZE:-10m}
+        max-file: '${LOG_MAX_FILES:-3}'
+    deploy:
+      resources:
+        limits:
+          memory: ${PUBLICATION_PROCESS_MEMORY_LIMIT:-1g}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # The R2 credentials arrive through the env file, as for `migrate`.
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URI: ${DATABASE_URI:-postgresql://payload:payload@postgres:5432/beyond_every_art}
+      PAYLOAD_SECRET: ${PAYLOAD_SECRET}
+      INDEXNOW_KEY: ''
 
 volumes:
   postgres_data:

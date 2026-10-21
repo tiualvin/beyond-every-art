@@ -39,6 +39,14 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Poppler and qpdf, which publication processing runs. The tests in
+      # tests/publications/processing/tools.test.ts call the real binaries, and
+      # fail here rather than skip if these are missing, so a removed line
+      # cannot turn them into tests of nothing.
+      - name: Install the PDF tools
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends poppler-utils qpdf
       # These four run first, and the order is load-bearing. `payload-types.ts`
       # is generated and gitignored, and any Payload CLI command that boots the
       # config writes it — so a step below that touches Payload would leave the
@@ -158,6 +166,20 @@ jobs:
           jq -e '.created == 0 and .updated == 4 and (.errors | length) == 0' members-report.json > /dev/null
           test "$(psql "$DATABASE_URI" -tAc 'SELECT count(*) FROM members')" = 4
           test "$(psql "$DATABASE_URI" -tAc "SELECT count(*) FROM members WHERE status = 'paid'")" = 2
+      # The processing command end to end, on the generated sample: Poppler,
+      # sharp, Payload's uploads (to local disk — no bucket exists here), the
+      # page records and the run record. Run twice, because the second run is
+      # the claim that matters on a server: a rerun of an unchanged file draws
+      # nothing and still ends ready. Checked in the database rather than in
+      # the printed report, which Payload's own log lines share stdout with.
+      - name: Process a generated sample issue, twice
+        run: |
+          pnpm --silent publications:process --publication ci-sample-issue --sample 4 --create
+          pnpm --silent publications:process --publication ci-sample-issue --sample 4
+          test "$(psql "$DATABASE_URI" -tAc "SELECT count(*) FROM publication_pages WHERE status = 'ready'")" = 4
+          test "$(psql "$DATABASE_URI" -tAc 'SELECT count(*) FROM publication_page_images')" = 4
+          test "$(psql "$DATABASE_URI" -tAc "SELECT string_agg(status::text, ',' ORDER BY id) FROM publication_runs")" = 'ready,ready'
+          test "$(psql "$DATABASE_URI" -tAc "SELECT summary->>'skipped' FROM publication_runs ORDER BY id DESC LIMIT 1")" = 4
       # "A database backup has been successfully restored" is an acceptance
       # criterion, and it was a thing someone did once by hand. A backup nobody
       # has restored is a hope, and the failure modes are quiet ones: a dump
@@ -195,7 +217,8 @@ jobs:
           jq -e '.encrypted == true and .restored == true' "$drill/restore-report.json" > /dev/null
           # Every table named here is filled by the steps above, so a zero row
           # count means the drill compared nothing and called it a match.
-          for table in posts pages tags authors members payload_migrations; do
+          for table in posts pages tags authors members payload_migrations \
+            publications publication_pages publication_page_images publication_runs; do
             source_rows=$(psql "$DATABASE_URI" -tAc "SELECT count(*) FROM $table")
             restored_rows=$(psql "$RESTORE_TARGET" -tAc "SELECT count(*) FROM $table")
             if [ "$source_rows" != "$restored_rows" ] || [ "$source_rows" = 0 ]; then
@@ -329,6 +352,15 @@ jobs:
         run: |
           docker run --rm --entrypoint sh beyond-every-art-migrator:ci \
             -c 'sh -n /app/docker/reconcile/entrypoint.sh'
+      # Publication processing runs Poppler and qpdf from this image, and the
+      # server installs Alpine's versions of them, not the Ubuntu ones the
+      # checks job tests against — newer, and with output formats that have
+      # moved before. So the tests that call the real tools run here too,
+      # inside the image, against the versions production will run.
+      - name: Run the PDF tool tests inside the migration image
+        run: |
+          docker run --rm -e CI=true --entrypoint pnpm beyond-every-art-migrator:ci \
+            exec vitest run tests/publications/processing/tools.test.ts
       # The images are only half of it: the deploy runs `docker compose up`, so
       # a service that names a stage that does not exist, or mistypes a key,
       # fails on the VPS rather than here. Interpolation is checked too, which

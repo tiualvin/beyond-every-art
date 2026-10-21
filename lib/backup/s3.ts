@@ -6,11 +6,17 @@
 // a build step. Everything here is implemented with node:crypto and the global
 // fetch shipped with Node 20, so `pnpm backup:db` runs anywhere Node runs.
 //
-// Only the four operations the backup pipeline needs are implemented:
-// putObject, getObject, listObjects, and deleteObject. Requests use path-style
-// addressing (`{endpoint}/{bucket}/{key}`), which R2 and modern S3 both accept.
+// Only the operations the backup pipeline needs are implemented — putObject,
+// getObject, listObjects, and deleteObject — plus downloadObject, which
+// publication processing uses to fetch a source PDF too large to buffer.
+// Requests use path-style addressing (`{endpoint}/{bucket}/{key}`), which R2
+// and modern S3 both accept.
 
 import { createHash, createHmac } from 'node:crypto'
+import { createWriteStream } from 'node:fs'
+import { rm } from 'node:fs/promises'
+import { Readable, Transform } from 'node:stream'
+import { pipeline } from 'node:stream/promises'
 
 export interface S3Config {
   endpoint: string
@@ -209,6 +215,70 @@ export async function getObject(
   const response = await s3Fetch(config, { method: 'GET', key }, now)
   await assertOk(response, `GET ${key}`)
   return Buffer.from(await response.arrayBuffer())
+}
+
+/**
+ * Download an object to a file, streaming, and refuse anything over
+ * `maxBytes`.
+ *
+ * For objects too large to hold in memory: a publication's source PDF is
+ * downloaded inside a container with a memory limit of its own, where
+ * `getObject` would hold the whole file at once. The limit is checked against
+ * the declared length before anything is written, and against the bytes
+ * actually received while writing, because a declared length can be absent.
+ * A refused or failed download leaves no partial file behind.
+ */
+export async function downloadObject(
+  config: S3Config,
+  key: string,
+  path: string,
+  options: { maxBytes: number },
+  now?: () => Date,
+): Promise<{ bytes: number }> {
+  const response = await s3Fetch(config, { method: 'GET', key }, now)
+  await assertOk(response, `GET ${key}`)
+  const declared = Number(response.headers.get('content-length'))
+  if (Number.isFinite(declared) && declared > options.maxBytes) {
+    await response.body?.cancel()
+    throw new ObjectTooLarge(key, declared, options.maxBytes)
+  }
+  if (!response.body) throw new Error(`S3 GET ${key} returned no body.`)
+
+  let bytes = 0
+  const counter = new Transform({
+    transform(chunk: Buffer, _encoding, callback) {
+      bytes += chunk.length
+      if (bytes > options.maxBytes) {
+        callback(new ObjectTooLarge(key, bytes, options.maxBytes))
+        return
+      }
+      callback(null, chunk)
+    },
+  })
+  try {
+    await pipeline(
+      Readable.fromWeb(
+        response.body as import('node:stream/web').ReadableStream,
+      ),
+      counter,
+      createWriteStream(path, { mode: 0o600 }),
+    )
+  } catch (error) {
+    await rm(path, { force: true })
+    throw error
+  }
+  return { bytes }
+}
+
+export class ObjectTooLarge extends Error {
+  constructor(
+    readonly key: string,
+    readonly bytes: number,
+    readonly maxBytes: number,
+  ) {
+    super(`S3 object ${key} is larger than ${maxBytes} bytes.`)
+    this.name = 'ObjectTooLarge'
+  }
 }
 
 /** Delete an object. */
