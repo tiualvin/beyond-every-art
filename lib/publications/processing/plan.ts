@@ -99,6 +99,8 @@ export type ExistingPage = {
   sourceSha256?: string | null
   rendition?: number | null
   status?: string | null
+  /** The page image, by ID or populated; null once that image is deleted. */
+  image?: unknown
 }
 
 /**
@@ -123,7 +125,11 @@ export function pagesToProcess(input: {
         (page) =>
           page.status === 'ready' &&
           page.sourceSha256 === sourceSha256 &&
-          page.rendition === RENDITION.version,
+          page.rendition === RENDITION.version &&
+          // An administrator can delete a page image, which leaves its page
+          // ready and pointing at nothing; that page is not done.
+          page.image !== null &&
+          page.image !== undefined,
       )
       .map((page) => page.pageNumber),
   )

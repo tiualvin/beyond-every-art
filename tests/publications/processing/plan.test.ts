@@ -66,6 +66,7 @@ describe('pagesToProcess', () => {
     sourceSha256: 'abc',
     rendition: RENDITION.version,
     status: 'ready',
+    image: 10 + pageNumber,
     ...extra,
   })
 
@@ -98,6 +99,18 @@ describe('pagesToProcess', () => {
         ],
       }),
     ).toEqual([1, 2, 3])
+  })
+
+  it('redraws a page whose image was deleted', () => {
+    // An administrator can delete a page image; the page stays ready and
+    // points at nothing, and a rerun used to skip it.
+    expect(
+      pagesToProcess({
+        pageCount: 2,
+        sourceSha256: 'abc',
+        existing: [done(1, { image: null }), done(2)],
+      }),
+    ).toEqual([1])
   })
 
   it('redraws the pages it is told to, whatever their state', () => {

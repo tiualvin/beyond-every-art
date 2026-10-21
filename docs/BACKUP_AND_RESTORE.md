@@ -24,9 +24,11 @@ Decided 20 Oct 2026 ([`PUBLICATION_SYSTEM.md`](PUBLICATION_SYSTEM.md), open
 decision 6). The owner keeps the original of every issue's PDF somewhere this
 stack does not touch, and the copy in R2 is only what the processing command
 reads. The page images derived from it are in R2 too, and are rebuilt by
-processing the PDF again; the page records and processing runs are in Postgres
-and in the backup above. So losing the R2 copy costs a re-upload and a run, not
-the issue. Nothing here restores a PDF the owner no longer has.
+processing the PDF again with `--all` — a plain rerun skips pages its records
+say are done, and only a forced redraw writes their files back. The page
+records and processing runs are in Postgres and in the backup above. So losing
+the R2 copy costs a re-upload and a run, not the issue. Nothing here restores a
+PDF the owner no longer has.
 
 ## How it works
 

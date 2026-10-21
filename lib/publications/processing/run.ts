@@ -346,11 +346,15 @@ export async function processPublication(
       try {
         const bytes = await drawPage(fetched.path, page, directory)
         const filename = pageImageFilename(publication.id, bytes)
+        // A page redrawn on purpose writes its image again even when the
+        // record exists, so `--all` restores files lost from storage.
+        const refresh = force === 'all' || Boolean(force?.includes(number))
         const image = await findOrCreatePageImage(
           payload,
           Number(publication.id),
           filename,
           bytes,
+          { refresh },
         )
         if (!image.created) report.imagesReused += 1
         const text = await readPageText(fetched.path, page)

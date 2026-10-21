@@ -176,6 +176,7 @@ export async function existingPages(
       sourceSha256: true,
       rendition: true,
       status: true,
+      image: true,
     },
     depth: 0,
     pagination: false,
@@ -249,12 +250,18 @@ export async function upsertPage(
  * existing image is the same picture and is reused — which is also what keeps
  * Payload from quietly storing a second copy as `<name>-1.webp`, a different
  * URL for the same page.
+ *
+ * `refresh` writes the bytes again over an image that is already recorded:
+ * the way back when the files are gone but the records are not — R2 objects
+ * deleted, or a database restored onto storage that lost them. The name is
+ * the content's hash, so writing it again can only restore what it was.
  */
 export async function findOrCreatePageImage(
   payload: Payload,
   publication: ID,
   filename: string,
   bytes: Buffer,
+  options: { refresh?: boolean } = {},
 ): Promise<{ id: ID; created: boolean }> {
   const found = await payload.find({
     collection: PUBLICATION_PAGE_IMAGES,
@@ -263,17 +270,36 @@ export async function findOrCreatePageImage(
     limit: 1,
     overrideAccess: true,
   })
+  const file = {
+    data: bytes,
+    mimetype: 'image/webp',
+    name: filename,
+    size: bytes.length,
+  }
   const existing = found.docs[0] as { id: ID } | undefined
-  if (existing) return { id: existing.id, created: false }
+  if (existing) {
+    if (options.refresh) {
+      await payload.update({
+        collection: PUBLICATION_PAGE_IMAGES,
+        id: existing.id,
+        data: {},
+        file,
+        overwriteExistingFiles: true,
+        depth: 0,
+        overrideAccess: true,
+      })
+    }
+    return { id: existing.id, created: false }
+  }
   const doc = (await payload.create({
     collection: PUBLICATION_PAGE_IMAGES,
     data: { publication },
-    file: {
-      data: bytes,
-      mimetype: 'image/webp',
-      name: filename,
-      size: bytes.length,
-    },
+    file,
+    // A file with this name and no record — left on local disk by a database
+    // that was reset or restored — holds these same bytes, so writing over it
+    // is right. Without this Payload renamed the upload to `<name>-1.webp`
+    // and every page of the issue failed, on every run.
+    overwriteExistingFiles: true,
     depth: 0,
     overrideAccess: true,
   })) as { id: ID; filename?: string }
