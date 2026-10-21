@@ -110,6 +110,12 @@ export const PublicationPageImages: CollectionConfig = {
       // configurations disagree about a column.
       name: 'prefix',
       type: 'text',
+      // The plugin's own default, given here too: enabled, the plugin keeps a
+      // declared default and otherwise supplies this one, and Postgres makes a
+      // default part of the column — so without it a migration generated
+      // with R2 configured set a default the committed schema lacked, and CI's
+      // drift check, which runs without R2, would fail on the next one.
+      defaultValue: PAGE_IMAGE_PREFIX,
       admin: { hidden: true, readOnly: true },
     },
     {

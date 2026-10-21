@@ -5008,7 +5008,8 @@
           "name": "prefix",
           "type": "varchar",
           "primaryKey": false,
-          "notNull": false
+          "notNull": false,
+          "default": "'publication-pages'"
         },
         "_objectkey": {
           "name": "_objectkey",
@@ -9288,6 +9289,6 @@
     "tables": {},
     "columns": {}
   },
-  "id": "b1c623fe-c779-4222-bd06-660dfb6adcfc",
+  "id": "bacf16aa-d10b-481e-8e01-59d2cd64384f",
   "prevId": "00000000-0000-0000-0000-000000000000"
 }
