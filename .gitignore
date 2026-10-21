@@ -10,6 +10,8 @@ test-results/
 # Local media uploads. Production stores media in Cloudflare R2; without the
 # S3_* variables Payload falls back to writing files here.
 /media/
+# Page images, where publication processing writes them without R2.
+/publication-pages/
 *.tsbuildinfo
 .env
 .env.*

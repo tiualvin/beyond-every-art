@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
 import {
+  assertStorage,
   parseArgs,
   sourceStorage,
   UsageError,
@@ -21,6 +25,7 @@ describe('process-publication parseArgs', () => {
       create: false,
       force: undefined,
       dryRun: false,
+      requireR2: false,
     })
   })
 
@@ -99,5 +104,33 @@ describe('sourceStorage', () => {
     expect(() => sourceStorage({ S3_BUCKET: 'media' })).toThrow(
       /S3_ENDPOINT, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY/,
     )
+  })
+})
+
+describe('assertStorage', () => {
+  it('lets a run go ahead when page images will reach R2', () => {
+    expect(() =>
+      assertStorage({ S3_BUCKET: 'media', S3_ENDPOINT: 'https://r2' }),
+    ).not.toThrow()
+  })
+
+  it('refuses when they would be written inside the container and lost', () => {
+    expect(() => assertStorage({ S3_BUCKET: 'media' })).toThrow(UsageError)
+    expect(() => assertStorage({})).toThrow(/lost when it is removed/)
+  })
+
+  it('is always asked for by the publications service', () => {
+    // The service runs `--rm`: without R2 its page images would vanish with
+    // it, and the records would point at nothing.
+    const compose = readFileSync(
+      resolve(import.meta.dirname, '../../docker-compose.yml'),
+      'utf8',
+    )
+    expect(compose).toContain(
+      "entrypoint: ['pnpm', 'publications:process', '--require-r2']",
+    )
+    expect(
+      parseArgs(['--publication', 's', '--sample', '--require-r2']).requireR2,
+    ).toBe(true)
   })
 })

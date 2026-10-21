@@ -42,6 +42,8 @@ export type Cli = {
   create: boolean
   force?: number[] | 'all'
   dryRun: boolean
+  /** Refuse to run without R2 (the `publications` service always passes it). */
+  requireR2: boolean
 }
 
 export class UsageError extends Error {
@@ -57,7 +59,13 @@ const VALUED = new Set([
   '--source-file',
   '--pages',
 ])
-const FLAGS = new Set(['--create', '--all', '--dry-run', '--sample'])
+const FLAGS = new Set([
+  '--create',
+  '--all',
+  '--dry-run',
+  '--sample',
+  '--require-r2',
+])
 
 export function parseArgs(argv: string[]): Cli {
   const values = new Map<string, string>()
@@ -133,6 +141,7 @@ export function parseArgs(argv: string[]): Cli {
     create: flags.has('--create'),
     force,
     dryRun: flags.has('--dry-run'),
+    requireR2: flags.has('--require-r2'),
   }
 }
 
@@ -160,8 +169,24 @@ export function sourceStorage(
   }
 }
 
+/**
+ * Whether page images will reach R2. Without it Payload writes them to
+ * `publication-pages/` in the working directory, which in a container that is
+ * removed when the run ends means records pointing at files that are gone.
+ */
+export function assertStorage(env: Record<string, string | undefined>): void {
+  if (!env.S3_BUCKET || !env.S3_ENDPOINT) {
+    throw new UsageError(
+      'R2 is not configured (S3_BUCKET, S3_ENDPOINT), so page images would be ' +
+        'written inside this container and lost when it is removed. Set the ' +
+        'S3_* variables, or run the command from a checkout instead.',
+    )
+  }
+}
+
 async function main(): Promise<void> {
   const cli = parseArgs(process.argv.slice(2))
+  if (cli.requireR2) assertStorage(process.env)
   const source: Source =
     cli.source.kind === 'r2'
       ? { ...cli.source, s3: sourceStorage(process.env) }

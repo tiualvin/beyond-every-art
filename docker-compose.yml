@@ -380,7 +380,10 @@ services:
     # Built by `docker compose build migrate`, never pulled: there is no such
     # image on a registry, and a pull would fail with a less useful message.
     pull_policy: never
-    entrypoint: ['pnpm', 'publications:process']
+    # `--require-r2`: without a bucket, page images would be written inside
+    # this container and deleted with it when the run ends, leaving records
+    # that point at nothing. So the service refuses rather than pretends.
+    entrypoint: ['pnpm', 'publications:process', '--require-r2']
     profiles: ['publications']
     restart: 'no'
     logging:
@@ -403,9 +406,6 @@ services:
       DATABASE_URI: ${DATABASE_URI:-postgresql://payload:payload@postgres:5432/beyond_every_art}
       PAYLOAD_SECRET: ${PAYLOAD_SECRET}
       INDEXNOW_KEY: ''
-    volumes:
-      # Where page images go when R2 is not configured, shared with `app`.
-      - media_data:/app/media
 
 volumes:
   postgres_data:

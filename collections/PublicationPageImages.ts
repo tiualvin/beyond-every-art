@@ -66,10 +66,12 @@ export const PublicationPageImages: CollectionConfig = {
     delete: adminOnly,
   },
   upload: {
-    // Written by the processing command when R2 is not configured — in
-    // development and CI. Under `media/`, which is gitignored and is the volume
-    // in Docker, rather than a new top-level directory that is neither.
-    staticDir: 'media/publication-pages',
+    // Where the processing command writes when R2 is not configured — in
+    // development and CI; the `publications` service refuses to run without
+    // R2. Not under `media/`: that is media's own directory, and media's file
+    // route, which anyone may read, served a page image from inside it to a
+    // request for `publication-pages%2F<name>`, before launch and uncached.
+    staticDir: 'publication-pages',
     // WebP only: the processing command writes nothing else, and files served
     // from `/api/<collection>/file/` come from the site's own origin (see the
     // note on SVG in collections/Media.ts).
