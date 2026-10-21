@@ -1014,8 +1014,17 @@ the PDF in `publication-sources/` stays.
 
 Before the first run on the server: the pending reboot, a build-cache prune, and
 a measurement of free memory with the stack running, which is what
-`PUBLICATION_PROCESS_MEMORY_LIMIT` (default 1g) has to fit inside. Keep runs
-clear of the 02:30, 03:00 and Sunday 04:00 jobs and of deploys.
+`PUBLICATION_PROCESS_MEMORY_LIMIT` (default 1g) has to fit inside. Also remove
+the image the `migrate` service used to build under Compose's own name —
+`docker image rm beyond-every-art-migrate` — now that it builds
+`beyond-every-art-migrator`: the old one stays tagged, so neither a prune nor
+the build-cache cleanup takes it, and it holds about 1.5 GB. Keep runs clear of
+the 02:30, 03:00 and Sunday 04:00 jobs and of deploys.
+
+The service needs R2. It runs with `--require-r2`, and refuses to start without
+`S3_BUCKET` and `S3_ENDPOINT` rather than write page images into a container
+that is removed when the run ends. Without R2, run the command from a checkout,
+where page images go to `publication-pages/`.
 
 ## Reader manifest
 
