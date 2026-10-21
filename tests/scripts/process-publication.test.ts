@@ -63,6 +63,16 @@ describe('process-publication parseArgs', () => {
     ).toThrow(/only goes with --sample/)
   })
 
+  it('will not create a publication on a dry run', () => {
+    // A dry run promises to write nothing; it created the draft anyway.
+    expect(() =>
+      parseArgs(['--publication', 's', '--sample', '--create', '--dry-run']),
+    ).toThrow(/--dry-run writes nothing/)
+    expect(
+      parseArgs(['--publication', 's', '--sample', '--dry-run']).dryRun,
+    ).toBe(true)
+  })
+
   it('refuses what it does not understand rather than ignoring it', () => {
     expect(() =>
       parseArgs(['--publication', 's', '--sample', '--force']),

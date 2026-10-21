@@ -88,8 +88,12 @@ export function parsePageSelection(value: string): number[] {
     const to = Number(range[2] ?? range[1])
     if (from < 1 || to < from)
       throw new Error(`"${part}" is not a range of pages from 1.`)
-    if (to - from >= LIMITS.maxPages)
-      throw new Error(`"${part}" covers more pages than any issue.`)
+    // No issue has a page past the limit. Checked before the loop, because a
+    // number past 2^53 rounds to one that `page++` cannot step past.
+    if (to > LIMITS.maxPages)
+      throw new Error(
+        `"${part}" goes past page ${LIMITS.maxPages}, the most any issue may have.`,
+      )
     for (let page = from; page <= to; page++) pages.add(page)
   }
   return [...pages].sort((a, b) => a - b)

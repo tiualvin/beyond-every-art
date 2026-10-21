@@ -56,7 +56,19 @@ describe('parsePageSelection', () => {
     expect(() => parsePageSelection('a')).toThrow(/not a page/)
     expect(() => parsePageSelection('2,')).toThrow(/not a page/)
     expect(() => parsePageSelection('-2')).toThrow(/not a page/)
-    expect(() => parsePageSelection('1-100000')).toThrow(/more pages/)
+    expect(() => parsePageSelection('1-100000')).toThrow(/goes past page/)
+  })
+
+  it('refuses a page past the limit before counting to it', () => {
+    // Past 2^53 a number rounds to one `page++` cannot step past, and the
+    // loop never ended.
+    expect(() => parsePageSelection('9007199254740993')).toThrow(
+      /goes past page/,
+    )
+    expect(() => parsePageSelection(`${LIMITS.maxPages + 1}`)).toThrow(
+      /goes past page/,
+    )
+    expect(parsePageSelection(`${LIMITS.maxPages}`)).toEqual([LIMITS.maxPages])
   })
 })
 

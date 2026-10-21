@@ -122,6 +122,12 @@ export function parseArgs(argv: string[]): Cli {
   if (flags.has('--create') && source.kind !== 'sample') {
     throw new UsageError('--create only goes with --sample.')
   }
+  // A dry run writes nothing, and creating the publication is a write.
+  if (flags.has('--create') && flags.has('--dry-run')) {
+    throw new UsageError(
+      '--dry-run writes nothing, so it cannot --create. Create the draft first, or leave out --dry-run.',
+    )
+  }
   if (flags.has('--all') && values.has('--pages')) {
     throw new UsageError('Give --all or --pages, not both.')
   }
