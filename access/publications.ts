@@ -54,8 +54,21 @@ export const publicationsRead: Access = publicationsReadFor(
  * `isReadingStaticFile` is what separates the two.
  */
 export function publicationPageImagesReadFor(launched: boolean): Access {
-  return ({ req, isReadingStaticFile }) =>
-    isEditor(req.user) || (launched && Boolean(isReadingStaticFile))
+  return ({ req, isReadingStaticFile }) => {
+    if (isEditor(req.user)) return true
+    if (!launched || !isReadingStaticFile) return false
+    // A condition every image meets, rather than `true`, and it is the
+    // difference between serving the file and a 500. Given `true`, Payload's
+    // file route loads no document and hands the R2 handler nothing, so the
+    // handler looks the file up itself — through this same rule, without
+    // `isReadingStaticFile`, which refuses an anonymous reader, and the
+    // refusal comes back as a server error for every page of every issue.
+    // Given a condition, the route loads the document and passes it on. Local
+    // storage never makes that second lookup, so CI could not see this; it
+    // was found by driving the route against a stand-in for R2.
+    const served: Where = { publication: { exists: true } }
+    return served
+  }
 }
 
 export const publicationPageImagesRead: Access = publicationPageImagesReadFor(

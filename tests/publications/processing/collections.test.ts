@@ -61,7 +61,17 @@ describe('page images, after launch', () => {
   const rule = publicationPageImagesReadFor(true)
 
   it('serves a file to anyone holding its URL', async () => {
-    expect(await read(rule, anonymous, true)).toBe(true)
+    // A condition every image meets — and not `true`. Given `true`, Payload's
+    // file route passes the R2 handler no document, the handler looks the
+    // file up through this rule without `isReadingStaticFile`, and every
+    // reader gets a 500. Local storage never makes that lookup, so only a
+    // run against a stand-in for R2 showed it.
+    expect(await read(rule, anonymous, true)).toEqual({
+      publication: { exists: true },
+    })
+    expect(await read(rule, author, true)).toEqual({
+      publication: { exists: true },
+    })
   })
 
   it('keeps the listing — every name at once — to editors', async () => {
