@@ -184,6 +184,10 @@ export async function readLinks(
       '--json-key=qpdf',
       // Object dictionaries only: a page's image data has no links in it.
       '--json-stream-data=none',
+      // qpdf exits 3 when it repaired anything, which Poppler repairs too
+      // without a word: a file every other tool here reads would otherwise
+      // fail at its links, on every run. The JSON is complete either way.
+      '--warning-exit-0',
       file,
     ],
     { timeoutMs: 300_000, maxBuffer: 256 * MiB },

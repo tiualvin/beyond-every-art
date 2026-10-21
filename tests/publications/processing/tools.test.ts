@@ -149,6 +149,30 @@ describe.skipIf(!installed)('the PDF tools, on the generated sample', () => {
     expect(heading.channels[0]!.min).toBeLessThan(100)
   })
 
+  it('reads the links of a file qpdf has to repair', async () => {
+    // Every cross-reference offset moved: Poppler repairs it silently and
+    // qpdf repairs it too, but exits 3 for having done so. Treated as a
+    // failure, no page of such a file could ever be processed.
+    const damaged = join(directory, 'damaged.pdf')
+    const shifted = buildSamplePdf(samplePages(3))
+      .toString('latin1')
+      .replace(
+        /^(\d{10}) 00000 n $/gm,
+        (_, offset: string) =>
+          `${String(Number(offset) + 7).padStart(10, '0')} 00000 n `,
+      )
+    writeFileSync(damaged, Buffer.from(shifted, 'latin1'))
+    const info = await inspectPdf(damaged)
+    expect(info.pageCount).toBe(3)
+    const links = await readLinks(damaged, info.pages, SITE)
+    expect(links.map((link) => link.target.kind)).toEqual([
+      'uri',
+      'uri',
+      'page',
+      'uri',
+    ])
+  })
+
   it('reads a file with only an owner password, and says it is encrypted', async () => {
     const locked = join(directory, 'owner.pdf')
     execFileSync('qpdf', [
