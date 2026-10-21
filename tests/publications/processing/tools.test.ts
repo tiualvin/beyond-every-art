@@ -194,6 +194,42 @@ describe.skipIf(!installed)('the PDF tools, on the generated sample', () => {
     expect(heading.channels[0]!.min).toBeLessThan(100)
   })
 
+  it('draws a turned page at the width asked, not its unturned width', async () => {
+    // A portrait page stored as a landscape box turned a quarter, as scanners
+    // write them, and a portrait box turned to landscape. Without
+    // `-scale-dimension-before-rotation` the first drew 30% narrower than its
+    // neighbours and the second wider than the rendition allows.
+    const turned = join(directory, 'turned.pdf')
+    writeFileSync(
+      turned,
+      buildSamplePdf([
+        {
+          width: 842,
+          height: 595,
+          rotate: 90,
+          heading: 'Stored turned',
+          lines: [],
+        },
+        {
+          width: 595,
+          height: 842,
+          rotate: 270,
+          heading: 'Shown turned',
+          lines: [],
+        },
+      ]),
+    )
+    const info = await inspectPdf(turned)
+    for (const page of info.pages) {
+      const png = await renderPage(turned, page, 400, directory)
+      const { width, height } = await sharp(png).metadata()
+      expect(width, `page ${page.number}`).toBe(400)
+      expect(
+        Math.abs(height - (400 * page.height) / page.width),
+      ).toBeLessThanOrEqual(1)
+    }
+  })
+
   it('reads the links of a file qpdf has to repair', async () => {
     // Every cross-reference offset moved: Poppler repairs it silently and
     // qpdf repairs it too, but exits 3 for having done so. Treated as a

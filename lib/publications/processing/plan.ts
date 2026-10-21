@@ -18,7 +18,8 @@ import { createHash } from 'node:crypto'
  * issue's image rights are known.
  */
 export const RENDITION = {
-  version: 1,
+  // 2: turned pages drawn at the rendition width (they were not, at 1).
+  version: 2,
   width: 1600,
   quality: 82,
   sizes: [

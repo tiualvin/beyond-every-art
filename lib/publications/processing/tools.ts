@@ -271,6 +271,11 @@ export async function renderPage(
       String(width),
       '-scale-to-y',
       '-1',
+      // Otherwise the width is measured before the page's /Rotate is
+      // applied, and a turned page comes out the wrong width: a portrait
+      // page stored turned drew 30% narrower than its neighbours, and a
+      // landscape one wider than the rendition allows.
+      '-scale-dimension-before-rotation',
       file,
       prefix,
     ],

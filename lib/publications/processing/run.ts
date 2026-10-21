@@ -202,7 +202,13 @@ async function drawPage(
 ): Promise<Buffer> {
   const png = await renderPage(file, page, RENDITION.width, directory)
   try {
-    return await sharp(png).webp({ quality: RENDITION.quality }).toBuffer()
+    // Poppler is asked for this width; a version that measures differently
+    // (as turned pages once did) must not store a larger image than the
+    // rendition allows, nor a smaller one beside its neighbours.
+    const { width } = await sharp(png).metadata()
+    const image = sharp(png)
+    if (width !== RENDITION.width) image.resize({ width: RENDITION.width })
+    return await image.webp({ quality: RENDITION.quality }).toBuffer()
   } finally {
     await rm(png, { force: true })
   }
