@@ -151,6 +151,13 @@ A premium freehand coloring app for adults inspired by the quality and calmness 
 
 This is not primarily color-by-number. Users should be able to color illustrations freely with realistic digital media and optional boundary assistance.
 
+### Reference product
+
+The owner's stated target (23 Oct 2026) is an app **similar to Lake: Colouring for Adults**:
+<https://apps.apple.com/ph/app/lake-colouring-for-adults/id1183717726>
+
+Treat Lake as the benchmark for the overall experience — calm pacing, artist-made illustrations with the artist credited, freehand coloring with real-feeling brushes and optional fill assistance, a daily free page, and a subscription. Match that standard of quality and feel; build everything that delivers it independently. The limits in the concept above still apply: no Lake branding, artwork, exact interface, sounds, or proprietary assets.
+
 ### Working positioning
 
 ```text
