@@ -7,6 +7,8 @@
 // Nor do they reach version history, which Payload keeps for every save; the
 // version tools read it, and `restoreArticleVersion` reverts to it — as a
 // draft, and never touching what decides where and to whom a post is served.
+// Nor can they edit a migrated article, whose page renders from its Ghost HTML;
+// `readLegacyHtml` and `editLegacyHtml` change that HTML a phrase at a time.
 //
 // `@payloadcms/plugin-mcp` still has no `defineTool` helper at `3.88.0`, the
 // release this project pins — it is documented on Payload's main branch but has
@@ -35,6 +37,14 @@ import { setFaq, type FaqInputItem } from './faq'
 import { setKeyFacts, type Fact } from './key-facts'
 import { withChildren } from './placement'
 import { setTable, TABLE_MAX_COLUMNS, TABLE_MAX_ROWS } from './table'
+import {
+  findInLegacyHtml,
+  MAX_MATCHES,
+  pageOfLegacyHtml,
+  planLegacyEdits,
+  type AddedLink,
+  type LegacyEdit,
+} from './legacy-html'
 import {
   blockFieldsForReading,
   lexicalToMarkdown,
@@ -196,6 +206,65 @@ function refuseLegacyBody(doc: Record<string, unknown>, what: string): void {
   )
 }
 
+/**
+ * Refuses an article whose page does not render from its Ghost HTML.
+ *
+ * The HTML tools read and change `legacyHTML`, which only reaches readers
+ * while the rich-text body is empty. Once an editor has written there, the
+ * HTML is left behind in the field and an edit to it changes nothing anyone
+ * sees — so the caller is pointed at the tool that does.
+ */
+function refuseUnlessLegacy(doc: Record<string, unknown>, instead: string) {
+  if (rendersFromLegacyHTML(doc)) return
+  throw new Error(
+    typeof doc.legacyHTML === 'string' && doc.legacyHTML
+      ? 'This article renders from its rich-text body, which has replaced its ' +
+          'migrated Ghost HTML (`legacyHTML`) on the page, so that HTML is not ' +
+          `what readers see. Use \`${instead}\`.`
+      : 'This article has no migrated Ghost HTML (`legacyHTML`); it renders ' +
+          `from its rich-text body. Use \`${instead}\`.`,
+  )
+}
+
+/**
+ * Refuses a write to a field the key's user may not write, before it is tried.
+ *
+ * Asked of the field's own access rule rather than restated here, so the tool
+ * follows the collection if the rule changes. Asking matters because Payload
+ * does not refuse such a write: under `overrideAccess: false` it keeps the
+ * stored value and says nothing, so an author's edit to `legacyHTML` would save
+ * a new draft identical to the last and report success.
+ */
+async function refuseUnlessWritable(
+  req: PayloadRequest,
+  doc: Record<string, unknown>,
+  name: string,
+) {
+  const field = req.payload.collections[
+    COLLECTION
+  ]?.config.flattenedFields.find(
+    (candidate) => 'name' in candidate && candidate.name === name,
+  )
+  // Fail closed: a field this cannot find is a field it cannot vouch for.
+  if (!field) throw new Error(`Posts has no \`${name}\` field to write.`)
+  const rule = field.access?.update
+  if (!rule) return
+  const allowed = await rule({
+    data: doc,
+    doc: doc as never,
+    id: doc.id as number | string,
+    req,
+    siblingData: doc,
+  })
+  if (!allowed) {
+    throw new Error(
+      `\`${name}\` can be written only by an editor or an administrator — it ` +
+        'is markup the public site runs as it stands — and this key belongs to ' +
+        'someone who may not write it. Ask an editor to make the change.',
+    )
+  }
+}
+
 const targetShape = {
   id: z.string().optional().describe('Document id. Provide this or `slug`.'),
   slug: z.string().optional().describe('Document slug. Provide this or `id`.'),
@@ -223,9 +292,14 @@ function articleView(req: PayloadRequest, doc: Record<string, unknown>) {
     excerpt: doc.excerpt ?? null,
     // Migrated bodies live in `legacyHTML` and are not Lexical; say so
     // rather than returning an empty string that reads like an empty post.
+    // This used to add that a Markdown edit "would not change the published
+    // page", which was backwards: a rich-text body wins over the HTML, so it
+    // would replace the whole article.
     markdown: rendersFromLegacyHTML(doc)
       ? '(This document renders from migrated Ghost HTML (`legacyHTML`), not from the ' +
-        'rich-text body. Editing it as Markdown would not change the published page.)'
+        'rich-text body. Read the HTML with `readLegacyHtml` and change it with ' +
+        '`editLegacyHtml`. A Markdown body saved with `updateArticleMarkdown` would ' +
+        'not edit this article: it would replace the whole of it.)'
       : lexicalToMarkdown(
           req.payload,
           COLLECTION,
@@ -346,6 +420,15 @@ async function readLiveRow(
   req: PayloadRequest,
   id: number | string,
   now: Date = new Date(),
+) {
+  return readLiveRowWhere(req, { id: { equals: id } }, now)
+}
+
+/** The same, for whichever post `where` names — a slug, for a link's target. */
+async function readLiveRowWhere(
+  req: PayloadRequest,
+  where: Where,
+  now: Date = new Date(),
 ): Promise<{
   state: LiveState
   publishedAt: string | null
@@ -359,7 +442,7 @@ async function readLiveRow(
     overrideAccess: false,
     req,
     user: req.user,
-    where: { id: { equals: id } },
+    where,
   })
   const doc = (docs[0] as unknown as Record<string, unknown>) ?? null
   if (!doc || doc._status !== 'published') {
@@ -412,6 +495,109 @@ async function whatReadersSee(
   }
   return { readers: 'unpublished' }
 }
+
+/** What a link added to a migrated article leads to, as a reader would find it. */
+type LinkReport =
+  | { edit: number; href: string; target: 'external' }
+  | {
+      edit: number
+      href: string
+      target: 'article'
+      slug: string
+      status: 'live' | 'scheduled'
+      title: unknown
+      publishedAt: string | null
+    }
+
+/**
+ * Checks every link an edit adds to this site against the article it names.
+ *
+ * A link to an article that is not on the site answers 404 to every reader who
+ * follows it, so it is refused — whether no article has that slug or one does
+ * and has never been published. A scheduled article is allowed, with a
+ * warning, because it will be there; until then it 404s too. Anything on this
+ * site that is not an article's address is refused, because this tool cannot
+ * check it: `pages` is outside the plugin's allowlist (see `COLLECTION`), and
+ * an unchecked internal link is exactly what this is here to prevent.
+ */
+async function checkAddedLinks(
+  req: PayloadRequest,
+  added: AddedLink[],
+): Promise<{ links: LinkReport[]; warnings: string[] }> {
+  const now = new Date()
+  const links: LinkReport[] = []
+  const warnings: string[] = []
+  const problems: string[] = []
+
+  for (const link of added) {
+    if (link.target === 'external') {
+      links.push({ edit: link.edit, href: link.href, target: 'external' })
+      continue
+    }
+    if (!link.slug) {
+      problems.push(
+        `Edit ${link.edit}: links to ${link.path}, which is not an article's ` +
+          'address. This tool links only to articles, which it can check; add ' +
+          'a link to a page, a tag or anything else in the admin panel.',
+      )
+      continue
+    }
+
+    const row = await readLiveRowWhere(
+      req,
+      { slug: { equals: link.slug } },
+      now,
+    )
+    if (row.state === 'unpublished') {
+      problems.push(
+        row.doc
+          ? `Edit ${link.edit}: links to ${link.path}, an article that has ` +
+              'never been published — the link would answer 404 until it is.'
+          : `Edit ${link.edit}: links to ${link.path}, and no article has the ` +
+              `slug \`${link.slug}\` (status: not found).`,
+      )
+      continue
+    }
+
+    links.push({
+      edit: link.edit,
+      href: link.href,
+      target: 'article',
+      slug: link.slug,
+      status: row.state,
+      title: row.doc?.title ?? null,
+      publishedAt: row.publishedAt,
+    })
+    if (row.state === 'scheduled') {
+      warnings.push(
+        `Edit ${link.edit}: ${link.path} is scheduled for ${row.publishedAt}. ` +
+          'Until then the link answers 404 to readers, so do not publish this ' +
+          'change before it.',
+      )
+    }
+    if (!link.path.endsWith('/')) {
+      warnings.push(
+        `Edit ${link.edit}: ${link.href} has no trailing slash, and the site ` +
+          `redirects it to ${postPath(link.slug)}. Link to that instead.`,
+      )
+    }
+  }
+
+  if (problems.length) throw new Error(problems.join('\n'))
+  return { links, warnings }
+}
+
+/** How much of the stored HTML `readLegacyHtml` returns at once, by default and at most. */
+const LEGACY_PAGE = 8000
+const LEGACY_PAGE_MAX = 20000
+
+/** Stored HTML either side of a match, by default and at most. */
+const LEGACY_CONTEXT = 300
+const LEGACY_CONTEXT_MAX = 2000
+
+/** Edits in one call, and the longest `find` or `replace`. */
+const LEGACY_EDITS_MAX = 20
+const LEGACY_EDIT_CHARS = 5000
 
 /** Payload's own bookkeeping, never sent back in a write. */
 const SYSTEM_FIELDS = new Set([
@@ -575,6 +761,110 @@ export const mcpTools: McpTool[] = [
     },
     name: 'readArticleMarkdown',
     parameters: targetShape,
+  },
+  {
+    description:
+      "Read a migrated article's Ghost HTML (`legacyHTML`) — the body its page " +
+      'renders from — exactly as stored, to copy strings for `editLegacyHtml`. ' +
+      'With `query`, finds text as a reader sees it (references decoded, curly ' +
+      'quotes and dashes matched by straight ones, case and spacing ignored, ' +
+      'across inline tags) and returns each match as the exact stored HTML it ' +
+      'spans, with `before` and `after` context, its occurrence number, the ' +
+      'heading it sits under, and `storedOccurrences`: 1 means `html` can be ' +
+      'used as `find` as it is, more means widen it with characters from ' +
+      '`before` or `after`. Without `query`, returns a page of the stored HTML ' +
+      'and its total length; continue from `nextOffset`. Read-only. Refused ' +
+      'for an article that renders from its rich-text body — use ' +
+      '`readArticleMarkdown` for that.',
+    handler: async (args: Record<string, unknown>, req: PayloadRequest) => {
+      const {
+        context = LEGACY_CONTEXT,
+        limit = LEGACY_PAGE,
+        offset = 0,
+        query,
+        ...target
+      } = args as {
+        context?: number
+        id?: string
+        limit?: number
+        offset?: number
+        query?: string
+        slug?: string
+      }
+
+      // The same resolution `readArticleMarkdown` uses: the newest version,
+      // under the key's own access, at depth 0.
+      const doc = (await findArticle(
+        req,
+        COLLECTION,
+        target,
+      )) as unknown as Record<string, unknown>
+      refuseUnlessLegacy(doc, 'readArticleMarkdown')
+
+      const html = doc.legacyHTML as string
+      const described = {
+        id: doc.id,
+        slug: doc.slug,
+        status: doc._status ?? null,
+        title: doc.title,
+        totalLength: html.length,
+      }
+
+      if (query !== undefined) {
+        const { total, matches } = findInLegacyHtml(html, query, { context })
+        return text({
+          ...described,
+          query,
+          totalMatches: total,
+          ...(total > matches.length
+            ? {
+                note: `Only the first ${MAX_MATCHES} matches are shown. Make the query longer to narrow it.`,
+              }
+            : {}),
+          matches,
+        })
+      }
+
+      return text({ ...described, ...pageOfLegacyHtml(html, offset, limit) })
+    },
+    name: 'readLegacyHtml',
+    parameters: {
+      ...targetShape,
+      context: z
+        .number()
+        .int()
+        .min(0)
+        .max(LEGACY_CONTEXT_MAX)
+        .optional()
+        .describe(
+          `With \`query\`: characters of stored HTML either side of each match. Defaults to ${LEGACY_CONTEXT}; at most ${LEGACY_CONTEXT_MAX}.`,
+        ),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(LEGACY_PAGE_MAX)
+        .optional()
+        .describe(
+          `Without \`query\`: characters per page. Defaults to ${LEGACY_PAGE}; at most ${LEGACY_PAGE_MAX}. A page never ends inside a tag.`,
+        ),
+      offset: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe(
+          'Without `query`: where the page starts in the stored HTML. Defaults to 0; continue from the `nextOffset` of the page before.',
+        ),
+      query: z
+        .string()
+        .min(1)
+        .max(500)
+        .optional()
+        .describe(
+          'Text to find, as a reader sees it on the page, e.g. "Tyrian purple". Not HTML.',
+        ),
+    },
   },
   {
     description:
@@ -896,6 +1186,139 @@ export const mcpTools: McpTool[] = [
     parameters: {
       markdown: z.string().describe('The replacement body, in Markdown.'),
       ...targetShape,
+    },
+  },
+  {
+    description:
+      "Make small, exact edits to a migrated article's Ghost HTML " +
+      '(`legacyHTML`) — wrap a phrase in a link, correct a sentence — saved as ' +
+      'a draft. Never publishes, and changes nothing but `legacyHTML`. Each ' +
+      '`find` is matched against the stored HTML exactly (copy it from ' +
+      '`readLegacyHtml`) and must occur exactly once; edits may not overlap; ' +
+      'if any edit is refused, none is made. New markup may only be ' +
+      '<a href="…"> (https:// or a /path/ on this site, with `rel` at most), ' +
+      '<em>, <strong>, <i> and <b>; markup already in `find` may be kept ' +
+      'verbatim. Refused: script, iframe, style, object, embed, event handlers, ' +
+      'style attributes, comments, javascript: and data: links; dropping an ' +
+      'image, figure, embed or block element that `find` holds; and HTML the ' +
+      'browser would have to repair, such as a tag left open. Every link to ' +
+      'this site must name an article: the reply says whether each is live or ' +
+      'scheduled, and a link to one that is not on the site is refused. The ' +
+      'reply shows each edit before and after. Pass `dryRun: true` to see that ' +
+      'and save nothing. Refused for an article that renders from its ' +
+      'rich-text body (use `updateArticleMarkdown`), and for a key whose user ' +
+      'may not write `legacyHTML`, which takes an editor.',
+    handler: async (args: Record<string, unknown>, req: PayloadRequest) => {
+      const {
+        dryRun = false,
+        edits,
+        ...target
+      } = args as {
+        dryRun?: boolean
+        edits: LegacyEdit[]
+        id?: string
+        slug?: string
+      }
+
+      // The newest version, which is what a draft save is completed from — so
+      // the edits are made to the HTML this save will carry forward.
+      const doc = (await findArticle(
+        req,
+        COLLECTION,
+        target,
+      )) as unknown as Record<string, unknown>
+      refuseUnlessLegacy(doc, 'updateArticleMarkdown')
+      await refuseUnlessWritable(req, doc, 'legacyHTML')
+
+      const plan = planLegacyEdits(doc.legacyHTML as string, edits)
+      const { links, warnings } = await checkAddedLinks(req, plan.links)
+      const id = doc.id as number | string
+      const described = {
+        id,
+        slug: doc.slug,
+        edits: plan.edits,
+        links,
+        ...(warnings.length ? { warnings } : {}),
+      }
+
+      if (dryRun) {
+        return text({
+          ...described,
+          dryRun: true,
+          readers: (await readLiveRow(req, id)).state,
+        })
+      }
+
+      // The same draft save as `updateArticleMarkdown`, so the same guards
+      // run: `keepMcpWritesInDraft`, `refuseMcpPublish`, the `mcp_write` line
+      // and the authorship stamp. One field, so nothing else can move —
+      // Payload completes the rest of the draft from the newest version.
+      const updated = (await req.payload.update({
+        collection: COLLECTION,
+        data: { _status: 'draft', legacyHTML: plan.html },
+        depth: 0,
+        draft: true,
+        id,
+        overrideAccess: false,
+        req,
+        user: req.user as TypedUser,
+      })) as unknown as Record<string, unknown>
+
+      // What landed, not what was sent: Payload keeps a field the key may not
+      // write and says nothing.
+      if (updated.legacyHTML !== plan.html) {
+        throw new Error(
+          'The draft was saved without the edits: `legacyHTML` came back ' +
+            'unchanged, which is what Payload does with a field this key may ' +
+            'not write.',
+        )
+      }
+
+      return text({
+        ...described,
+        dryRun: false,
+        preview: buildPreviewUrl({
+          collection: COLLECTION,
+          slug: updated.slug as string,
+        }),
+        status: 'draft',
+        ...(await whatReadersSee(req, id)),
+      })
+    },
+    name: 'editLegacyHtml',
+    parameters: {
+      ...targetShape,
+      dryRun: z
+        .boolean()
+        .optional()
+        .describe(
+          'Check every edit and link, show each before and after, and save nothing. Defaults to false.',
+        ),
+      edits: z
+        .array(
+          z.object({
+            find: z
+              .string()
+              .min(1)
+              .max(LEGACY_EDIT_CHARS)
+              .describe(
+                'Stored HTML to replace, exactly — character references, ' +
+                  'quotes and tags included. Must occur exactly once.',
+              ),
+            replace: z
+              .string()
+              .max(LEGACY_EDIT_CHARS)
+              .describe(
+                'What takes its place. Any image, figure or block element in ' +
+                  '`find` must reappear here verbatim.',
+              ),
+          }),
+        )
+        .min(1)
+        .max(LEGACY_EDITS_MAX)
+        .describe(
+          `1 to ${LEGACY_EDITS_MAX} edits, made together or not at all. Each \`find\` is looked for in the HTML as it was before any of them.`,
+        ),
     },
   },
   {

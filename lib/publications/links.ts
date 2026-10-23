@@ -46,8 +46,11 @@ export type PublicationLink =
 const EMAIL_ADDRESS =
   /^[^\s@,;:<>()[\]\\"]+@[^\s@,;:<>()[\]\\"]+\.[^\s@,;:<>()[\]\\".]+$/
 
-/** The hostnames this site answers on: the configured one, with and without `www.`. */
-function siteHosts(siteUrl: string): Set<string> {
+/**
+ * The hostnames this site answers on: the configured one, with and without
+ * `www.`. Also what `editLegacyHtml` counts as a link to this site.
+ */
+export function siteHosts(siteUrl: string): Set<string> {
   try {
     const host = new URL(siteUrl).hostname.toLowerCase()
     const bare = host.replace(/^www\./, '')

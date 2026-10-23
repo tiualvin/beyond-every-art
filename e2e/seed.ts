@@ -215,7 +215,18 @@ async function upsertRedirect(payload: Payload): Promise<void> {
  */
 async function upsertKeyedUser(
   payload: Payload,
-  { email, key, role }: { email: string; key: string; role: string },
+  {
+    email,
+    key,
+    role,
+    tools = {},
+  }: {
+    email: string
+    key: string
+    role: string
+    /** Custom tools to set otherwise than ticked. */
+    tools?: Record<string, boolean>
+  },
 ): Promise<void> {
   const existing = await payload.find({
     collection: 'users',
@@ -251,10 +262,12 @@ async function upsertKeyedUser(
     'payload-mcp-tool': {
       draftArticle: true,
       readArticleMarkdown: true,
+      readLegacyHtml: true,
       listArticleVersions: true,
       readArticleVersion: true,
       restoreArticleVersion: true,
       updateArticleMarkdown: true,
+      editLegacyHtml: true,
       setKeyFactsBlock: true,
       setFAQBlock: true,
       setTableBlock: true,
@@ -262,6 +275,7 @@ async function upsertKeyedUser(
       uploadMediaFromUrl: true,
       publishArticle: true,
       editorialStatus: true,
+      ...tools,
     },
   }
 
@@ -361,6 +375,12 @@ async function seed(): Promise<void> {
     email: fixtures.mcp.authorEmail,
     key: fixtures.mcp.authorKey,
     role: 'author',
+  })
+  await upsertKeyedUser(payload, {
+    email: fixtures.mcp.limitedEmail,
+    key: fixtures.mcp.limitedKey,
+    role: 'editor',
+    tools: { editLegacyHtml: false, readLegacyHtml: false },
   })
 
   payload.logger.info(

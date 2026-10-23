@@ -159,10 +159,12 @@ test.describe('MCP endpoint', () => {
       expect.arrayContaining([
         'draftArticle',
         'readArticleMarkdown',
+        'readLegacyHtml',
         'listArticleVersions',
         'readArticleVersion',
         'restoreArticleVersion',
         'updateArticleMarkdown',
+        'editLegacyHtml',
         'setKeyFactsBlock',
         'setFAQBlock',
         'setTableBlock',
@@ -194,6 +196,138 @@ test.describe('MCP endpoint', () => {
     // `delete: false` on posts, because an agent that removes an article is not
     // a workflow this project wants.
     expect(tools).not.toContain('deletePosts')
+  })
+
+  // A custom tool is offered by its checkbox on the key, and an unticked one
+  // is not merely refused: it is absent from the list, so a client cannot
+  // select it at all.
+  test('offers the legacy HTML tools only to a key that has them', async ({
+    request,
+  }) => {
+    const list = async (key: string) =>
+      (
+        (
+          (await rpc(request, key, 'tools/list')).result as {
+            tools?: Array<{ name: string }>
+          }
+        )?.tools ?? []
+      ).map((tool) => tool.name)
+
+    const limited = await list(fixtures.mcp.limitedKey)
+    expect(limited).toContain('readArticleMarkdown')
+    expect(limited).not.toContain('readLegacyHtml')
+    expect(limited).not.toContain('editLegacyHtml')
+
+    for (const name of ['readLegacyHtml', 'editLegacyHtml']) {
+      const refused = await callTool(request, fixtures.mcp.limitedKey, name, {
+        slug: fixtures.duplicateTitlePost.slug,
+      })
+      expect(refused).toContain(`Tool ${name} not found`)
+    }
+  })
+
+  // The one place an edit meets Payload's real save — field access, the
+  // draft guard, Postgres — and the HTML the page will render is read back.
+  test("edits a migrated article's HTML a phrase at a time, as a draft over the live page", async ({
+    request,
+  }) => {
+    const key = fixtures.mcp.editorKey
+    const slug = `e2e-mcp-legacy-${Date.now()}-${Math.floor(Math.random() * 1e6)}`
+    const legacyHTML =
+      '<h2>Ancient purples</h2>\n' +
+      '<p>Made from murex snails, Tyrian&nbsp;<em>purple</em> was worth its weight in silver.</p>'
+    const liveDoc = async () => {
+      const response = await request.get(
+        `/api/posts/?where[slug][equals]=${slug}&depth=0`,
+      )
+      return (
+        (await response.json()) as { docs: Array<Record<string, unknown>> }
+      ).docs[0]
+    }
+
+    // Shaped as the Ghost import leaves an article: HTML, no rich-text body,
+    // live under a date from before the cutover. The old date is also what
+    // keeps it below every fixture in the journal, whose first page other
+    // specs look for theirs on — an article published "now" on every run
+    // would push them off it.
+    const created = await callTool(
+      request,
+      fixtures.mcp.adminKey,
+      'createPosts',
+      {
+        _status: 'published',
+        legacyHTML,
+        publishedAt: '2019-05-14T09:00:00.000Z',
+        slug,
+        title: 'E2E MCP Migrated Article',
+        visibility: 'public',
+      },
+    )
+    expect(created).not.toContain('"isError":true')
+    expect((await liveDoc())?._status).toBe('published')
+
+    const found = await callToolJson(request, key, 'readLegacyHtml', {
+      query: 'Tyrian purple',
+      slug,
+    })
+    const [match] = found.matches as Array<Record<string, unknown>>
+    expect(match).toMatchObject({
+      heading: 'Ancient purples',
+      html: 'Tyrian&nbsp;<em>purple',
+      storedOccurrences: 1,
+    })
+
+    const find = `${match.html}</em>`
+    const replace = `<a href="/${fixtures.duplicateTitlePost.slug}/">${find}</a>`
+    const edits = [{ find, replace }]
+
+    const dry = await callToolJson(request, key, 'editLegacyHtml', {
+      dryRun: true,
+      edits,
+      slug,
+    })
+    expect(dry).toMatchObject({ dryRun: true, readers: 'live' })
+    expect(dry.links).toEqual([
+      expect.objectContaining({
+        slug: fixtures.duplicateTitlePost.slug,
+        status: 'live',
+      }),
+    ])
+    const untouched = await callToolJson(request, key, 'readLegacyHtml', {
+      slug,
+    })
+    expect(untouched.html).toBe(legacyHTML)
+
+    const saved = await callToolJson(request, key, 'editLegacyHtml', {
+      edits,
+      slug,
+    })
+    expect(saved).toMatchObject({
+      dryRun: false,
+      readers: 'live',
+      status: 'draft',
+    })
+    expect(saved.note).toMatch(/readers still see the published version/)
+
+    const draft = await callToolJson(request, key, 'readLegacyHtml', { slug })
+    expect(draft.html).toBe(legacyHTML.replace(find, replace))
+
+    // Readers still have the page as it was, and it is still on the site.
+    const live = await liveDoc()
+    expect(live?._status).toBe('published')
+    expect(live?.legacyHTML).toBe(legacyHTML)
+
+    // A refused edit writes nothing, whichever of its edits is refused.
+    const refused = await callTool(request, key, 'editLegacyHtml', {
+      edits: [
+        { find: 'in silver', replace: 'in gold' },
+        { find: 'Ancient', replace: '<img src=x onerror=alert(1)>Ancient' },
+      ],
+      slug,
+    })
+    expect(refused).toContain('adds <img>')
+    const after = await callToolJson(request, key, 'readLegacyHtml', { slug })
+    expect(after.html).toBe(legacyHTML.replace(find, replace))
   })
 
   test('drafts an article from Markdown and reads it back', async ({

@@ -8,8 +8,8 @@
 //
 // `overrideResponse` is the plugin's hook for this. It runs on the generated
 // tools only: the custom tools in `tools.ts` build their own compact replies,
-// and `readArticleMarkdown` returns a body because returning the body is its
-// entire purpose.
+// and `readArticleMarkdown` and `readLegacyHtml` return a body because
+// returning one is their entire purpose.
 
 import type { MCPPluginConfig } from '@payloadcms/plugin-mcp'
 
@@ -20,16 +20,17 @@ type OverrideResponse = NonNullable<CollectionOptions['overrideResponse']>
 type Response = Parameters<OverrideResponse>[0]
 
 /**
- * Fields replaced with a note saying what was there.
+ * Fields replaced with a note saying what was there, and what reads it.
  *
  * Both hold an article body: `content` as Lexical editor state, `legacyHTML` as
- * the migrated Ghost markup a migrated post actually renders from. An agent
- * that wants either should ask `readArticleMarkdown`, which returns one of them
- * as Markdown and says plainly when the document renders from the other.
+ * the migrated Ghost markup a migrated post actually renders from. Each note
+ * names the tool built for that body — `readArticleMarkdown` for the first,
+ * `readLegacyHtml`, which pages through the HTML and finds text in it, for the
+ * second — so an agent asks for one deliberately and a page at a time.
  */
-const HEAVY_FIELDS: Record<string, string> = {
-  content: 'rich-text body',
-  legacyHTML: 'migrated Ghost HTML',
+const HEAVY_FIELDS: Record<string, { description: string; reader: string }> = {
+  content: { description: 'rich-text body', reader: 'readArticleMarkdown' },
+  legacyHTML: { description: 'migrated Ghost HTML', reader: 'readLegacyHtml' },
 }
 
 /** Serialised size of a value, which is what actually costs context. */
@@ -51,13 +52,13 @@ export function elideDocument(
   let elided = false
   const result = { ...doc }
 
-  for (const [name, description] of Object.entries(HEAVY_FIELDS)) {
+  for (const [name, { description, reader }] of Object.entries(HEAVY_FIELDS)) {
     const value = doc[name]
     if (value === undefined || value === null || value === '') continue
 
     result[name] =
       `[elided by the MCP server: ${weigh(value)} characters of ${description}. ` +
-      'Read it with `readArticleMarkdown`.]'
+      `Read it with \`${reader}\`.]`
     elided = true
   }
 

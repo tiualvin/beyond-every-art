@@ -110,7 +110,9 @@ export const mcpPluginConfig: MCPPluginConfig = {
         'Articles. Bodies are stored as Lexical rich text, so use ' +
         '`draftArticle` and `updateArticleMarkdown` to write them rather than ' +
         'setting `content` directly, and `setKeyFactsBlock` to add a key ' +
-        'facts card. Migrated articles render from `legacyHTML`. ' +
+        'facts card. Migrated articles render from `legacyHTML`: read it with ' +
+        '`readLegacyHtml` and change it with `editLegacyHtml`, not by setting ' +
+        'the field. ' +
         'Prefer `select` to avoid pulling whole bodies into context.',
       // No `delete`: an agent that removes an article is not a workflow this
       // project wants, and the admin panel is two clicks away.
