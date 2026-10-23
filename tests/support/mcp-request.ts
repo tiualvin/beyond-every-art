@@ -50,6 +50,10 @@ function sanitizedCollections(): Promise<Payload['collections']> {
 /**
  * A request whose Payload holds `doc` and records every write to it.
  *
+ * `posts` are other articles, found by slug — the live rows a link check
+ * reads. A slug that is neither one of them nor `doc`'s finds nothing. `role`
+ * is the key's user's role, an editor unless a test says otherwise.
+ *
  * `update` merges the written data into the stored document, so a test can
  * call one tool after another and see the second read what the first wrote.
  *
@@ -58,16 +62,30 @@ function sanitizedCollections(): Promise<Payload['collections']> {
  * write without `draft` reaches. A draft saved over a published article leaves
  * the live row as it was — the difference the tools now report on.
  */
-export async function mcpRequest(initial: Doc) {
+export async function mcpRequest(
+  initial: Doc,
+  { posts = [], role = 'editor' }: { posts?: Doc[]; role?: string } = {},
+) {
   let doc: Doc = { ...initial }
   let live: Doc = { ...initial }
 
   const payload = {
     collections: await sanitizedCollections(),
     findByID: vi.fn(async () => doc),
-    find: vi.fn(async (args?: { draft?: boolean }) => ({
-      docs: [args?.draft === false ? live : doc],
-    })),
+    find: vi.fn(
+      async (args?: {
+        draft?: boolean
+        where?: { slug?: { equals?: unknown } }
+      }) => {
+        const slug = args?.where?.slug?.equals
+        const other = posts.find((post) => post.slug === slug)
+        if (other) return { docs: [other] }
+        if (posts.length && slug !== undefined && slug !== doc.slug) {
+          return { docs: [] }
+        }
+        return { docs: [args?.draft === false ? live : doc] }
+      },
+    ),
     update: vi.fn(
       async ({
         data,
@@ -85,7 +103,7 @@ export async function mcpRequest(initial: Doc) {
 
   const req = {
     payload,
-    user: { id: 1, collection: 'users', role: 'editor' },
+    user: { id: 1, collection: 'users', role },
   } as unknown as PayloadRequest
 
   return { req, payload, current: () => doc }

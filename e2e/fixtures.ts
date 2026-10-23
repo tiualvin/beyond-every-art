@@ -59,6 +59,13 @@ export const fixtures = {
      */
     authorKey: 'e2e-mcp-author-key-c83d1f0e6a9b4527',
     authorEmail: 'e2e-mcp-author@example.test',
+    /**
+     * An editor whose key has the two legacy-HTML tools unticked, so the suite
+     * can show that a capability left off removes the tool rather than merely
+     * refusing it.
+     */
+    limitedKey: 'e2e-mcp-limited-key-5e0b7a3c19d24f86',
+    limitedEmail: 'e2e-mcp-limited@example.test',
     password: 'e2e-mcp-Password-1!',
     /** Collections that must have no tool at all, whatever a key allows. */
     forbiddenCollections: [

@@ -48,7 +48,8 @@
 Configuration lives in [`lib/mcp/`](../lib/mcp): `plugin.ts` (allowlist, rate
 limit, request logging), `tools.ts` (the drafting and version-history tools),
 `markdown.ts`
-(Markdown ⇄ Lexical), `response.ts` (keeping bodies out of find responses),
+(Markdown ⇄ Lexical), `legacy-html.ts` (finding and editing a migrated
+article's HTML), `response.ts` (keeping bodies out of find responses),
 `api-keys.ts` (who may issue and revoke a key), `errors.ts` (the shape of a
 refusal), `publish-guard.ts`, `rate-limit.ts`, and `audit.ts`.
 
@@ -56,10 +57,11 @@ The endpoint itself is covered end to end by
 [`e2e/mcp.spec.ts`](../e2e/mcp.spec.ts), which the `browser-smoke` CI job runs
 against a seeded disposable database: it asserts that an unauthenticated call is
 refused, that a key is offered the drafting tools and nothing outside the
-allowlist, that a Markdown body survives the round trip, and that an editor key
-is refused a publish. Everything else about MCP is unit-tested under
-[`tests/mcp/`](../tests/mcp), but none of that can tell you the endpoint is
-mounted.
+allowlist, that a Markdown body survives the round trip, that a migrated
+article's HTML takes an exact edit as a draft while readers keep the live page,
+and that an editor key is refused a publish. Everything else about MCP is
+unit-tested under [`tests/mcp/`](../tests/mcp), but none of that can tell you
+the endpoint is mounted.
 
 ### Turning it on
 
@@ -127,6 +129,13 @@ gets them exactly where it already had `updateArticleMarkdown`.
 still `refuseMcpPublish`'s decision.
 `editorialStatus` reads titles, addresses and dates of posts the key can already
 read, so an existing key gets it where it had `posts.find`.
+`readLegacyHtml` reads the body `readArticleMarkdown` reads, for the articles
+that render from HTML, so an existing key or grant gets it where it had
+`readArticleMarkdown`. `editLegacyHtml` writes a draft body, so it follows
+`restoreArticleVersion`: an existing key gets it only where it had both
+`updateArticleMarkdown` and `posts.update`. A new connector's consent screen
+lists both, ticked, like every other custom tool — its rows are derived from
+the tool list.
 
 ### Tools
 
@@ -137,21 +146,23 @@ all.
 
 Written for this project, because the generated ones cannot do the job:
 
-| Tool                    | Does                                                                                                                                                                                                                                                                                   |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `draftArticle`          | Creates a post from Markdown, always as a draft. Resolves tag and author slugs, refuses unknown ones. The `ghostID` is autofilled by the collection.                                                                                                                                   |
-| `readArticleMarkdown`   | Reads a post back as Markdown, including the draft body, with each module as a marker line and its contents in `blocks`. Says so when the page renders from `legacyHTML`.                                                                                                              |
-| `listArticleVersions`   | Lists a post's saved versions, newest first — id, time, title, status and a 100-character snippet each, never a body.                                                                                                                                                                  |
-| `readArticleVersion`    | Reads one saved version in exactly the shape `readArticleMarkdown` returns the draft. Read-only.                                                                                                                                                                                       |
-| `restoreArticleVersion` | Reverts a post's body, or its whole article, to a saved version — as a draft, overwriting rather than merging. Has a dry run and an undo.                                                                                                                                              |
-| `updateArticleMarkdown` | Replaces a body from Markdown, saved as a draft. Puts each marked module back as it was; reports which were kept and which removed.                                                                                                                                                    |
-| `setKeyFactsBlock`      | Sets an article's key facts card — label and value pairs — in place, or under a named body heading. Saved as a draft; the rest of the body is untouched.                                                                                                                               |
-| `setFAQBlock`           | Sets an article's FAQ — questions with Markdown answers — in place, under a named body heading, or in place of a Markdown FAQ section. Saved as a draft; the rest of the body is untouched.                                                                                            |
-| `setTableBlock`         | Sets a comparison table — caption, header row, rows with inline-Markdown cells — by key, in a named section, or read from the Markdown table under a heading. Saved as a draft; the rest of the body is untouched.                                                                     |
-| `uploadMedia`           | Adds an image to the Media library from base64 and returns its id, for `updatePosts` to set as a `featuredImage`.                                                                                                                                                                      |
-| `uploadMediaFromUrl`    | The same, from an https address the server fetches itself. The only one of the two that works from a phone or a scheduled run.                                                                                                                                                         |
-| `publishArticle`        | Publishes a post as its newest version, in place, or schedules one that is not live — `"now"` or a zoned time ahead. Never moves a live article's date, slug or canonical URL; refuses to backdate. Has a dry run. Needs an administrator's key or a connector granted publishing.     |
-| `editorialStatus`       | Read-only. What is scheduled in the next days and what went live in the last, each with its address; and what is saved but not out — live or scheduled articles whose newest version is an unpublished draft, and drafts whose date has passed. The same lists as the admin dashboard. |
+| Tool                    | Does                                                                                                                                                                                                                                                                                         |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `draftArticle`          | Creates a post from Markdown, always as a draft. Resolves tag and author slugs, refuses unknown ones. The `ghostID` is autofilled by the collection.                                                                                                                                         |
+| `readArticleMarkdown`   | Reads a post back as Markdown, including the draft body, with each module as a marker line and its contents in `blocks`. Says so when the page renders from `legacyHTML`.                                                                                                                    |
+| `readLegacyHtml`        | Read-only. A migrated post's Ghost HTML exactly as stored, a page at a time — or, given text as a reader sees it, each match as the stored HTML it spans, with context, its heading and whether it is unique. Refused where the page renders from the rich-text body.                        |
+| `listArticleVersions`   | Lists a post's saved versions, newest first — id, time, title, status and a 100-character snippet each, never a body.                                                                                                                                                                        |
+| `readArticleVersion`    | Reads one saved version in exactly the shape `readArticleMarkdown` returns the draft. Read-only.                                                                                                                                                                                             |
+| `restoreArticleVersion` | Reverts a post's body, or its whole article, to a saved version — as a draft, overwriting rather than merging. Has a dry run and an undo.                                                                                                                                                    |
+| `updateArticleMarkdown` | Replaces a body from Markdown, saved as a draft. Puts each marked module back as it was; reports which were kept and which removed.                                                                                                                                                          |
+| `editLegacyHtml`        | Exact find-and-replace edits to a migrated post's Ghost HTML, saved as a draft, all or none. New markup is links, `em`, `strong`, `i` and `b` only; a link to this site must name a live or scheduled article. Has a dry run. See [Editing a migrated article](#editing-a-migrated-article). |
+| `setKeyFactsBlock`      | Sets an article's key facts card — label and value pairs — in place, or under a named body heading. Saved as a draft; the rest of the body is untouched.                                                                                                                                     |
+| `setFAQBlock`           | Sets an article's FAQ — questions with Markdown answers — in place, under a named body heading, or in place of a Markdown FAQ section. Saved as a draft; the rest of the body is untouched.                                                                                                  |
+| `setTableBlock`         | Sets a comparison table — caption, header row, rows with inline-Markdown cells — by key, in a named section, or read from the Markdown table under a heading. Saved as a draft; the rest of the body is untouched.                                                                           |
+| `uploadMedia`           | Adds an image to the Media library from base64 and returns its id, for `updatePosts` to set as a `featuredImage`.                                                                                                                                                                            |
+| `uploadMediaFromUrl`    | The same, from an https address the server fetches itself. The only one of the two that works from a phone or a scheduled run.                                                                                                                                                               |
+| `publishArticle`        | Publishes a post as its newest version, in place, or schedules one that is not live — `"now"` or a zoned time ahead. Never moves a live article's date, slug or canonical URL; refuses to backdate. Has a dry run. Needs an administrator's key or a connector granted publishing.           |
+| `editorialStatus`       | Read-only. What is scheduled in the next days and what went live in the last, each with its address; and what is saved but not out — live or scheduled articles whose newest version is an unpublished draft, and drafts whose date has passed. The same lists as the admin dashboard.       |
 
 ### Modules in a body
 
@@ -248,6 +259,77 @@ screen.
 Relationship nodes — a link card to another document, inserted from the editor's
 toolbar — have the same problem modules had, and are not covered: one still
 comes back from a revision as a line of text.
+
+### Editing a migrated article
+
+Every migrated article renders from `legacyHTML` while its rich-text body is
+empty, and until these two tools existed none of them could be edited over MCP.
+The find responses elide the field ([Finding 6](#finding-6-response-size--built)),
+`readArticleMarkdown` can only say the page renders from it, and
+`updateArticleMarkdown` writes `content` — which wins over the HTML the moment
+it holds anything, so a one-word correction made that way would replace the
+whole article with the Markdown sent. The work a migrated archive actually
+needs is smaller than that: wrap a phrase in a link to a newer article, correct
+a sentence.
+
+`readLegacyHtml` gives the agent the exact characters to name. Given a query
+it matches the text as a reader sees it — references decoded, curly quotes and
+dashes matched by straight ones, across inline tags — and returns each match as
+the stored HTML it spans, with context, its heading, and how often that exact
+HTML occurs; without one it pages through the stored body. `editLegacyHtml`
+then takes `find` and `replace` pairs, each `find` matched exactly and exactly
+once, all applied or none, and saves the result as a draft through the same
+update as `updateArticleMarkdown` — so the publish guard, the draft guard, the
+`mcp_write` line and the authorship stamp all apply, and nothing but
+`legacyHTML` changes.
+
+The HTML is put on the page raw, so what an edit may do is decided on a parse
+tree, with parse5 — the HTML standard's own tree-construction algorithm, which
+is what the browser runs when React sets `innerHTML` — rather than with
+patterns over the markup:
+
+- **Markup an edit adds** — any start tag or comment it touches that is not
+  copied verbatim from its own `find` — may be `<a href>` (`https://`, or a path
+  from the site's root, with `rel` at most), `<em>`, `<strong>`, `<i>` or
+  `<b>`. Script, iframe, style, object, embed, event handlers, style
+  attributes, comments and `javascript:` or `data:` links are refused by name.
+  A text edit that lands inside an existing tag changes that tag, and is judged
+  as new markup.
+- **An href may hold only URL characters.** The browser is not the only thing
+  that reads this HTML: the ad splitter in
+  [`lib/ads/inline.ts`](../lib/ads/inline.ts) finds a paragraph's end with a
+  regular expression, so an href containing `</p><img …>` — harmless to a
+  parser reading the whole body — could begin the next chunk with a live image.
+  Anything else is percent-encoded.
+- **Nothing in `find` that matters is lost.** An image, figure, embed or block
+  element there must reappear in `replace` verbatim, and an edit inside a
+  `<script>` or `<style>` is refused whatever it says.
+- **Nothing is left for the browser to repair.** Tree construction repairs
+  silently — a stray `</em>` vanishes, a `<p>` closed twice gains an empty
+  paragraph — so the check reads repairs off the tree: elements nobody wrote,
+  elements nobody closed, source the tree does not account for, content the
+  parser moved, and syntax errors. It compares the body with itself before the
+  edit, because Ghost's HTML is not always clean and an edit is not refused
+  for a fault it did not make.
+- **A link to this site must name an article readers can reach.** The reply
+  says whether each target is live or scheduled; a scheduled one is warned
+  about, since it answers 404 until its date, and one that does not exist or
+  was never published is refused. A path that is not an article's — a tag, a
+  page — is refused too, because `pages` is outside the allowlist and this
+  tool cannot check it.
+- **An author's key is refused before anything is tried.** `legacyHTML` takes
+  an editor ([below](#why-it-fits-this-repositorys-access-model)), and Payload
+  does not refuse a write to a field the user may not write: it keeps the
+  stored value and reports success. The tool asks the field's own rule first,
+  and checks what landed after.
+
+What this does not do, and is not for: converting a migrated article to the
+editor, changing an image or its alt text (an `<img>` is not on the list), or
+anything a person should see the page for. And the allowlist binds this tool,
+not the key. `updatePosts` can still set `legacyHTML` wholesale for an editor's
+key, exactly as an editor can in the admin panel; what `editLegacyHtml` adds is
+a way for an agent to make the small edit without being able to make any
+other.
 
 ### Images
 
@@ -643,6 +725,10 @@ Two existing protections are worth naming because they survive intact:
   land stored XSS on the public site. An editor- or admin-bound key can — same
   as an editor with a browser. That is the trust decision already recorded in
   [`collections/Posts.ts`](../collections/Posts.ts), not a new one.
+  Enforced means kept, not refused: Payload saves the rest of the write and
+  leaves the field as it was, so `editLegacyHtml` asks the field's rule itself
+  and refuses an author's key outright rather than reporting an edit that did
+  not happen.
 - **Gated posts stay gated.** `postsRead` keeps `members` and `paid` posts out
   of anonymous reads, and the MCP `find` tools inherit it.
 
@@ -757,7 +843,10 @@ Note that migrated posts render from `legacyHTML` only while `content` is empty:
 the rich-text body wins whenever it holds anything, so the first edit to a
 migrated article in the editor — or over MCP — becomes what the page shows.
 `readArticleMarkdown` asks the renderer which body applies, and says so rather
-than returning an empty string when it is the migrated HTML.
+than returning an empty string when it is the migrated HTML — pointing at
+`readLegacyHtml` and `editLegacyHtml`, which edit that HTML in place. It used
+to add that a Markdown edit "would not change the published page", which was
+backwards: it would replace the page.
 
 ### Finding 4: the endpoint is not behind the staging gate
 
@@ -857,8 +946,8 @@ responses.
 Built as [`lib/mcp/response.ts`](../lib/mcp/response.ts), which covers `content`
 as well as `legacyHTML` — both are article bodies, and the Lexical one is no
 cheaper to carry. Each is replaced by a note giving its size and pointing at
-`readArticleMarkdown`, so an agent can see that a body exists and ask for it
-deliberately.
+the tool that reads that body — `readArticleMarkdown`, or `readLegacyHtml` for
+the HTML — so an agent can see that a body exists and ask for it deliberately.
 
 Two implementation notes, because the hook is easy to get wrong. The response
 text arrives **already serialised** — the plugin has built its header and one

@@ -39,7 +39,7 @@ describe('elideDocument', () => {
     expect(elided?.legacyHTML).toContain(
       '800 characters of migrated Ghost HTML',
     )
-    expect(elided?.legacyHTML).toContain('readArticleMarkdown')
+    expect(elided?.legacyHTML).toContain('readLegacyHtml')
   })
 
   it('weighs a rich-text body by its serialised size', () => {
@@ -49,6 +49,7 @@ describe('elideDocument', () => {
     expect(elided?.content).toContain(
       `${JSON.stringify(content).length} characters of rich-text body`,
     )
+    expect(elided?.content).toContain('readArticleMarkdown')
   })
 
   // The caller leaves the plugin's own response alone when nothing was heavy,
