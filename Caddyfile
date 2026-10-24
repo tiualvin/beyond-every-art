@@ -221,10 +221,41 @@
 # Written inside `route` so these evaluate top to bottom as written. `handle`
 # blocks are otherwise sorted by matcher specificity, and the order is the whole
 # meaning here.
+#
+# **This hostname was also a second copy of the site.** The catch-all at the
+# end proxied every frontend route, so every article answered here exactly as
+# it does on the public address — and Google indexed them. Search Console for
+# 21 Jul – 22 Oct 2026 showed 35 article URLs with impressions on this host,
+# and 8 articles with impressions *only* here and none on `www`. The canonical
+# tag on every one of those pages already pointed at `www`; Google overrode it,
+# which it is entitled to do when a duplicate is served this cleanly. A
+# canonical is a hint, a redirect is not.
+#
+# Two answers, below, and neither alone would do. Every response here says
+# `noindex`, and a page request from anyone who is not signed in is sent to the
+# same path on the public address. The redirect is what moves the 8 orphaned
+# articles' signals onto the URLs that should hold them; the header is what
+# keeps the pages editors still get here — preview, Live Preview — out of the
+# index if a crawler ever reaches one. See docs/SEO_AND_REDIRECTS.md, "The CMS
+# host".
 {$CMS_ADDRESS:cms.localhost} {
   import {$CADDY_ACME:acme-default}
 
   encode zstd gzip
+
+  # Nothing this hostname serves is meant for a search engine: the admin, the
+  # API, the OAuth screens, and pages rendered for an editor.
+  #
+  # `defer` so it is applied as the response is written, after the application
+  # has set its own headers. Without it Caddy sets the header first and the
+  # proxy then *adds* the application's value alongside it, so `/indexnow.txt`
+  # — which sends its own `X-Robots-Tag: noindex` — would answer with two. Both
+  # say noindex and Google honours the stricter, so that would be harmless; one
+  # header that means what this block says is still the better answer.
+  header {
+    X-Robots-Tag "noindex, nofollow"
+    defer
+  }
 
   route {
     # Endpoints that have to answer without a credential, because they are how
@@ -265,7 +296,53 @@
       respond "Not found" 404
     }
 
-    # The admin panel itself, and everything else this hostname serves.
+    # A page request from someone who is not signed in, sent to the public
+    # address. This is the duplicate the block comment above describes, and the
+    # redirect is what closes it: a crawler never carries a session, so every
+    # article URL here now answers 301 to its `www` twin.
+    #
+    # What is exempt is what this hostname exists for — the admin, the API, the
+    # assets both of them load, the OAuth server and its discovery documents,
+    # and the redirect table `validate:redirects` reads from here — plus
+    # `/csp-report`. That last one is not in the obvious list and is not
+    # optional: the policy names it as a relative path, so violation reports
+    # from the admin are posted to this hostname, browsers send them without
+    # cookies, and a browser posting a report does not follow a redirect. The
+    # admin's own reports would vanish while the policy is still report-only,
+    # which is exactly when they are the only evidence there is.
+    #
+    # Signed-in editors are not redirected, and that is what keeps Preview and
+    # Live Preview working. `buildPreviewUrl` is deliberately relative so the
+    # whole flow stays on this host: `/api/preview` turns on draft mode and
+    # redirects to the document's path, which renders here. Payload's session
+    # cookie is set on this hostname with `Path=/`, so it rides on every one of
+    # those hops, and the global previews' iframe at `/` as well.
+    #
+    # Next's draft-mode cookie is deliberately *not* a way through. It is not
+    # needed — it never travels without the session cookie in a real preview —
+    # and it would not help: `getPreviewMode` ignores draft mode unless the
+    # request also carries an editorial Payload session, so a request with only
+    # the draft cookie renders the public page, which is the duplicate again.
+    #
+    # Presence, not validity, as with `@sessionApi` above: a forged cookie gets
+    # the page. It gets it with the `noindex` above, and crawlers do not forge
+    # cookies, so the forgery buys nothing the public address does not give.
+    #
+    # `no-store` because a 301 with no caching headers is cached by the
+    # browser indefinitely, keyed on the URL alone. An editor who once opened
+    # an article here before signing in — or typed this hostname's bare `/` —
+    # would then have Live Preview for that page, or the globals' iframe at
+    # `/`, silently follow the stale redirect to the public site, with no draft
+    # and no refresh. Search engines read the status, not the cache policy, so
+    # the redirect stays permanent where it matters.
+    @anonymousPage {
+      not path /admin* /api* /_next* /oauth* /.well-known/* /redirects-map* /csp-report*
+      not header Cookie *payload-token=*
+    }
+    header @anonymousPage Cache-Control no-store
+    redir @anonymousPage https://{$SITE_ADDRESS:localhost}{uri} permanent
+
+    # The admin panel itself, and pages rendered for a signed-in editor.
     handle {
       reverse_proxy app:3000
     }
