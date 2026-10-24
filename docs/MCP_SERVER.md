@@ -49,7 +49,9 @@ Configuration lives in [`lib/mcp/`](../lib/mcp): `plugin.ts` (allowlist, rate
 limit, request logging), `tools.ts` (the drafting and version-history tools),
 `markdown.ts`
 (Markdown ⇄ Lexical), `legacy-html.ts` (finding and editing a migrated
-article's HTML), `response.ts` (keeping bodies out of find responses),
+article's HTML), `convert-legacy.ts` (checking and saving a migrated
+article's conversion into the editor), `anchors.ts` (kept heading anchors
+through Markdown), `response.ts` (keeping bodies out of find responses),
 `api-keys.ts` (who may issue and revoke a key), `errors.ts` (the shape of a
 refusal), `publish-guard.ts`, `rate-limit.ts`, and `audit.ts`.
 
@@ -136,6 +138,10 @@ that render from HTML, so an existing key or grant gets it where it had
 `updateArticleMarkdown` and `posts.update`. A new connector's consent screen
 lists both, ticked, like every other custom tool — its rows are derived from
 the tool list.
+`convertLegacyArticle` replaces what a migrated article renders from, with a
+draft, and takes an editor exactly as `editLegacyHtml` does, so an existing
+key or grant gets it exactly where it has `editLegacyHtml`
+(`20261024_144445_add_convert_legacy_capability`).
 
 ### Tools
 
@@ -156,6 +162,7 @@ Written for this project, because the generated ones cannot do the job:
 | `restoreArticleVersion` | Reverts a post's body, or its whole article, to a saved version — as a draft, overwriting rather than merging. Has a dry run and an undo.                                                                                                                                                    |
 | `updateArticleMarkdown` | Replaces a body from Markdown, saved as a draft. Puts each marked module back as it was; reports which were kept and which removed.                                                                                                                                                          |
 | `editLegacyHtml`        | Exact find-and-replace edits to a migrated post's Ghost HTML, saved as a draft, all or none. New markup is links, `em`, `strong`, `i` and `b` only; a link to this site must name a live or scheduled article. Has a dry run. See [Editing a migrated article](#editing-a-migrated-article). |
+| `convertLegacyArticle`  | Converts one migrated post from its Ghost HTML into the rich-text body, so the module tools work on it. Dry run by default, with a report; saves a draft only when nothing is refused. See [Converting a migrated article](#converting-a-migrated-article).                                  |
 | `setKeyFactsBlock`      | Sets an article's key facts card — label and value pairs — in place, or under a named body heading. Saved as a draft; the rest of the body is untouched.                                                                                                                                     |
 | `setFAQBlock`           | Sets an article's FAQ — questions with Markdown answers — in place, under a named body heading, or in place of a Markdown FAQ section. Saved as a draft; the rest of the body is untouched.                                                                                                  |
 | `setTableBlock`         | Sets a comparison table — caption, header row, rows with inline-Markdown cells — by key, in a named section, or read from the Markdown table under a heading. Saved as a draft; the rest of the body is untouched.                                                                           |
@@ -324,12 +331,113 @@ patterns over the markup:
   and checks what landed after.
 
 What this does not do, and is not for: converting a migrated article to the
-editor, changing an image or its alt text (an `<img>` is not on the list), or
+editor — that is `convertLegacyArticle`, [below](#converting-a-migrated-article)
+— changing an image or its alt text (an `<img>` is not on the list), or
 anything a person should see the page for. And the allowlist binds this tool,
 not the key. `updatePosts` can still set `legacyHTML` wholesale for an editor's
 key, exactly as an editor can in the admin panel; what `editLegacyHtml` adds is
 a way for an agent to make the small edit without being able to make any
 other.
+
+### Converting a migrated article
+
+`editLegacyHtml` changes a migrated article a phrase at a time, and that is
+all it can do: the module tools — FAQ, key facts, tables — refuse any article
+that renders from `legacyHTML`, because a rich-text body holding only the
+module would replace the whole page. In October 2026 the 113 migrated articles
+carried no FAQ, one table and no key facts between them, against FAQs on 29 of
+48 new posts, while still ranking for question searches. `convertLegacyArticle`
+moves one article's body into the editor, so those tools work on it.
+
+**One article per call, and a dry run unless told otherwise.** The report is
+the point of the tool:
+
+- **plain text** — both bodies through `lib/content/plain-text.ts`, as the page
+  renders them, compared with whitespace set aside; equal or the first
+  difference;
+- **heading ids** — every legacy heading's id beside the id the converted page
+  will render, computed with the renderer's own allocator;
+- **links and images** — counted on both sides, with anything missing or extra
+  named, and each image matched to its Media document;
+- **cards** — which Ghost cards became which modules;
+- **round trip** — whether the body comes back unchanged through
+  `readArticleMarkdown` then `updateArticleMarkdown`, the same functions in the
+  same order;
+- **refused** — everything that stops it, and **notes** — everything left out
+  on purpose, with why that loses nothing.
+
+`dryRun: false` saves only when nothing is refused and the rich-text body is
+empty, writes `content` and `_status` and nothing else, as a draft through the
+same update the other draft tools use — so the publish guard, the draft guard,
+the `mcp_write` line and the authorship stamp all apply, and readers keep the
+live page until someone publishes. `legacyHTML` is never written. The reply
+names the version the draft replaced as `undo`; restoring it with
+`restoreArticleVersion`, scope `"body"`, empties the body again and the page
+renders from the HTML exactly as before. It takes an editor's key, for the
+same reason `editLegacyHtml` does. `pnpm content:convert-legacy --slug …` runs
+the same planning and saving from the server (`--write` to save; a dry run
+otherwise), as the database rather than as a user.
+
+**It refuses rather than approximates.**
+[`lib/migration/legacy-to-lexical.ts`](../lib/migration/legacy-to-lexical.ts)
+builds nodes in the posts editor's own shapes — byte for byte what the editor
+or a Markdown import would store, down to a paragraph's `textFormat` — and
+[`lib/mcp/convert-legacy.ts`](../lib/mcp/convert-legacy.ts) checks the result
+from outside. What it carries: paragraphs, headings and their ids, links,
+bold, italics, code, strikethrough, nested lists, quotes and rules; Ghost's
+image, gallery, bookmark, callout, toggle and embed cards as the gallery,
+bookmark, callout, accordion and embed modules (an image with a caption is a
+gallery of one, the one image this editor captions); and a table as a
+comparison table where it fits one. What it refuses, among others: an
+attribute that changes what a reader gets (`style`, `class`, an `id` off a
+heading, a link's `target`, any `rel` but `noopener`), an element with no node,
+an image with no Media document or whose alt text differs from that
+document's (the editor renders the document's), a table without a caption
+(the block needs one to publish, and a conversion adds no words), and a
+callout in a colour the module does not have.
+
+Measured on 24 Oct 2026 against the stored HTML, no migrated body carries an
+image, a figure, a quote or a Ghost card; one carries a raw HTML card holding a
+table with no caption, which is refused. **Three things the editor can hold
+are refused anyway**, because Markdown has no syntax for them and the first
+revision through the Markdown tools would flatten them: subscript and
+superscript (the chemical formulas in `ultramarine-science`), underline, and a
+line break inside a paragraph (`why-burnt-sienna-behaves-differently-in-oil-than-in-watercolor`).
+Giving the Markdown tools a form for those is what would unblock those two
+articles; converting them first would leave a trap.
+
+**Heading ids are kept, not re-derived.** Ghost's ids are not always what this
+site's anchors would be — it numbers a repeated heading `pros-1` where the
+renderer says `pros-2`, and drops characters the renderer turns into hyphens —
+and they are the addresses search engines show as sitelinks; Google shows
+about 18k impressions' worth under `most-expensive-colors-in-history` alone.
+So each converted heading stores its id as Lexical node state,
+`{ "$": { "anchor": "…" } }`, which the renderer and the contents rail use
+before anything derived from text, and which no derived anchor may take
+([`lib/content/headings.ts`](../lib/content/headings.ts)). Lexical carries
+node state it does not recognise through a load and save, so an editor who
+opens the article in the admin panel keeps every anchor —
+`tests/content/kept-anchors.test.tsx` loads one through the posts editor to
+check. The Markdown tools carry it as a suffix on the heading line:
+
+```
+## When Purple Was Worth More Than Your House {#when-purple-was-worth-more-than-your-house}
+```
+
+Keep the suffix when rewording a heading and the address stays; delete it and
+the heading answers to its text, and `updateArticleMarkdown` lists the anchor
+under `anchors.removed`. A malformed suffix, or one anchor on two headings, is
+refused before anything is saved. Natively written articles have no kept
+anchors and read exactly as before.
+
+Two things that changed around it. `setFAQBlock` with `replaceExisting`
+deletes a section and gives the FAQ that heading's text, from which its anchor
+is derived — so on a converted article it now refuses when the section holds a
+kept anchor the FAQ heading would not reproduce, and says to insert with
+`afterHeading` instead. And the renderer used to build one anchor allocator
+per part of an article split around its ad slots, so a heading repeated after
+a slot got the first one's id while the contents rail linked to `-2`; it
+builds one per article now.
 
 ### Images
 
@@ -535,6 +643,10 @@ Measured against the real editor config, and true of `readArticleMarkdown` →
 
 So an agent revising a post that holds a block or an inline image through
 Markdown damages it. `restoreArticleVersion` is the way back from that.
+
+A heading converted from a migrated article keeps its Ghost id through this
+round trip as a `{#anchor}` suffix on its line — see
+[Converting a migrated article](#converting-a-migrated-article).
 
 Three things the tools do that are easy to break:
 

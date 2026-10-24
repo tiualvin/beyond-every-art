@@ -26,7 +26,12 @@
 // heading that never had one.
 
 import type { ArticleBody, BodyNode } from './body'
-import { createAnchorAllocator, headingText } from './headings'
+import {
+  createAnchorAllocator,
+  headingText,
+  keptAnchor,
+  keptAnchors,
+} from './headings'
 
 /** One section of an article, as the rail lists it. */
 export type TocEntry = {
@@ -45,7 +50,9 @@ export function extractHeadings(body: ArticleBody): TocEntry[] {
 }
 
 function fromLexical(children: BodyNode[] | undefined): TocEntry[] {
-  const allocate = createAnchorAllocator()
+  // Seeded and consulted exactly as the renderer's is, so a heading that keeps
+  // its migrated anchor is listed under that anchor.
+  const allocate = createAnchorAllocator(keptAnchors(children))
   const entries: TocEntry[] = []
 
   for (const node of children ?? []) {
@@ -57,7 +64,7 @@ function fromLexical(children: BodyNode[] | undefined): TocEntry[] {
     const text = headingText(node)
     // Allocated for every heading level, not just the ones listed, because the
     // renderer allocates for all of them and the counters have to agree.
-    const id = allocate(text)
+    const id = allocate(text, keptAnchor(node))
     if (node.tag === HEADING_TAG && text) entries.push({ id, text })
   }
 

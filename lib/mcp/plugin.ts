@@ -112,7 +112,7 @@ export const mcpPluginConfig: MCPPluginConfig = {
         'setting `content` directly, and `setKeyFactsBlock` to add a key ' +
         'facts card. Migrated articles render from `legacyHTML`: read it with ' +
         '`readLegacyHtml` and change it with `editLegacyHtml`, not by setting ' +
-        'the field. ' +
+        'the field; `convertLegacyArticle` moves one into the rich-text body. ' +
         'Prefer `select` to avoid pulling whole bodies into context.',
       // No `delete`: an agent that removes an article is not a workflow this
       // project wants, and the admin panel is two clicks away.
