@@ -93,3 +93,32 @@ describe('related posts on a post page', () => {
     expect(rail).not.toMatch(/related[?]?:/)
   })
 })
+
+describe('the related read', () => {
+  const queries = readFileSync(
+    join(process.cwd(), 'lib/content/queries.ts'),
+    'utf8',
+  )
+
+  // Publishing, editing or removing a post must turn every page's list over,
+  // or a page goes on recommending an article that has since been taken down.
+  // The ranking changed; what purges it must not have.
+  it('is cached under the same content tags as before', () => {
+    expect(queries).toMatch(
+      /cachedRead\('related-posts', readRelatedPosts, \[\s*CONTENT_TAGS\.posts,\s*CONTENT_TAGS\.tags,\s*CONTENT_TAGS\.media,\s*\]\)/,
+    )
+  })
+
+  // One read of the candidates, ranked in memory, then the cards for the
+  // picks. The per-tag query is what made "Read next" newest-first.
+  it('ranks every live post instead of querying by tag', () => {
+    const body = queries.slice(
+      queries.indexOf('async function readRelatedPosts'),
+      queries.indexOf('export const getRelatedPosts'),
+    )
+    expect(body).toContain('readRelatedCandidates(payload, now)')
+    expect(body).toContain('rankRelated(')
+    expect(body).not.toContain("'tags.slug'")
+    expect(body).not.toContain("sort: '-publishedAt'")
+  })
+})

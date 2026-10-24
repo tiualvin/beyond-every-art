@@ -52,7 +52,8 @@ function sanitizedCollections(): Promise<Payload['collections']> {
  *
  * `posts` are other articles, found by slug — the live rows a link check
  * reads. A slug that is neither one of them nor `doc`'s finds nothing. `role`
- * is the key's user's role, an editor unless a test says otherwise.
+ * is the key's user's role, an editor unless a test says otherwise. `media`
+ * is the Media library, found by filename — what a conversion maps images to.
  *
  * `update` merges the written data into the stored document, so a test can
  * call one tool after another and see the second read what the first wrote.
@@ -64,7 +65,11 @@ function sanitizedCollections(): Promise<Payload['collections']> {
  */
 export async function mcpRequest(
   initial: Doc,
-  { posts = [], role = 'editor' }: { posts?: Doc[]; role?: string } = {},
+  {
+    posts = [],
+    role = 'editor',
+    media = [],
+  }: { posts?: Doc[]; role?: string; media?: Doc[] } = {},
 ) {
   let doc: Doc = { ...initial }
   let live: Doc = { ...initial }
@@ -74,9 +79,19 @@ export async function mcpRequest(
     findByID: vi.fn(async () => doc),
     find: vi.fn(
       async (args?: {
+        collection?: string
         draft?: boolean
-        where?: { slug?: { equals?: unknown } }
+        where?: {
+          slug?: { equals?: unknown }
+          filename?: { in?: unknown[] }
+        }
       }) => {
+        if (args?.collection === 'media') {
+          const names = args.where?.filename?.in ?? []
+          return {
+            docs: media.filter((item) => names.includes(item.filename)),
+          }
+        }
         const slug = args?.where?.slug?.equals
         const other = posts.find((post) => post.slug === slug)
         if (other) return { docs: [other] }
@@ -86,6 +101,9 @@ export async function mcpRequest(
         return { docs: [args?.draft === false ? live : doc] }
       },
     ),
+    findVersions: vi.fn(async () => ({
+      docs: [{ id: 'version-before', parent: doc.id }],
+    })),
     update: vi.fn(
       async ({
         data,

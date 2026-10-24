@@ -33,10 +33,16 @@ import {
   refuseLiteralComments,
   restoreBlocks,
 } from './blocks'
+import { compareAnchors, markAnchors, restoreAnchors } from './anchors'
 import { setFaq, type FaqInputItem } from './faq'
 import { setKeyFacts, type Fact } from './key-facts'
 import { withChildren } from './placement'
 import { setTable, TABLE_MAX_COLUMNS, TABLE_MAX_ROWS } from './table'
+import {
+  planLegacyConversion,
+  saveLegacyConversion,
+  type LegacyArticle,
+} from './convert-legacy'
 import {
   findInLegacyHtml,
   MAX_MATCHES,
@@ -239,6 +245,7 @@ async function refuseUnlessWritable(
   req: PayloadRequest,
   doc: Record<string, unknown>,
   name: string,
+  refusal?: string,
 ) {
   const field = req.payload.collections[
     COLLECTION
@@ -257,6 +264,7 @@ async function refuseUnlessWritable(
     siblingData: doc,
   })
   if (!allowed) {
+    if (refusal) throw new Error(refusal)
     throw new Error(
       `\`${name}\` can be written only by an editor or an administrator — it ` +
         'is markup the public site runs as it stands — and this key belongs to ' +
@@ -303,7 +311,9 @@ function articleView(req: PayloadRequest, doc: Record<string, unknown>) {
       : lexicalToMarkdown(
           req.payload,
           COLLECTION,
-          content && markBlocks(content),
+          // Kept heading anchors as `{#anchor}` suffixes, so a revision can
+          // carry them back; see `anchors.ts`.
+          content && markBlocks(markAnchors(content)),
         ),
     slug: doc.slug,
     status: doc._status ?? null,
@@ -689,7 +699,9 @@ export const mcpTools: McpTool[] = [
         idsForSlugs(req, 'tags', tagSlugs),
       ])
 
-      const content = markdownToLexical(req.payload, 'posts', markdown)
+      const content = restoreAnchors(
+        markdownToLexical(req.payload, 'posts', markdown),
+      )
       refuseLiteralComments(content)
 
       const created = await req.payload.create({
@@ -747,7 +759,9 @@ export const mcpTools: McpTool[] = [
       'Modules inserted into the body (key facts, FAQs, galleries, callouts) ' +
       'have no Markdown form: each appears as a line like ' +
       '`<!-- block:keyFacts:<key> -->` where it sits, and its contents are ' +
-      'listed in `blocks`.',
+      'listed in `blocks`. A heading that keeps an anchor from the migrated ' +
+      'article ends with `{#anchor}`: the address search engines link to ' +
+      'that section.',
     handler: async (args: Record<string, unknown>, req: PayloadRequest) => {
       const target = args as { id?: string; slug?: string }
 
@@ -1140,7 +1154,9 @@ export const mcpTools: McpTool[] = [
       'Keep each `<!-- block:... -->` line from readArticleMarkdown where its ' +
       'module should sit, on a line of its own: the module is put back exactly ' +
       'as it was. Leaving a line out removes that module; the response lists ' +
-      'which were kept and which removed.',
+      'which were kept and which removed. Keep each `{#anchor}` at the end ' +
+      'of its heading line, even when rewording the heading: it is the ' +
+      "section's address. The response lists any anchor removed.",
     handler: async (args: Record<string, unknown>, req: PayloadRequest) => {
       const { markdown, ...target } = args as {
         id?: string
@@ -1149,13 +1165,20 @@ export const mcpTools: McpTool[] = [
       }
 
       const doc = await findArticle(req, COLLECTION, target)
+      const current = (doc as unknown as { content?: EditorState | null })
+        .content
 
       // Before this, every module in the body was lost on a revision: Markdown
       // has no form for one, so it came back as a line of text. See `blocks.ts`.
-      const { state, kept, removed } = restoreBlocks(
+      // Kept heading anchors likewise ride as `{#anchor}` suffixes and are put
+      // back on their headings; see `anchors.ts`.
+      const restored = restoreBlocks(
         markdownToLexical(req.payload, COLLECTION, markdown),
-        (doc as unknown as { content?: EditorState | null }).content,
+        current,
       )
+      const { kept, removed } = restored
+      const state = restoreAnchors(restored.state)
+      const anchors = compareAnchors(current, state)
 
       const updated = await req.payload.update({
         collection: COLLECTION,
@@ -1171,6 +1194,24 @@ export const mcpTools: McpTool[] = [
       })
 
       return text({
+        ...(anchors.kept.length ||
+        anchors.removed.length ||
+        anchors.added.length
+          ? {
+              anchors: {
+                ...anchors,
+                ...(anchors.removed.length
+                  ? {
+                      note:
+                        'Removed anchors no longer exist on the page once ' +
+                        'published: links and search sitelinks to them land ' +
+                        'at the top. Put the {#anchor} back on a heading to ' +
+                        'keep one.',
+                    }
+                  : {}),
+              },
+            }
+          : {}),
         blocks: { kept, removed },
         id: updated.id,
         preview: buildPreviewUrl({
@@ -1318,6 +1359,111 @@ export const mcpTools: McpTool[] = [
         .max(LEGACY_EDITS_MAX)
         .describe(
           `1 to ${LEGACY_EDITS_MAX} edits, made together or not at all. Each \`find\` is looked for in the HTML as it was before any of them.`,
+        ),
+    },
+  },
+  {
+    description:
+      "Convert one migrated article's Ghost HTML (`legacyHTML`) into its " +
+      'rich-text body, so the module tools (setFAQBlock, setKeyFactsBlock, ' +
+      'setTableBlock) and updateArticleMarkdown can work on it. DRY RUN BY ' +
+      'DEFAULT: returns a report and saves nothing — whether the words are ' +
+      'the same, every heading id before and after, links and images ' +
+      'counted and matched, which Ghost cards became which modules, whether ' +
+      'the body survives readArticleMarkdown → updateArticleMarkdown ' +
+      'unchanged, and everything refused. Anything that cannot be kept ' +
+      'exactly is refused, and a refusal anywhere means nothing is saved. ' +
+      'With dryRun: false, saves the conversion as a draft — only when nothing ' +
+      'is refused and the rich-text body is empty. Never publishes, and never ' +
+      'changes `legacyHTML`: restoring the `undo` version with ' +
+      'restoreArticleVersion (scope "body") empties the body again and the ' +
+      'page renders from the HTML as before. One article per call. Needs an ' +
+      'editor key, as editLegacyHtml does.',
+    handler: async (args: Record<string, unknown>, req: PayloadRequest) => {
+      const { dryRun = true, ...target } = args as {
+        dryRun?: boolean
+        id?: string
+        slug?: string
+      }
+
+      // The newest version, which is what a draft save is completed from — so
+      // the HTML converted is the HTML this save carries forward.
+      const doc = (await findArticle(
+        req,
+        COLLECTION,
+        target,
+      )) as unknown as Record<string, unknown>
+      await refuseUnlessWritable(
+        req,
+        doc,
+        'legacyHTML',
+        'Converting a migrated article takes an editor or an administrator, ' +
+          'as editing its HTML does: it reads `legacyHTML`, markup only an ' +
+          'editor may write, and replaces what the page renders from. This ' +
+          'key belongs to someone who may not. Ask an editor to convert it.',
+      )
+
+      const id = doc.id as number | string
+      const article: LegacyArticle = {
+        id,
+        slug: String(doc.slug ?? ''),
+        title: String(doc.title ?? ''),
+        legacyHTML: typeof doc.legacyHTML === 'string' ? doc.legacyHTML : '',
+        content: doc.content,
+      }
+      const access = { req, overrideAccess: false }
+      const { report, state } = await planLegacyConversion(
+        req.payload,
+        article,
+        access,
+      )
+
+      if (dryRun) {
+        return text({
+          ...report,
+          dryRun: true,
+          readers: (await readLiveRow(req, id)).state,
+        })
+      }
+
+      if (!report.convertible) {
+        throw new Error(
+          `Not converted, and nothing was saved. ${report.refused.join(' ')} ` +
+            'Run with dryRun: true for the full report.',
+        )
+      }
+
+      const { replacedVersion, updated } = await saveLegacyConversion(
+        req.payload,
+        article,
+        state,
+        access,
+      )
+
+      return text({
+        ...report,
+        dryRun: false,
+        preview: buildPreviewUrl({
+          collection: COLLECTION,
+          slug: updated.slug as string,
+        }),
+        status: 'draft',
+        undo: replacedVersion,
+        rollback:
+          'legacyHTML is untouched. To put the page back as it was, restore ' +
+          'the `undo` version with restoreArticleVersion, scope "body": the ' +
+          'rich-text body empties and the page renders from the HTML again.',
+        ...(await whatReadersSee(req, id)),
+      })
+    },
+    name: 'convertLegacyArticle',
+    parameters: {
+      ...targetShape,
+      dryRun: z
+        .boolean()
+        .optional()
+        .describe(
+          'Report what the conversion would do, and save nothing. Defaults to true; pass false to save it as a draft.',
         ),
     },
   },
