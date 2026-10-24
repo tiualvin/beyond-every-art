@@ -165,6 +165,7 @@ test.describe('MCP endpoint', () => {
         'restoreArticleVersion',
         'updateArticleMarkdown',
         'editLegacyHtml',
+        'convertLegacyArticle',
         'setKeyFactsBlock',
         'setFAQBlock',
         'setTableBlock',
@@ -217,8 +218,13 @@ test.describe('MCP endpoint', () => {
     expect(limited).toContain('readArticleMarkdown')
     expect(limited).not.toContain('readLegacyHtml')
     expect(limited).not.toContain('editLegacyHtml')
+    expect(limited).not.toContain('convertLegacyArticle')
 
-    for (const name of ['readLegacyHtml', 'editLegacyHtml']) {
+    for (const name of [
+      'readLegacyHtml',
+      'editLegacyHtml',
+      'convertLegacyArticle',
+    ]) {
       const refused = await callTool(request, fixtures.mcp.limitedKey, name, {
         slug: fixtures.duplicateTitlePost.slug,
       })
@@ -328,6 +334,136 @@ test.describe('MCP endpoint', () => {
     expect(refused).toContain('adds <img>')
     const after = await callToolJson(request, key, 'readLegacyHtml', { slug })
     expect(after.html).toBe(legacyHTML.replace(find, replace))
+  })
+
+  // The conversion meets Payload's real save here: Postgres takes the body with
+  // its kept heading anchors, the draft guard keeps the live row where it was,
+  // and the module tools that refused the article before now take it.
+  test('converts a migrated article into the editor as a draft, keeping its heading ids', async ({
+    request,
+  }) => {
+    const key = fixtures.mcp.editorKey
+    const slug = `e2e-mcp-convert-${Date.now()}-${Math.floor(Math.random() * 1e6)}`
+    // Ghost's ids, including the `-1` it gives a repeated heading where this
+    // site's own anchors would say `-2`.
+    const legacyHTML =
+      '<h2 id="ancient-purples">Ancient purples</h2>' +
+      '<p>Made from murex snails, Tyrian&nbsp;<em>purple</em> was worth its weight in silver.</p>' +
+      '<h2 id="pros">Pros</h2><ul><li><strong>Colourfast</strong>: it does not fade.</li></ul>' +
+      '<h2 id="pros-1">Pros</h2><p>See <a href="https://www.beyondeveryart.com/purple-color-history/">the history</a>.</p>'
+    const liveDoc = async () => {
+      const response = await request.get(
+        `/api/posts/?where[slug][equals]=${slug}&depth=0`,
+      )
+      return (
+        (await response.json()) as { docs: Array<Record<string, unknown>> }
+      ).docs[0]
+    }
+
+    const created = await callTool(
+      request,
+      fixtures.mcp.adminKey,
+      'createPosts',
+      {
+        _status: 'published',
+        legacyHTML,
+        publishedAt: '2019-05-13T09:00:00.000Z',
+        slug,
+        title: 'E2E MCP Converted Article',
+        visibility: 'public',
+      },
+    )
+    expect(created).not.toContain('"isError":true')
+
+    // Before: the module tools refuse it, for the reason this tool exists.
+    const before = await callTool(request, key, 'setKeyFactsBlock', {
+      afterHeading: 'Ancient purples',
+      facts: [{ label: 'Source', value: 'Murex snails' }],
+      slug,
+    })
+    expect(before).toContain('renders from migrated Ghost HTML')
+
+    const dry = await callToolJson(request, key, 'convertLegacyArticle', {
+      slug,
+    })
+    expect(dry).toMatchObject({
+      convertible: true,
+      dryRun: true,
+      readers: 'live',
+      refused: [],
+      plainText: { equal: true },
+      headingIds: { equal: true },
+      links: { legacy: 1, converted: 1 },
+      roundTrip: { unchanged: true },
+    })
+    expect(
+      (
+        dry.headingIds as { headings: Array<{ converted: string }> }
+      ).headings.map((heading) => heading.converted),
+    ).toEqual(['ancient-purples', 'pros', 'pros-1'])
+    // A dry run saves nothing.
+    expect(
+      (await callToolJson(request, key, 'readArticleMarkdown', { slug }))
+        .markdown,
+    ).toMatch(/renders from migrated Ghost HTML/)
+
+    // An author's key is refused before anything is tried.
+    const byAuthor = await callTool(
+      request,
+      fixtures.mcp.authorKey,
+      'convertLegacyArticle',
+      { dryRun: false, slug },
+    )
+    expect(byAuthor).toContain('takes an editor')
+
+    const saved = await callToolJson(request, key, 'convertLegacyArticle', {
+      dryRun: false,
+      slug,
+    })
+    expect(saved).toMatchObject({
+      convertible: true,
+      dryRun: false,
+      readers: 'live',
+      status: 'draft',
+    })
+    expect(saved.undo).toEqual(expect.any(String))
+
+    // The draft holds the body, anchors and all; readers keep the live page.
+    const read = await callToolJson(request, key, 'readArticleMarkdown', {
+      slug,
+    })
+    expect(read.markdown).toContain('## Pros {#pros}')
+    expect(read.markdown).toContain('## Pros {#pros-1}')
+    const live = await liveDoc()
+    expect(live?._status).toBe('published')
+    expect(live?.legacyHTML).toBe(legacyHTML)
+
+    // A second conversion is refused: the body is no longer empty.
+    const again = await callTool(request, key, 'convertLegacyArticle', {
+      dryRun: false,
+      slug,
+    })
+    expect(again).toContain('already holds something')
+
+    // And the module tools take it now.
+    const faq = await callToolJson(request, key, 'setFAQBlock', {
+      afterHeading: 'Ancient purples',
+      items: [
+        {
+          question: 'What was Tyrian purple made from?',
+          answer: 'Murex snails.',
+        },
+      ],
+      slug,
+    })
+    expect(faq).toMatchObject({ readers: 'live', status: 'draft' })
+    const withFaq = await callToolJson(request, key, 'readArticleMarkdown', {
+      slug,
+    })
+    expect(withFaq.markdown).toContain('## Pros {#pros-1}')
+    expect(withFaq.blocks).toEqual([
+      expect.objectContaining({ blockType: 'faq' }),
+    ])
   })
 
   test('drafts an article from Markdown and reads it back', async ({

@@ -13,3 +13,7 @@ docs/GHOST_TO_PAYLOAD_HANDOFF_WITH_APP_STRATEGY.md
 /docs/assets/redesign-prototypes/
 AGENTS.md
 /.claude/
+# Cut byte-for-byte from migrated articles' stored Ghost HTML. The converter's
+# whitespace handling is part of what they test, so reflowing them would test
+# Prettier's output instead of Ghost's.
+/tests/fixtures/legacy-convert/

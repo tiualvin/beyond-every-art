@@ -37,7 +37,12 @@ import {
   type PullQuoteData,
   type SignupData,
 } from '@/blocks/schema'
-import { createAnchorAllocator, headingText } from '@/lib/content/headings'
+import {
+  createAnchorAllocator,
+  headingText,
+  keptAnchor,
+  type AnchorAllocator,
+} from '@/lib/content/headings'
 import { Accordion } from './accordion'
 import { Bookmark } from './bookmark'
 import { ActionButton } from './button'
@@ -66,7 +71,7 @@ import { UnknownNode } from './unknown'
  */
 type BlockContext = {
   preview: boolean
-  allocate: (text: string) => string
+  allocate: AnchorAllocator
 }
 
 /**
@@ -201,9 +206,12 @@ type HeadingTextNode = {
  * Anchors deliberately come from the heading's *text* rather than its position,
  * so `#binders-and-behaviour` survives an editor inserting a section above it.
  * Rewording the heading does change the anchor, which is the honest trade: an
- * anchor is a name for what the section says.
+ * anchor is a name for what the section says — except where the heading keeps
+ * one, as every heading converted from a migrated article does: that is the
+ * address search engines already link to, and it stays put whatever the text
+ * becomes. See `keptAnchor` in `lib/content/headings.ts`.
  */
-function headingConverter(allocate: (text: string) => string) {
+function headingConverter(allocate: AnchorAllocator) {
   // Named rather than an arrow so `react/display-name` can tell this is a
   // converter the renderer calls, not a component it mounts.
   return function convertHeading({
@@ -213,7 +221,11 @@ function headingConverter(allocate: (text: string) => string) {
     const Tag = (node.tag ?? 'h2') as 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6'
     const children = nodesToJSX({ nodes: (node.children ?? []) as never })
     return (
-      <Tag id={allocate(headingText(node as HeadingTextNode))}>{children}</Tag>
+      <Tag
+        id={allocate(headingText(node as HeadingTextNode), keptAnchor(node))}
+      >
+        {children}
+      </Tag>
     )
   }
 }
@@ -223,19 +235,26 @@ function headingConverter(allocate: (text: string) => string) {
  *
  * `preview` is threaded through rather than read from a hook because these run
  * on the server, inside an RSC render, where there is no request context to ask.
+ *
+ * `allocate` is the document's one anchor allocator, shared by the body's own
+ * headings and by every block that emits one. The caller makes it, once per
+ * document, and passes the same one to every part of a body it renders in
+ * pieces: `ArticleBody` cuts a long article into several `RichText`s around
+ * its ad slots, and when each built its own allocator, a heading repeated in
+ * a later part was handed the id of the first — a duplicate id, and a
+ * contents-list link (`toc.ts`, which counts across the whole body) pointing
+ * at the wrong section. The default is for a body rendered in one piece.
  */
-export function buildConverters(preview: boolean) {
+export function buildConverters(
+  preview: boolean,
+  allocate: AnchorAllocator = createAnchorAllocator(),
+) {
   return ({
     defaultConverters,
   }: {
     defaultConverters: JSXConverters
   }): JSXConverters => {
-    // One allocator for the whole document, shared by the body's own headings
-    // and by every block that emits one. Created here, so it is per render.
-    const context: BlockContext = {
-      preview,
-      allocate: createAnchorAllocator(),
-    }
+    const context: BlockContext = { preview, allocate }
 
     return {
       ...defaultConverters,

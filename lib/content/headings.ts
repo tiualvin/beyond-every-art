@@ -67,6 +67,53 @@ export function toAnchorSlug(text: string): string {
   )
 }
 
+// --- Anchors a heading keeps --------------------------------------------
+//
+// A heading converted from a migrated article keeps the `id` Ghost gave it,
+// stored on the node itself as Lexical node state: `{ "$": { "anchor": "…" } }`.
+// Those ids are not always what `toAnchorSlug` would make — Ghost numbers a
+// repeat `pros-1` where this file numbers it `pros-2`, and drops characters
+// this file turns into hyphens — and they are the addresses search engines
+// already show as sitelinks under the article. Deriving them again from the
+// text would move them; rewording a heading would move them again.
+//
+// Node state is Lexical's own mechanism for exactly this: a key it does not
+// recognise is carried through import and export untouched, so the anchor
+// survives an editor opening and saving the article in the admin panel
+// (`tests/content/heading-anchors.test.ts` loads one through the real editor
+// to check). The Markdown tools carry it as a `{#anchor}` suffix on the
+// heading line — see `lib/mcp/anchors.ts`.
+
+/**
+ * What a kept anchor may be: Ghost's ids and this file's slugs both fit, and
+ * nothing that would need escaping in an attribute, a URL fragment or a
+ * Markdown heading does.
+ */
+export const KEPT_ANCHOR = /^[A-Za-z0-9][A-Za-z0-9_.%-]{0,199}$/
+
+/** The anchor a heading node keeps, or null when it derives one from its text. */
+export function keptAnchor(node: unknown): string | null {
+  const state = (node as { $?: { anchor?: unknown } } | null | undefined)?.$
+  const anchor = state?.anchor
+  return typeof anchor === 'string' && KEPT_ANCHOR.test(anchor) ? anchor : null
+}
+
+/** Every anchor kept by a heading among `nodes`, so an allocator can step round them. */
+export function keptAnchors(
+  nodes: Array<{ type?: string }> | undefined,
+): Set<string> {
+  const anchors = new Set<string>()
+  for (const node of nodes ?? []) {
+    if (node.type !== 'heading') continue
+    const anchor = keptAnchor(node)
+    if (anchor) anchors.add(anchor)
+  }
+  return anchors
+}
+
+/** Hands out one anchor per call; see `createAnchorAllocator`. */
+export type AnchorAllocator = (text: string, kept?: string | null) => string
+
 /**
  * An allocator that hands out a unique anchor per call.
  *
@@ -78,16 +125,32 @@ export function toAnchorSlug(text: string): string {
  * The suffixed candidate is itself checked against the set rather than assumed
  * free, because a document can legitimately contain "Method", "Method" and
  * "Method 2" — the third heading would otherwise be handed `method-2` twice.
+ *
+ * `reserved` are the anchors headings in this document keep
+ * (`keptAnchors`). Nothing derived from text is handed one of those, so an
+ * FAQ question or a later heading can never take the address a migrated
+ * section already has, whichever renders first. A heading passes its own kept
+ * anchor as `kept` and gets it back — unless an earlier heading already
+ * claimed it, as a heading copied in the admin panel along with its state
+ * would, in which case it falls back to its text like any other.
  */
-export function createAnchorAllocator(): (text: string) => string {
+export function createAnchorAllocator(
+  reserved: Iterable<string> = [],
+): AnchorAllocator {
   const used = new Set<string>()
+  const held = new Set(reserved)
 
-  return (text: string): string => {
+  return (text: string, kept?: string | null): string => {
+    if (kept && KEPT_ANCHOR.test(kept) && !used.has(kept)) {
+      used.add(kept)
+      return kept
+    }
+
     const base = toAnchorSlug(text) || FALLBACK_ANCHOR
 
     let candidate = base
     let suffix = 1
-    while (used.has(candidate)) {
+    while (used.has(candidate) || held.has(candidate)) {
       suffix += 1
       candidate = `${base}-${suffix}`
     }
