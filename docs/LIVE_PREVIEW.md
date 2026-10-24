@@ -123,6 +123,12 @@ query parameter can turn it into an open redirect.
   pointed at the public hostname again, both break and it would need
   `SameSite=None; Secure`.
 
+- **Every preview hop carries Payload's session cookie.** The CMS host sends a
+  page request without `payload-token` to the public site
+  ([`Caddyfile`](../Caddyfile)), so a preview that authenticated some other way
+  — a token in the URL, a header — would land on `www` with no draft.
+  `tests/seo/cms-host.test.ts` checks every collection's preview target.
+
 - The listener is mounted only when a live-preview session is active, so no
   live-preview JavaScript reaches public readers.
 
@@ -165,7 +171,12 @@ to carry.
 Relative for the same reason the collection URL is: it resolves against whichever
 host the admin is served from. Caddy's `{$CMS_ADDRESS}` block ends in a catch-all
 `handle` that proxies to the same application, so `/` on the staff hostname
-renders the homepage.
+renders the homepage — for a signed-in editor. Since 24 Oct 2026 a page request
+there without Payload's `payload-token` cookie answers 301 to the public site,
+because the catch-all had made the CMS host an indexed copy of every article.
+Every preview request carries that cookie, so preview is unaffected; the
+reasoning, and why the draft-mode cookie alone is not let through, is in
+[`SEO_AND_REDIRECTS.md`](SEO_AND_REDIRECTS.md) under "The CMS host".
 
 What this does not do is follow typing. See "Not built" below.
 

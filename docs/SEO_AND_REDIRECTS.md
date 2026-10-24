@@ -363,6 +363,99 @@ Caddy answers with a 301 to the canonical host so only one host serves pages.
 publishes about itself — canonical tags, the sitemap, the feed — is built from
 it. Naming the wrong host there tells search engines the whole site moved.
 
+### The CMS host
+
+`CMS_ADDRESS` (`cms.beyondeveryart.com`) serves the same application, and until
+24 Oct 2026 its Caddy block ended in a catch-all that proxied every frontend
+route — so every article answered there exactly as it does on `www`, and Google
+indexed the copy. Search Console for 21 Jul – 22 Oct showed 35 article URLs with
+impressions on the CMS host, and 8 articles with impressions **only** there:
+
+- `red-color-meaning-western-chinese-painting`
+- `how-light-creates-form-space-and-meaning`
+- `egg-tempera-the-medium-oil-replaced`
+- `ice-wax-melting-materials-sculpture`
+- `street-arts-awkward-journey-from-illegal-walls-to-white-cube-galleries`
+- `small-artist-run-galleries-in-torontos-junction-triangle-actually-showing-experimental-work`
+- `clay-body-composition-warping-large-ceramic-sculpture`
+- `artist-skill-development`
+
+Each of those pages already carried a canonical tag pointing at `www`. Google
+overrode it, which it may: a canonical is a hint, and a duplicate served this
+cleanly is a strong signal the other way. So the CMS block now does two things:
+
+- **Every response carries `X-Robots-Tag: noindex, nofollow`.** Deferred, so it
+  replaces the application's own value (`/indexnow.txt` sets one) instead of
+  sitting beside it. The exception is an error Caddy generates itself — a 502
+  while the app restarts — which carries no header; a 5xx is never indexed.
+- **A page request without a Payload session answers 301** to
+  `https://$SITE_ADDRESS{uri}`, path and query intact. Exempt: `/admin*`,
+  `/api*`, `/_next*`, `/oauth*`, `/.well-known/*`, `/redirects-map*` — what the
+  hostname exists for — and `/csp-report*`, because the policy names that path
+  relatively, browsers post violation reports without cookies, and a browser
+  delivering a report does not follow a redirect. Without the exemption the
+  admin's reports would be dropped during the report-only phase, the one time
+  they are the only evidence. Everything else is redirected, `/`, `/robots.txt`
+  and `/sitemap.xml` included, so a crawler is sent to the public versions
+  rather than told anything host-specific.
+
+The redirect is what moves the 8 orphaned articles' signals to the URLs that
+should hold them; the header is what keeps the pages an editor still gets on
+that host out of the index if a crawler ever reaches one.
+
+**Why a session cookie and not a blanket redirect.** Preview and Live Preview
+render frontend pages on the CMS host on purpose: `buildPreviewUrl` is relative
+so the editor's session cookie stays with them
+([`LIVE_PREVIEW.md`](LIVE_PREVIEW.md)), `/api/preview` redirects to the
+document's path on the same host, and the globals' Live Preview iframe is `/`.
+Payload sets `payload-token` on this hostname with `Path=/`, so it rides on
+every one of those requests, and the matcher is the same presence test
+`@sessionApi` already uses for the admin's API calls.
+
+**Next's draft-mode cookie is not a way through, deliberately.** It was the
+obvious question, and it is not needed: in a real preview it never travels
+without `payload-token`. Nor would it help — `getPreviewMode` ignores draft mode
+unless the request also carries an editorial Payload session, so a request with
+only `__prerender_bypass` renders the public page, which is the duplicate again.
+
+**Presence, not validity.** A forged `payload-token` gets the page, with
+`noindex`. Crawlers do not forge cookies, and what the forgery buys is what the
+public address serves anyway.
+
+**`Cache-Control: no-store` on the redirect**, because a 301 with no caching
+headers is kept by the browser indefinitely, keyed on the URL alone. An editor
+who once opened an article on the CMS host before signing in — or typed its
+bare `/` — would otherwise have that page's Live Preview, or the globals' iframe,
+silently follow the cached redirect to `www`: no draft, no refresh, and nothing
+on screen to say why. Search engines act on the status code, not on the cache
+policy, so the redirect is still permanent where that matters.
+
+`tests/seo/cms-host.test.ts` evaluates the matcher against the paths the code
+uses — the preview entry point and every collection's preview target, the CSP
+report path, the 8 articles above — and fails if the header ever appears in
+the public site's block, where it would deindex the real site. Checked against
+Caddy 2.10.2 locally; confirm against the live host after each deploy that
+touches the block:
+
+```bash
+# Anonymous: 301 to www, no-store, noindex.
+curl -sI https://cms.beyondeveryart.com/red-color-meaning-western-chinese-painting/
+
+# Any payload-token: 200, noindex.
+curl -sI -H 'Cookie: payload-token=x' \
+  https://cms.beyondeveryart.com/red-color-meaning-western-chinese-painting/
+
+# Still served: admin 200, MCP not redirected.
+curl -sI https://cms.beyondeveryart.com/admin/
+curl -sI https://cms.beyondeveryart.com/api/mcp
+
+# The public site: 200 and no X-Robots-Tag.
+curl -sI https://www.beyondeveryart.com/red-color-meaning-western-chinese-painting/
+```
+
+Then sign in to the admin and open Live Preview on a post and on a global.
+After the deploy, request indexing in Search Console for the 8 `www` URLs above.
+
 ### The trailing slash
 
 Ghost served every permalink with a trailing slash, so `next.config.ts` sets
