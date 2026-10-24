@@ -667,7 +667,12 @@ the first three, the slots take the rest in order, and the two surfaces are
 disjoint by construction rather than by a dedupe pass. That also makes the
 content contextual to the piece for free, and leaves nothing for an editor to
 keep up to date on every article — which is why this one is derived where the
-rail's is chosen. A slot past the end of the list is given nothing and renders
+rail's is chosen. "Contextual" was true in name only until 24 Oct 2026: the
+pool was the same tags newest first, so on most pages the boxes advertised the
+week's newest posts. It is ranked by relevance now —
+[`../lib/content/related-rank.ts`](../lib/content/related-rank.ts) — and
+`pnpm audit:related` reports what the boxes and "Read next" link to across the
+site. A slot past the end of the list is given nothing and renders
 exactly the box it rendered before; that needs an archive of fewer than ten
 published pieces to happen at all.
 

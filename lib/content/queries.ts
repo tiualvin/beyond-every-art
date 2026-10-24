@@ -3,6 +3,7 @@ import type { Where } from 'payload'
 import { cachedRead, CONTENT_TAGS } from '@/lib/cache/content'
 import { toMediaImage, type MediaImage } from '@/lib/content/media'
 import { htmlToPlainText, richTextToPlainText } from '@/lib/content/plain-text'
+import { rankRelated, type RelatedCandidate } from '@/lib/content/related-rank'
 import { live, publishedStatus } from '@/lib/content/schedule'
 import { isSubjectTag } from '@/lib/content/topics'
 import { ARCHIVE_PAGE_SIZE } from '@/lib/content/pagination'
@@ -925,11 +926,68 @@ export function getPostBySlug(
 }
 
 /**
- * What to read after a piece: other posts under the same tags, newest first,
- * topped up with recent posts when a tag is too thin to fill the row.
+ * How many live posts the related ranking considers, newest first.
  *
- * Both halves exclude the piece being read, and the top-up excludes whatever
- * the tag match already found, so the three are always distinct.
+ * The whole archive, with room to spare: 161 live articles in October 2026,
+ * and each row is a slug, a title, a date and two or three tag slugs, so a
+ * thousand of them is still a small read. Past the cap the oldest stop being
+ * candidates — which is the old behaviour arriving at the far end of the
+ * archive, so raise this before that happens.
+ */
+export const RELATED_CANDIDATE_LIMIT = 1000
+
+/**
+ * Every live post, reduced to what `rankRelated` reads. One query, no bodies.
+ *
+ * Exported for `scripts/audit-related.ts`, which must see exactly the
+ * candidates the page sees. Takes the client rather than fetching it so the
+ * script can pass its own; the page goes through `readRelatedPosts` below.
+ */
+export async function readRelatedCandidates(
+  payload: Awaited<ReturnType<typeof getPayloadClient>>,
+  now: Date = new Date(),
+): Promise<RelatedCandidate[]> {
+  const result = await payload.find({
+    collection: 'posts',
+    overrideAccess: true,
+    depth: 1,
+    limit: RELATED_CANDIDATE_LIMIT,
+    pagination: false,
+    sort: '-publishedAt',
+    where: live(now),
+    select: { slug: true, title: true, tags: true, publishedAt: true },
+    populate: { tags: { slug: true } },
+  })
+  return (result.docs as RawPost[]).flatMap((doc) =>
+    doc.slug
+      ? [
+          {
+            slug: doc.slug,
+            title: doc.title ?? doc.slug,
+            tags: (doc.tags ?? []).flatMap((tag) =>
+              typeof tag === 'object' && tag?.slug ? [tag.slug] : [],
+            ),
+            publishedAt: doc.publishedAt ?? null,
+          },
+        ]
+      : [],
+  )
+}
+
+/**
+ * What to read after a piece: the most related posts of any age.
+ *
+ * Ranked by `rankRelated` (`lib/content/related-rank.ts`), which explains the
+ * scoring and why it replaced "same tags, newest first": shared title and slug
+ * words weighted by rarity, shared tags weighted the same way, a small
+ * recency tiebreak, and near-ties spread by a hash of this page's slug so that
+ * equally related pieces land on different pages. Deterministic: the same
+ * page gets the same list until a post is published, edited or removed —
+ * which purges this read through the same content tags as before.
+ *
+ * Two queries whatever the archive's size: the candidates, then the cards for
+ * the ones chosen, in the order they were ranked. The piece being read is
+ * never among them.
  */
 async function readRelatedPosts(
   slug: string,
@@ -938,48 +996,34 @@ async function readRelatedPosts(
 ): Promise<PostCard[]> {
   try {
     const payload = await getPayloadClient()
-    const notThisPost: Where = { slug: { not_equals: slug } }
+    const now = new Date()
+    const candidates = await readRelatedCandidates(payload, now)
+    const chosen = rankRelated(
+      { slug, tags: tagSlugs },
+      candidates,
+      limit,
+      now,
+    ).map((candidate) => candidate.slug)
+    if (chosen.length === 0) return []
 
-    const byTag =
-      tagSlugs.length > 0
-        ? await payload.find({
-            collection: 'posts',
-            overrideAccess: true,
-            depth: 1,
-            limit,
-            sort: '-publishedAt',
-            where: {
-              and: [live(), notThisPost, { 'tags.slug': { in: tagSlugs } }],
-            },
-          })
-        : { docs: [] }
-
-    const related = (byTag.docs as RawPost[])
-      .map(toPostCard)
-      .filter((p): p is PostCard => p !== null)
-
-    if (related.length >= limit) return related
-
-    const topUp = await payload.find({
+    const result = await payload.find({
       collection: 'posts',
       overrideAccess: true,
       depth: 1,
-      limit: limit - related.length,
-      sort: '-publishedAt',
-      where: {
-        and: [
-          live(),
-          notThisPost,
-          { slug: { not_in: related.map((p) => p.slug) } },
-        ],
-      },
+      limit: chosen.length,
+      pagination: false,
+      where: { and: [live(now), { slug: { in: chosen } }] },
     })
-
-    return related.concat(
-      (topUp.docs as RawPost[])
+    const cards = new Map(
+      (result.docs as RawPost[])
         .map(toPostCard)
-        .filter((p): p is PostCard => p !== null),
+        .filter((p): p is PostCard => p !== null)
+        .map((card) => [card.slug, card]),
     )
+    return chosen.flatMap((pick) => {
+      const card = cards.get(pick)
+      return card ? [card] : []
+    })
   } catch {
     return []
   }
