@@ -226,6 +226,20 @@
 
   encode zstd gzip
 
+  # Nothing this hostname serves is meant for a search engine: the admin, the
+  # API, the OAuth screens, and pages rendered for an editor.
+  #
+  # `defer` so it is applied as the response is written, after the application
+  # has set its own headers. Without it Caddy sets the header first and the
+  # proxy then *adds* the application's value alongside it, so `/indexnow.txt`
+  # — which sends its own `X-Robots-Tag: noindex` — would answer with two. Both
+  # say noindex and Google honours the stricter, so that would be harmless; one
+  # header that means what this block says is still the better answer.
+  header {
+    X-Robots-Tag "noindex, nofollow"
+    defer
+  }
+
   route {
     # Endpoints that have to answer without a credential, because they are how
     # one is obtained or used: the MCP endpoint carries its own bearer key and
