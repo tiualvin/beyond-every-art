@@ -29,7 +29,7 @@ import {
   type FaqItem,
 } from '../../blocks/schema'
 import { isEmptyRichText } from '../content/richtext'
-import { headingText } from '../content/headings'
+import { headingText, keptAnchor, toAnchorSlug } from '../content/headings'
 import {
   blockMarker,
   isBlockNode,
@@ -226,6 +226,28 @@ export function setFaq(
   }
 
   const heading = asked || match.text
+
+  // A converted article's headings keep the ids Ghost gave them — addresses
+  // search engines link to (`lib/content/headings.ts`). The FAQ's own heading
+  // takes an anchor from its text, so replacing a section deletes every kept
+  // anchor in it that the FAQ heading would not happen to reproduce.
+  const lost = children
+    .slice(match.index, end)
+    .map((node) => keptAnchor(node))
+    .filter(
+      (anchor, offset): anchor is string =>
+        anchor !== null && !(offset === 0 && anchor === toAnchorSlug(heading)),
+    )
+  if (lost.length) {
+    throw new Error(
+      `The section under "${match.text}" keeps the anchor${lost.length > 1 ? 's' : ''} ` +
+        `${lost.map((anchor) => `#${anchor}`).join(', ')} from the migrated ` +
+        'article, which links and search results point at, and replacing the ' +
+        'section would remove it. Nothing was changed. Call again without ' +
+        'replaceExisting to insert the FAQ under the heading.',
+    )
+  }
+
   children.splice(
     match.index,
     end - match.index,

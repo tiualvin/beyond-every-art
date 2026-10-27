@@ -268,6 +268,7 @@ async function upsertKeyedUser(
       restoreArticleVersion: true,
       updateArticleMarkdown: true,
       editLegacyHtml: true,
+      convertLegacyArticle: true,
       setKeyFactsBlock: true,
       setFAQBlock: true,
       setTableBlock: true,
@@ -380,7 +381,11 @@ async function seed(): Promise<void> {
     email: fixtures.mcp.limitedEmail,
     key: fixtures.mcp.limitedKey,
     role: 'editor',
-    tools: { editLegacyHtml: false, readLegacyHtml: false },
+    tools: {
+      editLegacyHtml: false,
+      readLegacyHtml: false,
+      convertLegacyArticle: false,
+    },
   })
 
   payload.logger.info(

@@ -3,6 +3,7 @@ import { RichText } from '@payloadcms/richtext-lexical/react'
 import { splitHtmlForAds, splitLexicalForAds } from '@/lib/ads/inline'
 import type { Placement } from '@/lib/ads/placements'
 import type { ArticleBody as ArticleBodyValue } from '@/lib/content/body'
+import { createAnchorAllocator, keptAnchors } from '@/lib/content/headings'
 import type { PostCard } from '@/lib/content/queries'
 
 import { AdUnit } from './ad-unit'
@@ -100,6 +101,13 @@ export function ArticleBody({
   }
 
   const parts = adClient ? splitLexicalForAds(body.content) : [body.content]
+  // One allocator across every part, so ids stay unique over the whole body
+  // and agree with the contents list — see `buildConverters`. Seeded with the
+  // anchors headings keep, so nothing derived from text can take one.
+  const converters = buildConverters(
+    preview,
+    createAnchorAllocator(keptAnchors(body.content.root?.children)),
+  )
 
   return (
     <div className={className}>
@@ -114,7 +122,7 @@ export function ArticleBody({
           )}
           <RichText
             data={part as never}
-            converters={buildConverters(preview)}
+            converters={converters}
             disableContainer
           />
         </ArticleBodyChunk>

@@ -38,8 +38,8 @@ export const INLINE_PROMO_MAX = INLINE_MAX
 /**
  * What the post page asks the database for: exactly what it renders.
  *
- * Nine rather than three. `readRelatedPosts` tops a thin tag match up with
- * recent posts, so this is what it returns on any archive with ten published
+ * Nine rather than three. `readRelatedPosts` ranks every live post and takes
+ * the best nine, so this is what it returns on any archive with ten published
  * pieces; below that the tail runs short and the slots past it fall back to
  * showing nothing, which is what they did before this existed.
  */
@@ -50,9 +50,11 @@ export const RELATED_QUERY_LIMIT = READ_NEXT_COUNT + INLINE_PROMO_MAX
  *
  * Generic over the item because the division is arithmetic about a list and
  * nothing here needs to know it is holding posts. Both halves come out in the
- * order the query returned them — newest first, tag matches before top-ups —
- * so "Read next" keeps showing the three most relevant pieces and the in-body
- * slots take what is left in the same order.
+ * order the query ranked them — most related first, by the scoring in
+ * `related-rank.ts` — so "Read next" shows the three most relevant pieces of
+ * any age and the in-body slots take the next six in the same order. Those
+ * used to be the tail of a newest-first list, which is how the house boxes
+ * down every long article came to advertise the same week's posts.
  */
 export function splitRelated<T>(pool: T[]): { readNext: T[]; inline: T[] } {
   return {

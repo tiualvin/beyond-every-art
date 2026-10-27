@@ -403,6 +403,14 @@ Document these editor rules:
 
 - Keep `legacyHTML` authoritative for migrated documents.
 - Inventory Ghost cards/custom HTML and count actual module patterns.
+  Measured on 24 Oct 2026 against the 113 migrated articles' stored
+  `legacyHTML`, not the export: no body carries a `kg-*-card`, an image, a
+  figure, a quote or an embed; one carries a raw HTML card holding a table.
+  The constructs that do occur are paragraphs, headings h1–h4, links,
+  emphasis, nested bullet lists, rules, line breaks, and sub- and
+  superscript. `convertLegacyArticle` ([`MCP_SERVER.md`](MCP_SERVER.md#converting-a-migrated-article))
+  moves one article at a time into the editor and refuses what it cannot
+  keep — it is not a bulk conversion, which stays a non-goal below.
 - Record representative desktop/mobile fixtures and external dependencies.
 - Do not change migration mappings or canonical URLs.
 - Adopt a schema-change workflow before any phase that adds a collection — see

@@ -1,0 +1,1133 @@
+{
+  "//": "Every live post on beyondeveryart.com on 24 Oct 2026: slug, title, tag slugs, publication date, and whether it was migrated from Ghost. Public metadata only, read through the MCP find tools. Used by tests/content/related-rank.test.ts to hold the site-wide targets for related posts on real data, and by `pnpm audit:related --snapshot`.",
+  "capturedAt": "2026-10-24",
+  "posts": [
+    {
+      "slug": "bronze-casting-from-wax-to-patina",
+      "title": "Bronze Casting: From Wax to Patina",
+      "tags": ["art", "studio-insider"],
+      "publishedAt": "2026-10-23T22:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "how-long-does-a-sculpture-last",
+      "title": "How Long Does a Sculpture Actually Last?",
+      "tags": ["art", "studio-insider"],
+      "publishedAt": "2026-10-23T19:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "what-is-a-large-scale-sculpture",
+      "title": "What Is a Large-Scale Sculpture?",
+      "tags": ["art", "studio-insider"],
+      "publishedAt": "2026-10-23T16:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "walking-route-lower-east-side-galleries",
+      "title": "A Walking Route Through the Lower East Side's Gallery Blocks",
+      "tags": ["art", "exhibitions"],
+      "publishedAt": "2026-10-22T22:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "why-the-lower-east-side-replaced-chelsea",
+      "title": "Why the Lower East Side Replaced Chelsea as NYC's Real Gallery District",
+      "tags": ["art", "exhibitions"],
+      "publishedAt": "2026-10-22T19:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "soho-vs-chelsea-vs-les-gallery-neighborhoods",
+      "title": "SoHo vs. Chelsea vs. LES: What Actually Separates NYC's Gallery Neighborhoods",
+      "tags": ["art", "exhibitions"],
+      "publishedAt": "2026-10-22T16:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "what-is-a-life-size-sculpture",
+      "title": "What Is a Life-Size Sculpture?",
+      "tags": ["art", "studio-insider"],
+      "publishedAt": "2026-10-21T22:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "silverpoint-to-graphite-pencil-history",
+      "title": "What Artists Drew With Before the Pencil Existed",
+      "tags": ["art"],
+      "publishedAt": "2026-10-21T19:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "how-a-painting-is-actually-made-complete-guide",
+      "title": "How a Painting Is Actually Made: A Complete Guide to Mediums, Grounds, and Technique",
+      "tags": ["art", "science-of-art-materials"],
+      "publishedAt": "2026-10-21T16:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "why-paint-cracks-flaking-craquelure-and-age",
+      "title": "Why Paint Cracks: Flaking, Craquelure, and Age",
+      "tags": ["science-of-art-materials", "studio-insider"],
+      "publishedAt": "2026-10-20T22:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "grisaille-history-painting-imitating-stone",
+      "title": "The Grey Painting Technique Born From a Ban on Color",
+      "tags": ["art"],
+      "publishedAt": "2026-10-20T19:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "chiaroscuro-to-tenebrism-caravaggio-history",
+      "title": "How One Painting Technique Went From Softening Shadows to Total Darkness",
+      "tags": ["art"],
+      "publishedAt": "2026-10-20T16:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "buon-fresco-vs-fresco-secco-chemistry",
+      "title": "Why Michelangelo's Ceiling Survived and Leonardo's Wall Didn't",
+      "tags": ["art", "science-of-art-materials"],
+      "publishedAt": "2026-10-19T22:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "why-watercolor-granulates",
+      "title": "Why Watercolor Granulates on Some Papers",
+      "tags": ["materials-science"],
+      "publishedAt": "2026-10-19T19:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "why-acrylic-dries-darker",
+      "title": "Why Acrylic Paint Dries Darker",
+      "tags": ["materials-science"],
+      "publishedAt": "2026-10-19T16:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "why-watercolor-lifts-and-acrylic-doesnt",
+      "title": "Why Watercolor Lifts and Acrylic Doesn't",
+      "tags": ["science-of-art-materials", "palette"],
+      "publishedAt": "2026-10-16T22:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "the-chemistry-of-encaustic-wax-painting",
+      "title": "The Chemistry of Encaustic Wax Painting",
+      "tags": ["science-of-art-materials", "palette"],
+      "publishedAt": "2026-10-16T19:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "linseed-vs-walnut-oil",
+      "title": "Linseed vs. Walnut Oil: What Changes in Paint",
+      "tags": ["materials-science"],
+      "publishedAt": "2026-10-16T16:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "how-oil-paint-dries-oxidation-not-evaporation",
+      "title": "How Oil Paint Dries: Oxidation, Not Evaporation",
+      "tags": ["science-of-art-materials", "palette"],
+      "publishedAt": "2026-10-15T22:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "egg-tempera-the-medium-oil-replaced",
+      "title": "The Paint That Oil Replaced",
+      "tags": ["art", "science-of-art-materials"],
+      "publishedAt": "2026-10-15T19:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "gesso-grounds-and-surface-preparation",
+      "title": "Gesso, Grounds, and Surface Preparation",
+      "tags": ["science-of-art-materials", "studio-insider"],
+      "publishedAt": "2026-10-15T16:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "why-painters-switched-panel-to-canvas",
+      "title": "Why Painters Abandoned Wood for Canvas",
+      "tags": ["art"],
+      "publishedAt": "2026-10-14T22:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "how-artists-trick-the-eye-perspective-illusion",
+      "title": "How Artists Trick the Eye: Perspective, Illusion, and Optical Effects",
+      "tags": ["art"],
+      "publishedAt": "2026-10-14T16:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "what-visual-artists-learn-from-composers",
+      "title": "What Visual Artists Can Learn From Composers",
+      "tags": ["music"],
+      "publishedAt": "2026-10-13T22:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "ecce-homo-monkey-christ-restoration",
+      "title": "Was \"Monkey Christ\" Actually a Disaster?",
+      "tags": ["art"],
+      "publishedAt": "2026-10-13T19:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "impressionism-and-the-chemistry-of-light",
+      "title": "Impressionism and the Chemistry of Light",
+      "tags": ["art", "palette"],
+      "publishedAt": "2026-10-13T16:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "vanitas-still-life-dutch-golden-age-symbolism",
+      "title": "Vanitas Paintings Were Never Really About the Fruit",
+      "tags": ["art"],
+      "publishedAt": "2026-10-12T22:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "vermeer-camera-obscura-hockney-falco-thesis",
+      "title": "Did Vermeer Secretly Use a Camera?",
+      "tags": ["art"],
+      "publishedAt": "2026-10-12T19:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "golden-ratio-in-art-myth-or-real",
+      "title": "Did Renaissance Painters Really Use the Golden Ratio?",
+      "tags": ["art"],
+      "publishedAt": "2026-10-12T16:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "mosaic-tesserae-byzantine-gold-history",
+      "title": "The Optical Trick Byzantine Mosaic Makers Took a Thousand Years to Master",
+      "tags": ["art"],
+      "publishedAt": "2026-10-09T22:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "pointillism-optical-mixing-myth-seurat",
+      "title": "Pointillism Doesn't Actually Work the Way You Think",
+      "tags": ["art", "palette"],
+      "publishedAt": "2026-10-09T19:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "the-quiet-power-of-negative-space",
+      "title": "The Quiet Power of Negative Space",
+      "tags": ["art"],
+      "publishedAt": "2026-10-09T16:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "sfumato-leonardo-technique-explained",
+      "title": "The Technique With No Edges",
+      "tags": ["art"],
+      "publishedAt": "2026-10-08T22:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "zeuxis-parrhasius-trompe-loeil-legend",
+      "title": "Did Ancient Greece's Most Famous Painting Contest Actually Happen?",
+      "tags": ["art"],
+      "publishedAt": "2026-10-08T19:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "holbein-ambassadors-anamorphic-skull",
+      "title": "The \"Mistake\" in a 1533 Painting That Wasn't a Mistake",
+      "tags": ["art"],
+      "publishedAt": "2026-10-08T16:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "linear-perspective-brunelleschi-alberti-history",
+      "title": "Why Painters Discovered Perspective Only Once",
+      "tags": ["art"],
+      "publishedAt": "2026-10-07T22:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "building-a-sustainable-art-career-complete-guide",
+      "title": "Building a Sustainable Art Career: Galleries, Documentation, and Getting Paid",
+      "tags": ["studio-notes"],
+      "publishedAt": "2026-10-07T16:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "how-to-ship-a-painting",
+      "title": "How to Ship a Painting Without Damage",
+      "tags": ["studio-notes"],
+      "publishedAt": "2026-10-06T22:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "artist-consignment-agreements",
+      "title": "Artist Contracts and Consignment Agreements Explained",
+      "tags": ["studio-notes"],
+      "publishedAt": "2026-10-06T19:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "how-to-price-art-prints",
+      "title": "How to Price Art Prints (Not Originals)",
+      "tags": ["studio-notes"],
+      "publishedAt": "2026-10-06T16:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "giclee-vs-lithograph-what-actually-differs",
+      "title": "Giclee vs. Lithograph: What Actually Differs",
+      "tags": ["art", "studio-notes"],
+      "publishedAt": "2026-10-05T22:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "engraving-vs-etching-how-to-tell-apart",
+      "title": "Engraving vs. Etching: How to Actually Tell Them Apart",
+      "tags": ["art"],
+      "publishedAt": "2026-10-05T19:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "what-is-an-artists-proof",
+      "title": "What Is an Artist's Proof?",
+      "tags": ["art", "studio-notes"],
+      "publishedAt": "2026-10-05T16:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "why-artists-started-signing-their-work",
+      "title": "Why Artists Started Signing Their Work",
+      "tags": ["art"],
+      "publishedAt": "2026-10-02T22:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "how-to-photograph-your-own-artwork",
+      "title": "How to Photograph Your Own Artwork",
+      "tags": ["studio-notes", "studio-insider"],
+      "publishedAt": "2026-10-02T16:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "artist-bio-vs-statement",
+      "title": "How to Write an Artist Bio vs. an Artist Statement",
+      "tags": ["studio-notes"],
+      "publishedAt": "2026-10-01T22:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "how-to-approach-a-gallery-without-a-cold-pitch",
+      "title": "How to Approach a Gallery Without a Cold Pitch",
+      "tags": ["studio-notes", "art"],
+      "publishedAt": "2026-10-01T19:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "why-small-galleries-matter-more-than-museums",
+      "title": "Why Small Galleries Matter More Than Museums",
+      "tags": ["exhibitions", "art"],
+      "publishedAt": "2026-10-01T16:00:00.000Z",
+      "migrated": false
+    },
+    {
+      "slug": "physics-light-renaissance-painting",
+      "title": "The Luminous Illusion: Physics of Light & Shadow in Renaissance Art",
+      "tags": ["science-of-art-materials"],
+      "publishedAt": "2026-05-24T00:05:00.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "ultramarine-science",
+      "title": "The Chemical Symphony of Ultramarine: From Lapis Lazuli to Modern Art",
+      "tags": ["art", "science-of-art-materials", "palette"],
+      "publishedAt": "2026-05-23T08:35:23.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "the-alchemical-canvas-unveiling-the-deep-chemistry-of-oil-paints",
+      "title": "The Alchemical Canvas: Unveiling the Deep Chemistry of Oil Paints",
+      "tags": ["art", "science-of-art-materials"],
+      "publishedAt": "2026-05-23T07:58:40.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "why-burnt-sienna-behaves-differently-in-oil-than-in-watercolor",
+      "title": "Why Burnt Sienna Behaves Differently in Oil Than in Watercolor",
+      "tags": ["materials-science"],
+      "publishedAt": "2026-04-30T08:48:31.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "why-titanium-white-behaves-differently-than-lead-white",
+      "title": "Why Titanium White Behaves Differently Than Lead White",
+      "tags": ["art", "palette"],
+      "publishedAt": "2026-02-20T10:00:19.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "charcoal-smudges-differently-paper-surfaces",
+      "title": "Why Charcoal Smudges Differently on Various Paper Surfaces",
+      "tags": ["art", "studio-notes"],
+      "publishedAt": "2026-02-19T10:00:00.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "gouache-reactivates-water-acrylic-doesnt",
+      "title": "Why Gouache Reactivates With Water While Acrylic Doesn't",
+      "tags": ["art", "palette"],
+      "publishedAt": "2026-02-18T10:00:58.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "pointillism-optical-mixing-vs-pigment-mixing",
+      "title": "How Pointillism Exploits Optical Mixing vs Pigment Mixing",
+      "tags": ["art"],
+      "publishedAt": "2026-02-18T10:00:07.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "varnishing-oil-paintings-without-yellowing-or-blooming",
+      "title": "Varnishing Oil Paintings Without Yellowing or Blooming",
+      "tags": ["art"],
+      "publishedAt": "2026-02-17T10:00:52.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "why-pastels-smudge-different-amounts",
+      "title": "Why Some Pastels Smudge More Than Others",
+      "tags": ["art", "palette"],
+      "publishedAt": "2026-02-16T10:00:27.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "how-bioluminescent-bacteria-create-living-paintings",
+      "title": "How Bioluminescent Bacteria Create Living Paintings",
+      "tags": ["art"],
+      "publishedAt": "2026-02-15T10:00:14.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "why-gold-leaf-adheres-to-surfaces-without-glue-in-gilding",
+      "title": "Why Gold Leaf Adheres to Surfaces Without Glue in Gilding",
+      "tags": ["art"],
+      "publishedAt": "2026-02-15T10:00:02.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "rust-richard-serra-weathering-steel-sculptures",
+      "title": "How Rust Behaves in Richard Serra's Weathering Steel Sculptures",
+      "tags": ["art", "studio-notes"],
+      "publishedAt": "2026-02-14T10:00:28.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "glaze-recipes-fail-different-kiln-temperatures",
+      "title": "Why Some Glaze Recipes Fail at Different Kiln Temperatures",
+      "tags": ["art"],
+      "publishedAt": "2026-02-08T07:37:43.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "artist-run-galleries-newcastle-beyond-london",
+      "title": "Artist-Run Galleries in Newcastle Worth Visiting Beyond London",
+      "tags": ["art", "exhibitions"],
+      "publishedAt": "2026-02-08T07:32:33.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "calder-mobiles-kinetic-sculpture-angular-momentum",
+      "title": "How Calder's Mobiles Work: Kinetic Sculpture and Angular Momentum",
+      "tags": ["art"],
+      "publishedAt": "2026-02-08T07:27:18.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "muddy-paintings-color-mixing-problems-solutions",
+      "title": "Why Your Paintings Look Muddy and How to Fix Color Mixing Problems",
+      "tags": ["art", "palette"],
+      "publishedAt": "2026-02-08T07:22:22.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "small-galleries-glasgow-southside-art-scene",
+      "title": "Small Galleries in Glasgow's Southside You've Never Heard Of",
+      "tags": ["art", "exhibitions"],
+      "publishedAt": "2026-02-08T07:16:40.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "marble-carving-crystal-structure-sculpture",
+      "title": "Why Marble Carving Requires Understanding Crystal Structure",
+      "tags": ["art"],
+      "publishedAt": "2026-02-08T07:07:39.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "natural-pigments-and-the-geology-of-color-through-history",
+      "title": "Natural Pigments and the Geology of Color Through History",
+      "tags": ["art", "studio-notes", "palette"],
+      "publishedAt": "2026-02-08T06:59:09.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "environmental-art-scientific-accuracy-problems",
+      "title": "Why Environmental Art Often Gets the Science Wrong",
+      "tags": ["art", "studio-notes"],
+      "publishedAt": "2026-02-08T06:52:51.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "interference-patterns-wave-physics-optical-art",
+      "title": "How Artists Use Interference Patterns and Wave Physics in Optical Art",
+      "tags": ["art"],
+      "publishedAt": "2026-02-08T06:47:07.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "warhol-banana-pop-art-album-cover-design",
+      "title": "Andy Warhol's Banana and When Pop Art Became Music Packaging",
+      "tags": ["art"],
+      "publishedAt": "2026-02-08T06:39:44.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "kandinsky-synesthesia-abstract-painting-influence",
+      "title": "How Synesthesia Influenced Kandinsky's Abstract Paintings",
+      "tags": ["art", "music"],
+      "publishedAt": "2026-02-08T06:32:40.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "pueblo-pottery-techniques-that-predate-european-ceramic-technology",
+      "title": "Pueblo Pottery Techniques That Predate European Ceramic Technology",
+      "tags": ["art"],
+      "publishedAt": "2026-02-08T06:25:12.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "clay-body-composition-warping-large-ceramic-sculpture",
+      "title": "How Clay Body Composition Affects Warping in Large Sculptural Forms",
+      "tags": ["art"],
+      "publishedAt": "2026-02-08T06:20:31.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "the-rothko-effect-and-how-large-color-fields-create-emotional-response",
+      "title": "The Rothko Effect and How Large Color Fields Create Emotional Response",
+      "tags": ["art", "palette"],
+      "publishedAt": "2026-02-08T06:13:50.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "color-symbolism-religious-painting-history",
+      "title": "How Color Symbolism in Religious Painting Changed Across Centuries",
+      "tags": ["art", "palette"],
+      "publishedAt": "2026-02-08T06:08:28.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "red-color-meaning-western-chinese-painting",
+      "title": "Why Red Means Different Things in Western and Chinese Painting",
+      "tags": ["art", "palette", "studio-notes"],
+      "publishedAt": "2026-02-08T05:33:09.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "quebec-citys-small-gallery-scene-navigating-language-and-regional-art-politics",
+      "title": "Quebec City's Small Gallery Scene: Navigating Language and Regional Art Politics",
+      "tags": ["art", "exhibitions"],
+      "publishedAt": "2026-02-08T05:27:51.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "baltimore-station-north-artist-run-galleries-guide",
+      "title": "Baltimore's Station North Artist-Run Galleries: A Neighborhood Guide",
+      "tags": ["art", "exhibitions"],
+      "publishedAt": "2026-02-07T10:54:30.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "small-galleries-in-manchesters-northern-quarter-actually-worth-the-train-from-london",
+      "title": "Small Galleries in Manchester's Northern Quarter Actually Worth the Train from London",
+      "tags": ["art", "exhibitions"],
+      "publishedAt": "2026-02-07T10:47:09.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "small-artist-run-galleries-in-torontos-junction-triangle-actually-showing-experimental-work",
+      "title": "Small Artist-Run Galleries in Toronto's Junction Triangle Actually Showing Experimental Work",
+      "tags": ["art", "exhibitions"],
+      "publishedAt": "2026-02-07T10:39:54.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "storefront-galleries-philadelphia-contemporary-art",
+      "title": "Storefront Galleries in Philadelphia You've Never Heard Of But Should Visit",
+      "tags": ["art", "exhibitions"],
+      "publishedAt": "2026-02-07T10:32:13.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "how-regional-artists-get-into-local-group-shows",
+      "title": "How Regional Artists Actually Get Into Local Group Shows Without Gallery Representation",
+      "tags": ["art", "exhibitions", "studio-notes"],
+      "publishedAt": "2026-02-07T10:15:55.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "hidden-gallery-districts-us-regional-art-scenes",
+      "title": "Hidden Gallery Districts Worth Traveling For: Regional US Art Scenes Beyond Major Cities",
+      "tags": ["art", "exhibitions"],
+      "publishedAt": "2026-02-07T10:08:14.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "whats-the-point-of-abstraction-when-photography-exists",
+      "title": "What's the Point of Abstraction When Photography Exists?",
+      "tags": ["art"],
+      "publishedAt": "2026-02-01T09:37:57.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "reading-art-history-as-a-practicing-artist",
+      "title": "Reading Art History as a Practicing Artist",
+      "tags": ["art"],
+      "publishedAt": "2026-02-01T07:59:17.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "rust-patina-and-controlled-corrosion-as-artistic-process",
+      "title": "Rust, Patina, and Controlled Corrosion as Artistic Process",
+      "tags": ["art"],
+      "publishedAt": "2026-01-31T08:50:18.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "using-explosives-fire-and-destruction-to-create-art",
+      "title": "Using Explosives, Fire, and Destruction to Create Art",
+      "tags": ["art"],
+      "publishedAt": "2026-01-31T08:37:54.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "ice-wax-melting-materials-sculpture",
+      "title": "Sculpture From Ice, Wax, and Other Materials Designed to Transform",
+      "tags": ["art"],
+      "publishedAt": "2026-01-31T08:31:01.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "how-light-creates-form-space-and-meaning",
+      "title": "How Light Creates Form, Space, and Meaning",
+      "tags": ["art"],
+      "publishedAt": "2026-01-31T08:08:25.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "why-some-lines-feel-alive-and-others-feel-dead",
+      "title": "Why Some Lines Feel Alive and Others Feel Dead",
+      "tags": ["art"],
+      "publishedAt": "2026-01-31T07:59:20.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "the-only-color-theory-guide-you-actually-need",
+      "title": "The Only Color Theory Guide You Actually Need",
+      "tags": ["art"],
+      "publishedAt": "2026-01-31T07:49:29.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "machine-learning-generative-art-without-hype",
+      "title": "Machine Learning for Generative Art Without the Hype",
+      "tags": ["art"],
+      "publishedAt": "2026-01-31T07:33:16.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "phenomenology-for-artists-merleau-pontys-ideas-applied-to-studio-practice",
+      "title": "Phenomenology for Artists: Merleau-Ponty's Ideas Applied to Studio Practice",
+      "tags": ["art"],
+      "publishedAt": "2026-01-31T07:26:09.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "collaborating-with-musicians-when-youre-a-visual-artist",
+      "title": "Collaborating With Musicians When You're a Visual Artist",
+      "tags": ["art", "music"],
+      "publishedAt": "2026-01-31T07:16:31.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "why-musicians-should-think-like-visual-artists-about-space-and-installation",
+      "title": "Why Musicians Should Think Like Visual Artists About Space and Installation",
+      "tags": ["art", "music"],
+      "publishedAt": "2026-01-31T06:59:13.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "research-methods-for-artists-who-want-more-than-visual-inspiration",
+      "title": "Research Methods for Artists Who Want More Than Visual Inspiration",
+      "tags": ["art"],
+      "publishedAt": "2026-01-31T04:01:04.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "found-objects-sculpture-beyond-readymade",
+      "title": "Found Objects Do Things That New Materials Can't",
+      "tags": ["art"],
+      "publishedAt": "2026-01-31T03:54:26.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "outdoor-sculpture-material-durability",
+      "title": "What Actually Survives Outside: Material Realities of Outdoor Sculpture",
+      "tags": ["art"],
+      "publishedAt": "2026-01-31T03:47:46.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "street-arts-awkward-journey-from-illegal-walls-to-white-cube-galleries",
+      "title": "Street Art's Awkward Journey From Illegal Walls to White Cube Galleries",
+      "tags": ["art"],
+      "publishedAt": "2026-01-31T03:40:08.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "immaterial-sculpture-light-sound",
+      "title": "Making Sculpture From Light, Sound, and Things You Can't Touch",
+      "tags": ["art"],
+      "publishedAt": "2026-01-31T03:33:24.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "why-ceramics-struggles-for-respect-in-contemporary-art-and-why-thats-changing",
+      "title": "Why Ceramics Struggles for Respect in Contemporary Art (And Why That's Changing)",
+      "tags": ["art"],
+      "publishedAt": "2026-01-31T03:24:08.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "size-matters-in-sculpture",
+      "title": "Scale and Site: Why Size Matters More Than You Think in Sculpture",
+      "tags": ["art"],
+      "publishedAt": "2026-01-31T03:14:40.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "color-bias-and-mixing",
+      "title": "Color Bias and Mixing: Why Your Combinations Don't Match Your Expectations",
+      "tags": ["art"],
+      "publishedAt": "2026-01-31T03:02:48.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "photography-relationship-reality-meaning",
+      "title": "How Photography's Relationship to Reality Shapes Meaning",
+      "tags": ["art", "studio-notes"],
+      "publishedAt": "2025-12-16T10:29:15.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "how-constraints-create-conceptual-depth-in-art",
+      "title": "How Constraints Create Conceptual Depth in Art",
+      "tags": ["art", "studio-notes"],
+      "publishedAt": "2025-12-16T09:47:11.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "developing-art-concept-body-of-work",
+      "title": "Developing an Art Concept Across a Body of Work",
+      "tags": ["art", "studio-notes"],
+      "publishedAt": "2025-12-16T03:17:11.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "subject-matter-vs-concept",
+      "title": "The Difference Between Subject Matter and Concept",
+      "tags": ["art"],
+      "publishedAt": "2025-12-14T12:19:53.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "synthetic-pigments-revolution",
+      "title": "How Synthetic Pigments Destroyed (and Democratized) the Color Economy",
+      "tags": ["palette"],
+      "publishedAt": "2025-12-14T06:35:43.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "the-truth-about-pigment-prices-what-artists-actually-paid-throughout-history",
+      "title": "The Truth About Pigment Prices: What Artists Actually Paid Throughout History",
+      "tags": ["palette"],
+      "publishedAt": "2025-12-14T06:28:38.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "most-expensive-colors-in-history",
+      "title": "The Most Expensive Colors in History (and Why They Cost a Fortune)",
+      "tags": ["palette"],
+      "publishedAt": "2025-12-14T05:41:08.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "breaking-creative-block-twelve-exercises",
+      "title": "Breaking the Block: Twelve Proven Exercises for Creative Momentum",
+      "tags": ["studio-notes"],
+      "publishedAt": "2025-11-08T15:41:10.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "conceptual-depth-beyond-technical-skill",
+      "title": "Conceptual Depth: Moving Beyond Technical Skill",
+      "tags": ["studio-notes"],
+      "publishedAt": "2025-11-08T15:34:22.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "artist-statement-writing-clarity-conviction",
+      "title": "The Artist Statement That Opens Doors: Writing With Clarity and Conviction",
+      "tags": ["studio-notes"],
+      "publishedAt": "2025-11-08T15:26:56.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "surface-preparation-secrets",
+      "title": "Surface Preparation Secrets: What They Don't Teach in Art School",
+      "tags": ["studio-insider"],
+      "publishedAt": "2025-11-08T15:19:15.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "color-constancy-context-why-pigments-look-different",
+      "title": "Color Constancy and Context: Why the Same Pigment Looks Different",
+      "tags": ["palette"],
+      "publishedAt": "2025-11-08T15:09:03.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "invention-of-mauve-synthetic-dye-changed-art",
+      "title": "The Invention of Mauve: How One Synthetic Dye Changed Art Forever",
+      "tags": ["palette"],
+      "publishedAt": "2025-11-08T08:24:14.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "purple-orange-green-triadic-harmony-art-nouveau",
+      "title": "The Triadic Power of Purple, Orange, and Green in Art Nouveau",
+      "tags": ["palette"],
+      "publishedAt": "2025-11-08T08:13:07.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "sustainable-art-practice-avoid-burnout",
+      "title": "Building a Sustainable Art Practice Without Burning Out",
+      "tags": ["studio-notes"],
+      "publishedAt": "2025-11-08T07:59:47.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "six-months-develop-art-style-visual-voice",
+      "title": "Six Months to Signature: A Structured Approach to Developing Your Visual Voice",
+      "tags": ["studio-notes"],
+      "publishedAt": "2025-11-08T07:53:31.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "turner-constable-tate-britain-2025",
+      "title": "Turner and Constable at Tate Britain: What Their Rivalry Teaches Working Artists",
+      "tags": ["exhibitions"],
+      "publishedAt": "2025-11-08T07:49:21.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "unconventional-art-materials",
+      "title": "Working with Unconventional Materials in Art",
+      "tags": ["art"],
+      "publishedAt": "2025-11-08T07:43:46.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "watercolor-colored-pencil-mixed-media-techniques",
+      "title": "The Synergy of Water and Wax: Mastering Watercolor and Colored Pencil",
+      "tags": ["featured"],
+      "publishedAt": "2025-11-08T07:41:16.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "before-you-quit-day-job-artist-career-questions",
+      "title": "Before You Quit Your Day Job: Essential Questions for the Aspiring Professional Artist",
+      "tags": ["studio-notes"],
+      "publishedAt": "2025-11-08T07:32:15.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "commission-pricing-formula-emerging-artists",
+      "title": "The Commission Pricing Formula Every Emerging Artist Needs",
+      "tags": ["studio-notes"],
+      "publishedAt": "2025-11-08T07:21:33.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "rashid-johnson-guggenheim-2025",
+      "title": "What Artists Can Learn from Rashid Johnson's Guggenheim Retrospective",
+      "tags": ["exhibitions"],
+      "publishedAt": "2025-11-02T06:31:27.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "place-based-art",
+      "title": "Making Art About Places Without Sentimentality",
+      "tags": ["art"],
+      "publishedAt": "2025-11-02T05:31:38.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "color-perception-science",
+      "title": "You're Not Seeing Color the Same Way as Everyone Else",
+      "tags": ["palette"],
+      "publishedAt": "2025-11-02T05:21:41.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "working-with-fewer-colors-makes-your-art-stronger",
+      "title": "Working With Fewer Colors Makes Your Art Stronger",
+      "tags": ["palette"],
+      "publishedAt": "2025-11-02T05:15:20.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "color-harmony-schemes",
+      "title": "Color Harmony Isn't About Following Rules You Learned in School",
+      "tags": ["palette"],
+      "publishedAt": "2025-10-31T12:56:55.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "color-temperature-guide",
+      "title": "Why Warm and Cool Colors Change Everything in Your Art",
+      "tags": ["palette"],
+      "publishedAt": "2025-10-31T12:46:30.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "purple-color-history",
+      "title": "Purple Was the Most Expensive Color for Thousands of Years",
+      "tags": ["palette"],
+      "publishedAt": "2025-10-31T03:26:11.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "green-color-symbolism",
+      "title": "Green Represents Both Life and Decay Depending on Context",
+      "tags": ["palette"],
+      "publishedAt": "2025-10-31T03:18:01.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "orange-color-psychology",
+      "title": "Orange Gets Ignored and That's a Mistake in Your Palette",
+      "tags": ["palette"],
+      "publishedAt": "2025-10-31T03:04:54.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "yellow-color-meaning",
+      "title": "Yellow Is the Most Difficult Color and Most Artists Get It Wrong",
+      "tags": ["palette", "art"],
+      "publishedAt": "2025-10-31T02:49:40.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "red-color-psychology",
+      "title": "Red Demands Attention and That's Exactly Why It's Dangerous",
+      "tags": ["palette"],
+      "publishedAt": "2025-10-31T02:38:03.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "artist-skill-development",
+      "title": "How to Learn New Art Skills Without Wasting Time",
+      "tags": ["studio-insider"],
+      "publishedAt": "2025-10-31T02:26:26.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "experimental-art-techniques",
+      "title": "Why Experimenting Makes You a Better Artist",
+      "tags": ["studio-notes"],
+      "publishedAt": "2025-10-31T02:18:16.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "maintaining-artist-motivation",
+      "title": "Staying Motivated as an Artist When Nothing Seems to Work",
+      "tags": ["studio-notes"],
+      "publishedAt": "2025-10-31T01:41:38.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "creative-problem-solving",
+      "title": "Every Artist Faces These Problems and How to Solve Them",
+      "tags": ["studio-notes"],
+      "publishedAt": "2025-10-29T13:00:06.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "creative-journaling",
+      "title": "What Artists Actually Use Journals For Besides Sketching",
+      "tags": ["studio-notes"],
+      "publishedAt": "2025-10-29T12:49:26.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "artist-time-management",
+      "title": "Time Management for Artists Who Hate Schedules",
+      "tags": ["studio-notes"],
+      "publishedAt": "2025-10-29T12:39:28.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "the-collectors-guide-art-fairs-auctions",
+      "title": "The Collector's Guide to Art Fairs and Auctions: Navigating High-Stakes Environments",
+      "tags": ["studio-insider"],
+      "publishedAt": "2025-10-26T07:13:29.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "myth-daily-studio-practice",
+      "title": "The Myth of Daily Studio Practice",
+      "tags": ["studio-notes"],
+      "publishedAt": "2025-10-26T06:52:05.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "studio-rituals-the-small-habits-that-shape-practice",
+      "title": "Studio Rituals: The Small Habits That Shape Practice",
+      "tags": ["studio-notes"],
+      "publishedAt": "2025-10-26T06:45:15.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "when-artists-know-work-finished",
+      "title": "When Artists Know a Work Is Finished",
+      "tags": ["studio-notes"],
+      "publishedAt": "2025-10-26T03:08:00.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "black-and-white-in-the-age-of-color",
+      "title": "Black and White in the Age of Color",
+      "tags": ["palette"],
+      "publishedAt": "2025-10-26T03:00:54.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "return-of-pink-reclamation",
+      "title": "The Return of Pink: From Dismissal to Reclamation",
+      "tags": ["palette"],
+      "publishedAt": "2025-10-26T02:57:23.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "psychology-of-blue-contemporary-art",
+      "title": "The Psychology of Blue in Contemporary Art",
+      "tags": ["palette"],
+      "publishedAt": "2025-10-26T02:47:26.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "understanding-abstract-art",
+      "title": "Understanding Abstract Art: Beyond 'My Kid Could Do That'",
+      "tags": ["art"],
+      "publishedAt": "2025-10-26T02:40:04.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "how-to-experience-art-exhibitions",
+      "title": "How to Experience Art Exhibitions Meaningfully",
+      "tags": ["art", "exhibitions"],
+      "publishedAt": "2025-10-26T02:28:55.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "understanding-art-symbolism",
+      "title": "Reading Symbolism in Art: A Practical Guide",
+      "tags": ["art"],
+      "publishedAt": "2025-10-26T02:20:58.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "why-beauty-isnt-enough-arts-purpose-in-modern-life",
+      "title": "Why Beauty Isn't Enough: Art's Purpose in Modern Life",
+      "tags": ["art"],
+      "publishedAt": "2025-10-26T02:14:58.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "how-to-develop-visual-literacy-reading-art-like-a-critical-thinker",
+      "title": "How to Develop Visual Literacy: Reading Art Like a Critical Thinker",
+      "tags": ["art"],
+      "publishedAt": "2025-10-25T10:24:24.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "psychology-of-art-collecting",
+      "title": "The Psychology of Art Collecting: Why We Buy What We Buy",
+      "tags": ["art"],
+      "publishedAt": "2025-10-25T10:16:29.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "how-to-understand-contemporary-art",
+      "title": "How to Understand Contemporary Art: A Complete Guide",
+      "tags": ["art"],
+      "publishedAt": "2025-10-25T10:06:48.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "fine-art-print-value-guide",
+      "title": "Fine Art Print Value: A Comprehensive Guide to Assessment and Understanding",
+      "tags": ["art"],
+      "publishedAt": "2025-10-25T02:28:52.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "the-ultimate-guide-to-understanding-different-types-of-art-prints-giclee-lithographs-and-more",
+      "title": "The Ultimate Guide to Understanding Different Types of Art Prints: Giclee, Lithographs, and More",
+      "tags": ["art"],
+      "publishedAt": "2025-10-25T02:28:20.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "limited-edition-vs-open-edition-prints-which-is-right-for-you",
+      "title": "Limited Edition vs. Open Edition Prints: Which Is Right for You?",
+      "tags": ["art"],
+      "publishedAt": "2025-10-25T02:27:49.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "how-to-frame-and-display-fine-art-prints-to-enhance-your-space",
+      "title": "How to Frame and Display Fine Art Prints to Enhance Your Space",
+      "tags": ["art"],
+      "publishedAt": "2025-10-25T02:26:59.000Z",
+      "migrated": true
+    },
+    {
+      "slug": "fine-art-home-guide",
+      "title": "How to Choose the Perfect Fine Art Print for Your Home: A Step-by-Step Guide",
+      "tags": ["featured"],
+      "publishedAt": "2025-10-25T02:24:01.000Z",
+      "migrated": true
+    }
+  ]
+}
