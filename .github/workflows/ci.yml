@@ -47,6 +47,40 @@ jobs:
         run: |
           sudo apt-get update -q
           sudo apt-get install -y -q --no-install-recommends poppler-utils qpdf
+      # The PostgreSQL 16 client, ahead of whatever the runner image ships.
+      #
+      # The restore drill below has to dump and replay the way production does,
+      # and production's backup image pins `postgresql16-client` against a
+      # `postgres:16-alpine` server (docker/backup/Dockerfile,
+      # docker-compose.yml). The runner's own client is whatever GitHub
+      # installed: PostgreSQL 16 on ubuntu-24.04, 18 on ubuntu-26.04, which
+      # `ubuntu-latest` started rolling onto in October 2026. pg_dump 17 and
+      # later write `SET transaction_timeout = 0;` into every dump, a 16
+      # server rejects it, and the drill's ON_ERROR_STOP replay failed on the
+      # first 26.04 run (27 Oct, run 40478999448) — skipping that push's
+      # deploy, on a commit whose identical tree had passed on 24.04 hours
+      # earlier. Which image a job lands on is not ours to choose, so the
+      # client version is pinned instead.
+      #
+      # The image installs its own PostgreSQL from this repository and then
+      # removes the apt source, so adding it here cannot collide with one
+      # already present. Prepended to PATH, so every `psql` in this job is the
+      # same major version as the server it talks to.
+      - name: Use the PostgreSQL client production backups use
+        run: |
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            | sudo gpg --batch --yes --dearmor -o /usr/share/keyrings/pgdg.gpg
+          codename=$(. /etc/os-release && echo "$VERSION_CODENAME")
+          echo "deb [signed-by=/usr/share/keyrings/pgdg.gpg] https://apt.postgresql.org/pub/repos/apt ${codename}-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends postgresql-client-16
+          echo /usr/lib/postgresql/16/bin >> "$GITHUB_PATH"
+      - name: Check the PostgreSQL client matches the server
+        run: |
+          pg_dump --version
+          pg_dump --version | grep -q ' 16\.'
+          psql --version | grep -q ' 16\.'
       # These four run first, and the order is load-bearing. `payload-types.ts`
       # is generated and gitignored, and any Payload CLI command that boots the
       # config writes it — so a step below that touches Payload would leave the
