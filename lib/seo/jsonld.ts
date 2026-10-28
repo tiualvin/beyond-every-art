@@ -1,10 +1,26 @@
+/**
+ * A byline as Article JSON-LD sends it.
+ *
+ * A bare name was all this used to carry, which left Google to guess which
+ * "Alvin Tiu" on the web wrote the piece. Its Article guidance asks for
+ * `author.url` — a page that identifies the author — and every byline here has
+ * one: `/author/<slug>/`.
+ */
+export type ArticleAuthor = {
+  name: string
+  /** Absolute URL of the author's page on this site. */
+  url?: string | null
+  /** The author's own profiles elsewhere, already vetted to http(s). */
+  sameAs?: readonly string[]
+}
+
 export type ArticleJsonLdInput = {
   url: string
   headline: string
   description?: string
   datePublished?: string | null
   dateModified?: string | null
-  authors?: string[]
+  authors?: ArticleAuthor[]
   /** Absolute URL of the featured image, when the post has one. */
   image?: string | null
   siteName: string
@@ -45,12 +61,39 @@ export function buildArticleJsonLd(
   // list, and a list of one stays valid for both.
   if (input.image) jsonLd.image = [input.image]
 
-  const authors = (input.authors ?? []).filter(Boolean)
+  const authors = (input.authors ?? []).filter((author) => author.name)
   if (authors.length > 0) {
-    jsonLd.author = authors.map((name) => ({ '@type': 'Person', name }))
+    jsonLd.author = authors.map((author) => authorNode(author, input.siteName))
   }
 
   return jsonLd
+}
+
+/**
+ * One byline as a node: a `Person`, unless the byline is the publication.
+ *
+ * One of the two bylines on this site is "Beyond Every Art" itself — the house
+ * byline Ghost carried for unsigned pieces. Calling that a `Person` is a false
+ * statement Google's guidance names specifically ("use Organization for
+ * organizations"), so a byline whose name is the site's name is sent as the
+ * `Organization` it is. It keeps its author-page `url` either way.
+ */
+function authorNode(
+  author: ArticleAuthor,
+  siteName: string,
+): Record<string, unknown> {
+  const isPublication =
+    author.name.trim().toLowerCase() === siteName.trim().toLowerCase()
+  const node: Record<string, unknown> = {
+    '@type': isPublication ? 'Organization' : 'Person',
+    name: author.name,
+  }
+  if (author.url) node.url = author.url
+  const sameAs = (author.sameAs ?? []).filter(
+    (link) => link && link !== author.url,
+  )
+  if (sameAs.length > 0) node.sameAs = sameAs
+  return node
 }
 
 export type WebSiteJsonLdInput = {

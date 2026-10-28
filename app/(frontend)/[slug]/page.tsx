@@ -27,7 +27,13 @@ import {
   buildWebPageJsonLd,
   serializeJsonLd,
 } from '@/lib/seo/jsonld'
-import { absoluteUrl, getSiteUrl, pagePath, postPath } from '@/lib/seo/site'
+import {
+  absoluteUrl,
+  authorPath,
+  getSiteUrl,
+  pagePath,
+  postPath,
+} from '@/lib/seo/site'
 
 import { AdUnit } from '../components/ad-unit'
 import { Article, FeaturedFigure } from '../components/article'
@@ -242,7 +248,11 @@ export default async function SlugPage({
       description: post.metaDescription || post.excerpt || undefined,
       datePublished: post.publishedAt,
       dateModified: post.updatedAt,
-      authors: post.authors.map((a) => a.name),
+      authors: post.authors.map((a) => ({
+        name: a.name,
+        url: a.slug ? absoluteUrl(authorPath(a.slug), siteUrl) : null,
+        sameAs: a.website ? [a.website] : [],
+      })),
       image: post.image ? absoluteUrl(post.image.url, siteUrl) : null,
       siteName: settings.title,
       siteUrl,
