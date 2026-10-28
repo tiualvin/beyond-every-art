@@ -2,6 +2,11 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { cache } from 'react'
 
+import {
+  archivePagePath,
+  buildPagination,
+  parsePageParam,
+} from '@/lib/content/pagination'
 import { getPostsByAuthor, getSiteSettings } from '@/lib/content/queries'
 import { logMissingRoute } from '@/lib/observability/missing-route'
 import {
@@ -11,6 +16,7 @@ import {
 import { buildProfilePageJsonLd, serializeJsonLd } from '@/lib/seo/jsonld'
 import { absoluteUrl, authorPath, getSiteUrl } from '@/lib/seo/site'
 
+import { ArchivePagination } from '../../components/archive-pagination'
 import { FadeIn } from '../../components/motion/fade-in'
 import { StaggerChildren, StaggerItem } from '../../components/motion/stagger'
 import { StoryCard } from '../../components/story-card'
@@ -21,27 +27,37 @@ import { StoryCard } from '../../components/story-card'
 export const dynamic = 'force-dynamic'
 
 type Params = { slug: string }
+type SearchParams = Promise<Record<string, string | string[] | undefined>>
 
 // Resolved once per request, and gated first: a slug that cannot name an
 // author is answered 404 without a query. See `lib/security/slug-requests.ts`.
-const resolve = cache(async (slug: string) => {
+const resolve = cache(async (slug: string, page: number) => {
   await requireLookupableSlug(slug)
-  const archive = await getPostsByAuthor(slug)
+  const archive = await getPostsByAuthor(slug, page)
   if (!archive) await recordSlugMiss()
   return archive
 })
 
 export async function generateMetadata({
   params,
+  searchParams,
 }: {
   params: Promise<Params>
+  searchParams: SearchParams
 }): Promise<Metadata> {
   const { slug } = await params
-  const archive = await resolve(slug)
+  const archive = await resolve(slug, parsePageParam((await searchParams).page))
   if (!archive) return { title: 'Not found' }
-  const canonical = absoluteUrl(authorPath(archive.slug), getSiteUrl())
+  // Self-canonical per page, for the reason the tag archive gives.
+  const canonical = absoluteUrl(
+    archivePagePath(authorPath(archive.slug), archive.page),
+    getSiteUrl(),
+  )
   return {
-    title: archive.name,
+    title:
+      archive.page > 1
+        ? `${archive.name} — Page ${archive.page}`
+        : archive.name,
     description: archive.description || undefined,
     alternates: { canonical },
     openGraph: { type: 'profile', title: archive.name, url: canonical },
@@ -50,15 +66,25 @@ export async function generateMetadata({
 
 export default async function AuthorPage({
   params,
+  searchParams,
 }: {
   params: Promise<Params>
+  searchParams: SearchParams
 }) {
   const { slug } = await params
-  const archive = await resolve(slug)
+  const requested = parsePageParam((await searchParams).page)
+  const archive = await resolve(slug, requested)
   if (!archive) {
     await logMissingRoute(authorPath(slug))
     notFound()
   }
+  if (requested > 1 && requested > archive.totalPages) notFound()
+
+  const pagination = buildPagination({
+    basePath: authorPath(archive.slug),
+    page: archive.page,
+    totalPages: archive.totalPages,
+  })
 
   // Ghost emitted a bare Person here; this wraps it as the mainEntity of a
   // ProfilePage, which is what the page actually is. See `lib/seo/jsonld.ts`.
@@ -100,6 +126,10 @@ export default async function AuthorPage({
               </StaggerItem>
             ))}
           </StaggerChildren>
+          <ArchivePagination
+            pagination={pagination}
+            label={`Pages of pieces by ${archive.name}`}
+          />
         </div>
       </section>
     </main>

@@ -2064,6 +2064,64 @@ img {
   margin-bottom: 0.75rem;
 }
 
+/* The trail above the title: the eyebrow's face, size and margin, so it sits
+   on the line the topic eyebrow used to and the header keeps its height. One
+   line at every width; the title crumb is what an ellipsis cuts. See
+   `app/(frontend)/components/breadcrumb.tsx`. */
+.breadcrumb {
+  margin-bottom: 0.75rem;
+  font-family: var(--font-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-muted);
+}
+
+.breadcrumb ol {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.breadcrumb li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.breadcrumb a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.breadcrumb a:hover {
+  color: var(--color-ink);
+}
+
+.breadcrumb__topic a {
+  color: var(--color-burgundy);
+}
+
+/* Two classes, to outrank `.breadcrumb li` above: at one, the title crumb
+   kept its `flex-shrink: 0` and ran off a phone's screen uncut. */
+.breadcrumb .breadcrumb__current {
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.breadcrumb .breadcrumb__current a {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .article__header h1 {
   font-size: clamp(2rem, 5vw, 3.2rem);
 }

@@ -21,9 +21,11 @@ import {
   requireLookupableSlug,
 } from '@/lib/security/slug-requests'
 import { collectBlockJsonLd } from '@/lib/seo/block-jsonld'
+import { articleBreadcrumbs } from '@/lib/seo/breadcrumbs'
 import { robotsDirective } from '@/lib/seo/indexing'
 import {
   buildArticleJsonLd,
+  buildBreadcrumbListJsonLd,
   buildWebPageJsonLd,
   serializeJsonLd,
 } from '@/lib/seo/jsonld'
@@ -260,6 +262,17 @@ export default async function SlugPage({
     }),
   )
 
+  // The same list the visible trail above the title renders, so the two say
+  // the same thing by construction — `lib/seo/breadcrumbs.ts`.
+  const breadcrumbJsonLd = serializeJsonLd(
+    buildBreadcrumbListJsonLd({
+      items: articleBreadcrumbs(post).map((crumb) => ({
+        name: crumb.name,
+        url: absoluteUrl(crumb.path, siteUrl),
+      })),
+    }),
+  )
+
   // Separate <script> tags rather than one `@graph`. Both are valid and
   // crawlers merge them, and keeping the Article node byte-identical to what it
   // was means a block cannot change the shape of the thing that already ranks.
@@ -270,6 +283,10 @@ export default async function SlugPage({
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: jsonLd }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: breadcrumbJsonLd }}
       />
       {blockJsonLd.map((node, index) => (
         <BlockJsonLd key={index} node={node} />
