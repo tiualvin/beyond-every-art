@@ -534,6 +534,33 @@ document names, and the OAuth resource identifier it has to match.
 Redirect matching is trailing-slash insensitive, so stored rules and inbound
 links resolve whether or not they include a trailing slash.
 
+## Structured data
+
+The builders are in `lib/seo/jsonld.ts` and unit tested in
+`tests/seo/jsonld.test.ts`. Each route serializes its own nodes; this section
+records the decisions that are not obvious from the shape.
+
+### Article authors
+
+Until 27 Oct each byline in Article JSON-LD was `{ "@type": "Person", name }`
+and nothing else, which leaves a search engine to guess which person of that
+name wrote the piece. Google's Article guidance asks for `author.url`: a page
+that identifies the author. Every byline here has one, so each now carries the
+absolute `/author/<slug>/` URL, plus `sameAs` with the author's `website` when
+the record has an http(s) one (vetted in `toAuthorSummaries`, since it is a
+free-text field Ghost imported as it was).
+
+The house byline, **Beyond Every Art**, is sent as an `Organization`, not a
+`Person`: any byline whose name is the site's name is the publication, and
+Google asks that organizations not be marked up as people.
+
+What this does not fix: on 27 Oct both author records had an empty `bio` and no
+`website`, so `/author/alvin/` and `/author/beyond/` are a name and a grid of
+cards. They are indexable, self-canonical and in the sitemap, but thin. A bio is
+editorial content, so writing one is the owner's call; once a bio exists the
+page shows it and the `ProfilePage` node carries it as the `Person`'s
+`description`.
+
 ## Build behavior
 
 `/sitemap.xml`, `/rss`, and `/redirects-map` are `force-dynamic`: they query
