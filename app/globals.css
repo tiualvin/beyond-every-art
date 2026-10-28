@@ -2264,6 +2264,17 @@ img {
   margin: 2rem 0;
 }
 
+/* An image placed in a rich-text body (`components/body-image.tsx`). The
+   figure carries the vertical rhythm, so the image inside it does not take
+   `.prose img`'s margin as well and float 2rem clear of its own caption. */
+.prose .body-figure {
+  margin: 2.5rem 0;
+}
+
+.prose .body-figure img {
+  margin: 0;
+}
+
 .prose blockquote {
   margin: 2.5rem 0;
   padding: 1.5rem 0;

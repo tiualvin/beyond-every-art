@@ -37,12 +37,15 @@ import {
   type PullQuoteData,
   type SignupData,
 } from '@/blocks/schema'
+import type { BodyNode } from '@/lib/content/body'
+import { toBodyImage } from '@/lib/content/body-image'
 import {
   createAnchorAllocator,
   headingText,
   keptAnchor,
   type AnchorAllocator,
 } from '@/lib/content/headings'
+import { BodyImage } from '../body-image'
 import { Accordion } from './accordion'
 import { Bookmark } from './bookmark'
 import { ActionButton } from './button'
@@ -259,6 +262,13 @@ export function buildConverters(
     return {
       ...defaultConverters,
       heading: headingConverter(context.allocate),
+      // A figure with its caption and credit, in place of Payload's bare
+      // `<img>`. Nothing for an image that did not populate — see
+      // `toBodyImage`.
+      upload: ({ node }: { node: unknown }) => {
+        const figure = toBodyImage(node as BodyNode)
+        return figure ? <BodyImage figure={figure} /> : null
+      },
       blocks: Object.fromEntries(
         Object.entries(renderers).map(([slug, render]) => [
           slug,

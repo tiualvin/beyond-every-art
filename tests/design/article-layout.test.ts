@@ -217,6 +217,19 @@ describe('media in the body', () => {
       expect(evaluateSizes(sizes, viewport)).toBe('44rem')
     }
   })
+
+  // A single image placed in the body fills the same box a gallery row does.
+  it('tells the browser a body image is the measure, and a phone its width', () => {
+    const sizes = sizesFrom(
+      'app/(frontend)/components/body-image.tsx',
+      'BODY_IMAGE_SIZES',
+    )
+
+    for (const viewport of [1152, 1280, 1440, 1920]) {
+      expect(evaluateSizes(sizes, viewport)).toBe('44rem')
+    }
+    expect(evaluateSizes(sizes, 390)).toBe('100vw')
+  })
 })
 
 describe('the rail', () => {

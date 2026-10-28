@@ -286,9 +286,79 @@ export function restoreBlocks(
     .map(([key, node]) => ({ key, blockType: node.fields.blockType }))
 
   return {
-    state: { ...converted, root: { ...converted.root, children } },
+    state: restoreImageFields(
+      { ...converted, root: { ...converted.root, children } },
+      current,
+    ),
     kept,
     removed,
+  }
+}
+
+/** The Media id an upload node points at, populated or not. */
+function uploadTarget(node: LexicalNode): string | null {
+  if (node.type !== 'upload') return null
+  const value = node.value as { id?: unknown } | string | number | null
+  const id = typeof value === 'object' && value !== null ? value.id : value
+  return id === undefined || id === null || id === ''
+    ? null
+    : `${String(node.relationTo)}:${String(id)}`
+}
+
+function uploadNodes(nodes: LexicalNode[] | undefined): LexicalNode[] {
+  return (nodes ?? []).flatMap((node) =>
+    node.type === 'upload' ? [node] : uploadNodes(node.children),
+  )
+}
+
+/**
+ * Each image's own caption and credit, carried through a trip through Markdown.
+ *
+ * An image's Markdown form is `![media:7]()`, which names the upload and
+ * nothing else, so an image placed with a caption of its own came back from
+ * a revision as the bare upload: the caption gone, and nothing in the update's
+ * report to say so. This puts back each image's `fields` (and its node id)
+ * from the draft the revision replaces, matching on the upload it points at —
+ * in order, so the second placement of one picture gets the second one's
+ * caption. An image the revision adds has nothing to inherit and stays bare;
+ * one it removes is simply gone, as a removed paragraph is.
+ */
+export function restoreImageFields(
+  converted: EditorState,
+  current: EditorState | null | undefined,
+): EditorState {
+  const pool = new Map<string, LexicalNode[]>()
+  for (const node of uploadNodes(current?.root?.children as LexicalNode[])) {
+    const target = uploadTarget(node)
+    if (!target) continue
+    pool.set(target, [...(pool.get(target) ?? []), node])
+  }
+  if (!pool.size) return converted
+
+  const carry = (node: LexicalNode): LexicalNode => {
+    if (node.type === 'upload') {
+      const target = uploadTarget(node)
+      const previous = target ? pool.get(target)?.shift() : undefined
+      if (!previous) return node
+      return {
+        ...node,
+        ...(previous.id !== undefined ? { id: previous.id } : {}),
+        ...(previous.fields !== undefined ? { fields: previous.fields } : {}),
+      }
+    }
+    return node.children
+      ? { ...node, children: node.children.map(carry) }
+      : node
+  }
+
+  return {
+    ...converted,
+    root: {
+      ...converted.root,
+      children: (converted.root.children as LexicalNode[]).map(
+        carry,
+      ) as EditorState['root']['children'],
+    },
   }
 }
 
