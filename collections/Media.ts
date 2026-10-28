@@ -8,6 +8,16 @@ import { purgeOnChange, purgeOnDelete } from '../lib/cache/purge'
 import { stripMediaUrlSlashes } from '../lib/media/urls'
 import { refuseOversizedUpload } from '../lib/security/uploads'
 
+/** A URL field that is empty or a full https address, as `creditURL` is. */
+function httpsOrEmpty(label: string) {
+  return (value: string | null | undefined) => {
+    const raw = (value ?? '').trim()
+    if (!raw) return true
+    if (toCreditURL(raw)) return true
+    return `${label} must be a full https:// address.`
+  }
+}
+
 export const Media: CollectionConfig = {
   slug: 'media',
   admin: {
@@ -117,7 +127,14 @@ export const Media: CollectionConfig = {
     },
     { name: 'alt', type: 'text', required: true },
     { name: 'caption', type: 'textarea' },
-    { name: 'credit', type: 'text' },
+    {
+      name: 'credit',
+      type: 'text',
+      admin: {
+        description:
+          'The credit line shown under the image — “Photo by Ana Ruiz / Unsplash”. It is also the credit text Google Images shows beside it.',
+      },
+    },
     {
       name: 'creditURL',
       label: 'Credit URL',
@@ -139,6 +156,59 @@ export const Media: CollectionConfig = {
         if (toCreditURL(raw)) return true
         return 'Credit links must be a full https:// address.'
       },
+    },
+    // What Google Images reads to show "Licensable" and a credit beside a
+    // picture, emitted as ImageObject JSON-LD for every image placed in an
+    // article body (`lib/seo/jsonld.ts`, `buildImageObjectJsonLd`). All
+    // optional; `credit` above is the credit text. A collapsible is
+    // presentation only, so these stay top-level columns.
+    {
+      type: 'collapsible',
+      label: 'Licensing',
+      admin: {
+        initCollapsed: true,
+        description:
+          'Optional. Filled in, these tell Google Images who made the picture and how it may be used. Leave empty what you do not know — a wrong licence is worse than none.',
+      },
+      fields: [
+        {
+          name: 'creator',
+          type: 'text',
+          admin: {
+            description:
+              'The person or organisation that made the image — the photographer, the artist, the museum.',
+          },
+        },
+        {
+          name: 'copyrightNotice',
+          label: 'Copyright notice',
+          type: 'text',
+          admin: {
+            description:
+              'As the rights holder states it, e.g. “© 2024 Ana Ruiz”.',
+          },
+        },
+        {
+          name: 'licenseURL',
+          label: 'License URL',
+          type: 'text',
+          admin: {
+            description:
+              'The licence the image is used under, e.g. https://unsplash.com/license or a Creative Commons deed.',
+          },
+          validate: httpsOrEmpty('License'),
+        },
+        {
+          name: 'acquireLicensePage',
+          label: 'Acquire-license page',
+          type: 'text',
+          admin: {
+            description:
+              'Where a reader can license the image themselves — a stock page or the rights holder’s contact page.',
+          },
+          validate: httpsOrEmpty('Acquire-license page'),
+        },
+      ],
     },
     {
       name: 'aiGenerated',

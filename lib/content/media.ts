@@ -32,6 +32,15 @@ export type MediaImage = {
    */
   cardUrl: string | null
   ogUrl: string | null
+  /**
+   * Licensing, for ImageObject JSON-LD. Optional on the type because most
+   * callers never read them; null on every record that does not say.
+   * `licenseURL` and `acquireLicensePage` are vetted to https like `creditURL`.
+   */
+  creator?: string | null
+  copyrightNotice?: string | null
+  licenseURL?: string | null
+  acquireLicensePage?: string | null
 }
 
 const IMAGE_FILE_EXTENSION = /\.(avif|gif|jpe?g|png|svg|tiff?|webp)$/i
@@ -105,6 +114,10 @@ type RawMedia = {
   caption?: unknown
   credit?: unknown
   creditURL?: unknown
+  creator?: unknown
+  copyrightNotice?: unknown
+  licenseURL?: unknown
+  acquireLicensePage?: unknown
   width?: unknown
   height?: unknown
   sizes?: unknown
@@ -145,6 +158,10 @@ export function toMediaImage(value: unknown): MediaImage | null {
     creditURL: toCreditURL(raw.creditURL),
     cardUrl: sizeUrl(raw.sizes, 'card'),
     ogUrl: sizeUrl(raw.sizes, 'og'),
+    creator: toOptionalText(raw.creator),
+    copyrightNotice: toOptionalText(raw.copyrightNotice),
+    licenseURL: toCreditURL(raw.licenseURL),
+    acquireLicensePage: toCreditURL(raw.acquireLicensePage),
   }
 }
 

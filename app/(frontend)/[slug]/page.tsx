@@ -21,6 +21,7 @@ import {
   requireLookupableSlug,
 } from '@/lib/security/slug-requests'
 import { collectBlockJsonLd } from '@/lib/seo/block-jsonld'
+import { bodyImageJsonLd } from '@/lib/seo/image-jsonld'
 import { robotsDirective } from '@/lib/seo/indexing'
 import {
   buildArticleJsonLd,
@@ -183,6 +184,7 @@ export default async function SlugPage({
       }),
     )
     const pageBlockJsonLd = collectBlockJsonLd(page.body)
+    const pageImageJsonLd = bodyImageJsonLd(page.body, pageSiteUrl)
     return (
       <main>
         <script
@@ -191,6 +193,9 @@ export default async function SlugPage({
         />
         {pageBlockJsonLd.map((node, index) => (
           <BlockJsonLd key={index} node={node} />
+        ))}
+        {pageImageJsonLd.map((node, index) => (
+          <JsonLdScript key={`image-${index}`} node={node} />
         ))}
         {showBanner && <DraftBanner />}
         <article className="article">
@@ -254,6 +259,8 @@ export default async function SlugPage({
   // crawlers merge them, and keeping the Article node byte-identical to what it
   // was means a block cannot change the shape of the thing that already ranks.
   const blockJsonLd = collectBlockJsonLd(post.body)
+  // One per body image with licensing, for Google Images — `image-jsonld.ts`.
+  const imageJsonLd = bodyImageJsonLd(post.body, siteUrl)
 
   return (
     <>
@@ -263,6 +270,9 @@ export default async function SlugPage({
       />
       {blockJsonLd.map((node, index) => (
         <BlockJsonLd key={index} node={node} />
+      ))}
+      {imageJsonLd.map((node, index) => (
+        <JsonLdScript key={`image-${index}`} node={node} />
       ))}
       {showBanner && <DraftBanner />}
       <Article
@@ -297,6 +307,16 @@ function BlockJsonLd({ node }: { node: Record<string, unknown> }) {
       dangerouslySetInnerHTML={{
         __html: serializeJsonLd({ '@context': 'https://schema.org', ...node }),
       }}
+    />
+  )
+}
+
+/** A complete node, `@context` included, in its own script. */
+function JsonLdScript({ node }: { node: Record<string, unknown> }) {
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: serializeJsonLd(node) }}
     />
   )
 }
