@@ -58,7 +58,10 @@ flat.
 visibility, featured, byline, tags, review state, noindex, owners. These are the
 things somebody decides _about_ an article rather than part of it, and they sit
 beside the button that acts on them. They used to be scattered down a single
-column below the search metadata.
+column below the search metadata. One sidebar field on Posts is not a decision
+at all: **Text last changed** (`contentUpdatedAt`) is read-only and set by a
+hook when a published edit changes the title or the body's words — see
+[`SEO_AND_REDIRECTS.md`](SEO_AND_REDIRECTS.md), "Honest last-modified dates".
 
 **The Content tab holds the article.** Title, standfirst, cover, body — and
 `legacyHTML`, which deliberately does **not** live under Migration with the rest

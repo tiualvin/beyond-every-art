@@ -505,6 +505,91 @@ Payload at request time and never touch the database during `next build`, and
 they degrade to a valid minimal response if the database is briefly
 unavailable. `/robots.txt` is static.
 
+## Honest last-modified dates
+
+A post publishes "last modified" three times: `dateModified` in its Article
+JSON-LD, `article:modified_time`, and `<lastmod>` in the sitemap. Until 28 Oct
+all three were `updatedAt`, which moves on every save — a link added, a tag
+fixed, a meta description reworded. Google says it uses `lastmod` only when it
+is "consistently and verifiably accurate", and one that moves when nothing on
+the page did is neither, so the signal was being discarded for every post,
+including after the edits that mattered.
+
+All three now come from `contentModifiedAt` (`lib/content/modified-at.ts`):
+
+1. **`contentUpdatedAt`**, a read-only post field ("Text last changed" in the
+   sidebar), set by `stampContentUpdatedAt` in
+   `lib/content/content-updated.ts`, never earlier than `publishedAt`.
+2. **`updatedAt`**, only for a row that has no `contentUpdatedAt` yet — one
+   the backfill below has not reached. That is what all three said before, so
+   nothing jumps on deploy day; falling back to `publishedAt` instead would move
+   every recently edited article's date backwards, which is the inaccurate
+   signal again in the other direction.
+
+Pages and the archives still use `updatedAt`; this is about articles.
+
+### When it moves
+
+Only when a write that lands **published** changes the **visible text**: the
+title, or the words of the body as the page renders them (through the same
+`toArticleBody` the page uses, so rich text wins over `legacyHTML`, a leading
+heading that repeats the title is ignored, and editor HTML-comment notes and
+the members-only marker are not text). Entities, whitespace and Unicode form
+are normalised.
+
+| Edit, then publish                                    | `contentUpdatedAt`   |
+| ----------------------------------------------------- | -------------------- |
+| First publish                                         | the publication date |
+| A word in the body, or the title                      | now                  |
+| A link's target, or a link added around existing text | unchanged            |
+| Bold, italic, a heading level, HTML markup            | unchanged            |
+| Excerpt, meta fields, tags, featured image, slug      | unchanged            |
+| A draft save or autosave, of anything                 | unchanged            |
+
+Whatever a write sends for the field is replaced: the hook owns it.
+
+**The comparison is against the live row, not `originalDoc`.** With drafts on,
+Payload hands `beforeChange` the latest _version_ as `originalDoc` — usually
+the very draft being published, which already holds the new words, so every
+publish would look unchanged. A draft save never writes the main row (Payload
+3.90 writes it only when not saving a draft), so the main row is exactly what
+the site serves. Checked against a real database on 28 Oct: draft save, then
+publish of that draft, then a link-and-excerpt-only publish, then a title
+change — the value moved on the second and fourth and on nothing else.
+
+### The backfill
+
+Every post that predates the field has no value and falls back to
+`updatedAt` until this runs. **It is dry-run by default and must be confirmed
+with the owner before `--apply` on production.**
+
+```bash
+docker compose run --rm \
+  -v "$PWD/.migration-reports:/app/.migration-reports" \
+  migrate pnpm backfill:content-updated-at \
+  --report .migration-reports/content-updated-at-report.json
+# review, then the same with --apply
+```
+
+The rule, `backfillContentUpdatedAt`: **the latest published version whose
+visible text differs from the published version before it; if none does, the
+publication date.** Never earlier than `publishedAt`.
+
+- **Published versions only.** A draft's text was never on the site, so when a
+  draft was saved is not when the page changed; the publish that carried it is.
+- **History is partial.** Posts keep 50 versions (`maxPerDoc`), and autosave
+  spends them, so a change older than the surviving published versions is not
+  seen and the date falls back to `publishedAt` — older than the truth, never
+  newer. A migrated article's Ghost-era edits were never versions here at all:
+  the import is its first version, so it reads as unchanged since its Ghost
+  publication date.
+- **What it writes.** One column, by a single `UPDATE` per post. Not
+  `payload.update`, which would run hooks, write a version, move `updatedAt`,
+  purge caches and announce to IndexNow for a value no reader sees. Rendered
+  pages pick the new date up when the content cache turns over.
+- **Safe to rerun.** Posts that already have a value are skipped unless
+  `--all` is given, so a later run cannot overwrite a date the hook decided.
+
 ## Pending
 
 ~~The public content routes are not built yet.~~ They shipped with the

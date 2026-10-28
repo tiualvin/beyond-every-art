@@ -5,6 +5,7 @@ import { toMediaImage, type MediaImage } from '@/lib/content/media'
 import { htmlToPlainText, richTextToPlainText } from '@/lib/content/plain-text'
 import { rankRelated, type RelatedCandidate } from '@/lib/content/related-rank'
 import { live, publishedStatus } from '@/lib/content/schedule'
+import { contentModifiedAt } from '@/lib/content/modified-at'
 import { isSubjectTag } from '@/lib/content/topics'
 import { ARCHIVE_PAGE_SIZE } from '@/lib/content/pagination'
 import { toArticleBody, type ArticleBody } from '@/lib/content/body'
@@ -713,6 +714,12 @@ export type PostDetail = {
   body: ArticleBody
   publishedAt: string | null
   updatedAt: string | null
+  /**
+   * When the text a reader sees last changed, for every "last modified" the
+   * page publishes. Never `updatedAt`, which a link edit moves — see
+   * `lib/content/content-updated.ts`.
+   */
+  modifiedAt: string | null
   authors: AuthorSummary[]
   tags: TagRef[]
   image: MediaImage | null
@@ -772,6 +779,7 @@ type RawContentDoc = {
   legacyHTML?: string
   publishedAt?: string
   updatedAt?: string
+  contentUpdatedAt?: string | null
   authors?: Array<RawAuthor | string | number>
   tags?: Array<(RawTag & { slug?: string }) | string | number>
   featuredImage?: unknown
@@ -803,6 +811,7 @@ function toPostDetail(doc: RawContentDoc, preview: boolean): PostDetail {
     body: toArticleBody(doc, { restricted, preview }),
     publishedAt: doc.publishedAt ?? null,
     updatedAt: doc.updatedAt ?? null,
+    modifiedAt: contentModifiedAt(doc),
     authors: toAuthorSummaries(doc.authors),
     tags: toTagRefs(doc.tags),
     image: toMediaImage(doc.featuredImage),

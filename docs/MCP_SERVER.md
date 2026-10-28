@@ -603,8 +603,9 @@ history and `readArticleVersion` reads it. From there, two ways back:
 
 What a revert **never** touches, whatever the scope, is everything that decides
 where, when, and to whom the post is served: the slug, visibility, canonical
-URL, `noindex`, the homepage `featured` flag, `publishedAt`, owners, review
-state, and the Ghost migration fields. Each would change a URL, a paywall, or
+URL, `noindex`, the homepage `featured` flag, `publishedAt`,
+`contentUpdatedAt` (which its own hook moves when a restored body is published
+with different words), owners, review state, and the Ghost migration fields. Each would change a URL, a paywall, or
 what crawlers are told the next time somebody pressed publish, with nothing on
 the edit screen to say it had moved. `RESTORED_FIELDS` and `KEPT_ON_RESTORE` in
 [`lib/mcp/tools.ts`](../lib/mcp/tools.ts) are allowlists, and

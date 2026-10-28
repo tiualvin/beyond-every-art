@@ -382,6 +382,9 @@ export const RESTORED_FIELDS = {
  * - `canonicalURL` and `noindex` are what search engines are told.
  * - `featured` places the article on the homepage.
  * - `publishedAt` is the date readers and feeds see; `stampPublishedAt` owns it.
+ * - `contentUpdatedAt` is the "last modified" search engines see, and
+ *   `stampContentUpdatedAt` owns it: a restore that changes the words moves it
+ *   through the hook when it is published, which is the date that is true.
  * - `owners` is who may edit; `lastEditedBy` is stamped by the write itself.
  * - `reviewState` is where the draft stands in review now, not then.
  * - the `ghost*` and `migrationStatus` fields are the Ghost import's identity
@@ -394,6 +397,7 @@ export const KEPT_ON_RESTORE = [
   'noindex',
   'featured',
   'publishedAt',
+  'contentUpdatedAt',
   'owners',
   'lastEditedBy',
   'reviewState',
