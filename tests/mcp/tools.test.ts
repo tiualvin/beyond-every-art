@@ -38,6 +38,7 @@ describe('mcpTools', () => {
       'setKeyFactsBlock',
       'setFAQBlock',
       'setTableBlock',
+      'placeImage',
       'uploadMedia',
       'uploadMediaFromUrl',
       'publishArticle',

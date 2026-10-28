@@ -300,6 +300,12 @@ field to an editor, not for avoiding the source.
 This is deliberately out of scope for the immediate question and is recorded
 here because the immediate question is the smaller one.
 
+The field exists now: `Media` has an optional, collapsed **Licensing** group —
+creator, copyright notice, licence URL and acquire-license page — which feeds
+ImageObject JSON-LD for every image placed in an article body
+([`SEO_AND_REDIRECTS.md`](SEO_AND_REDIRECTS.md), "Images"). It is filled in by
+an editor in the admin panel; no MCP tool writes it.
+
 ## Recommended shape, if it is built
 
 1. ~~**`creditURL` on `Media`, and a linked credit in `FeaturedFigure`.**~~
