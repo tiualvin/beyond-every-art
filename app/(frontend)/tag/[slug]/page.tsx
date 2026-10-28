@@ -5,6 +5,11 @@ import { cache } from 'react'
 
 import { adClientFor } from '@/lib/ads/eligibility'
 import {
+  archivePagePath,
+  buildPagination,
+  parsePageParam,
+} from '@/lib/content/pagination'
+import {
   getPostsByTag,
   getSiteSettings,
   getTagsWithCounts,
@@ -21,6 +26,7 @@ import { absoluteUrl, getSiteUrl, JOURNAL_PATH, tagPath } from '@/lib/seo/site'
 import { topicMeta } from '@/lib/seo/topic-meta'
 
 import { ArchiveGroups } from '../../components/archive-groups'
+import { ArchivePagination } from '../../components/archive-pagination'
 import { FadeIn } from '../../components/motion/fade-in'
 
 // Rendered per request so canonical URLs, feeds and JSON-LD come from the
@@ -29,29 +35,39 @@ import { FadeIn } from '../../components/motion/fade-in'
 export const dynamic = 'force-dynamic'
 
 type Params = { slug: string }
+type SearchParams = Promise<Record<string, string | string[] | undefined>>
 
 /** Enough to move on with, without turning the foot into a second archive. */
 const SIBLING_TOPICS = 5
 
 // Resolved once per request, and gated first: a slug that cannot name a tag
 // is answered 404 without a query. See `lib/security/slug-requests.ts`.
-const resolve = cache(async (slug: string) => {
+const resolve = cache(async (slug: string, page: number) => {
   await requireLookupableSlug(slug)
-  const archive = await getPostsByTag(slug)
+  const archive = await getPostsByTag(slug, page)
   if (!archive) await recordSlugMiss()
   return archive
 })
 
 export async function generateMetadata({
   params,
+  searchParams,
 }: {
   params: Promise<Params>
+  searchParams: SearchParams
 }): Promise<Metadata> {
   const { slug } = await params
-  const archive = await resolve(slug)
+  const page = parsePageParam((await searchParams).page)
+  const archive = await resolve(slug, page)
   if (!archive) return { title: 'Not found' }
   const siteUrl = getSiteUrl()
-  const canonical = absoluteUrl(tagPath(archive.slug), siteUrl)
+  // Each page of a hub is its own canonical, as on `/journal/`: page 2 lists
+  // different articles from page 1, so pointing it at page 1 would tell a
+  // crawler to drop the only links some of them have.
+  const canonical = absoluteUrl(
+    archivePagePath(tagPath(archive.slug), archive.page),
+    siteUrl,
+  )
   const settings = await getSiteSettings()
   // The tag's own search fields first, then a sentence built from its
   // articles; the newest article's image when the tag has none of its own.
@@ -67,8 +83,13 @@ export async function generateMetadata({
     : undefined
   const shareTitle =
     typeof meta.title === 'string' ? meta.title : meta.title.absolute
+  // Page 1's title is untouched — it is the one search results already show.
+  const suffix = archive.page > 1 ? ` — Page ${archive.page}` : ''
   return {
-    title: meta.title,
+    title:
+      typeof meta.title === 'string'
+        ? `${meta.title}${suffix}`
+        : { absolute: `${meta.title.absolute}${suffix}` },
     description: meta.description,
     alternates: { canonical },
     openGraph: {
@@ -87,13 +108,28 @@ export async function generateMetadata({
   }
 }
 
-export default async function TagPage({ params }: { params: Promise<Params> }) {
+export default async function TagPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<Params>
+  searchParams: SearchParams
+}) {
   const { slug } = await params
-  const archive = await resolve(slug)
+  const requested = parsePageParam((await searchParams).page)
+  const archive = await resolve(slug, requested)
   if (!archive) {
     await logMissingRoute(tagPath(slug))
     notFound()
   }
+  // Past the end is a 404, as on `/journal/`, never a quietly empty page.
+  if (requested > 1 && requested > archive.totalPages) notFound()
+
+  const pagination = buildPagination({
+    basePath: tagPath(archive.slug),
+    page: archive.page,
+    totalPages: archive.totalPages,
+  })
 
   const subjects = await getTagsWithCounts()
   // The topic archive carries listing units on the same terms as the journal.
@@ -117,7 +153,10 @@ export default async function TagPage({ params }: { params: Promise<Params> }) {
   const siteUrl = getSiteUrl()
   const jsonLd = serializeJsonLd(
     buildCollectionPageJsonLd({
-      url: absoluteUrl(tagPath(archive.slug), siteUrl),
+      url: absoluteUrl(
+        archivePagePath(tagPath(archive.slug), archive.page),
+        siteUrl,
+      ),
       name: archive.name,
       // The same sentence the meta description carries, so the two never
       // describe one page differently.
@@ -176,6 +215,10 @@ export default async function TagPage({ params }: { params: Promise<Params> }) {
               Nothing filed under this topic yet.
             </p>
           )}
+          <ArchivePagination
+            pagination={pagination}
+            label={`${archive.name} pages`}
+          />
         </div>
       </section>
 

@@ -1,5 +1,4 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { cache } from 'react'
 
@@ -17,6 +16,7 @@ import {
 import { absoluteUrl, getSiteUrl, JOURNAL_PATH } from '@/lib/seo/site'
 
 import { ArchiveFilter } from '../components/archive-filter'
+import { ArchivePagination } from '../components/archive-pagination'
 import { FadeIn } from '../components/motion/fade-in'
 
 // Rendered per request so canonical URLs, feeds and JSON-LD come from the
@@ -99,35 +99,7 @@ export default async function JournalPage({
             fallback={settings.railFallback}
           />
 
-          {pagination.totalPages > 1 && (
-            <nav className="pagination" aria-label="Journal pages">
-              {pagination.prevPath ? (
-                <Link
-                  href={pagination.prevPath}
-                  className="button button--ghost"
-                  rel="prev"
-                >
-                  Newer stories
-                </Link>
-              ) : (
-                <span />
-              )}
-              <p className="pagination__status">
-                Page {pagination.page} of {pagination.totalPages}
-              </p>
-              {pagination.nextPath ? (
-                <Link
-                  href={pagination.nextPath}
-                  className="button button--ghost"
-                  rel="next"
-                >
-                  Older stories
-                </Link>
-              ) : (
-                <span />
-              )}
-            </nav>
-          )}
+          <ArchivePagination pagination={pagination} label="Journal pages" />
         </div>
       </section>
     </main>

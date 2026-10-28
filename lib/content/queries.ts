@@ -759,8 +759,25 @@ export type Archive = {
   metaDescription: string | null
   /** A tag's featured image. Authors keep theirs on the author record. */
   image: MediaImage | null
+  /** One page of the owner's posts, newest first. */
   posts: PostCard[]
+  /** The page `posts` is, clamped into range, and how many there are. */
+  page: number
+  totalPages: number
 }
+
+/**
+ * Posts per page on a tag or author archive.
+ *
+ * A hundred, which is what these archives showed before they paginated at all —
+ * so page 1 of every hub is the page it always was. The difference is what
+ * happens past it: the read used to stop at a hundred with no way on, and with
+ * `/tag/art/` at 130 live posts and `/author/beyond/` near 200 in October 2026,
+ * the oldest thirty-odd articles under each had no link from the page that is
+ * supposed to collect them. Large on purpose: a hub's job is to link to its
+ * articles, and twelve to a page would bury most of them four clicks deep.
+ */
+export const HUB_PAGE_SIZE = 100
 
 export type SlugRef = { slug: string; updatedAt: string | null }
 
@@ -1113,6 +1130,7 @@ async function readArchive(
   collection: 'tags' | 'authors',
   slug: string,
   relationField: 'tags' | 'authors',
+  page = 1,
 ): Promise<Archive | null> {
   try {
     const payload = await getPayloadClient()
@@ -1142,7 +1160,8 @@ async function readArchive(
       collection: 'posts',
       overrideAccess: true,
       depth: 1,
-      limit: 100,
+      limit: HUB_PAGE_SIZE,
+      page: Math.max(1, Math.floor(page)),
       sort: '-publishedAt',
       where: { and: [{ [relationField]: { in: [doc.id] } }, live()] },
     })
@@ -1157,6 +1176,8 @@ async function readArchive(
       posts: (posts.docs as RawPost[])
         .map(toPostCard)
         .filter((p): p is PostCard => p !== null),
+      page: posts.page ?? 1,
+      totalPages: Math.max(1, posts.totalPages ?? 1),
     }
   } catch {
     return null
@@ -1170,14 +1191,17 @@ const getArchive = cachedRead('archive', readArchive, [
   CONTENT_TAGS.media,
 ])
 
-/** Posts filed under a tag, plus the tag's own metadata. */
-export function getPostsByTag(slug: string): Promise<Archive | null> {
-  return getArchive('tags', slug, 'tags')
+/** One page of the posts filed under a tag, plus the tag's own metadata. */
+export function getPostsByTag(slug: string, page = 1): Promise<Archive | null> {
+  return getArchive('tags', slug, 'tags', page)
 }
 
-/** Posts written by an author, plus the author's own metadata. */
-export function getPostsByAuthor(slug: string): Promise<Archive | null> {
-  return getArchive('authors', slug, 'authors')
+/** One page of the posts an author wrote, plus the author's own metadata. */
+export function getPostsByAuthor(
+  slug: string,
+  page = 1,
+): Promise<Archive | null> {
+  return getArchive('authors', slug, 'authors', page)
 }
 
 async function readSlugRefs(
