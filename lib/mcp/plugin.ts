@@ -109,8 +109,8 @@ export const mcpPluginConfig: MCPPluginConfig = {
       description:
         'Articles. Bodies are stored as Lexical rich text, so use ' +
         '`draftArticle` and `updateArticleMarkdown` to write them rather than ' +
-        'setting `content` directly, and `setKeyFactsBlock` to add a key ' +
-        'facts card. Migrated articles render from `legacyHTML`: read it with ' +
+        'setting `content` directly, `setKeyFactsBlock` to add a key ' +
+        'facts card, and `placeImage` to put an image in the body. Migrated articles render from `legacyHTML`: read it with ' +
         '`readLegacyHtml` and change it with `editLegacyHtml`, not by setting ' +
         'the field; `convertLegacyArticle` moves one into the rich-text body. ' +
         'Prefer `select` to avoid pulling whole bodies into context.',

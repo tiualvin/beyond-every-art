@@ -158,6 +158,16 @@ test('robots, sitemap, and RSS expose the public launch surface', async ({
   expect(sitemap.headers()['content-type']).toContain('application/xml')
   const sitemapXml = await sitemap.text()
   expect(sitemapXml).toContain(`/${fixtures.publicPost.slug}/`)
+  // The seeded post's featured image, as an image entry under its URL. Checked
+  // here rather than only in unit tests because the URL comes from a Media
+  // read, and a `select` that omits `filename` returns every `url` as null —
+  // which no test without a database can see.
+  const postEntry = sitemapXml
+    .split('<url>')
+    .find((entry) => entry.includes(`/${fixtures.publicPost.slug}/</loc>`))
+  expect(postEntry).toMatch(
+    /<image:loc>https?:\/\/[^<]+\/api\/media\/file\/[^<]+<\/image:loc>/,
+  )
   expect(sitemapXml).toContain(`/tag/${fixtures.tag.slug}/`)
   expect(sitemapXml).toContain(`/author/${fixtures.author.slug}/`)
 

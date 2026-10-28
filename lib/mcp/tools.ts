@@ -35,6 +35,12 @@ import {
 } from './blocks'
 import { compareAnchors, markAnchors, restoreAnchors } from './anchors'
 import { setFaq, type FaqInputItem } from './faq'
+import {
+  IMAGE_CAPTION_MAX,
+  IMAGE_CREDIT_MAX,
+  listImages,
+  placeImage,
+} from './image'
 import { setKeyFacts, type Fact } from './key-facts'
 import { withChildren } from './placement'
 import { setTable, TABLE_MAX_COLUMNS, TABLE_MAX_ROWS } from './table'
@@ -289,6 +295,7 @@ const targetShape = {
  */
 function articleView(req: PayloadRequest, doc: Record<string, unknown>) {
   const content = doc.content as EditorState | null | undefined
+  const images = listImages(content)
 
   return {
     // Beside the Markdown rather than in it, so reviewing a draft shows what
@@ -298,6 +305,10 @@ function articleView(req: PayloadRequest, doc: Record<string, unknown>) {
       blockFieldsForReading(req.payload, COLLECTION, fields),
     ),
     excerpt: doc.excerpt ?? null,
+    // Beside the Markdown for the reason `blocks` is: an image's Markdown is
+    // the bare `![media:id]()`, so its own caption and credit show only here.
+    // Present only when the body has images, so every other read is unchanged.
+    ...(images.length ? { images } : {}),
     // Migrated bodies live in `legacyHTML` and are not Lexical; say so
     // rather than returning an empty string that reads like an empty post.
     // This used to add that a Markdown edit "would not change the published
@@ -1867,8 +1878,148 @@ export const mcpTools: McpTool[] = [
   },
   {
     description:
+      "Place an image already in the Media library into an article's body, " +
+      'directly under the body heading named in `afterHeading`, with an ' +
+      'optional caption and credit for this placement. It renders as a ' +
+      'figure with the caption and credit beneath it; left out, they are the ' +
+      "image's own. Calling again for the same image under the same heading " +
+      'updates its caption and credit rather than placing it twice. Get an ' +
+      'id from `findMedia`, or upload one with `uploadMediaFromUrl` first. ' +
+      'Saved as a draft and never published; the rest of the body is left ' +
+      'exactly as it is. Refused for an article that still renders from ' +
+      'migrated Ghost HTML.',
+    handler: async (args: Record<string, unknown>, req: PayloadRequest) => {
+      const { afterHeading, caption, credit, mediaId, ...target } = args as {
+        afterHeading: string
+        caption?: string
+        credit?: string
+        id?: string
+        mediaId: string
+        slug?: string
+      }
+
+      const doc = (await findArticle(
+        req,
+        COLLECTION,
+        target,
+      )) as unknown as Record<string, unknown>
+
+      refuseLegacyBody(doc, 'an image')
+
+      // Read as the key's user, so an id the key could not find with
+      // `findMedia` is not one it can place. A trashed image is not found:
+      // placing it would put a figure on the page that renders nothing.
+      const media = (await req.payload
+        .findByID({
+          collection: 'media',
+          id: mediaId,
+          depth: 0,
+          overrideAccess: false,
+          req,
+          user: req.user as TypedUser,
+        })
+        .catch(() => null)) as Record<string, unknown> | null
+      if (!media) {
+        throw new Error(
+          `No image in the Media library has id \`${mediaId}\`. Find one ` +
+            'with findMedia, or add one with uploadMediaFromUrl.',
+        )
+      }
+
+      const result = placeImage(doc.content as EditorState | null, {
+        afterHeading,
+        caption,
+        credit,
+        mediaId: media.id as number | string,
+      })
+
+      const updated = await req.payload.update({
+        collection: COLLECTION,
+        id: doc.id as number | string,
+        data: { _status: 'draft', content: result.state },
+        draft: true,
+        overrideAccess: false,
+        req,
+        user: req.user as TypedUser,
+      })
+
+      const shownCaption = caption?.trim() || (media.caption as string) || null
+      const shownCredit = credit?.trim() || (media.credit as string) || null
+
+      return text({
+        afterHeading: result.afterHeading,
+        id: updated.id,
+        image: {
+          alt: media.alt ?? null,
+          caption: shownCaption,
+          credit: shownCredit,
+          filename: media.filename ?? null,
+          // How the image reads in readArticleMarkdown, and what keeps it —
+          // with this caption and credit — through updateArticleMarkdown.
+          markdown: `![media:${media.id}]()`,
+          mediaId: media.id,
+        },
+        ...(shownCredit
+          ? {}
+          : {
+              note:
+                'This image has no credit, here or in the Media library, so ' +
+                'none shows under it. Pass `credit` if the image is not ' +
+                "this site's own.",
+            }),
+        placement: result.placement,
+        preview: buildPreviewUrl({
+          collection: COLLECTION,
+          slug: updated.slug,
+        }),
+        slug: updated.slug,
+        status: 'draft',
+        ...(await whatReadersSee(req, updated.id)),
+      })
+    },
+    name: 'placeImage',
+    parameters: {
+      afterHeading: z
+        .string()
+        .min(1)
+        .describe(
+          'The text of a heading in the body, e.g. "The cabinet". The image ' +
+            'goes directly under it.',
+        ),
+      caption: z
+        .string()
+        .max(IMAGE_CAPTION_MAX)
+        .optional()
+        .describe(
+          'What the picture shows here, as a sentence, shown under it. ' +
+            "Leave out to use the image's own caption. Not alt text: that " +
+            'is set on the image itself.',
+        ),
+      credit: z
+        .string()
+        .max(IMAGE_CREDIT_MAX)
+        .optional()
+        .describe(
+          'Who made or supplied the image, e.g. "Photo by Ana Ruiz / ' +
+            'Unsplash" or "Courtesy the Metropolitan Museum of Art". Leave ' +
+            "out to use the image's own credit, which is the only one shown " +
+            'as a link.',
+        ),
+      mediaId: z
+        .string()
+        .min(1)
+        .describe(
+          'The id of an image in the Media library, from findMedia or ' +
+            'uploadMediaFromUrl.',
+        ),
+      ...targetShape,
+    },
+  },
+  {
+    description:
       'Upload an image to the Media library from base64 and return its id, ' +
-      "for use as a post's featuredImage via `updatePosts`. Accepts PNG, " +
+      "for use as a post's featuredImage via `updatePosts`, or in its body " +
+      'via `placeImage`. Accepts PNG, ' +
       'JPEG and WebP up to 8MB; SVG is refused. Images are marked as ' +
       'generated unless told otherwise, so the archive stays auditable. ' +
       '`alt` is required and should describe what the image shows, not that ' +
@@ -1961,7 +2112,8 @@ export const mcpTools: McpTool[] = [
   {
     description:
       'Add an image to the Media library by giving its https address, and ' +
-      "return its id for use as a post's featuredImage via `updatePosts`. " +
+      "return its id for use as a post's featuredImage via `updatePosts`, " +
+      'or in its body via `placeImage`. ' +
       'Use this rather than `uploadMedia` from any client that cannot hold a ' +
       'whole file in a message — a phone connector, a scheduled run. Accepts ' +
       'PNG, JPEG and WebP up to 8MB; SVG is refused. Only public https ' +

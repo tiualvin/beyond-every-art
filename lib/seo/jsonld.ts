@@ -316,6 +316,56 @@ export function buildItemListJsonLd(
   return jsonLd
 }
 
+export type ImageObjectJsonLdInput = {
+  /** Absolute URL of the image file. */
+  contentUrl: string
+  creator?: string | null
+  /** The credit line the page shows under the image. */
+  creditText?: string | null
+  copyrightNotice?: string | null
+  /** https URL of the licence. */
+  license?: string | null
+  /** https URL where the image can be licensed. */
+  acquireLicensePage?: string | null
+}
+
+/**
+ * An `ImageObject` carrying an image's licensing, per Google's "image metadata"
+ * guidance — what puts a credit and a "Licensable" badge beside it in Google
+ * Images.
+ *
+ * Null when the image has none of `creator`, `creditText`, `copyrightNotice` or
+ * `license`: Google requires at least one, and a node with only a URL says
+ * nothing a crawler did not already read from the `<img>`. An
+ * `acquireLicensePage` alone does not qualify for the same reason.
+ *
+ * `creator` is a `Person`, the type Google's own examples use. The field is a
+ * name and cannot say whether it names a person or an institution; a museum
+ * credited as a `Person` is a smaller error than dropping the credit.
+ */
+export function buildImageObjectJsonLd(
+  input: ImageObjectJsonLdInput,
+): Record<string, unknown> | null {
+  const creator = input.creator?.trim()
+  const creditText = input.creditText?.trim()
+  const copyrightNotice = input.copyrightNotice?.trim()
+  const license = input.license?.trim()
+  const acquireLicensePage = input.acquireLicensePage?.trim()
+  if (!creator && !creditText && !copyrightNotice && !license) return null
+
+  const jsonLd: Record<string, unknown> = {
+    '@context': 'https://schema.org',
+    '@type': 'ImageObject',
+    contentUrl: input.contentUrl,
+  }
+  if (license) jsonLd.license = license
+  if (acquireLicensePage) jsonLd.acquireLicensePage = acquireLicensePage
+  if (creditText) jsonLd.creditText = creditText
+  if (creator) jsonLd.creator = { '@type': 'Person', name: creator }
+  if (copyrightNotice) jsonLd.copyrightNotice = copyrightNotice
+  return jsonLd
+}
+
 /**
  * Serializes a JSON-LD object for safe inline embedding, escaping the
  * characters that could otherwise break out of a <script> element.

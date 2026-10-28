@@ -49,6 +49,42 @@ sets `robots`, and it never returns undefined: Next's metadata merge treats a
 page's `robots: undefined` as a value that replaces the layout's, which is how
 the empty search page came to drop staging's noindex.
 
+### Images in an article body
+
+Three things make a picture placed in a rich-text body findable in Google
+Images. They read one list — `collectBodyImages` in
+[`lib/content/body-image.ts`](../lib/content/body-image.ts) — so the figure,
+its JSON-LD and its sitemap entry describe the same picture with the same
+credit.
+
+- **A `<figure>`.** Payload's default upload converter rendered a bare `<img>`:
+  no caption, no credit, no `sizes`, so a phone downloaded the original.
+  `components/body-image.tsx` renders `next/image` (dimensioned, lazy — the hero
+  holds the LCP element — and sized to the 44rem measure, which
+  `tests/design/article-layout.test.ts` checks against the stylesheet) inside a
+  `<figure>` whose `<figcaption>` carries the caption and the credit, linked
+  through `attributionHref`. A placement can carry its own caption and credit
+  (fields on the editor's upload node); left empty, the Media record's are
+  used, and only the record's credit is ever a link.
+- **ImageObject JSON-LD**, per Google's image-metadata guidance, for each
+  distinct body image that has a creator, credit, copyright notice or licence
+  (Google requires one of the four): `buildImageObjectJsonLd` in
+  `lib/seo/jsonld.ts`, emitted by `lib/seo/image-jsonld.ts`. The four optional
+  fields sit in a collapsed **Licensing** group on Media; `credit` is the
+  credit text. Licence and acquire-license URLs must be https.
+- **`<image:image>` sitemap entries** under each post: its featured image, then
+  its body images, each once (`lib/seo/sitemap-images.ts`). A members-only or
+  paid post lists only its featured image, since a crawler is served only the
+  opening of its body. The Media read selects `filename` beside `url`, because
+  `url` is built from it after the read and comes back null alone; the e2e
+  sitemap check is the only test that can see that.
+
+Preserved Ghost HTML gets none of the first two — it has no Media records
+behind its markup, and on 28 Oct no migrated body held an inline image — but an
+`<img>` in it served from `/api/media/file/` is listed in the sitemap. Images
+reach bodies through the editor's image button or the MCP tool `placeImage`
+([`MCP_SERVER.md`](MCP_SERVER.md)).
+
 ### IndexNow
 
 A published post or page is announced to IndexNow (Bing, and the engines that

@@ -20,6 +20,11 @@ export type SitemapDoc = {
    * caller that passes nothing gets the old behaviour.
    */
   noindex?: boolean | null
+  /**
+   * Posts only: site-relative paths of the images the page shows, featured
+   * image first — `postImagePaths` in `lib/seo/sitemap-images.ts`.
+   */
+  images?: readonly string[]
 }
 
 export type SitemapEntry = {
@@ -28,6 +33,8 @@ export type SitemapEntry = {
   changeFrequency?:
     'always' | 'hourly' | 'daily' | 'weekly' | 'monthly' | 'yearly' | 'never'
   priority?: number
+  /** Absolute, XML-escaped image URLs: `<image:image>` entries. */
+  images?: string[]
 }
 
 function toIso(value: string | Date | null | undefined): string | undefined {
@@ -112,11 +119,15 @@ export function buildSitemapEntries({
   // whichever direction the crawler prefers rather than the one asked for.
   for (const post of posts) {
     if (!post.slug || post.noindex) continue
+    const images = (post.images ?? []).map((path) =>
+      escapeXml(absoluteUrl(path, siteUrl)),
+    )
     entries.push({
       url: absoluteUrl(postPath(post.slug), siteUrl),
       lastModified: toIso(post.updatedAt) ?? toIso(post.publishedAt),
       changeFrequency: 'weekly',
       priority: 0.7,
+      ...(images.length ? { images } : {}),
     })
   }
 
@@ -161,4 +172,20 @@ export function buildSitemapEntries({
   }
 
   return entries
+}
+
+/**
+ * A URL made safe to stand as XML text.
+ *
+ * Next writes each `<image:loc>` exactly as given — it escapes nothing — so an
+ * `&` in a filename would make the whole sitemap invalid XML, and a crawler
+ * that rejects one sitemap rejects every URL in it.
+ */
+function escapeXml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;')
 }

@@ -125,6 +125,10 @@ hand.
 `setKeyFactsBlock`, `setFAQBlock` and `setTableBlock` write the draft body and
 nothing else — what `updateArticleMarkdown` already does — so an existing key
 gets them exactly where it already had `updateArticleMarkdown`.
+`placeImage` writes the draft body and nothing else too — a `![media:id]()`
+line through `updateArticleMarkdown` already placed an image, without a caption
+— so it follows the same rule
+(`20261028_155427_add_place_image_capability`).
 `publishArticle` is an update to a post, which `updatePosts` with
 `_status: 'published'` already was, so an existing key gets it where it had
 `posts.update`. That widens nobody's authority: whether the publish lands is
@@ -152,24 +156,25 @@ all.
 
 Written for this project, because the generated ones cannot do the job:
 
-| Tool                    | Does                                                                                                                                                                                                                                                                                         |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `draftArticle`          | Creates a post from Markdown, always as a draft. Resolves tag and author slugs, refuses unknown ones. The `ghostID` is autofilled by the collection.                                                                                                                                         |
-| `readArticleMarkdown`   | Reads a post back as Markdown, including the draft body, with each module as a marker line and its contents in `blocks`. Says so when the page renders from `legacyHTML`.                                                                                                                    |
-| `readLegacyHtml`        | Read-only. A migrated post's Ghost HTML exactly as stored, a page at a time — or, given text as a reader sees it, each match as the stored HTML it spans, with context, its heading and whether it is unique. Refused where the page renders from the rich-text body.                        |
-| `listArticleVersions`   | Lists a post's saved versions, newest first — id, time, title, status and a 100-character snippet each, never a body.                                                                                                                                                                        |
-| `readArticleVersion`    | Reads one saved version in exactly the shape `readArticleMarkdown` returns the draft. Read-only.                                                                                                                                                                                             |
-| `restoreArticleVersion` | Reverts a post's body, or its whole article, to a saved version — as a draft, overwriting rather than merging. Has a dry run and an undo.                                                                                                                                                    |
-| `updateArticleMarkdown` | Replaces a body from Markdown, saved as a draft. Puts each marked module back as it was; reports which were kept and which removed.                                                                                                                                                          |
-| `editLegacyHtml`        | Exact find-and-replace edits to a migrated post's Ghost HTML, saved as a draft, all or none. New markup is links, `em`, `strong`, `i` and `b` only; a link to this site must name a live or scheduled article. Has a dry run. See [Editing a migrated article](#editing-a-migrated-article). |
-| `convertLegacyArticle`  | Converts one migrated post from its Ghost HTML into the rich-text body, so the module tools work on it. Dry run by default, with a report; saves a draft only when nothing is refused. See [Converting a migrated article](#converting-a-migrated-article).                                  |
-| `setKeyFactsBlock`      | Sets an article's key facts card — label and value pairs — in place, or under a named body heading. Saved as a draft; the rest of the body is untouched.                                                                                                                                     |
-| `setFAQBlock`           | Sets an article's FAQ — questions with Markdown answers — in place, under a named body heading, or in place of a Markdown FAQ section. Saved as a draft; the rest of the body is untouched.                                                                                                  |
-| `setTableBlock`         | Sets a comparison table — caption, header row, rows with inline-Markdown cells — by key, in a named section, or read from the Markdown table under a heading. Saved as a draft; the rest of the body is untouched.                                                                           |
-| `uploadMedia`           | Adds an image to the Media library from base64 and returns its id, for `updatePosts` to set as a `featuredImage`.                                                                                                                                                                            |
-| `uploadMediaFromUrl`    | The same, from an https address the server fetches itself. The only one of the two that works from a phone or a scheduled run.                                                                                                                                                               |
-| `publishArticle`        | Publishes a post as its newest version, in place, or schedules one that is not live — `"now"` or a zoned time ahead. Never moves a live article's date, slug or canonical URL; refuses to backdate. Has a dry run. Needs an administrator's key or a connector granted publishing.           |
-| `editorialStatus`       | Read-only. What is scheduled in the next days and what went live in the last, each with its address; and what is saved but not out — live or scheduled articles whose newest version is an unpublished draft, and drafts whose date has passed. The same lists as the admin dashboard.       |
+| Tool                    | Does                                                                                                                                                                                                                                                                                                     |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `draftArticle`          | Creates a post from Markdown, always as a draft. Resolves tag and author slugs, refuses unknown ones. The `ghostID` is autofilled by the collection.                                                                                                                                                     |
+| `readArticleMarkdown`   | Reads a post back as Markdown, including the draft body, with each module as a marker line and its contents in `blocks`. Says so when the page renders from `legacyHTML`.                                                                                                                                |
+| `readLegacyHtml`        | Read-only. A migrated post's Ghost HTML exactly as stored, a page at a time — or, given text as a reader sees it, each match as the stored HTML it spans, with context, its heading and whether it is unique. Refused where the page renders from the rich-text body.                                    |
+| `listArticleVersions`   | Lists a post's saved versions, newest first — id, time, title, status and a 100-character snippet each, never a body.                                                                                                                                                                                    |
+| `readArticleVersion`    | Reads one saved version in exactly the shape `readArticleMarkdown` returns the draft. Read-only.                                                                                                                                                                                                         |
+| `restoreArticleVersion` | Reverts a post's body, or its whole article, to a saved version — as a draft, overwriting rather than merging. Has a dry run and an undo.                                                                                                                                                                |
+| `updateArticleMarkdown` | Replaces a body from Markdown, saved as a draft. Puts each marked module back as it was; reports which were kept and which removed.                                                                                                                                                                      |
+| `editLegacyHtml`        | Exact find-and-replace edits to a migrated post's Ghost HTML, saved as a draft, all or none. New markup is links, `em`, `strong`, `i` and `b` only; a link to this site must name a live or scheduled article. Has a dry run. See [Editing a migrated article](#editing-a-migrated-article).             |
+| `convertLegacyArticle`  | Converts one migrated post from its Ghost HTML into the rich-text body, so the module tools work on it. Dry run by default, with a report; saves a draft only when nothing is refused. See [Converting a migrated article](#converting-a-migrated-article).                                              |
+| `setKeyFactsBlock`      | Sets an article's key facts card — label and value pairs — in place, or under a named body heading. Saved as a draft; the rest of the body is untouched.                                                                                                                                                 |
+| `setFAQBlock`           | Sets an article's FAQ — questions with Markdown answers — in place, under a named body heading, or in place of a Markdown FAQ section. Saved as a draft; the rest of the body is untouched.                                                                                                              |
+| `setTableBlock`         | Sets a comparison table — caption, header row, rows with inline-Markdown cells — by key, in a named section, or read from the Markdown table under a heading. Saved as a draft; the rest of the body is untouched.                                                                                       |
+| `placeImage`            | Places an image already in the Media library directly under a named body heading, with an optional caption and credit for that placement. Calling again for the same image there updates it. Saved as a draft; the rest of the body is untouched. Refused for an article that renders from `legacyHTML`. |
+| `uploadMedia`           | Adds an image to the Media library from base64 and returns its id, for `updatePosts` to set as a `featuredImage`.                                                                                                                                                                                        |
+| `uploadMediaFromUrl`    | The same, from an https address the server fetches itself. The only one of the two that works from a phone or a scheduled run.                                                                                                                                                                           |
+| `publishArticle`        | Publishes a post as its newest version, in place, or schedules one that is not live — `"now"` or a zoned time ahead. Never moves a live article's date, slug or canonical URL; refuses to backdate. Has a dry run. Needs an administrator's key or a connector granted publishing.                       |
+| `editorialStatus`       | Read-only. What is scheduled in the next days and what went live in the last, each with its address; and what is saved but not out — live or scheduled articles whose newest version is an unpublished draft, and drafts whose date has passed. The same lists as the admin dashboard.                   |
 
 ### Modules in a body
 
@@ -495,7 +500,38 @@ the same `vetImageBytes`, which reads the format from the file's leading bytes �
 a `Content-Type: image/png` on a downloaded SVG buys nothing.
 
 Uploading is one call; attaching is the next one. Either tool returns the new
-document's id, and `updatePosts` sets it as `featuredImage`.
+document's id, and `updatePosts` sets it as `featuredImage` — or `placeImage`
+puts it in the body.
+
+**`placeImage`** follows `setKeyFactsBlock`'s contract
+([`lib/mcp/image.ts`](../lib/mcp/image.ts)): the image goes directly under the
+body heading named in `afterHeading` (matched ignoring case and spacing, and
+refused with the list of headings when none or several match); every other node
+is passed through untouched; the save is a draft, as the key's own user, and
+never a publish; and an article that still renders from `legacyHTML` is refused,
+because a rich-text body holding one image would replace the whole migrated
+article on the page. Calling it again for the same image under the same heading
+updates that placement instead of adding a second, so a retry is safe. The image
+must be one the key can find in the Media library; a trashed one is refused.
+
+`caption` and `credit` belong to the placement and override the Media record's
+own for this article only; left out, the figure shows the record's. Only the
+record's credit is ever a link (`creditURL`), so a placement that credits
+someone else never links to whoever the record credits. The response says when
+the image will show with no credit at all. The licensing fields an ImageObject
+needs — creator, copyright notice, licence — live on the Media record and are
+editor-only: no MCP tool writes them, for the reason
+[`STOCK_IMAGERY.md`](STOCK_IMAGERY.md) gives for not letting an agent read
+rights silently.
+
+A placed image survives a Markdown revision with its caption: its Markdown form
+is `![media:id]()`, which carries only the id, so `restoreBlocks` puts each
+image's own fields back from the draft it replaces, matched by upload in order.
+`tests/mcp/image-round-trip.test.ts` holds it. And because that line shows no
+caption, and bodies are elided from every other response, `readArticleMarkdown`
+and `readArticleVersion` list the body's images beside the Markdown — `images`,
+each with its line, the heading above it, and its own caption and credit — when
+there are any.
 
 On a published article that second call lands as a **draft** over the live
 version, like every other MCP write that is not a publish — see

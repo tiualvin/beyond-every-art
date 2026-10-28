@@ -169,6 +169,7 @@ test.describe('MCP endpoint', () => {
         'setKeyFactsBlock',
         'setFAQBlock',
         'setTableBlock',
+        'placeImage',
         'uploadMedia',
         'publishArticle',
         'editorialStatus',
@@ -703,6 +704,85 @@ test.describe('MCP endpoint', () => {
     })) as Read
     expect(reread.markdown).toContain('More text.')
     expect(reread.blocks).toEqual(read.blocks)
+  })
+
+  // An existing image into a body, through Payload's real save: the upload
+  // node, its own caption, and the caption surviving a Markdown revision —
+  // which, before `restoreImageFields`, it did not.
+  test('places an image under a heading, and a revision keeps its caption', async ({
+    request,
+  }) => {
+    const key = fixtures.mcp.editorKey
+    const slug = `e2e-mcp-image-${Date.now()}-${Math.floor(Math.random() * 1e6)}`
+    const media = (
+      (await (await request.get('/api/media/?limit=1&depth=0')).json()) as {
+        docs: Array<{ id: number | string }>
+      }
+    ).docs[0]
+    expect(media, 'the seed has no Media to place').toBeDefined()
+
+    await callToolJson(request, key, 'draftArticle', {
+      markdown: '## The cabinet\n\nText.\n',
+      slug,
+      title: 'E2E MCP Image',
+    })
+
+    const placed = await callToolJson(request, key, 'placeImage', {
+      afterHeading: 'The cabinet',
+      caption: 'Placed by the e2e suite.',
+      mediaId: String(media.id),
+      slug,
+    })
+    expect(placed).toMatchObject({
+      placement: 'inserted',
+      status: 'draft',
+      image: {
+        caption: 'Placed by the e2e suite.',
+        markdown: `![media:${media.id}]()`,
+      },
+    })
+
+    const read = (await callToolJson(request, key, 'readArticleMarkdown', {
+      slug,
+    })) as { markdown: string }
+    expect(read.markdown).toMatch(
+      new RegExp(`## The cabinet\\s+!\\[media:${media.id}\\]\\(\\)`),
+    )
+
+    await callToolJson(request, key, 'updateArticleMarkdown', {
+      markdown: read.markdown.replace('Text.', 'More text.'),
+      slug,
+    })
+
+    // The draft as Payload saved it, read back: the image still carries the
+    // caption given to this placement.
+    const stored = (await callToolJson(request, key, 'readArticleMarkdown', {
+      slug,
+    })) as { markdown: string; images: Array<Record<string, unknown>> }
+    expect(stored.markdown).toContain('More text.')
+    expect(stored.images).toEqual([
+      {
+        afterHeading: 'The cabinet',
+        caption: 'Placed by the e2e suite.',
+        credit: null,
+        markdown: `![media:${media.id}]()`,
+        mediaId: String(media.id),
+      },
+    ])
+
+    // Placing it again where it stands updates it rather than adding another.
+    const again = await callToolJson(request, key, 'placeImage', {
+      afterHeading: 'The cabinet',
+      caption: 'Placed by the e2e suite.',
+      mediaId: String(media.id),
+      slug,
+    })
+    expect(again).toMatchObject({ placement: 'updated' })
+    const reread = (await callToolJson(request, key, 'readArticleMarkdown', {
+      slug,
+    })) as { markdown: string }
+    expect(reread.markdown).toContain('More text.')
+    expect(reread.markdown.match(/!\[media:/g)).toHaveLength(1)
   })
 
   // Version history, over the wire: a real Lexical round trip against a real

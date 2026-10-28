@@ -55,6 +55,29 @@ describe('toMediaImage', () => {
       creditURL: null,
       cardUrl: null,
       ogUrl: null,
+      creator: null,
+      copyrightNotice: null,
+      licenseURL: null,
+      acquireLicensePage: null,
+    })
+  })
+
+  // What ImageObject JSON-LD reads. The two URLs are vetted as `creditURL` is:
+  // an href and a JSON-LD value both reach a crawler as written.
+  it('carries licensing through, with its URLs vetted to https', () => {
+    expect(
+      toMediaImage({
+        ...record,
+        creator: ' Ana Ruiz ',
+        copyrightNotice: '© 2024 Ana Ruiz',
+        licenseURL: 'https://unsplash.com/license',
+        acquireLicensePage: 'http://insecure.example/buy',
+      }),
+    ).toMatchObject({
+      creator: 'Ana Ruiz',
+      copyrightNotice: '© 2024 Ana Ruiz',
+      licenseURL: 'https://unsplash.com/license',
+      acquireLicensePage: null,
     })
   })
 
