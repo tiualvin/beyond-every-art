@@ -19,6 +19,7 @@ import { noindexField, seoFields } from '../fields/seo'
 import { slugField } from '../fields/slug'
 import { CONTENT_TAGS } from '../lib/cache/content'
 import { stampLastEditedBy, lastEditedByField } from '../lib/content/authorship'
+import { stampContentUpdatedAt } from '../lib/content/content-updated'
 import { contentEditor } from '../lib/content/editor'
 import { stampPublishedAt } from '../lib/content/publish-date'
 import { purgeOnChange, purgeOnDelete } from '../lib/cache/purge'
@@ -76,8 +77,10 @@ export const Posts: CollectionConfig = {
       },
       refuseMcpPublish,
       stampLastEditedBy,
-      // Last, so it sees the status this write actually lands on.
+      // Late, so it sees the status this write actually lands on.
       stampPublishedAt,
+      // After the publish date, which a first publish copies.
+      stampContentUpdatedAt,
     ],
     afterChange: [
       recordMcpWrite,
@@ -224,6 +227,21 @@ export const Posts: CollectionConfig = {
         position: 'sidebar',
         description:
           'Set this ahead and the article stays off the site until then — it is how a piece is scheduled. Left empty, it is filled in when the article is published.',
+      },
+    },
+    {
+      // Owned by `stampContentUpdatedAt`, which replaces whatever a write
+      // sends for it — readOnly here only spares an editor a field that would
+      // ignore them. See `lib/content/content-updated.ts`.
+      name: 'contentUpdatedAt',
+      label: 'Text last changed',
+      type: 'date',
+      admin: {
+        position: 'sidebar',
+        readOnly: true,
+        date: { pickerAppearance: 'dayAndTime' },
+        description:
+          'Set when a published change alters the title or the words of the body. It is the “last updated” date search engines see; links, tags, images and search fields leave it alone.',
       },
     },
     {

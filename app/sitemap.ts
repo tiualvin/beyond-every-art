@@ -19,6 +19,8 @@ type PublishedDoc = {
   slug?: string
   updatedAt?: string
   publishedAt?: string
+  /** Posts only. */
+  contentUpdatedAt?: string | null
   /** Posts and Pages only; the archives have no such field to select. */
   noindex?: boolean
 }
@@ -33,6 +35,7 @@ function toDocs(docs: PublishedDoc[]): SitemapDoc[] {
       slug: doc.slug,
       updatedAt: doc.updatedAt ?? null,
       publishedAt: doc.publishedAt ?? null,
+      contentUpdatedAt: doc.contentUpdatedAt ?? null,
       noindex: doc.noindex ?? false,
     }))
 }
@@ -69,6 +72,7 @@ const readSlugs = cachedRead(
           slug: true,
           updatedAt: true,
           publishedAt: true,
+          contentUpdatedAt: true,
           noindex: true,
         },
       }),

@@ -9,6 +9,7 @@ import {
   buildWebSiteJsonLd,
   serializeJsonLd,
 } from '../../lib/seo/jsonld'
+import { contentModifiedAt } from '../../lib/content/modified-at'
 
 describe('buildArticleJsonLd', () => {
   const base = {
@@ -48,6 +49,21 @@ describe('buildArticleJsonLd', () => {
     expect(data.author).toEqual([
       { '@type': 'Person', name: 'Livia M. Calderon' },
     ])
+  })
+
+  // The route passes `post.modifiedAt` (`contentModifiedAt`): the date the
+  // words last changed. This pins the composition the page performs.
+  it('takes dateModified from when the text changed, not from updatedAt', () => {
+    const data = buildArticleJsonLd({
+      ...base,
+      datePublished: '2026-01-10T09:00:00.000Z',
+      dateModified: contentModifiedAt({
+        publishedAt: '2026-01-10T09:00:00.000Z',
+        contentUpdatedAt: '2026-03-01T09:00:00.000Z',
+        updatedAt: '2026-10-28T12:00:00.000Z',
+      }),
+    })
+    expect(data.dateModified).toBe('2026-03-01T09:00:00.000Z')
   })
 
   it('links each author to their page on this site, and their own site', () => {

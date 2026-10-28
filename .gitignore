@@ -58,6 +58,7 @@ members-report*.json
 reconciliation-report*.json
 media-backfill-report*.json
 media-restore-report*.json
+content-updated-at-report*.json
 
 # Search Console and GA4 exports. This repository is public, so committing them
 # would publish the site's query data and traffic figures; the README explaining

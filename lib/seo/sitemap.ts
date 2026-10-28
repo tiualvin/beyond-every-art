@@ -1,3 +1,4 @@
+import { contentModifiedAt } from '../content/modified-at'
 import {
   absoluteUrl,
   appPath,
@@ -13,6 +14,12 @@ export type SitemapDoc = {
   slug: string
   updatedAt?: string | Date | null
   publishedAt?: string | Date | null
+  /**
+   * Posts only: when the text a reader sees last changed. A post's `lastmod`
+   * is chosen by `contentModifiedAt`, never from `updatedAt` alone, because
+   * Google ignores a `lastmod` that moves when nothing on the page did.
+   */
+  contentUpdatedAt?: string | Date | null
   /**
    * The document asks to stay out of search results.
    *
@@ -114,7 +121,7 @@ export function buildSitemapEntries({
     if (!post.slug || post.noindex) continue
     entries.push({
       url: absoluteUrl(postPath(post.slug), siteUrl),
-      lastModified: toIso(post.updatedAt) ?? toIso(post.publishedAt),
+      lastModified: contentModifiedAt(post) ?? undefined,
       changeFrequency: 'weekly',
       priority: 0.7,
     })

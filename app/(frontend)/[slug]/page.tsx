@@ -134,7 +134,8 @@ export async function generateMetadata({
       description,
       url: canonical,
       publishedTime: post.publishedAt ?? undefined,
-      modifiedTime: post.updatedAt ?? undefined,
+      // When the words last changed, not the row: `lib/content/content-updated.ts`.
+      modifiedTime: post.modifiedAt ?? undefined,
       authors: post.authors.map((a) => a.name),
       images,
     },
@@ -247,7 +248,7 @@ export default async function SlugPage({
       headline: post.title,
       description: post.metaDescription || post.excerpt || undefined,
       datePublished: post.publishedAt,
-      dateModified: post.updatedAt,
+      dateModified: post.modifiedAt,
       authors: post.authors.map((a) => ({
         name: a.name,
         url: a.slug ? absoluteUrl(authorPath(a.slug), siteUrl) : null,

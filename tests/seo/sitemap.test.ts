@@ -44,6 +44,39 @@ describe('buildSitemapEntries', () => {
     expect(page?.lastModified).toBe('2024-01-01T00:00:00.000Z')
   })
 
+  // A post's lastmod is when its words last changed. Google ignores a lastmod
+  // that moves when nothing on the page did, and `updatedAt` moves on a link
+  // edit. `lib/content/content-updated.ts`.
+  it('dates a post by when its text changed, not when its row did', () => {
+    const [, , post] = buildSitemapEntries({
+      siteUrl,
+      posts: [
+        {
+          slug: 'ultramarine',
+          publishedAt: '2026-01-10T09:00:00.000Z',
+          contentUpdatedAt: '2026-03-01T09:00:00.000Z',
+          updatedAt: '2026-10-28T12:00:00.000Z',
+        },
+      ],
+    })
+    expect(post.lastModified).toBe('2026-03-01T09:00:00.000Z')
+  })
+
+  it('falls back to updatedAt for a post the backfill has not reached', () => {
+    const [, , post] = buildSitemapEntries({
+      siteUrl,
+      posts: [
+        {
+          slug: 'ultramarine',
+          publishedAt: '2026-01-10T09:00:00.000Z',
+          contentUpdatedAt: null,
+          updatedAt: '2026-10-28T12:00:00.000Z',
+        },
+      ],
+    })
+    expect(post.lastModified).toBe('2026-10-28T12:00:00.000Z')
+  })
+
   it('skips documents without a slug and tolerates invalid dates', () => {
     const entries = buildSitemapEntries({
       siteUrl,
