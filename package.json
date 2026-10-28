@@ -39,6 +39,7 @@
     "content:convert-legacy": "tsx scripts/convert-legacy-article.ts",
     "tags:apply": "tsx scripts/apply-tag-plan.ts",
     "backfill:media": "tsx scripts/backfill-media-sizes.ts",
+    "backfill:content-updated-at": "tsx scripts/backfill-content-updated-at.ts",
     "restore:media": "tsx scripts/restore-media-from-ghost.ts",
     "migration:compare": "tsx scripts/compare-sites.ts",
     "validate:redirects": "tsx scripts/validate-redirects.ts",
