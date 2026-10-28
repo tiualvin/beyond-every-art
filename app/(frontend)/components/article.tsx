@@ -12,10 +12,12 @@ import type {
 } from '@/lib/content/queries'
 import { extractHeadings } from '@/lib/content/toc'
 import { formatDate } from '@/lib/format'
+import { articleBreadcrumbs } from '@/lib/seo/breadcrumbs'
 import { authorPath, tagPath } from '@/lib/seo/site'
 
 import { ArticleRail } from './article-rail'
 import { ArticleBody } from './body'
+import { Breadcrumb } from './breadcrumb'
 import { MembershipGate } from './membership-gate'
 import { FadeIn } from './motion/fade-in'
 import { ShareRow } from './share-row'
@@ -70,7 +72,6 @@ export function Article({
   inlinePromos?: PostCard[]
   preview?: boolean
 }) {
-  const primaryTag = post.tags[0]
   const author = post.authors[0]
   const byline = [
     post.authors.map((a) => a.name).join(', '),
@@ -94,13 +95,9 @@ export function Article({
         <div className="article__shell">
           <div className="article__hero">
             <header className="article__header">
-              {primaryTag && (
-                <FadeIn delay={0}>
-                  <Link href={tagPath(primaryTag.slug)} className="eyebrow">
-                    {primaryTag.name}
-                  </Link>
-                </FadeIn>
-              )}
+              <FadeIn delay={0}>
+                <Breadcrumb crumbs={articleBreadcrumbs(post)} />
+              </FadeIn>
               <FadeIn delay={0.08}>
                 <h1>{post.title}</h1>
               </FadeIn>

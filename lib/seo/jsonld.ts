@@ -273,6 +273,34 @@ export function buildItemListJsonLd(
   return jsonLd
 }
 
+export type BreadcrumbListJsonLdInput = {
+  /** In trail order, each with the absolute URL its visible link points at. */
+  items: readonly { name: string; url: string }[]
+}
+
+/**
+ * The `BreadcrumbList` for a visible trail.
+ *
+ * Every item carries `item`, the last included. Google allows the current page
+ * to omit it, but the visible trail links its last crumb too, and the point of
+ * this node is to say exactly what the reader sees — see
+ * `lib/seo/breadcrumbs.ts`, which builds both from one list.
+ */
+export function buildBreadcrumbListJsonLd(
+  input: BreadcrumbListJsonLdInput,
+): Record<string, unknown> {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: input.items.map((crumb, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      name: crumb.name,
+      item: crumb.url,
+    })),
+  }
+}
+
 /**
  * Serializes a JSON-LD object for safe inline embedding, escaping the
  * characters that could otherwise break out of a <script> element.

@@ -22,13 +22,31 @@ test('article metadata, canonical URL, and structured data agree', async ({
     'max-image-preview:large',
   )
 
-  const jsonLd = JSON.parse(
-    (await page.locator('script[type="application/ld+json"]').textContent()) ||
-      '{}',
-  ) as { '@type'?: string; headline?: string; url?: string }
-  expect(jsonLd['@type']).toBe('Article')
-  expect(jsonLd.headline).toBe(fixtures.publicPost.title)
-  expect(jsonLd.url).toMatch(new RegExp(`/${fixtures.publicPost.slug}/$`))
+  // An article carries several nodes — Article, BreadcrumbList, and whatever
+  // its blocks contribute — each in its own script, so find them by type.
+  const nodes = (
+    await page.locator('script[type="application/ld+json"]').allTextContents()
+  ).map((text) => JSON.parse(text) as Record<string, unknown>)
+  const jsonLd = nodes.find((node) => node['@type'] === 'Article') as
+    { headline?: string; url?: string } | undefined
+  expect(jsonLd).toBeDefined()
+  expect(jsonLd!.headline).toBe(fixtures.publicPost.title)
+  expect(jsonLd!.url).toMatch(new RegExp(`/${fixtures.publicPost.slug}/$`))
+
+  // The trail a reader sees and the one a crawler reads are the same list.
+  const breadcrumbs = nodes.find(
+    (node) => node['@type'] === 'BreadcrumbList',
+  ) as { itemListElement: { name: string; item: string }[] } | undefined
+  expect(breadcrumbs).toBeDefined()
+  const trail = page.getByRole('navigation', { name: 'Breadcrumb' })
+  const links = trail.getByRole('link')
+  await expect(links).toHaveCount(breadcrumbs!.itemListElement.length)
+  for (const [index, crumb] of breadcrumbs!.itemListElement.entries()) {
+    const link = links.nth(index)
+    await expect(link).toHaveText(crumb.name)
+    await expect(link).toHaveAttribute('href', new URL(crumb.item).pathname)
+  }
+  await expect(links.last()).toHaveAttribute('aria-current', 'page')
 })
 
 test('the homepage, a page, a tag and an author archive each describe themselves', async ({

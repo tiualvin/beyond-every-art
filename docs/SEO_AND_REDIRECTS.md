@@ -347,6 +347,73 @@ the posts back under the retired tags. After a retirement, pass only surviving
 slugs to `validate:redirects --tag`: a retired archive now redirects, and its
 pagination probe would report a chain.
 
+## Breadcrumbs and topic hubs
+
+### The trail above an article
+
+Every article shows **Home › {primary topic} › {title}** above its title, and
+carries a `BreadcrumbList` node describing the same trail. Both are built from
+`articleBreadcrumbs` in `lib/seo/breadcrumbs.ts`, so they cannot disagree:
+Google asks that breadcrumb markup match what a reader sees, and
+`tests/seo/breadcrumbs.test.tsx` renders the trail and compares it with the
+JSON-LD, as does the article check in `e2e/seo-and-health.spec.ts`.
+
+- **The primary topic** is the article's first tag that is a public subject.
+  Ghost's internal tags (names starting `#`) are skipped, and so are workflow
+  tags (`featured`, from `lib/content/topics.ts`), which name a placement rather
+  than somewhere the article belongs. No public subject, no middle crumb.
+- **Every crumb is a link**, the last one to the article itself with
+  `aria-current="page"`, and every `ListItem` carries its `item` URL, the last
+  included, so the two say the same thing.
+- **It replaced the topic eyebrow** that sat on the same line, at the same size,
+  with the topic still in burgundy. The header got 7px shorter (the eyebrow was
+  an inline-block on the body line-height), so nothing below it moves down and
+  the featured image, this template's LCP element, sits where it did on
+  desktop. On a phone the trail stays on one line and the title crumb is cut
+  with an ellipsis; the full title is the heading directly beneath it.
+
+### Tag and author archives as hubs
+
+A tag archive is where an article's topic crumb points, so it has to do a hub's
+job: be indexable, name itself canonically, say what the topic is, and link to
+every article under it. Checked on 28 Oct:
+
+| Requirement                  | State                                                                 |
+| ---------------------------- | --------------------------------------------------------------------- |
+| Indexable                    | Yes — inherits the layout's `robotsDirective(false)`                  |
+| Self-referencing canonical   | Yes — `/tag/<slug>/`, and `/tag/<slug>/?page=N` for later pages       |
+| Intro shown                  | Yes — every tag has a `description`, shown under the title            |
+| Every live article reachable | **Was not.** Fixed: see below                                         |
+| In the sitemap               | Yes, page 1 only, while the tag has a published post (`listableTags`) |
+| Links to other hubs          | Yes — "Related topics", five sibling subjects                         |
+
+**The reachability bug.** `readArchive` read the newest 100 posts and stopped,
+with no pagination. `/tag/art/` had 130 live posts and `/author/beyond/` close
+to 200, so the oldest 30-odd articles under each had no link from their hub.
+Tag and author archives now paginate the way `/journal/` does: `?page=N`,
+`HUB_PAGE_SIZE` (100) to a page, plain `<a href>` links with `rel="prev"`/
+`"next"` (`app/(frontend)/components/archive-pagination.tsx`), each page its
+own canonical with "— Page N" in its title, and a page past the end a 404.
+
+A hundred to a page so that page 1 of every hub is exactly the page it was:
+the only change to an existing URL's content is a "next" link at the bottom of
+the hubs that have more than a hundred posts. Later pages are not listed in the
+sitemap — Google discovers them from the links, and listing them would add URLs
+whose contents shift every time something is published. Ghost's path-style
+pagination (`/tag/x/page/N/`) still collapses to page 1, for the reasons under
+[Pagination, which no export covers](#pagination-which-no-export-covers).
+
+### Proposed, not built: a curated "Start here" per topic
+
+A short, ordered list of the pieces an editor would hand a newcomer, at the top
+of a tag archive above the chronological list. It would give each hub's best
+articles the strongest internal link on the page, independent of publish date.
+It needs a schema change — an ordered `hasMany` relationship from `tags` to
+`posts`, say `startHere`, capped at five or six, plus its migration — so it
+waits for the owner's decision. Open questions: whether an unpublished pick is
+hidden or blocks the save, and whether it also feeds the article's "Read
+next".
+
 ## URL structure
 
 ### The host
