@@ -44,6 +44,32 @@ describe('buildSitemapEntries', () => {
     expect(page?.lastModified).toBe('2024-01-01T00:00:00.000Z')
   })
 
+  // `<image:image>` entries: the pictures the page shows, as absolute URLs.
+  // Next escapes nothing in them, so an `&` has to arrive escaped.
+  it("lists a post's images as absolute, XML-safe URLs", () => {
+    const [, , post] = buildSitemapEntries({
+      siteUrl,
+      posts: [
+        {
+          slug: 'ultramarine',
+          images: ['/api/media/file/lapis.jpg', '/api/media/file/a&b.jpg'],
+        },
+      ],
+    })
+    expect(post.images).toEqual([
+      'https://beyondeveryart.com/api/media/file/lapis.jpg',
+      'https://beyondeveryart.com/api/media/file/a&amp;b.jpg',
+    ])
+  })
+
+  it('leaves images out of an entry that has none', () => {
+    const [, , post] = buildSitemapEntries({
+      siteUrl,
+      posts: [{ slug: 'ultramarine', images: [] }],
+    })
+    expect(post).not.toHaveProperty('images')
+  })
+
   it('skips documents without a slug and tolerates invalid dates', () => {
     const entries = buildSitemapEntries({
       siteUrl,
