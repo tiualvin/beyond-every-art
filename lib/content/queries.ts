@@ -107,6 +107,12 @@ export type AuthorSummary = {
   /** Only populated where a page shows the author, not merely credits them. */
   bio?: string
   image?: MediaImage | null
+  /**
+   * The author's own site, when the record has one and it is an http(s) URL.
+   * Article JSON-LD sends it as `sameAs`, so it is vetted here rather than
+   * trusted: it is a free-text field Ghost imported as-is.
+   */
+  website?: string | null
 }
 
 /** What `Posts.visibility` holds, mirroring the levels Ghost had. */
@@ -180,6 +186,7 @@ type RawAuthor = {
   slug?: string
   bio?: string
   profileImage?: unknown
+  website?: string | null
 }
 type RawTag = { name?: string; slug?: string }
 type RawPost = {
@@ -197,6 +204,19 @@ type RawPost = {
   visibility?: string
 }
 
+/** An http(s) URL, or null — anything else is not a profile to point at. */
+function toProfileUrl(value: unknown): string | null {
+  if (typeof value !== 'string' || !value.trim()) return null
+  try {
+    const url = new URL(value.trim())
+    return url.protocol === 'https:' || url.protocol === 'http:'
+      ? url.toString()
+      : null
+  } catch {
+    return null
+  }
+}
+
 function toAuthorSummaries(authors: RawPost['authors']): AuthorSummary[] {
   if (!authors) return []
   return authors
@@ -206,6 +226,7 @@ function toAuthorSummaries(authors: RawPost['authors']): AuthorSummary[] {
       slug: a.slug,
       bio: a.bio,
       image: toMediaImage(a.profileImage),
+      website: toProfileUrl(a.website),
     }))
     .filter((a) => a.name)
 }

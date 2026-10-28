@@ -41,7 +41,7 @@ describe('buildArticleJsonLd', () => {
       description: 'Two whites.',
       datePublished: '2025-05-20T00:00:00.000Z',
       dateModified: '2025-05-21T00:00:00.000Z',
-      authors: ['Livia M. Calderon', ''],
+      authors: [{ name: 'Livia M. Calderon' }, { name: '' }],
     })
     expect(data.description).toBe('Two whites.')
     expect(data.datePublished).toBe('2025-05-20T00:00:00.000Z')
@@ -64,6 +64,66 @@ describe('buildArticleJsonLd', () => {
       }),
     })
     expect(data.dateModified).toBe('2026-03-01T09:00:00.000Z')
+  })
+
+  it('links each author to their page on this site, and their own site', () => {
+    const data = buildArticleJsonLd({
+      ...base,
+      authors: [
+        {
+          name: 'Alvin Tiu',
+          url: 'https://beyondeveryart.com/author/alvin/',
+          sameAs: ['https://alvintiu.example/'],
+        },
+      ],
+    })
+    expect(data.author).toEqual([
+      {
+        '@type': 'Person',
+        name: 'Alvin Tiu',
+        url: 'https://beyondeveryart.com/author/alvin/',
+        sameAs: ['https://alvintiu.example/'],
+      },
+    ])
+  })
+
+  it('omits sameAs when there is none, or it only repeats the url', () => {
+    const data = buildArticleJsonLd({
+      ...base,
+      authors: [
+        {
+          name: 'Alvin Tiu',
+          url: 'https://beyondeveryart.com/author/alvin/',
+          sameAs: ['https://beyondeveryart.com/author/alvin/'],
+        },
+      ],
+    })
+    expect(data.author).toEqual([
+      {
+        '@type': 'Person',
+        name: 'Alvin Tiu',
+        url: 'https://beyondeveryart.com/author/alvin/',
+      },
+    ])
+  })
+
+  it('sends the house byline as the Organization it is', () => {
+    const data = buildArticleJsonLd({
+      ...base,
+      authors: [
+        {
+          name: 'beyond every art',
+          url: 'https://beyondeveryart.com/author/beyond/',
+        },
+      ],
+    })
+    expect(data.author).toEqual([
+      {
+        '@type': 'Organization',
+        name: 'beyond every art',
+        url: 'https://beyondeveryart.com/author/beyond/',
+      },
+    ])
   })
 
   it('includes the featured image as a list', () => {
