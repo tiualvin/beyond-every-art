@@ -2,6 +2,7 @@ import { withPayload } from '@payloadcms/next/withPayload'
 
 import type { NextConfig } from 'next'
 
+import { withAdminOnlyColorSchemeHint } from './lib/performance/client-hints'
 import { buildSecurityHeaders } from './lib/security/headers'
 import { buildImageConfig } from './lib/security/images'
 
@@ -44,4 +45,7 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
 }
 
-export default withPayload(nextConfig)
+// Outside `withPayload`, because the headers it moves are the ones `withPayload`
+// adds: Payload's colour-scheme `Critical-CH` made Chrome request every page
+// twice on a first visit. See `lib/performance/client-hints.ts`.
+export default withAdminOnlyColorSchemeHint(withPayload(nextConfig))

@@ -164,6 +164,27 @@ a:hover {
   .swatches[data-drawing] .swatch__fill {
     transition-delay: var(--stagger, 0ms);
   }
+
+  /* The entrance `FadeIn` renders: rise and fade, once, on first paint.
+
+     It wraps the hero of every template, which is the LCP element, so it must
+     not wait for script — this used to be framer-motion, which server-rendered
+     the hero at `opacity: 0` and revealed it on hydration. The hidden state now
+     exists only as this `from` frame, inside the motion query, so nothing can
+     leave content invisible. `backwards`, not `both`: it holds the `from`
+     frame through the stagger delay and then lets go, where `forwards` would
+     keep a stacking context on the hero for good. See
+     `components/motion/fade-in.tsx`. */
+  .fade-in {
+    animation: fade-in 0.5s ease var(--fade-delay, 0s) backwards;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--fade-y, 16px));
+  }
 }
 
 img {
