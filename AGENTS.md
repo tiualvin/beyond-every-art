@@ -83,6 +83,15 @@ settings that decide AI-assistant visibility more than that file does. None of
 it is built. Read it before adding an AI-crawler rule to `robots.ts` or
 Cloudflare, or any machine-readable summary of the site's content.
 
+[`docs/EDGE_CACHING.md`](docs/EDGE_CACHING.md) records what Cloudflare caches
+and why resized images and pages are the two things it does not. Resized images
+now carry a week's lifetime. That is safe only because a media URL never changes
+its bytes, and a test fails if a new code path starts overwriting media in place.
+The cache rule that would put them at the edge is a dashboard step for the
+owner, and it must admit WebP requests only. Read it before changing
+`images.minimumCacheTTL`, enabling AVIF, adding a Cloudflare cache rule, or
+setting any cache header on a page.
+
 [`docs/AUTONOMOUS_WORKSTREAMS.md`](docs/AUTONOMOUS_WORKSTREAMS.md) defines the
 sequencing, shared invariants, ownership boundaries, and verification gates for
 the repository's launch-readiness automation workstreams.

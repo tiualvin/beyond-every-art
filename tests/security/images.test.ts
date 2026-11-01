@@ -6,14 +6,35 @@
 // the site keeps rendering images either way, and the only difference is what a
 // stranger can make the server do.
 
+import { readdirSync, readFileSync } from 'node:fs'
+import { join, relative, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import {
   ALLOWED_IMAGE_QUALITY,
   buildImageConfig,
+  IMAGE_CACHE_TTL_SECONDS,
   imageRemotePatterns,
   LOCAL_IMAGE_PATTERN,
 } from '../../lib/security/images'
+
+const ROOT = resolve(import.meta.dirname, '../..')
+
+/** Every source file under `dirs`, as repository-relative paths. */
+function sourceFiles(dirs: string[]): string[] {
+  const out: string[] = []
+  const walk = (dir: string) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue
+      const path = join(dir, entry.name)
+      if (entry.isDirectory()) walk(path)
+      else if (/\.(c|m)?[jt]sx?$/.test(entry.name))
+        out.push(relative(ROOT, path))
+    }
+  }
+  for (const dir of dirs) walk(join(ROOT, dir))
+  return out.sort()
+}
 
 describe('buildImageConfig', () => {
   it('allows exactly one quality, so `q` is not 100 variants per width', () => {
@@ -103,5 +124,57 @@ describe('buildImageConfig', () => {
     // This used to throw out of `new URL` and take the whole Next config with
     // it, so a typo in one variable failed the build rather than the variable.
     expect(imageRemotePatterns({ S3_PUBLIC_URL: 'not-a-url' })).toEqual([])
+  })
+})
+
+describe('how long a resized image is cached', () => {
+  it('is a week, not the framework’s 60 seconds', () => {
+    // At 60s every page view a minute after the last asked the VPS again for
+    // every image on it — about 0.8s to first byte each, featured image
+    // included.
+    expect(IMAGE_CACHE_TTL_SECONDS).toBe(604_800)
+    expect(buildImageConfig({}).minimumCacheTTL).toBe(IMAGE_CACHE_TTL_SECONDS)
+  })
+
+  it('rests on no code writing new bytes over an existing media filename', () => {
+    // A week is only safe because a media URL never starts serving different
+    // bytes: Payload renames a colliding upload rather than overwrite it. The
+    // way round that is `overwriteExistingFiles: true`, and each file below
+    // uses it to write the *same* bytes back — the original, re-uploaded to
+    // regenerate sizes or to restore a lost file, or a page image whose name
+    // is a hash of its bytes.
+    //
+    // A new entry here is a new way for a cached URL to go stale. Read
+    // `IMAGE_CACHE_TTL_SECONDS` in lib/security/images.ts before adding it:
+    // either the new path writes identical bytes too, or the TTL has to come
+    // down.
+    const writers = sourceFiles([
+      'app',
+      'blocks',
+      'collections',
+      'components',
+      'fields',
+      'globals',
+      'lib',
+      'scripts',
+    ]).filter((file) =>
+      readFileSync(join(ROOT, file), 'utf8').includes('overwriteExistingFiles'),
+    )
+    expect(writers).toEqual([
+      'lib/publications/processing/store.ts',
+      'scripts/backfill-media-sizes.ts',
+      'scripts/restore-media-from-ghost.ts',
+    ])
+  })
+
+  it('serves one modern format, because Cloudflare cannot keep two', () => {
+    // Next picks the output format from the request's Accept header and says
+    // so with `Vary: Accept`. Cloudflare ignores that, and keying its cache on
+    // Accept is Enterprise-only, so a URL it caches holds one variant for
+    // everyone. The rule in docs/EDGE_CACHING.md admits only requests that
+    // accept WebP, which is correct while WebP is the only format Next
+    // produces. Turning on AVIF here would let whichever format was fetched
+    // first be served to every browser — change that rule first.
+    expect(buildImageConfig({}).formats).toBeUndefined()
   })
 })

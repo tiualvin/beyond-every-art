@@ -123,9 +123,44 @@ export function imageRemotePatterns(
   ]
 }
 
+/**
+ * How long a resized image may be reused, by the browser and by Next.js's own
+ * cache, before it is checked again: seven days.
+ *
+ * The framework default is 60 seconds, which Next 15 sends as
+ * `Cache-Control: public, max-age=60, must-revalidate`. For a resized image
+ * that is close to no caching at all. Every page view more than a minute after
+ * the last one asked the VPS again for every image on the page, featured image
+ * included. Measured from outside, that is about 0.8s to first byte per image,
+ * against about 0.25s for a file Cloudflare already holds. It also put each
+ * repeat request through the `/_next/image` rate limit in `middleware.ts`.
+ *
+ * **A long lifetime is safe here because an image URL never changes what it
+ * serves.** Payload never reuses a filename while any document holds it
+ * (`getSafeFileName`), so a replaced file arrives under a new name and a new
+ * URL. The three places that write over an existing name write the same
+ * bytes. `pnpm backfill:media` and `pnpm restore:media` re-upload the original
+ * they read, and publication page images are named by a hash of their bytes.
+ * `tests/security/images.test.ts` fails if a fourth appears, because that is
+ * the one change that would make this number wrong.
+ *
+ * **What it costs is deletion.** An image removed from the library stops
+ * being served by the optimizer at the next deploy, because `.next/cache` is
+ * not a volume (`docker-compose.yml` mounts only `/app/media`). It can be
+ * purged from Cloudflare by URL. A browser that already loaded it keeps its
+ * copy for up to this long. Seven days bounds that, while still covering the
+ * case that matters for speed: a reader coming back within the week.
+ *
+ * This is also the TTL Cloudflare uses for these responses once the cache rule
+ * in `docs/EDGE_CACHING.md` is in place. Today Cloudflare caches nothing under
+ * `/_next/image/`, because the path has no file extension.
+ */
+export const IMAGE_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60
+
 /** The whole `images` block, as `next.config.ts` should hand it to Next.js. */
 export function buildImageConfig(env: Env = process.env): ImageConfig {
   return {
+    minimumCacheTTL: IMAGE_CACHE_TTL_SECONDS,
     qualities: [ALLOWED_IMAGE_QUALITY],
     localPatterns: [{ ...LOCAL_IMAGE_PATTERN }],
     remotePatterns: imageRemotePatterns(env),
