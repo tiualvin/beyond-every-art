@@ -88,9 +88,11 @@ and why resized images and pages are the two things it does not. Resized images
 now carry a week's lifetime. That is safe only because a media URL never changes
 its bytes, and a test fails if a new code path starts overwriting media in place.
 The cache rule that would put them at the edge is a dashboard step for the
-owner, and it must admit WebP requests only. Read it before changing
-`images.minimumCacheTTL`, enabling AVIF, adding a Cloudflare cache rule, or
-setting any cache header on a page.
+owner, and it must admit WebP requests only. Caching pages for signed-out
+readers is a plan, not built, waiting on the owner's decisions. Its first
+hazard is the slug-miss limiter, which answers 404 for real articles, so no 404
+may ever be cached. Read it before changing `images.minimumCacheTTL`, enabling
+AVIF, adding a Cloudflare cache rule, or setting any cache header on a page.
 
 [`docs/AUTONOMOUS_WORKSTREAMS.md`](docs/AUTONOMOUS_WORKSTREAMS.md) defines the
 sequencing, shared invariants, ownership boundaries, and verification gates for
