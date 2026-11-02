@@ -217,6 +217,22 @@ describe('media in the body', () => {
       expect(evaluateSizes(sizes, viewport)).toBe('44rem')
     }
   })
+
+  // An image in a Lexical body spans the reading column, so it promises the
+  // same measure a gallery row does. Worth pinning because the hint is new: the
+  // converter the package ships rendered a bare `<picture>` with no `sizes` at
+  // all, so the browser had to assume the viewport, and on a wide screen it
+  // fetched a source several hundred pixels wider than the box.
+  it('tells the browser a body image is the measure', () => {
+    const sizes = sizesFrom(
+      'app/(frontend)/components/body-image.tsx',
+      'BODY_IMAGE_SIZES',
+    )
+
+    for (const viewport of [1152, 1280, 1440, 1920]) {
+      expect(evaluateSizes(sizes, viewport)).toBe('44rem')
+    }
+  })
 })
 
 describe('the rail', () => {

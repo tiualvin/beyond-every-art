@@ -37,6 +37,7 @@ import {
   type PullQuoteData,
   type SignupData,
 } from '@/blocks/schema'
+import { BodyImage } from '../body-image'
 import {
   createAnchorAllocator,
   headingText,
@@ -259,6 +260,14 @@ export function buildConverters(
     return {
       ...defaultConverters,
       heading: headingConverter(context.allocate),
+      // An image inside a body. Overridden because the converter the package
+      // ships renders the stored media URL into a bare `<picture>` — it goes
+      // through neither `next/image` nor `toMediaImage`, so it inherits neither
+      // the optimiser nor the trailing-slash correction, and delivered 1.8MB of
+      // PNG where the optimiser delivers 132KB of WebP. See `BodyImage`.
+      upload: ({ node }: JSXConverterArgs<{ value?: unknown }>) => (
+        <BodyImage value={node.value} />
+      ),
       blocks: Object.fromEntries(
         Object.entries(renderers).map(([slug, render]) => [
           slug,
