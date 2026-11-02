@@ -209,6 +209,17 @@ symptom: the layout stays right, the browser fetches a source too small for the
 box, and the picture is quietly soft. The test evaluates the string against the
 tracks rather than trusting it.
 
+**An image in a body promises the same measure.** `BODY_IMAGE_SIZES` in
+`app/(frontend)/components/body-image.tsx` resolves to 44rem at every width the
+tracks apply, and `article-layout.test.ts` evaluates it alongside the hero and
+gallery hints. It is worth naming here because until this existed a body image
+had _no_ hint: the converter the lexical package ships renders a bare
+`<picture>` carrying the stored media URL, which goes through neither
+`next/image` nor `toMediaImage` — so the browser assumed the viewport, took a
+308 redirect for the privilege, and fetched a full-size PNG where the optimiser
+would have sent a WebP a fraction of the size. See `BodyImage` for the
+measurements.
+
 **Pages are untouched.** A Page still renders through `.article__inner` at
 44rem. It has neither a rail's worth of related content nor, per §8's exclusion
 list, any ad slot.

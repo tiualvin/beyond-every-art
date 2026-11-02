@@ -2205,6 +2205,52 @@ img {
   text-decoration-color: currentColor;
 }
 
+/* An image inside a body — a Lexical upload node, rendered by `BodyImage`.
+
+   This used to be a bare `<picture>` emitted by the package's own converter,
+   carrying the stored `url` and nothing else: no optimiser and a trailing slash
+   the file does not live at, so every image and every `<source>` took a 308 hop
+   and the browser downloaded 1.8MB of PNG where the optimiser sends 132KB of
+   WebP. The figure below is what `BodyImage` renders instead, and the spacing
+   is deliberately the same `2rem` the bare image had, so the only change a
+   reader sees is that the picture arrives faster. */
+.prose__figure {
+  margin: 2rem 0;
+}
+
+/* `.prose img` gives every image in a body `margin: 2rem 0`. The figure owns
+   that spacing now, and a margin here would offset a fill image from the top of
+   its frame instead of letting the container position it — the same trap
+   `.gallery__frame img` documents above. */
+.prose__figure img {
+  width: 100%;
+  height: auto;
+  margin: 0;
+  border-radius: var(--radius);
+}
+
+/* A record storing no intrinsic size still reserves its space, so the column
+   does not jump when the image arrives. Same ratio as the featured figure's
+   fallback, which is the site's one answer for a picture with no dimensions. */
+.prose__figure-fill {
+  display: block;
+  position: relative;
+  aspect-ratio: 3 / 2;
+  overflow: hidden;
+  border-radius: var(--radius);
+}
+
+.prose__figure-fill img {
+  object-fit: cover;
+}
+
+.prose__figure figcaption {
+  margin-top: 0.7rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--color-muted);
+}
+
 /* Rendered body (preserved legacy HTML). */
 .prose {
   font-size: 1.1rem;
