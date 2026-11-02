@@ -78,8 +78,23 @@ valid shape.
 `lib/content/media.ts` deliberately blanks Ghost's file-name-as-alt, so 109
 migrated featured images render `alt=""` and are decorative to a screen reader
 and to image search alike. They are all Unsplash photographs — the source and
-the open questions are in [`STOCK_IMAGERY.md`](STOCK_IMAGERY.md), and the
-worklist is a replacement decision rather than a code change.
+the open questions are in [`STOCK_IMAGERY.md`](STOCK_IMAGERY.md).
+
+The writing half of that is `pnpm repair:media-alt --input <csv>`, which sets
+`alt` on existing media records from a two-column file. Planning is in
+`lib/media/alt-text.ts` and unit tested; two properties are worth knowing. A
+proposal the site would discard — blank, or a bare file name — is **refused
+rather than written**, because writing it would reproduce the exact fault being
+repaired: the field would hold text and the page would still render `alt=""`.
+And the update payload is built as `{ alt }` and nothing else, with `url`,
+`filename` and `filesize` compared before and after each write, so this path
+cannot rename, replace or move an image. It is not `backfill:media`, which
+does write image files.
+
+The descriptions themselves are not in the repository: they come from a CSV
+proposed from the images and reviewed against them, because the accuracy
+question is what a photograph actually shows, and no amount of markup settles
+that.
 
 ### IndexNow
 
