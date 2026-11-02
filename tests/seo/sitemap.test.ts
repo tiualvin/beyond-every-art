@@ -177,3 +177,95 @@ describe('listableTags', () => {
     expect(listableTags([])).toEqual([])
   })
 })
+
+// A sitemap entry can name the page's images, which Next writes as
+// `<image:image>` tags. Before this the sitemap described 188 article URLs and
+// not one image, so image search had only the HTML to go on — and most of those
+// pages carry a single stock photograph with no alt text.
+describe('sitemap image entries', () => {
+  const siteUrl = 'https://beyondeveryart.com'
+
+  it("lists a post's featured image as an absolute URL", () => {
+    const entries = buildSitemapEntries({
+      siteUrl,
+      posts: [
+        {
+          slug: 'lead-white',
+          publishedAt: '2025-05-20T00:00:00.000Z',
+          images: ['/api/media/file/lead-white.jpg'],
+        },
+      ],
+    })
+
+    const post = entries.find((e) => e.url.includes('lead-white'))
+    expect(post?.images).toEqual([
+      'https://beyondeveryart.com/api/media/file/lead-white.jpg',
+    ])
+  })
+
+  it('passes an image already absolute through untouched', () => {
+    const entries = buildSitemapEntries({
+      siteUrl,
+      posts: [
+        {
+          slug: 'migrated',
+          images: ['https://cdn.example.com/old/photo.jpg'],
+        },
+      ],
+    })
+
+    const post = entries.find((e) => e.url.includes('migrated'))
+    expect(post?.images).toEqual(['https://cdn.example.com/old/photo.jpg'])
+  })
+
+  it('omits the images key entirely when a document has none', () => {
+    // The ordinary state: most posts in the library have no featured image, and
+    // an entry with `images: []` is not the same document as one without it.
+    const entries = buildSitemapEntries({
+      siteUrl,
+      posts: [{ slug: 'no-image', images: [] }],
+      pages: [{ slug: 'about' }],
+    })
+
+    const post = entries.find((e) => e.url.includes('no-image'))
+    const page = entries.find((e) => e.url.includes('about'))
+    expect(post).not.toHaveProperty('images')
+    expect(page).not.toHaveProperty('images')
+  })
+
+  it('drops blank duplicates without turning them into the page URL', () => {
+    // `absoluteUrl('')` returns the site origin, which would list the page as
+    // its own image — a wrong answer that looks deliberate.
+    const entries = buildSitemapEntries({
+      siteUrl,
+      posts: [
+        {
+          slug: 'dupes',
+          images: [
+            '/api/media/file/one.jpg',
+            '/api/media/file/one.jpg',
+            '',
+            '   ',
+          ],
+        },
+      ],
+    })
+
+    const post = entries.find((e) => e.url.includes('dupes'))
+    expect(post?.images).toEqual([
+      'https://beyondeveryart.com/api/media/file/one.jpg',
+    ])
+  })
+
+  it("lists an app's hero image under the apps collection field name", () => {
+    const entries = buildSitemapEntries({
+      siteUrl,
+      apps: [{ slug: 'reader', images: ['/api/media/file/reader-hero.png'] }],
+    })
+
+    const app = entries.find((e) => e.url.includes('/apps/reader/'))
+    expect(app?.images).toEqual([
+      'https://beyondeveryart.com/api/media/file/reader-hero.png',
+    ])
+  })
+})

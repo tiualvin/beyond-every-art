@@ -20,6 +20,7 @@ import {
   recordSlugMiss,
   requireLookupableSlug,
 } from '@/lib/security/slug-requests'
+import { collectBodyImages } from '@/lib/seo/body-images'
 import { collectBlockJsonLd } from '@/lib/seo/block-jsonld'
 import { robotsDirective } from '@/lib/seo/indexing'
 import {
@@ -254,6 +255,11 @@ export default async function SlugPage({
         sameAs: a.website ? [a.website] : [],
       })),
       image: post.image ? absoluteUrl(post.image.url, siteUrl) : null,
+      // The images inside the piece, so the Article node describes everything a
+      // reader can see rather than only the thing at the top. Free here: the
+      // body is already resolved. A gated post passes its teaser, so this
+      // cannot describe a part of the piece the reader was not given.
+      images: collectBodyImages(post.body, siteUrl),
       siteName: settings.title,
       siteUrl,
       isAccessibleForFree: !post.restricted,

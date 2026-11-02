@@ -23,6 +23,15 @@ export type ArticleJsonLdInput = {
   authors?: ArticleAuthor[]
   /** Absolute URL of the featured image, when the post has one. */
   image?: string | null
+  /**
+   * Absolute URLs of the images in the body, in document order.
+   *
+   * They follow the featured image rather than replacing it: the featured
+   * image is what the page opens with and what a share card shows, and a
+   * crawler reading the list benefits from that one being first. Duplicates are
+   * dropped, so a post whose body repeats its featured image lists it once.
+   */
+  images?: readonly string[]
   siteName: string
   siteUrl: string
   /**
@@ -59,7 +68,10 @@ export function buildArticleJsonLd(
   if (input.dateModified) jsonLd.dateModified = input.dateModified
   // schema.org accepts a single URL, but Google's Article guidance asks for a
   // list, and a list of one stays valid for both.
-  if (input.image) jsonLd.image = [input.image]
+  const images = [input.image, ...(input.images ?? [])]
+    .map((url) => (typeof url === 'string' ? url.trim() : ''))
+    .filter(Boolean)
+  if (images.length > 0) jsonLd.image = [...new Set(images)]
 
   const authors = (input.authors ?? []).filter((author) => author.name)
   if (authors.length > 0) {

@@ -29,6 +29,7 @@ The pure, framework-free logic lives under `lib/seo/` and is unit tested:
 - `lib/seo/sitemap.ts` — sitemap entry construction.
 - `lib/seo/indexing.ts` — the robots meta directive every page carries.
 - `lib/seo/topic-meta.ts` — a tag archive's title, description and share image.
+- `lib/seo/body-images.ts` — the images a body renders, for structured data.
 - `lib/seo/indexnow.ts` — announcing publishes to Bing through IndexNow.
 
 ### Robots, images, and previews
@@ -48,6 +49,37 @@ included. `robotsDirective` in `lib/seo/indexing.ts` is the only way a page
 sets `robots`, and it never returns undefined: Next's metadata merge treats a
 page's `robots: undefined` as a value that replaces the layout's, which is how
 the empty search page came to drop staging's noindex.
+
+### Images in the sitemap and the Article node
+
+Two reads beyond the URL list name the pictures on a page, and until Nov 2026
+neither did:
+
+- **`/sitemap.xml`** lists each post, page and app with its featured image as
+  an `<image:image>` tag. Next declares the `xmlns:image` namespace itself as
+  soon as any entry carries one, so an entry with no image stays byte-identical
+  to what it was. The route's reads are therefore at `depth: 1`; at `depth: 0`
+  a relationship arrives as an id and `toMediaImage` has no URL to give, which
+  would list every post with no image while looking like it worked.
+- **Article JSON-LD** carries every image in the body, not only the featured
+  one. `collectBodyImages` in `lib/seo/body-images.ts` reads the three places an
+  image can sit — a Lexical `upload` node, the four modules that carry one
+  (gallery, image and text, feature list, bookmark), and an `<img>` in
+  preserved Ghost markup — and it is free on the page because the body is
+  already resolved there. A gated post is passed its teaser, so nothing
+  withheld can reach the structured data.
+
+The URLs point at `/api/media/file/`, which is the one path under the
+disallowed `/api` that robots opens. That allowance is what makes both of these
+worth writing: an image location a crawler may not fetch is a dead end with a
+valid shape.
+
+**What is still missing is alt text, not markup.** `toAltText` in
+`lib/content/media.ts` deliberately blanks Ghost's file-name-as-alt, so 109
+migrated featured images render `alt=""` and are decorative to a screen reader
+and to image search alike. They are all Unsplash photographs — the source and
+the open questions are in [`STOCK_IMAGERY.md`](STOCK_IMAGERY.md), and the
+worklist is a replacement decision rather than a code change.
 
 ### IndexNow
 
