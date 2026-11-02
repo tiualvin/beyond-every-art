@@ -20,6 +20,15 @@ export type SitemapDoc = {
    * caller that passes nothing gets the old behaviour.
    */
   noindex?: boolean | null
+  /**
+   * The document's own images — site-relative paths or absolute URLs.
+   *
+   * A document with no featured image passes nothing and gets no `images` key,
+   * which is what every entry did before this existed. Only the kinds that
+   * render an image carry one: posts, pages and apps. Tag and author archives
+   * have a field for a featured image and none set, so they are not passed.
+   */
+  images?: readonly string[] | null
 }
 
 export type SitemapEntry = {
@@ -28,6 +37,50 @@ export type SitemapEntry = {
   changeFrequency?:
     'always' | 'hourly' | 'daily' | 'weekly' | 'monthly' | 'yearly' | 'never'
   priority?: number
+  /**
+   * Image URLs for the entry's `<image:image>` tags.
+   *
+   * Next emits one per string. Kept absolute because a sitemap is fetched from
+   * outside the site, where a root-relative path names nothing.
+   */
+  images?: string[]
+}
+
+/**
+ * The image URLs an entry should advertise: absolute, deduped, in order.
+ *
+ * Blank values are dropped rather than turned into the page's own URL, which is
+ * what `absoluteUrl('')` would do — an image location equal to the page is a
+ * wrong answer that looks like a deliberate one.
+ */
+function toImageUrls(
+  images: readonly string[] | null | undefined,
+  siteUrl: string,
+): string[] {
+  const seen = new Set<string>()
+  const urls: string[] = []
+
+  for (const image of images ?? []) {
+    const trimmed = typeof image === 'string' ? image.trim() : ''
+    if (!trimmed) continue
+
+    const url = absoluteUrl(trimmed, siteUrl)
+    if (seen.has(url)) continue
+    seen.add(url)
+    urls.push(url)
+  }
+
+  return urls
+}
+
+/** The entry with its image list attached, when it has one. */
+function withImages(
+  entry: SitemapEntry,
+  doc: SitemapDoc,
+  siteUrl: string,
+): SitemapEntry {
+  const images = toImageUrls(doc.images, siteUrl)
+  return images.length > 0 ? { ...entry, images } : entry
 }
 
 function toIso(value: string | Date | null | undefined): string | undefined {
@@ -112,22 +165,34 @@ export function buildSitemapEntries({
   // whichever direction the crawler prefers rather than the one asked for.
   for (const post of posts) {
     if (!post.slug || post.noindex) continue
-    entries.push({
-      url: absoluteUrl(postPath(post.slug), siteUrl),
-      lastModified: toIso(post.updatedAt) ?? toIso(post.publishedAt),
-      changeFrequency: 'weekly',
-      priority: 0.7,
-    })
+    entries.push(
+      withImages(
+        {
+          url: absoluteUrl(postPath(post.slug), siteUrl),
+          lastModified: toIso(post.updatedAt) ?? toIso(post.publishedAt),
+          changeFrequency: 'weekly',
+          priority: 0.7,
+        },
+        post,
+        siteUrl,
+      ),
+    )
   }
 
   for (const page of pages) {
     if (!page.slug || page.noindex) continue
-    entries.push({
-      url: absoluteUrl(pagePath(page.slug), siteUrl),
-      lastModified: toIso(page.updatedAt) ?? toIso(page.publishedAt),
-      changeFrequency: 'monthly',
-      priority: 0.5,
-    })
+    entries.push(
+      withImages(
+        {
+          url: absoluteUrl(pagePath(page.slug), siteUrl),
+          lastModified: toIso(page.updatedAt) ?? toIso(page.publishedAt),
+          changeFrequency: 'monthly',
+          priority: 0.5,
+        },
+        page,
+        siteUrl,
+      ),
+    )
   }
 
   for (const tag of tags) {
@@ -152,12 +217,18 @@ export function buildSitemapEntries({
 
   for (const app of apps) {
     if (!app.slug) continue
-    entries.push({
-      url: absoluteUrl(appPath(app.slug), siteUrl),
-      lastModified: toIso(app.updatedAt) ?? toIso(app.publishedAt),
-      changeFrequency: 'monthly',
-      priority: 0.4,
-    })
+    entries.push(
+      withImages(
+        {
+          url: absoluteUrl(appPath(app.slug), siteUrl),
+          lastModified: toIso(app.updatedAt) ?? toIso(app.publishedAt),
+          changeFrequency: 'monthly',
+          priority: 0.4,
+        },
+        app,
+        siteUrl,
+      ),
+    )
   }
 
   return entries

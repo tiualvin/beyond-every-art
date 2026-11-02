@@ -120,8 +120,53 @@ describe('buildArticleJsonLd', () => {
     ])
   })
 
+  it('lists the body images after the featured image, in order', () => {
+    const data = buildArticleJsonLd({
+      ...base,
+      image: 'https://beyondeveryart.com/api/media/file/lead-white.jpg',
+      images: [
+        'https://beyondeveryart.com/api/media/file/muller.jpg',
+        'https://beyondeveryart.com/api/media/file/stack.jpg',
+      ],
+    })
+
+    expect(data.image).toEqual([
+      'https://beyondeveryart.com/api/media/file/lead-white.jpg',
+      'https://beyondeveryart.com/api/media/file/muller.jpg',
+      'https://beyondeveryart.com/api/media/file/stack.jpg',
+    ])
+  })
+
+  it('names the body images when there is no featured image', () => {
+    const data = buildArticleJsonLd({
+      ...base,
+      images: ['https://beyondeveryart.com/api/media/file/muller.jpg'],
+    })
+
+    expect(data.image).toEqual([
+      'https://beyondeveryart.com/api/media/file/muller.jpg',
+    ])
+  })
+
+  it('lists an image once even when the body repeats the featured one', () => {
+    const data = buildArticleJsonLd({
+      ...base,
+      image: 'https://beyondeveryart.com/api/media/file/muller.jpg',
+      images: ['https://beyondeveryart.com/api/media/file/muller.jpg'],
+    })
+
+    expect(data.image).toEqual([
+      'https://beyondeveryart.com/api/media/file/muller.jpg',
+    ])
+  })
+
   it('omits optional fields and the author array when empty', () => {
-    const data = buildArticleJsonLd({ ...base, authors: [], image: null })
+    const data = buildArticleJsonLd({
+      ...base,
+      authors: [],
+      image: null,
+      images: [],
+    })
     expect(data).not.toHaveProperty('description')
     expect(data).not.toHaveProperty('datePublished')
     expect(data).not.toHaveProperty('author')

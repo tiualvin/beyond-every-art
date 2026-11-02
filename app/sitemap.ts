@@ -1,6 +1,7 @@
 import type { MetadataRoute } from 'next'
 
 import { cachedRead, CONTENT_TAGS } from '@/lib/cache/content'
+import { toMediaImage } from '@/lib/content/media'
 import { live } from '@/lib/content/schedule'
 import { getPayloadClient } from '@/lib/payload'
 import { getSiteUrl } from '@/lib/seo/site'
@@ -21,10 +22,27 @@ type PublishedDoc = {
   publishedAt?: string
   /** Posts and Pages only; the archives have no such field to select. */
   noindex?: boolean
+  /** Posts and Pages: the image that opens the document. */
+  featuredImage?: unknown
+  /** Apps: the same thing under the name that collection gives it. */
+  heroImage?: unknown
 }
 
 /** Tag rows keep their id, which `toDocs` drops and the count below needs. */
 type TagDoc = PublishedDoc & { id: string | number }
+
+/**
+ * A document's featured image as a one-entry image list.
+ *
+ * `toMediaImage` is the normalizer the templates use, so the URL listed is the
+ * one the page actually loads — trailing slash dropped, and a relationship left
+ * as a bare id (a query run at `depth: 0`) correctly yielding nothing. An app
+ * carries its hero under `heroImage`, which is why both are read.
+ */
+function featuredImageUrls(doc: PublishedDoc): string[] {
+  const image = toMediaImage(doc.featuredImage ?? doc.heroImage)
+  return image ? [image.url] : []
+}
 
 function toDocs(docs: PublishedDoc[]): SitemapDoc[] {
   return docs
@@ -34,6 +52,7 @@ function toDocs(docs: PublishedDoc[]): SitemapDoc[] {
       updatedAt: doc.updatedAt ?? null,
       publishedAt: doc.publishedAt ?? null,
       noindex: doc.noindex ?? false,
+      images: featuredImageUrls(doc),
     }))
 }
 
@@ -52,7 +71,10 @@ const readSlugs = cachedRead(
       payload.find({
         collection: 'posts',
         overrideAccess: true,
-        depth: 0,
+        // One level, so the featured image arrives as a media record with a
+        // URL rather than an id. Without it `toMediaImage` has nothing to
+        // resolve and every post would be listed with no image at all.
+        depth: 1,
         pagination: false,
         limit: 0,
         // Restricted posts have real, indexable URLs that serve a teaser, so
@@ -70,12 +92,13 @@ const readSlugs = cachedRead(
           updatedAt: true,
           publishedAt: true,
           noindex: true,
+          featuredImage: true,
         },
       }),
       payload.find({
         collection: 'pages',
         overrideAccess: true,
-        depth: 0,
+        depth: 1,
         pagination: false,
         limit: 0,
         where: { _status: { equals: 'published' } },
@@ -84,6 +107,7 @@ const readSlugs = cachedRead(
           updatedAt: true,
           publishedAt: true,
           noindex: true,
+          featuredImage: true,
         },
       }),
       payload.find({
@@ -105,11 +129,11 @@ const readSlugs = cachedRead(
       payload.find({
         collection: 'apps',
         overrideAccess: true,
-        depth: 0,
+        depth: 1,
         pagination: false,
         limit: 0,
         where: { _status: { equals: 'published' } },
-        select: { slug: true, updatedAt: true },
+        select: { slug: true, updatedAt: true, heroImage: true },
       }),
     ])
 
