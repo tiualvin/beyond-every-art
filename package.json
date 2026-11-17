@@ -34,6 +34,7 @@
     "migrate:redirects": "tsx scripts/migrate-redirects.ts",
     "migrate:members": "tsx scripts/migrate-members.ts",
     "migrate:validate": "tsx scripts/validate-migration.ts",
+    "i18n:migration-counts": "tsx scripts/i18n-migration-counts.ts",
     "fix:ghost-links": "tsx scripts/fix-ghost-url-placeholders.ts",
     "repair:content": "tsx scripts/repair-migrated-content.ts",
     "repair:media-alt": "tsx scripts/repair-media-alt.ts",

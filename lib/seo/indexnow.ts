@@ -37,6 +37,7 @@ import type {
 
 // Relative imports, like everything a collection config pulls in: the
 // Payload CLI loads these too, outside Next's resolver.
+import { isPrefixedLocale, type Locale } from '../i18n/locales'
 import { isScheduled } from '../content/schedule'
 import { isNoindex } from './indexing'
 import { absoluteUrl, getSiteUrl, isPublicSiteUrl } from './site'
@@ -275,20 +276,62 @@ function queueFor(config: IndexNowConfig): IndexNowQueue {
   return queue
 }
 
+/**
+ * A translation as the rules above read a document: on the site when the
+ * article is and its own status and date say so, at its own address.
+ */
+export function asTranslation(
+  doc: (Publishable & Record<string, unknown>) | null | undefined,
+): Publishable | null {
+  if (!doc) return null
+  const published =
+    doc._status === 'published' && doc.translationStatus === 'published'
+  const dates = [doc.publishedAt, doc.translationPublishedAt].filter(
+    (d): d is string => typeof d === 'string' && Boolean(d),
+  )
+  return {
+    slug: doc.slug,
+    _status: published ? 'published' : 'draft',
+    // Live once both have arrived: the later of the two.
+    publishedAt: dates.sort().at(-1) ?? null,
+  }
+}
+
+type IndexNowOptions = {
+  /**
+   * Where a document is served in a translated locale. Given for a collection
+   * whose documents have translations (posts); a write in that locale then
+   * announces the translation's own URL, by its own liveness — not the English
+   * slug's path, which is what `pathFor` would build from a Spanish slug.
+   */
+  localizedPath?: (slug: string, locale: Locale) => string
+}
+
 /** `afterChange` for a collection whose documents are served at `pathFor`. */
 export function indexNowOnChange(
   pathFor: (slug: string) => string,
+  options: IndexNowOptions = {},
 ): CollectionAfterChangeHook {
-  return ({ doc, previousDoc }) => {
+  return ({ doc, previousDoc, req }) => {
     try {
       const config = indexNowConfig()
       if (!config) return doc
-      const urls = urlsOnChange({
-        doc: doc as Publishable,
-        previousDoc: previousDoc as Publishable | null,
-        pathFor,
-        siteUrl: getSiteUrl(),
-      })
+      const locale = req?.locale
+      const translated =
+        options.localizedPath && isPrefixedLocale(locale) ? locale : null
+      const urls = translated
+        ? urlsOnChange({
+            doc: asTranslation(doc) ?? {},
+            previousDoc: asTranslation(previousDoc),
+            pathFor: (slug) => options.localizedPath!(slug, translated),
+            siteUrl: getSiteUrl(),
+          })
+        : urlsOnChange({
+            doc: doc as Publishable,
+            previousDoc: previousDoc as Publishable | null,
+            pathFor,
+            siteUrl: getSiteUrl(),
+          })
       if (urls.length > 0) queueFor(config).enqueue(urls)
     } catch {
       // A submission is a courtesy to a crawler; it never fails a save.

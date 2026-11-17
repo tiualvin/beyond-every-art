@@ -29,15 +29,24 @@ type SeoFieldsOptions = {
    * a way to point a live URL at somebody else's.
    */
   canonical?: boolean
+  /**
+   * One title and description per language. The canonical override, when
+   * offered, stays shared: it names where the *English* piece was first
+   * published, and a translation is always canonical to itself.
+   */
+  localized?: boolean
 }
 
 export function seoFields({
   canonical = false,
+  localized = false,
 }: SeoFieldsOptions = {}): Field[] {
+  const perLocale = localized ? { localized: true } : {}
   return [
     {
       name: 'metaTitle',
       type: 'text',
+      ...perLocale,
       admin: {
         description:
           'Overrides the title in search results and share cards. Falls back to the title above.',
@@ -46,6 +55,7 @@ export function seoFields({
     {
       name: 'metaDescription',
       type: 'textarea',
+      ...perLocale,
       admin: {
         description:
           'The snippet under the title in search results. Around 155 characters.',

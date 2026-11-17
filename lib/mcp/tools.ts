@@ -386,6 +386,11 @@ export const RESTORED_FIELDS = {
  * - `reviewState` is where the draft stands in review now, not then.
  * - the `ghost*` and `migrationStatus` fields are the Ghost import's identity
  *   and bookkeeping, which a rerun matches on.
+ * - `translationStatus` and `translationPublishedAt` are a translation's own
+ *   publish switch and date — the same reason as `publishedAt`; `modifiedAt`
+ *   is stamped by publishing; `translatedFrom` (its `version` and
+ *   `englishModifiedAt`) records what was translated, which an old version
+ *   would misstate.
  */
 export const KEPT_ON_RESTORE = [
   'slug',
@@ -401,6 +406,12 @@ export const KEPT_ON_RESTORE = [
   'ghostUpdatedAt',
   'ghostURL',
   'migrationStatus',
+  'translationStatus',
+  'translationPublishedAt',
+  'modifiedAt',
+  'translatedFrom',
+  'version',
+  'englishModifiedAt',
 ] as const
 
 type RestoreScope = keyof typeof RESTORED_FIELDS

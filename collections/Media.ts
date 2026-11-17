@@ -115,8 +115,11 @@ export const Media: CollectionConfig = {
         components: { Field: '/components/admin/MediaUsage#MediaUsage' },
       },
     },
-    { name: 'alt', type: 'text', required: true },
-    { name: 'caption', type: 'textarea' },
+    // Per language, because both are read aloud or printed under the image on
+    // a page in that language. A translated article will not publish while one
+    // of its images has no alt text in its language — see `saveTranslation`.
+    { name: 'alt', type: 'text', required: true, localized: true },
+    { name: 'caption', type: 'textarea', localized: true },
     { name: 'credit', type: 'text' },
     {
       name: 'creditURL',

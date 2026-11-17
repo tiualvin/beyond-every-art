@@ -1,6 +1,11 @@
 import type { Access, FieldAccess, GlobalConfig, Where } from 'payload'
 
-import { notScheduled, publishedStatus } from '../lib/content/schedule'
+import {
+  notScheduled,
+  publishedStatus,
+  translationLive,
+} from '../lib/content/schedule'
+import { isPrefixedLocale } from '../lib/i18n/locales'
 
 export type Role = 'admin' | 'editor' | 'author'
 
@@ -70,8 +75,22 @@ export const pagesRead: Access = ({ req }) =>
 export const postsRead: Access = ({ req }) => {
   if (isEditor(req.user)) return true
 
+  // A read in a translated language returns that language's fields, which the
+  // live row holds from the moment a translation is first published — and
+  // keeps after it is taken back down. So the translation's own status and
+  // date join the rule there, and `locale=all`, which would return every
+  // language's text at once, is closed to anyone who is not staff.
+  // Typed as a configured code, but `?locale=all` arrives here verbatim.
+  const locale = req.locale as string | undefined
+  if (locale === 'all' || locale === '*') {
+    return req.user ? { owners: { equals: req.user.id } } : false
+  }
   const publiclyReadable: Where = {
-    and: [...onTheSite(), { visibility: { equals: 'public' } }],
+    and: [
+      ...onTheSite(),
+      { visibility: { equals: 'public' } },
+      ...(isPrefixedLocale(locale) ? translationLive() : []),
+    ],
   }
   if (!req.user) return publiclyReadable
 

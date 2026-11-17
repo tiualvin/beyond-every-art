@@ -27,6 +27,8 @@
 
 import type { Where } from 'payload'
 
+import { DEFAULT_LOCALE } from '../i18n/locales'
+
 /** The collections that carry a publication date. `apps` do not. */
 export const SCHEDULABLE_COLLECTIONS = [
   'posts',
@@ -100,3 +102,32 @@ export function isScheduled(
  * number so the admin can say it in words rather than leaving it folklore.
  */
 export { CONTENT_TTL_SECONDS as SCHEDULE_GRANULARITY_SECONDS } from '../cache/ttl'
+
+/**
+ * The translation's own half of "on the site": its status published and its
+ * date arrived. Evaluated in the locale the query is made in — Payload reads a
+ * localized field from that locale's row — so it only means anything inside a
+ * query that passes `locale`.
+ *
+ * Unlike English, a translation with no date is not treated as live. The
+ * dateless case above is a fault inherited from a migration; a translation is
+ * always published through a hook that stamps its date (`stampLocaleDates`),
+ * so a missing one is a write that went round it, and withholding is safe.
+ */
+export function translationLive(now: Date = new Date()): Where[] {
+  return [
+    { translationStatus: { equals: 'published' } },
+    { translationPublishedAt: { less_than_equal: now.toISOString() } },
+  ]
+}
+
+/**
+ * What the public site may serve in `locale`. English is `live()` exactly;
+ * a translation is that *and* its own status and date — a translation of an
+ * article whose English is withdrawn or still scheduled is not served either,
+ * because every translated page names the English URL as `x-default`.
+ */
+export function liveIn(locale: string, now: Date = new Date()): Where {
+  if (locale === DEFAULT_LOCALE) return live(now)
+  return { and: [publishedStatus, notScheduled(now), ...translationLive(now)] }
+}
