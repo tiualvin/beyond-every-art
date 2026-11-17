@@ -3,6 +3,7 @@ import type { MetadataRoute } from 'next'
 import { cachedRead, CONTENT_TAGS } from '@/lib/cache/content'
 import { toMediaImage } from '@/lib/content/media'
 import { live } from '@/lib/content/schedule'
+import { getLocaleIndex } from '@/lib/i18n/locale-index'
 import { getPayloadClient } from '@/lib/payload'
 import { getSiteUrl } from '@/lib/seo/site'
 import {
@@ -19,6 +20,12 @@ export const dynamic = 'force-dynamic'
 type PublishedDoc = {
   slug?: string
   updatedAt?: string
+  /**
+   * Posts only: when the English article last changed. `updatedAt` moves on a
+   * publish in any language, so it would date an English URL by its Spanish
+   * translation; the migration seeded this from it, so values are unchanged.
+   */
+  modifiedAt?: string
   publishedAt?: string
   /** Posts and Pages only; the archives have no such field to select. */
   noindex?: boolean
@@ -49,7 +56,7 @@ function toDocs(docs: PublishedDoc[]): SitemapDoc[] {
     .filter((doc): doc is PublishedDoc & { slug: string } => Boolean(doc.slug))
     .map((doc) => ({
       slug: doc.slug,
-      updatedAt: doc.updatedAt ?? null,
+      updatedAt: doc.modifiedAt ?? doc.updatedAt ?? null,
       publishedAt: doc.publishedAt ?? null,
       noindex: doc.noindex ?? false,
       images: featuredImageUrls(doc),
@@ -90,6 +97,7 @@ const readSlugs = cachedRead(
         select: {
           slug: true,
           updatedAt: true,
+          modifiedAt: true,
           publishedAt: true,
           noindex: true,
           featuredImage: true,
@@ -182,7 +190,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const siteUrl = getSiteUrl()
 
   try {
-    return buildSitemapEntries({ siteUrl, ...(await readSlugs()) })
+    const [slugs, locales] = await Promise.all([readSlugs(), getLocaleIndex()])
+    return buildSitemapEntries({ siteUrl, ...slugs, locales })
   } catch {
     // If the database is unavailable (e.g. during a build), still emit a valid
     // sitemap containing the homepage rather than failing the route.
