@@ -26,7 +26,6 @@ import { buildWebPageJsonLd, serializeJsonLd } from '@/lib/seo/jsonld'
 import {
   absoluteUrl,
   getSiteUrl,
-  localeHomePath,
   pagePath,
   postPath,
 } from '@/lib/seo/site'
@@ -107,7 +106,6 @@ export async function generateMetadata({
     return localeHomeMetadata({
       locale: slug,
       archive,
-      alternates: await alternatesFor(localeHomePath(slug)),
       siteTitle: settings.title,
       description: settings.description,
     })

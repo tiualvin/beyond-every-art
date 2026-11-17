@@ -26,13 +26,11 @@ import { hreflangFor, openGraphLocale } from './post-view'
 export function localeHomeMetadata({
   locale,
   archive,
-  alternates,
   siteTitle,
   description,
 }: {
   locale: Locale
   archive: PostPage
-  alternates: Alternates | null
   siteTitle: string
   description: string
 }): Metadata {
@@ -46,18 +44,14 @@ export function localeHomeMetadata({
     archive.page > 1
       ? `${t.title} — ${t.page(archive.page, archive.totalPages)}`
       : t.title
-  const languages =
-    archive.page === 1 ? hreflangFor(alternates, siteUrl) : undefined
+  // Self-canonical, and no hreflang: a language's home page lists the pieces
+  // translated into it, which is not a translation of the English homepage.
+  // The masthead's switcher still links the two.
   return {
     title: { absolute: `${title} - ${siteTitle}` },
     description: description || t.description,
-    alternates: languages ? { canonical, languages } : { canonical },
-    openGraph: {
-      type: 'website',
-      title,
-      url: canonical,
-      ...openGraphLocale(alternates, locale),
-    },
+    alternates: { canonical },
+    openGraph: { type: 'website', title, url: canonical },
   }
 }
 

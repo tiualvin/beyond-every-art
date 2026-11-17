@@ -144,20 +144,34 @@ its old rule exactly.
 ## What the site outputs
 
 - **Canonical**: every page is canonical to itself, in its own language.
-- **hreflang**: on every page published in two or more languages — articles,
-  language home pages, tag and author archives — one `<link rel="alternate"
-hreflang>` per language plus `x-default` at the English URL. Built by
+- **hreflang**: on every article, tag archive and author archive published in
+  two or more languages — one `<link rel="alternate" hreflang>` per language
+  plus `x-default` at the English URL. Built by
   `hreflangFor(alternatesForPath(…))` in `lib/i18n/alternates.ts`, from one
   index (`lib/i18n/locale-index.ts`), so every version carries the same set.
-  A page in English only gets none.
+  A page in English only gets none. **Home pages get none**: `/` is the whole
+  English archive and `/es/` the pieces translated so far, which are not
+  translations of each other — and computing it in the root layout's metadata
+  made the homepage's metadata resolve late (see below). The switcher still
+  links them.
 - **Sitemap**: still one `/sitemap.xml`. English entries are unchanged in URL
   and lastmod; those with translations gain `xhtml:link` alternates identical to
-  their page's. Translated URLs follow all English ones. A language with nothing
+  their page's (home pages none, as on the pages). Translated URLs follow all English ones. A language with nothing
   live contributes nothing.
 - **JSON-LD**: `inLanguage`, translated headline and description, and the FAQ
   node built from the translated block — on translated pages and on English
   articles that have a translation. Untranslated English pages are unchanged.
 - **Open Graph**: `og:locale` and `og:locale:alternate` under the same rule.
+- **Where the metadata lands — a pre-existing caveat.** Next.js 15.5 streams
+  metadata: when a page's `generateMetadata` resolves after its shell, the
+  title, description, canonical and hreflang are sent in the body and moved
+  into `<head>` by React on the client. Measured on 17 Nov 2026, the build
+  _before_ this work does it on warm requests for every page tested, for a
+  browser and for Googlebot alike. Google renders and sees them in the head;
+  a crawler that does not run JavaScript does not. Translations add one cached
+  read to an article's metadata, so the same applies to them. Making metadata
+  blocking for crawlers (`htmlLimitedBots` in `next.config.ts`) is the fix and
+  is a site-wide, crawler-facing change — left for the owner to decide.
 - **RSS**: `/rss/` is English as before; `/es/rss/` and so on exist only for
   languages with content.
 - **robots.txt**: unchanged; nothing in it blocks `/es/`, `/id/` or `/de/`.

@@ -174,13 +174,10 @@ export function buildSitemapEntries({
    */
   locales?: LocaleIndex
 }): SitemapEntry[] {
+  // The homepage keeps no alternates: home pages are not translations of
+  // each other, and the pages themselves declare none (see the layout).
   const entries: SitemapEntry[] = [
-    withLanguages(
-      { url: `${siteUrl}/`, changeFrequency: 'daily', priority: 1 },
-      locales,
-      '/',
-      siteUrl,
-    ),
+    { url: `${siteUrl}/`, changeFrequency: 'daily', priority: 1 },
     // The archive is a route rather than a document, so it has no lastModified
     // of its own. Only page one is listed; deeper pages are reachable from it.
     {
@@ -326,18 +323,11 @@ function translatedEntries(
     })
     if (live.length === 0) continue
 
-    entries.push(
-      withLanguages(
-        {
-          url: absoluteUrl(localeHomePath(locale), siteUrl),
-          changeFrequency: 'daily',
-          priority: 0.8,
-        },
-        locales,
-        localeHomePath(locale),
-        siteUrl,
-      ),
-    )
+    entries.push({
+      url: absoluteUrl(localeHomePath(locale), siteUrl),
+      changeFrequency: 'daily',
+      priority: 0.8,
+    })
 
     for (const post of live) {
       const entry = post.locales[locale]!
