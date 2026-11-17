@@ -83,6 +83,15 @@ settings that decide AI-assistant visibility more than that file does. None of
 it is built. Read it before adding an AI-crawler rule to `robots.ts` or
 Cloudflare, or any machine-readable summary of the site's content.
 
+[`docs/LOCALIZATION.md`](docs/LOCALIZATION.md) covers translated editions —
+Spanish, Indonesian and German at launch, under `/{locale}/` while English URLs
+stay exactly where they are. It records why per-language publishing is our own
+fields and guards rather than Payload's experimental localized status, the four
+guards on the write path, how hreflang, the sitemap and canonicals are kept
+reciprocal, and how to add a language (one line, a dictionary, a generated
+migration). Read it before changing a localized field, a public query, the
+article routes, or any MCP tool's `locale`.
+
 [`docs/AUTONOMOUS_WORKSTREAMS.md`](docs/AUTONOMOUS_WORKSTREAMS.md) defines the
 sequencing, shared invariants, ownership boundaries, and verification gates for
 the repository's launch-readiness automation workstreams.
