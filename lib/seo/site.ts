@@ -1,3 +1,5 @@
+import { localizePath, type Locale } from '../i18n/locales'
+
 const DEFAULT_SITE_URL = 'http://localhost:3000'
 
 /**
@@ -59,6 +61,26 @@ export const postPath = (slug: string): string => `/${slug}/`
 export const pagePath = (slug: string): string => `/${slug}/`
 export const tagPath = (slug: string): string => `/tag/${slug}/`
 export const authorPath = (slug: string): string => `/author/${slug}/`
+
+// The same shapes in a language. English returns exactly the path above —
+// no `/en/` prefix exists or ever will — and every other locale puts its code
+// in front: `/es/{slug}/`, `/es/tag/{slug}/`. The slug passed is the one the
+// document has *in that locale*; a translated article has its own.
+export const localePostPath = (slug: string, locale: Locale): string =>
+  localizePath(postPath(slug), locale)
+export const localeTagPath = (slug: string, locale: Locale): string =>
+  localizePath(tagPath(slug), locale)
+export const localeAuthorPath = (slug: string, locale: Locale): string =>
+  localizePath(authorPath(slug), locale)
+/** A language's home page: `/` for English, `/es/` for Spanish. */
+export const localeHomePath = (locale: Locale): string =>
+  localizePath('/', locale)
+/** A language's feed: `/rss/` for English, `/es/rss/` for Spanish. */
+export const localeFeedPath = (locale: Locale): string =>
+  localizePath(FEED_PATH, locale)
+/** A language's search page. */
+export const localeSearchPath = (locale: Locale): string =>
+  localizePath(SEARCH_PATH, locale)
 
 /**
  * Where Payload serves every upload: `/api/media/file/<filename>`.
