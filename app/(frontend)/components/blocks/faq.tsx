@@ -25,6 +25,7 @@ export function Faq({
   anchors,
   headingAnchor,
   preview = false,
+  defaultHeading = FAQ_DEFAULT_HEADING,
 }: {
   data: FaqData
   /** Page-unique id per question, in item order. From the block registry. */
@@ -32,6 +33,8 @@ export function Faq({
   /** Page-unique id for the section heading. */
   headingAnchor: string
   preview?: boolean
+  /** What an unheaded FAQ is called, in the page's language. */
+  defaultHeading?: string
 }) {
   // A question with no text has no control to open it, so it is unreachable
   // rather than merely untidy. Dropped, exactly as an untitled dropdown panel
@@ -44,7 +47,7 @@ export function Faq({
 
   if (items.length === 0) return null
 
-  const heading = data.heading?.trim() || FAQ_DEFAULT_HEADING
+  const heading = data.heading?.trim() || defaultHeading
 
   return (
     <section className="module module--faq faq" aria-labelledby={headingAnchor}>

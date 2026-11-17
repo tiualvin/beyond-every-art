@@ -62,6 +62,14 @@ export type Locale = (typeof LOCALES)[number]['code']
  */
 export const DEFAULT_LOCALE = 'en' satisfies Locale
 
+/**
+ * Request headers `middleware.ts` sets on every page request, read by the root
+ * layout and the 404 (`lib/i18n/request.ts`). Here rather than there so the
+ * middleware, which runs on the edge, imports nothing but this file.
+ */
+export const LOCALE_HEADER = 'x-bea-locale'
+export const PATH_HEADER = 'x-bea-path'
+
 export const LOCALE_CODES: readonly Locale[] = LOCALES.map((l) => l.code)
 
 /** Every locale that lives under a prefix — all of them but English. */
@@ -90,6 +98,20 @@ export function localeConfig(code: Locale): LocaleConfig {
 export function localeOfPath(pathname: string): Locale {
   const first = pathname.split('/').filter(Boolean)[0]
   return isPrefixedLocale(first) ? first : DEFAULT_LOCALE
+}
+
+/**
+ * `{ locale }` for a translated language, `{}` for English — spread into the
+ * props of a client component.
+ *
+ * A client component's props are serialized into the page's RSC payload, so
+ * passing `locale="en"` would change the bytes of every English page even
+ * where nothing visible changed. English pages are meant to be identical to
+ * what they were before translations existed; the component defaults to
+ * English when the prop is absent.
+ */
+export function localeProp(locale: Locale): { locale?: Locale } {
+  return locale === DEFAULT_LOCALE ? {} : { locale }
 }
 
 /**

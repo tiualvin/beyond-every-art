@@ -1,3 +1,4 @@
+import { dictionaryFor } from '@/lib/i18n/dictionaries'
 import Link from 'next/link'
 
 import type { RailFallback as Fallback } from '@/lib/content/queries'
@@ -29,13 +30,21 @@ import type { RailFallback as Fallback } from '@/lib/content/queries'
  * subtree until the slot is known to be empty — `AdUnit` sets `data-fill` — so
  * it is out of the accessibility tree and never fetched until then.
  */
-export function HouseBand({ fallback }: { fallback: Fallback }) {
+export function HouseBand({
+  fallback,
+  locale,
+}: {
+  fallback: Fallback
+  /** The page's language, for the band's label. */
+  locale?: string
+}) {
   if (!fallback) return null
+  const t = dictionaryFor(locale).promos
 
   if (fallback.kind === 'app') {
     return (
       <div className="house-band house-band--app">
-        <p className="house-band__label eyebrow">From Beyond Every Art</p>
+        <p className="house-band__label eyebrow">{t.fromSite}</p>
         <Link href={fallback.href} className="house-band__app">
           <h3 className="house-band__title">{fallback.name}</h3>
           {fallback.tagline && (
@@ -48,7 +57,7 @@ export function HouseBand({ fallback }: { fallback: Fallback }) {
 
   return (
     <div className="house-band">
-      <p className="house-band__label eyebrow">More from the journal</p>
+      <p className="house-band__label eyebrow">{t.moreFromJournal}</p>
       <ul className="house-band__list">
         {fallback.posts.map((post) => (
           <li key={post.href}>

@@ -36,7 +36,10 @@ import { InlineMarkdown } from './inline-markdown'
 export function ComparisonTable({
   data,
   id,
+  fallbackLabel = 'Comparison table',
 }: {
+  /** The table's accessible name when it has no caption, in the page's language. */
+  fallbackLabel?: string
   data: ComparisonTableData
   /** Page-unique prefix for the caption's id. From the block registry. */
   id?: string
@@ -74,7 +77,7 @@ export function ComparisonTable({
         // A labelled region rather than a bare div: the label is what tells a
         // keyboard user what they have just tabbed into.
         role="region"
-        aria-label={caption || 'Comparison table'}
+        aria-label={caption || fallbackLabel}
         tabIndex={0}
       >
         <table className="comparison__table" aria-labelledby={captionId}>

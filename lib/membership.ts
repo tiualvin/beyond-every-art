@@ -1,4 +1,5 @@
 import type { PostVisibility } from '@/lib/content/queries'
+import { dictionaryFor } from '@/lib/i18n/dictionaries'
 
 /**
  * How a restricted post is marked in a list, or `null` for a public one.
@@ -6,9 +7,13 @@ import type { PostVisibility } from '@/lib/content/queries'
  * Listings include members-only pieces, so a reader who clicks one meets a
  * teaser. Saying so up front is the difference between a gate and a bait.
  */
-export function visibilityLabel(visibility: PostVisibility): string | null {
-  if (visibility === 'members') return 'Members'
-  if (visibility === 'paid') return 'Subscribers'
+export function visibilityLabel(
+  visibility: PostVisibility,
+  locale?: string,
+): string | null {
+  const t = dictionaryFor(locale).common
+  if (visibility === 'members') return t.members
+  if (visibility === 'paid') return t.subscribers
   return null
 }
 
@@ -29,18 +34,9 @@ export const PRICES: Record<BillingPeriod, number> = {
 /** Two months free, stated rather than left for the reader to work out. */
 export const YEARLY_SAVING = PRICES.monthly * 12 - PRICES.yearly
 
-export const FREE_BENEFITS = [
-  'Every public piece, in full',
-  'The newsletter when a story is ready',
-  'No card, no charge',
-]
-
-export const PAID_BENEFITS = [
-  'Everything in Free',
-  'Members-only and subscriber-only pieces',
-  'The complete archive',
-  'Supports the reporting and the lab time',
-]
+// The two plans' benefit lists live in `membership-copy.ts`, which the English
+// dictionary reads too; re-exported here so callers keep one import.
+export { FREE_BENEFITS, PAID_BENEFITS } from './membership-copy'
 
 /**
  * Where the paid plan sends a reader.

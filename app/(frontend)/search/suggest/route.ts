@@ -7,7 +7,8 @@ import {
   FixedWindowRateLimiter,
   tooManyRequests,
 } from '@/lib/security/rate-limit'
-import { postPath } from '@/lib/seo/site'
+import { DEFAULT_LOCALE, isPrefixedLocale } from '@/lib/i18n/locales'
+import { localePostPath } from '@/lib/seo/site'
 
 // Rendered per request so canonical URLs, feeds and JSON-LD come from the
 // running container's environment rather than the build's; the database reads
@@ -43,17 +44,22 @@ export async function GET(request: Request) {
   const allowance = limiter.check(clientKey(request.headers))
   if (!allowance.allowed) return tooManyRequests(allowance.resetAt)
 
-  const query = new URL(request.url).searchParams.get('q')?.trim() ?? ''
+  const params = new URL(request.url).searchParams
+  const query = params.get('q')?.trim() ?? ''
   if (!query) return NextResponse.json({ results: [] })
+  // A translated page's drawer asks in its own language; anything else is
+  // English, exactly as before.
+  const requested = params.get('locale')
+  const locale = isPrefixedLocale(requested) ? requested : DEFAULT_LOCALE
 
-  const posts = await searchPosts(query, LIMIT)
+  const posts = await searchPosts(query, LIMIT, locale)
 
   return NextResponse.json(
     {
       results: posts.map((post) => ({
         title: post.title,
         excerpt: post.excerpt,
-        href: postPath(post.slug),
+        href: localePostPath(post.slug, locale),
         tag: post.tags[0]?.name ?? null,
         readingTime: post.readingTime,
       })),

@@ -1,46 +1,40 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { cache } from 'react'
 
-import { adClientFor } from '@/lib/ads/eligibility'
+import { parsePageParam } from '@/lib/content/pagination'
 import {
   getPageBySlug,
   getPostBySlug,
-  getRelatedPosts,
+  getPublishedPosts,
   getSiteSettings,
   type PageDetail,
   type PostDetail,
 } from '@/lib/content/queries'
-import { shareImageSrc } from '@/lib/content/media'
-import { RELATED_QUERY_LIMIT, splitRelated } from '@/lib/content/related'
+import { alternatesForPath } from '@/lib/i18n/alternates'
+import { getLocaleIndex } from '@/lib/i18n/locale-index'
+import { isPrefixedLocale, type Locale } from '@/lib/i18n/locales'
 import { logMissingRoute } from '@/lib/observability/missing-route'
 import { getPreviewMode } from '@/lib/preview/mode'
 import {
   recordSlugMiss,
   requireLookupableSlug,
 } from '@/lib/security/slug-requests'
-import { collectBodyImages } from '@/lib/seo/body-images'
 import { collectBlockJsonLd } from '@/lib/seo/block-jsonld'
 import { robotsDirective } from '@/lib/seo/indexing'
-import {
-  buildArticleJsonLd,
-  buildWebPageJsonLd,
-  serializeJsonLd,
-} from '@/lib/seo/jsonld'
+import { buildWebPageJsonLd, serializeJsonLd } from '@/lib/seo/jsonld'
 import {
   absoluteUrl,
-  authorPath,
   getSiteUrl,
+  localeHomePath,
   pagePath,
   postPath,
 } from '@/lib/seo/site'
 
-import { AdUnit } from '../components/ad-unit'
-import { Article, FeaturedFigure } from '../components/article'
+import { FeaturedFigure } from '../components/article'
 import { ArticleBody } from '../components/body'
-import { HouseBand } from '../components/house-band'
-import { ReadNext } from '../components/read-next'
+import { LocaleHome, localeHomeMetadata } from '../locale-pages'
+import { BlockJsonLd, DraftBanner, postMetadata, PostView } from '../post-view'
 
 // Rendered per request so canonical URLs, feeds and JSON-LD come from the
 // running container's environment rather than the build's; the database reads
@@ -48,6 +42,7 @@ import { ReadNext } from '../components/read-next'
 export const dynamic = 'force-dynamic'
 
 type Params = { slug: string }
+type SearchParams = Promise<Record<string, string | string[] | undefined>>
 
 type Resolved =
   | { kind: 'post'; post: PostDetail }
@@ -61,6 +56,9 @@ type Resolved =
 // belongs here rather than in the two callers precisely because `cache()` makes
 // it run once: `generateMetadata` and the page body get the same verdict.
 const resolve = cache(async (slug: string): Promise<Resolved> => {
+  // `/es/`, `/id/`, `/de/`: a language's home page, not an article. Every
+  // locale code is a reserved slug, so no English post or page can be here.
+  if (isPrefixedLocale(slug)) return { kind: 'none' }
   const { draft, user } = await getPreviewMode()
   // Preview is exempt. A draft save relaxes field validation, so an editor is
   // the one caller who can legitimately ask for a slug the pattern refuses.
@@ -77,12 +75,43 @@ const resolve = cache(async (slug: string): Promise<Resolved> => {
   return { kind: 'none' }
 })
 
+/**
+ * A language's home page: its live articles, newest first. Null — and so a
+ * 404 — while the language has none, or for a page past the last.
+ */
+const resolveLocaleHome = cache(async (locale: Locale, page: number) => {
+  const archive = await getPublishedPosts({ page, locale })
+  if (archive.totalPosts === 0) return null
+  if (page > 1 && page > archive.totalPages) return null
+  return archive
+})
+
+/** The English page's other languages, when it has any. */
+async function alternatesFor(path: string) {
+  return alternatesForPath(await getLocaleIndex(), path)
+}
+
 export async function generateMetadata({
   params,
+  searchParams,
 }: {
   params: Promise<Params>
+  searchParams: SearchParams
 }): Promise<Metadata> {
   const { slug } = await params
+  if (isPrefixedLocale(slug)) {
+    const page = parsePageParam((await searchParams).page)
+    const archive = await resolveLocaleHome(slug, page)
+    if (!archive) return { title: 'Not found' }
+    const settings = await getSiteSettings(slug)
+    return localeHomeMetadata({
+      locale: slug,
+      archive,
+      alternates: await alternatesFor(localeHomePath(slug)),
+      siteTitle: settings.title,
+      description: settings.description,
+    })
+  }
   // The same gated check the page body uses, so a draft's title and
   // description cannot leak through metadata to a request that may not read it.
   const resolved = await resolve(slug)
@@ -109,52 +138,30 @@ export async function generateMetadata({
   }
 
   const { post } = resolved
-  const canonical =
-    post.canonicalURL || absoluteUrl(postPath(post.slug), siteUrl)
-  const description = post.metaDescription || post.excerpt || undefined
-  // Ghost emitted og:image for every post with a featured image; sharing cards
-  // stay intact after the migration only if this one does too.
-  const images = post.image
-    ? [
-        {
-          url: absoluteUrl(shareImageSrc(post.image), siteUrl),
-          alt: post.image.alt,
-        },
-      ]
-    : undefined
-  return {
-    // Bare, as Ghost served it. Three of the 113 migrated posts carry a
-    // hand-written ` | beyondeveryart` suffix of their own, which the layout's
-    // template would have doubled.
-    title: { absolute: post.metaTitle || post.title },
-    description,
-    alternates: { canonical },
-    openGraph: {
-      type: 'article',
-      title: post.title,
-      description,
-      url: canonical,
-      publishedTime: post.publishedAt ?? undefined,
-      modifiedTime: post.updatedAt ?? undefined,
-      authors: post.authors.map((a) => a.name),
-      images,
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: post.title,
-      description,
-      images,
-    },
-    robots: robotsDirective(post.noindex),
-  }
+  return postMetadata(post, await alternatesFor(postPath(post.slug)))
 }
 
 export default async function SlugPage({
   params,
+  searchParams,
 }: {
   params: Promise<Params>
+  searchParams: SearchParams
 }) {
   const { slug } = await params
+  if (isPrefixedLocale(slug)) {
+    const page = parsePageParam((await searchParams).page)
+    const archive = await resolveLocaleHome(slug, page)
+    if (!archive) notFound()
+    const settings = await getSiteSettings(slug)
+    return (
+      <LocaleHome
+        locale={slug}
+        archive={archive}
+        description={settings.description}
+      />
+    )
+  }
   const { draft, live } = await getPreviewMode()
   const resolved = await resolve(slug)
 
@@ -224,114 +231,12 @@ export default async function SlugPage({
   }
 
   const { post } = resolved
-  const [settings, related] = await Promise.all([
-    getSiteSettings(),
-    // Nine: three for "Read next" and up to six for the house boxes in the
-    // in-body ad slots. One query for both, divided below, so the two surfaces
-    // cannot show a reader the same piece twice — `lib/content/related.ts`.
-    getRelatedPosts(
-      post.slug,
-      post.tags.map((tag) => tag.slug),
-      RELATED_QUERY_LIMIT,
-    ),
-  ])
-  const { readNext, inline: inlinePromos } = splitRelated(related)
-  // The end-of-article unit's publisher. Same answer the body and rail take,
-  // from the same predicate, so a restricted teaser carries none of the three.
-  const adClient = adClientFor({ restricted: post.restricted })
-  const siteUrl = getSiteUrl()
-  const url = post.canonicalURL || absoluteUrl(postPath(post.slug), siteUrl)
-
-  const jsonLd = serializeJsonLd(
-    buildArticleJsonLd({
-      url,
-      headline: post.title,
-      description: post.metaDescription || post.excerpt || undefined,
-      datePublished: post.publishedAt,
-      dateModified: post.updatedAt,
-      authors: post.authors.map((a) => ({
-        name: a.name,
-        url: a.slug ? absoluteUrl(authorPath(a.slug), siteUrl) : null,
-        sameAs: a.website ? [a.website] : [],
-      })),
-      image: post.image ? absoluteUrl(post.image.url, siteUrl) : null,
-      // The images inside the piece, so the Article node describes everything a
-      // reader can see rather than only the thing at the top. Free here: the
-      // body is already resolved. A gated post passes its teaser, so this
-      // cannot describe a part of the piece the reader was not given.
-      images: collectBodyImages(post.body, siteUrl),
-      siteName: settings.title,
-      siteUrl,
-      isAccessibleForFree: !post.restricted,
-    }),
-  )
-
-  // Separate <script> tags rather than one `@graph`. Both are valid and
-  // crawlers merge them, and keeping the Article node byte-identical to what it
-  // was means a block cannot change the shape of the thing that already ranks.
-  const blockJsonLd = collectBlockJsonLd(post.body)
-
   return (
-    <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: jsonLd }}
-      />
-      {blockJsonLd.map((node, index) => (
-        <BlockJsonLd key={index} node={node} />
-      ))}
-      {showBanner && <DraftBanner />}
-      <Article
-        post={post}
-        newsletterImage={settings.newsletterImage}
-        railFallback={settings.railFallback}
-        inlinePromos={inlinePromos}
-        preview={draft}
-      />
-      {/* `article-end`: below the author card the article renders, above
-          "Read next". The block and the container are the same width the
-          billboard is sized against — docs/ADVERTISING.md §8. */}
-      {adClient && (
-        <div className="container">
-          <AdUnit placement="article-end" client={adClient}>
-            {settings.railFallback ? (
-              <HouseBand fallback={settings.railFallback} />
-            ) : undefined}
-          </AdUnit>
-        </div>
-      )}
-      <ReadNext posts={readNext} topic={post.tags[0]?.name} />
-    </>
-  )
-}
-
-/** One structured-data node contributed by a block in the body. */
-function BlockJsonLd({ node }: { node: Record<string, unknown> }) {
-  return (
-    <script
-      type="application/ld+json"
-      dangerouslySetInnerHTML={{
-        __html: serializeJsonLd({ '@context': 'https://schema.org', ...node }),
-      }}
+    <PostView
+      post={post}
+      alternates={await alternatesFor(postPath(post.slug))}
+      showBanner={showBanner}
+      draft={draft}
     />
-  )
-}
-
-function DraftBanner() {
-  return (
-    <div
-      style={{
-        background: '#111',
-        color: '#fff',
-        padding: '0.5rem 1rem',
-        fontSize: '0.875rem',
-        textAlign: 'center',
-      }}
-    >
-      Draft preview —{' '}
-      <Link href="/api/preview/exit" style={{ color: '#fff' }}>
-        exit preview
-      </Link>
-    </div>
   )
 }

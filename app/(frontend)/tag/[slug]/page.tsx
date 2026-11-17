@@ -19,6 +19,11 @@ import {
 import { buildCollectionPageJsonLd, serializeJsonLd } from '@/lib/seo/jsonld'
 import { absoluteUrl, getSiteUrl, JOURNAL_PATH, tagPath } from '@/lib/seo/site'
 import { topicMeta } from '@/lib/seo/topic-meta'
+import { alternatesForPath } from '@/lib/i18n/alternates'
+import { getLocaleIndex } from '@/lib/i18n/locale-index'
+import { DEFAULT_LOCALE } from '@/lib/i18n/locales'
+
+import { hreflangFor, openGraphLocale } from '../../post-view'
 
 import { ArchiveGroups } from '../../components/archive-groups'
 import { FadeIn } from '../../components/motion/fade-in'
@@ -67,15 +72,23 @@ export async function generateMetadata({
     : undefined
   const shareTitle =
     typeof meta.title === 'string' ? meta.title : meta.title.absolute
+  // Other languages' archives of this tag, once there are any; nothing is
+  // added to a tag that exists in English only.
+  const alternates = alternatesForPath(
+    await getLocaleIndex(),
+    tagPath(archive.slug),
+  )
+  const languages = hreflangFor(alternates, siteUrl)
   return {
     title: meta.title,
     description: meta.description,
-    alternates: { canonical },
+    alternates: languages ? { canonical, languages } : { canonical },
     openGraph: {
       type: 'website',
       title: shareTitle,
       description: meta.description,
       url: canonical,
+      ...openGraphLocale(alternates, DEFAULT_LOCALE),
       images,
     },
     twitter: {

@@ -44,7 +44,8 @@ export const Posts: CollectionConfig = {
     group: 'Content',
     useAsTitle: 'title',
     defaultColumns: ['title', 'publishedAt', 'visibility', '_status'],
-    preview: (doc) => buildPreviewUrl({ collection: 'posts', slug: doc?.slug }),
+    preview: (doc, { locale }) =>
+      buildPreviewUrl({ collection: 'posts', slug: doc?.slug, locale }),
   },
   // The date an editor thinks in. Postgres orders nulls first on a descending
   // sort, so drafts — which have no `publishedAt` yet — collect at the top of

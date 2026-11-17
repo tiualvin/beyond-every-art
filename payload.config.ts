@@ -92,7 +92,7 @@ export default buildConfig({
       // promise — a global has no drafts, so the frame follows saves rather
       // than keystrokes.
       globals: [...PREVIEW_GLOBALS],
-      url: ({ collectionConfig, globalConfig, data }) =>
+      url: ({ collectionConfig, globalConfig, data, locale }) =>
         // A global has no slug of its own; it is previewed against the
         // homepage, which is the one page that carries all three at once.
         globalConfig
@@ -104,6 +104,8 @@ export default buildConfig({
               collection: collectionConfig?.slug,
               slug: data?.slug,
               live: true,
+              // The Spanish edit view previews the Spanish page.
+              locale: locale?.code,
             }),
     },
   },

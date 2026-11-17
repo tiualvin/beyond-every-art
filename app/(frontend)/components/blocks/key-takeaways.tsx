@@ -17,7 +17,10 @@ const DEFAULT_HEADING = 'Key takeaways'
 export function KeyTakeaways({
   data,
   anchor,
+  defaultHeading = DEFAULT_HEADING,
 }: {
+  /** What an unheaded list is called, in the page's language. */
+  defaultHeading?: string
   data: KeyTakeawaysData
   /** Page-unique id for the heading. Supplied by the block registry. */
   anchor: string
@@ -29,7 +32,7 @@ export function KeyTakeaways({
 
   if (items.length === 0) return null
 
-  const heading = data.heading?.trim() || DEFAULT_HEADING
+  const heading = data.heading?.trim() || defaultHeading
 
   return (
     <section

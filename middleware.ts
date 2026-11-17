@@ -8,6 +8,7 @@ import {
   tooManyRequestsInit,
 } from '@/lib/security/rate-limit'
 import { forwardedOrigin, internalOrigin } from '@/lib/security/origins'
+import { LOCALE_HEADER, localeOfPath, PATH_HEADER } from '@/lib/i18n/locales'
 import { legacyGhostRedirect } from '@/lib/seo/ghost-urls'
 import { isAuthorized, parseBasicAuth } from '@/lib/seo/indexing'
 import { RedirectMapCache } from '@/lib/seo/redirect-map'
@@ -237,7 +238,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 
   const hit =
     (map ? matchRedirect(map, request.nextUrl.pathname) : null) ?? legacy
-  if (!hit) return NextResponse.next()
+  if (!hit) return withPageLocale(request)
 
   // Resolved against the origin the reader used, not `request.nextUrl.origin`
   // — which is the bind address wearing the forwarded scheme, and sent every
@@ -250,6 +251,23 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   )
 
   return NextResponse.redirect(location, hit.statusCode)
+}
+
+/**
+ * Tells the page which language it is in, from its own path: `/es/…` is
+ * Spanish, anything else English. The root layout reads it for `<html lang>`
+ * and the masthead, which have no route params of their own to ask.
+ *
+ * Always *set*, never appended, so a client cannot send its own value and get
+ * an English page rendered with Spanish chrome. Nothing about the language is
+ * read from Accept-Language or the visitor's address: the URL decides, and
+ * only the language switcher changes it.
+ */
+function withPageLocale(request: NextRequest): NextResponse {
+  const headers = new Headers(request.headers)
+  headers.set(PATH_HEADER, request.nextUrl.pathname)
+  headers.set(LOCALE_HEADER, localeOfPath(request.nextUrl.pathname))
+  return NextResponse.next({ request: { headers } })
 }
 
 export const config = {

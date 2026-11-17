@@ -4,6 +4,7 @@ import { adClientFor } from '@/lib/ads/eligibility'
 import type { MediaImage } from '@/lib/content/media'
 import type { RailFallback as Fallback } from '@/lib/content/queries'
 import type { TocEntry } from '@/lib/content/toc'
+import { dictionaryFor } from '@/lib/i18n/dictionaries'
 
 import { AdUnit } from './ad-unit'
 import { RailFallback } from './rail-fallback'
@@ -57,7 +58,10 @@ export function ArticleRail({
   newsletterImage = null,
   railFallback = null,
   restricted = false,
+  locale,
 }: {
+  /** The page's language, for the rail's own words. */
+  locale?: string
   headings: TocEntry[]
   /** From `SiteSettings`; null is the ordinary state, not a failure. */
   newsletterImage?: MediaImage | null
@@ -68,13 +72,14 @@ export function ArticleRail({
 }) {
   const contents = headings.length >= MIN_TOC_ENTRIES ? headings : []
   const adClient = adClientFor({ restricted })
+  const t = dictionaryFor(locale)
 
   return (
-    <aside className="article__rail" aria-label="More from Beyond Every Art">
+    <aside className="article__rail" aria-label={t.article.railLabel}>
       {contents.length > 0 && (
         <nav className="rail__mod" aria-labelledby="rail-contents">
           <p className="rail__label" id="rail-contents">
-            In this piece
+            {t.article.inThisPiece}
           </p>
           <ol className="rail__toc">
             {contents.map((entry) => (
@@ -104,7 +109,7 @@ export function ArticleRail({
                 that can know whether an ad arrived, but it has no business
                 knowing what an editor chose to show instead. */}
             <AdUnit placement="rail-1" client={adClient}>
-              <RailFallback fallback={railFallback} />
+              <RailFallback fallback={railFallback} locale={locale} />
             </AdUnit>
           </div>
         )}
@@ -123,17 +128,15 @@ export function ArticleRail({
               </div>
             )}
             <div className="rail__signup-body">
-              <p className="rail__label">The newsletter</p>
+              <p className="rail__label">{t.rail.newsletter}</p>
               {/* The modal's own heading. A card that opens it should promise
                   the same thing the thing it opens promises. */}
-              <h3 className="rail__signup-title">Stay close to the work</h3>
+              <h3 className="rail__signup-title">{t.rail.title}</h3>
               {/* Classed because the ladder hides this line when the picture
                   has already gone and the window is shorter still. */}
-              <p className="rail__copy">
-                One piece a week on colour, material, and practice.
-              </p>
+              <p className="rail__copy">{t.rail.copy}</p>
               <SubscribeLink className="button button--primary">
-                Join the list
+                {t.rail.join}
               </SubscribeLink>
             </div>
           </div>

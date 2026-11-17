@@ -11,8 +11,9 @@ import {
   splitRelated,
 } from '../../lib/content/related'
 
+// The article template, shared by English and translated routes.
 const page = readFileSync(
-  join(process.cwd(), 'app/(frontend)/[slug]/page.tsx'),
+  join(process.cwd(), 'app/(frontend)/post-view.tsx'),
   'utf8',
 )
 const rail = readFileSync(
@@ -116,7 +117,7 @@ describe('the related read', () => {
       queries.indexOf('async function readRelatedPosts'),
       queries.indexOf('export const getRelatedPosts'),
     )
-    expect(body).toContain('readRelatedCandidates(payload, now)')
+    expect(body).toContain('readRelatedCandidates(payload, now, locale)')
     expect(body).toContain('rankRelated(')
     expect(body).not.toContain("'tags.slug'")
     expect(body).not.toContain("sort: '-publishedAt'")

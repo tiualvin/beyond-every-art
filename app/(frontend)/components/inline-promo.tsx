@@ -2,7 +2,9 @@ import Link from 'next/link'
 
 import type { PostCard } from '@/lib/content/queries'
 import { visibilityLabel } from '@/lib/membership'
-import { postPath } from '@/lib/seo/site'
+import { dictionaryFor } from '@/lib/i18n/dictionaries'
+import { DEFAULT_LOCALE } from '@/lib/i18n/locales'
+import { localePostPath } from '@/lib/seo/site'
 
 /**
  * What an in-body ad slot holds when no ad is served.
@@ -48,10 +50,11 @@ export function InlinePromo({ post }: { post: PostCard }) {
   // its height on labels. The membership word is the part that earns its place
   // rather than decorating, because it tells a reader the piece is gated before
   // they spend a tap on it.
+  const t = dictionaryFor(post.locale)
   const meta = [
     post.tags[0]?.name,
-    visibilityLabel(post.visibility),
-    post.readingTime ? `${post.readingTime} min` : null,
+    visibilityLabel(post.visibility, post.locale),
+    post.readingTime ? t.common.minutes(post.readingTime) : null,
   ]
     .filter(Boolean)
     .join(' · ')
@@ -60,8 +63,11 @@ export function InlinePromo({ post }: { post: PostCard }) {
     <div className="inline-promo">
       {/* Not "Read next", which closes the article, and not the rail's "Worth
           reading", which a desktop reader has in view on the same screen. */}
-      <p className="eyebrow inline-promo__label">Also from Beyond Every Art</p>
-      <Link href={postPath(post.slug)} className="inline-promo__item">
+      <p className="eyebrow inline-promo__label">{t.promos.alsoFrom}</p>
+      <Link
+        href={localePostPath(post.slug, post.locale ?? DEFAULT_LOCALE)}
+        className="inline-promo__item"
+      >
         <span className="inline-promo__title">{post.title}</span>
         {post.excerpt && (
           <span className="inline-promo__excerpt">{post.excerpt}</span>

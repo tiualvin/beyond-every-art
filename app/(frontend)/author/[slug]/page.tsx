@@ -10,6 +10,11 @@ import {
 } from '@/lib/security/slug-requests'
 import { buildProfilePageJsonLd, serializeJsonLd } from '@/lib/seo/jsonld'
 import { absoluteUrl, authorPath, getSiteUrl } from '@/lib/seo/site'
+import { alternatesForPath } from '@/lib/i18n/alternates'
+import { getLocaleIndex } from '@/lib/i18n/locale-index'
+import { DEFAULT_LOCALE } from '@/lib/i18n/locales'
+
+import { hreflangFor, openGraphLocale } from '../../post-view'
 
 import { FadeIn } from '../../components/motion/fade-in'
 import { StaggerChildren, StaggerItem } from '../../components/motion/stagger'
@@ -40,11 +45,22 @@ export async function generateMetadata({
   const archive = await resolve(slug)
   if (!archive) return { title: 'Not found' }
   const canonical = absoluteUrl(authorPath(archive.slug), getSiteUrl())
+  // Other languages' archives of this author, once there are any.
+  const alternates = alternatesForPath(
+    await getLocaleIndex(),
+    authorPath(archive.slug),
+  )
+  const languages = hreflangFor(alternates, getSiteUrl())
   return {
     title: archive.name,
     description: archive.description || undefined,
-    alternates: { canonical },
-    openGraph: { type: 'profile', title: archive.name, url: canonical },
+    alternates: languages ? { canonical, languages } : { canonical },
+    openGraph: {
+      type: 'profile',
+      title: archive.name,
+      url: canonical,
+      ...openGraphLocale(alternates, DEFAULT_LOCALE),
+    },
   }
 }
 

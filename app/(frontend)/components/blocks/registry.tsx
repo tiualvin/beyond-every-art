@@ -11,7 +11,6 @@ import {
   COMPARISON_TABLE_BLOCK,
   EMBED_BLOCK,
   FAQ_BLOCK,
-  FAQ_DEFAULT_HEADING,
   FEATURE_LIST_BLOCK,
   GALLERY_BLOCK,
   KEY_FACTS_BLOCK,
@@ -48,6 +47,8 @@ import { Accordion } from './accordion'
 import { Bookmark } from './bookmark'
 import { ActionButton } from './button'
 import { Callout } from './callout'
+import { dictionaryFor, type Dictionary } from '@/lib/i18n/dictionaries'
+
 import { ComparisonTable } from './comparison-table'
 import { Embed } from './embed'
 import { Faq } from './faq'
@@ -73,6 +74,11 @@ import { UnknownNode } from './unknown'
 type BlockContext = {
   preview: boolean
   allocate: AnchorAllocator
+  /**
+   * The words a module uses when its own field is empty — "Frequently asked
+   * questions" over an unheaded FAQ — in the page's language.
+   */
+  t: Dictionary['blocks']
 }
 
 /**
@@ -105,21 +111,22 @@ const renderers: BlockRenderers = {
 
   // Anchors are allocated here rather than inside each component so that every
   // id on the page comes from one counter, in render order.
-  [KEY_TAKEAWAYS_BLOCK]: (fields, { allocate }) => {
+  [KEY_TAKEAWAYS_BLOCK]: (fields, { allocate, t }) => {
     const data = fields as KeyTakeawaysData
     return (
       <KeyTakeaways
         data={data}
-        anchor={allocate(data.heading?.trim() || 'Key takeaways')}
+        anchor={allocate(data.heading?.trim() || t.keyTakeaways)}
+        defaultHeading={t.keyTakeaways}
       />
     )
   },
-  [FAQ_BLOCK]: (fields, { allocate, preview }) => {
+  [FAQ_BLOCK]: (fields, { allocate, preview, t }) => {
     const data = fields as FaqData
     // The heading is allocated first because it renders first; the questions
     // follow in their own order. Allocating in reading order is what keeps a
     // `-2` suffix landing on the later of two identical headings.
-    const headingAnchor = allocate(data.heading?.trim() || FAQ_DEFAULT_HEADING)
+    const headingAnchor = allocate(data.heading?.trim() || t.faqHeading)
     const anchors = (data.items ?? []).map((item) =>
       allocate(item?.question?.trim() || 'question'),
     )
@@ -129,6 +136,7 @@ const renderers: BlockRenderers = {
         anchors={anchors}
         headingAnchor={headingAnchor}
         preview={preview}
+        defaultHeading={t.faqHeading}
       />
     )
   },
@@ -141,9 +149,10 @@ const renderers: BlockRenderers = {
   },
   // The block's own id makes the caption's: unique on the page without
   // drawing on the heading allocator, whose numbering the headings own.
-  [COMPARISON_TABLE_BLOCK]: (fields) => (
+  [COMPARISON_TABLE_BLOCK]: (fields, { t }) => (
     <ComparisonTable
       data={fields as ComparisonTableData}
+      fallbackLabel={t.comparisonTable}
       id={
         typeof fields.id === 'string' && /^[A-Za-z0-9_-]+$/.test(fields.id)
           ? `comparison-${fields.id}`
@@ -249,13 +258,15 @@ function headingConverter(allocate: AnchorAllocator) {
 export function buildConverters(
   preview: boolean,
   allocate: AnchorAllocator = createAnchorAllocator(),
+  locale?: string,
 ) {
+  const t = dictionaryFor(locale).blocks
   return ({
     defaultConverters,
   }: {
     defaultConverters: JSXConverters
   }): JSXConverters => {
-    const context: BlockContext = { preview, allocate }
+    const context: BlockContext = { preview, allocate, t }
 
     return {
       ...defaultConverters,

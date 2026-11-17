@@ -30,6 +30,7 @@ import {
   FALLBACK_CTA,
   FALLBACK_FOOTER_NAV,
   FALLBACK_NAV,
+  fallbackNavFor,
 } from '@/lib/content/fallback-nav'
 
 const frontend = resolve(import.meta.dirname, '../../app/(frontend)')
@@ -144,9 +145,16 @@ describe('the header fallback navigation', () => {
     // Both menus point at it, and both are checked.
     expect(new Set(fragments)).toEqual(new Set(['topics']))
     expect(home).toContain('id={HOME_TOPICS_ID}')
-    // Each component takes its list whole rather than keeping a second copy.
-    expect(header).toContain('FALLBACK_NAV')
-    expect(footer).toContain('FALLBACK_FOOTER_NAV')
+    // Each component takes its list whole rather than keeping a second copy:
+    // through `fallbackNavFor`, which hands English exactly these two lists
+    // and a translated language its own (`lib/content/fallback-nav.ts`).
+    expect(header).toContain('fallbackNavFor(locale)')
+    expect(footer).toContain('fallbackNavFor(locale)')
+    expect(fallbackNavFor('en')).toEqual({
+      header: FALLBACK_NAV,
+      cta: FALLBACK_CTA,
+      footer: FALLBACK_FOOTER_NAV,
+    })
   })
 })
 
@@ -155,7 +163,10 @@ describe('the footer fallback navigation', () => {
   // page on the site ended with a wordmark, a copyright line, and no way on.
   it('is what the footer actually renders', () => {
     expect(FALLBACK_FOOTER_NAV.length).toBeGreaterThan(0)
-    expect(footer).toContain('links.length > 0 ? links : FALLBACK_FOOTER_NAV')
+    expect(footer).toContain(
+      'links.length > 0 ? links : fallbackNavFor(locale).footer',
+    )
+    expect(fallbackNavFor('en').footer).toBe(FALLBACK_FOOTER_NAV)
   })
 
   it('offers the two destinations the masthead has no room for', () => {

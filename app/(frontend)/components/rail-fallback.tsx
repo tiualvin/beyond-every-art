@@ -2,6 +2,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 
 import type { RailFallback as Fallback } from '@/lib/content/queries'
+import { dictionaryFor } from '@/lib/i18n/dictionaries'
 
 /** The rail is 300px and hidden below it, so one width is the whole truth. */
 const PROMO_IMAGE_SIZES = '300px'
@@ -26,13 +27,21 @@ const PROMO_IMAGE_SIZES = '300px'
  * reads as two competing boxes rather than as a rail. This is the quieter
  * grammar the related list had — an eyebrow, serif lines, a detail under each.
  */
-export function RailFallback({ fallback }: { fallback: Fallback }) {
+export function RailFallback({
+  fallback,
+  locale,
+}: {
+  fallback: Fallback
+  /** The page's language, for the box's labels. */
+  locale?: string
+}) {
+  const t = dictionaryFor(locale).promos
   if (!fallback) return null
 
   if (fallback.kind === 'app') {
     return (
       <div className="rail__promo">
-        <p className="rail__label">From Beyond Every Art</p>
+        <p className="rail__label">{t.fromSite}</p>
         <Link href={fallback.href} className="rail__promo-item">
           <h3>{fallback.name}</h3>
           {fallback.tagline && (
@@ -50,7 +59,7 @@ export function RailFallback({ fallback }: { fallback: Fallback }) {
   return (
     <div className={`rail__promo${featured ? ' rail__promo--featured' : ''}`}>
       <p className="rail__label">
-        {featured ? 'Worth reading' : 'More from the journal'}
+        {featured ? t.worthReading : t.moreFromJournal}
       </p>
       <ul className="rail__promo-list">
         {posts.map((post) => (

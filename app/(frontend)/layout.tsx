@@ -2,9 +2,13 @@ import type { Metadata } from 'next'
 import { Inter, Playfair_Display } from 'next/font/google'
 
 import { getFooter, getHeader, getSiteSettings } from '@/lib/content/queries'
+import { alternatesForPath } from '@/lib/i18n/alternates'
+import { getLocaleIndex } from '@/lib/i18n/locale-index'
+import { DEFAULT_LOCALE, localeProp } from '@/lib/i18n/locales'
+import { getRequestLocale, getRequestPath } from '@/lib/i18n/request'
 import { getPreviewMode } from '@/lib/preview/mode'
 import { robotsDirective } from '@/lib/seo/indexing'
-import { getSiteUrl } from '@/lib/seo/site'
+import { getSiteUrl, localeFeedPath } from '@/lib/seo/site'
 
 import { resolveAdsenseClient } from '@/lib/ads/adsense'
 import { consentBootstrap } from '@/lib/analytics/consent'
@@ -17,6 +21,7 @@ import { LivePreviewListener } from './components/live-preview-listener'
 import { NewsletterBand } from './components/newsletter-band'
 import { SiteFooter } from './components/site-footer'
 import { SiteHeader } from './components/site-header'
+import { hreflangFor } from './post-view'
 import '../globals.css'
 
 const playfair = Playfair_Display({
@@ -33,6 +38,18 @@ const inter = Inter({
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSiteSettings()
+  const locale = await getRequestLocale()
+  // The English homepage is the one page that takes its alternates from here
+  // rather than setting its own: once a language has a home page of its own,
+  // `/` and `/es/` name each other. Nothing is added before that.
+  const path = await getRequestPath()
+  const languages =
+    path === '/'
+      ? hreflangFor(
+          alternatesForPath(await getLocaleIndex(), '/'),
+          getSiteUrl(),
+        )
+      : undefined
   return {
     metadataBase: new URL(getSiteUrl()),
     // Ghost's rule, which the migration has to keep: generated archives carry
@@ -47,7 +64,13 @@ export async function generateMetadata(): Promise<Metadata> {
     description: settings.metaDescription,
     alternates: {
       canonical: '/',
-      types: { 'application/rss+xml': '/rss' },
+      ...(languages ? { languages } : {}),
+      // A translated page advertises its own language's feed. Every one of
+      // them sets its own canonical, so the `/` above is only ever English's.
+      types: {
+        'application/rss+xml':
+          locale === DEFAULT_LOCALE ? '/rss' : localeFeedPath(locale),
+      },
     },
     // Inherited by every page that sets no `robots` of its own: noindex on
     // staging, large image previews on the live site. See `robotsDirective`.
@@ -58,12 +81,18 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function FrontendLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const [settings, header, footer, preview] = await Promise.all([
+  const locale = await getRequestLocale()
+  const path = await getRequestPath()
+  const [settings, header, footer, preview, index] = await Promise.all([
     getSiteSettings(),
-    getHeader(),
-    getFooter(),
+    getHeader(locale),
+    getFooter(locale),
     getPreviewMode(),
+    getLocaleIndex(),
   ])
+  // The languages the page under this masthead is published in — the same
+  // answer, from the same function, the page itself gives its hreflang.
+  const alternates = path ? alternatesForPath(index, path) : null
 
   const analyticsTag = resolveAnalyticsTag()
   const adsenseClient = resolveAdsenseClient()
@@ -73,7 +102,7 @@ export default async function FrontendLayout({
 
   return (
     <html
-      lang="en"
+      lang={locale}
       className={`${playfair.variable} ${inter.variable}`}
       // Which tag loaded, for the custom events that have to address it in
       // its own shape — `lib/analytics/events.ts` says why the window cannot
@@ -92,13 +121,16 @@ export default async function FrontendLayout({
           siteTitle={settings.title}
           links={header.links}
           cta={header.cta}
+          locale={locale}
+          alternates={alternates}
         />
         {children}
-        <NewsletterBand />
+        <NewsletterBand {...localeProp(locale)} />
         <SiteFooter
           siteTitle={settings.title}
           links={footer.links}
           copyright={footer.copyright}
+          locale={locale}
         />
         {adsenseClient && <AdSense client={adsenseClient} />}
         {analyticsTag && <Analytics tag={analyticsTag} />}
