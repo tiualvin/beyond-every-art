@@ -8,6 +8,7 @@ import {
   REST_PUT,
 } from '@payloadcms/next/routes'
 
+import { DEFAULT_LOCALE } from '@/lib/i18n/locales'
 import { issuerOrigin, oauthEnabled } from '@/lib/oauth/config'
 import { MCP_PATH, wwwAuthenticate } from '@/lib/oauth/metadata'
 
@@ -43,11 +44,38 @@ function withoutTrailingSlash(request: Request): Request {
   return new Request(url, request)
 }
 
+/**
+ * The request with `?locale=en` added when it names no locale.
+ *
+ * With `localization.fallback: false` — which the site depends on, so a
+ * translated page is never filled with English — Payload 3.90.2 leaves
+ * `req.locale` null for a REST request that does not say which language it
+ * wants, instead of taking the default locale as it does when fallback is on.
+ * Its query validation then reads `req.locale.length` and answers any `where`
+ * with a 500: `GET /api/posts?where[slug][equals]=…`, anonymous or not, failed
+ * the day localization was switched on. The admin panel always sends a locale
+ * and is unaffected.
+ *
+ * English is what such a request meant before there were other languages, and
+ * what Payload itself would pick with fallback on. Only for reads and the MCP
+ * endpoint: a write may carry its locale in the body, which a query parameter
+ * would override.
+ */
+function withDefaultLocale(request: Request): Request {
+  const url = new URL(request.url)
+  if (url.searchParams.has('locale')) return request
+  const read = ['GET', 'HEAD', 'DELETE', 'OPTIONS'].includes(request.method)
+  if (!read && url.pathname !== MCP_PATH) return request
+  url.searchParams.set('locale', DEFAULT_LOCALE)
+  return new Request(url, request)
+}
+
 /** Wraps a Payload route handler so it sees the un-slashed URL. */
 function normalized<Args extends unknown[]>(
   handler: (request: Request, ...args: Args) => Promise<Response>,
 ): (request: Request, ...args: Args) => Promise<Response> {
-  return (request, ...args) => handler(withoutTrailingSlash(request), ...args)
+  return (request, ...args) =>
+    handler(withDefaultLocale(withoutTrailingSlash(request)), ...args)
 }
 
 /**
@@ -73,7 +101,7 @@ export async function POST(
   incoming: Request,
   context: { params: Promise<{ slug: string[] }> },
 ): Promise<Response> {
-  const request = withoutTrailingSlash(incoming)
+  const request = withDefaultLocale(withoutTrailingSlash(incoming))
   const response = await payloadPost(
     request as Parameters<typeof payloadPost>[0],
     context as Parameters<typeof payloadPost>[1],
