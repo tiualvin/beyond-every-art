@@ -144,6 +144,20 @@ describe('what a translation may not go live with', () => {
     ])
   })
 
+  it('catches a translated module whose heading is still the English one', () => {
+    const headed = (id: string, heading: string, question: string) => ({
+      ...faq(id, question),
+      fields: { ...faq(id, question).fields, heading },
+    })
+    const english = body(headed('a', 'Questions', 'Is it toxic?'))
+    const translated = body(headed('a', 'Questions', '¿Es tóxico?'))
+    expect(untranslatedBlocks(translated, english)).toEqual([
+      { key: 'a', blockType: 'faq', fields: ['heading'] },
+    ])
+    const done = body(headed('a', 'Preguntas', '¿Es tóxico?'))
+    expect(untranslatedBlocks(done, english)).toEqual([])
+  })
+
   it('lists every image an article shows: cover, body and modules', () => {
     const content = {
       root: {

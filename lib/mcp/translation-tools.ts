@@ -289,26 +289,41 @@ function holdsWords(value: unknown, key?: string): boolean {
   return false
 }
 
+/** A module's own label fields: the words a reader meets before its items. */
+const LABELS = ['heading', 'caption', 'intro', 'rowHeader'] as const
+
 /**
- * Modules in a translated body that are still exactly the English ones: copied
- * across by `saveTranslation` to keep their place and not translated since. A
- * module with no words in it — an embed, a gallery without captions — is not
- * one; it has nothing to translate.
+ * Modules in a translated body still showing English: copied across by
+ * `saveTranslation` and not translated since, or translated except for a
+ * heading, caption or intro that is still the English one — which is what a
+ * block tool leaves when it is not given that field. A module with no words in
+ * it — an embed, a gallery without captions — is never one; it has nothing to
+ * translate. Items are not compared one by one: a key fact can rightly read the
+ * same in two languages ("Lapis lazuli"), a heading almost never does.
  */
 export function untranslatedBlocks(
   translated: EditorState | null | undefined,
   english: EditorState | null | undefined,
-): BlockRef[] {
+): Array<BlockRef & { fields?: string[] }> {
   const englishByKey = new Map(
     indexBlocks(english).map(({ key, node }) => [key, node]),
   )
   return indexBlocks(translated).flatMap(({ key, node }) => {
     const original = englishByKey.get(key)
     if (!original) return []
-    const same = JSON.stringify(original.fields) === JSON.stringify(node.fields)
-    return same && holdsWords(node.fields)
-      ? [{ key, blockType: String(node.fields.blockType) }]
-      : []
+    const blockType = String(node.fields.blockType)
+    if (JSON.stringify(original.fields) === JSON.stringify(node.fields)) {
+      return holdsWords(node.fields) ? [{ key, blockType }] : []
+    }
+    const fields = LABELS.filter((label) => {
+      const value = node.fields[label]
+      return (
+        typeof value === 'string' &&
+        /\p{L}/u.test(value) &&
+        value === original.fields[label]
+      )
+    })
+    return fields.length ? [{ key, blockType, fields: [...fields] }] : []
   })
 }
 
@@ -759,10 +774,13 @@ export async function publishTranslation(
   if (stillEnglish.length) {
     problems.push(
       `Modules still in English: ${stillEnglish
-        .map((ref) => `${ref.blockType}:${ref.key}`)
-        .join(
-          ', ',
-        )}. Translate each with its block tool and \`locale: "${locale}"\`.`,
+        .map(
+          (ref) =>
+            `${ref.blockType}:${ref.key}` +
+            (ref.fields ? ` (its ${ref.fields.join(', ')})` : ''),
+        )
+        .join(', ')}. Translate each with its block tool and ` +
+        `\`locale: "${locale}"\`, giving its heading or caption too.`,
     )
   }
   const missingAlt = await imagesMissingAlt(
