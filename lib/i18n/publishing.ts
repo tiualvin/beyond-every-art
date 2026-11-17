@@ -242,6 +242,19 @@ export const stampLocaleDates: CollectionBeforeChangeHook = ({
 }
 
 /**
+ * Stamps `draftedAt` on a draft save, in the language it is made in.
+ *
+ * A draft save always arrives with `_status: 'draft'` (Payload sets it before
+ * the hooks run). So does an unpublish, which is a change nobody has published
+ * either. Paired with `modifiedAt`, this answers "does this language have
+ * unpublished work" from two dates rather than by comparing bodies.
+ */
+export const stampDraftedAt: CollectionBeforeChangeHook = ({ data }) => {
+  if (data?._status !== 'draft') return data
+  return { ...data, draftedAt: new Date().toISOString() }
+}
+
+/**
  * Records which English text a translation was made from, the first time it is
  * saved, unless the caller said so itself (`saveTranslation` always does).
  *

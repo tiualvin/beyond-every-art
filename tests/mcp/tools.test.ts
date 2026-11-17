@@ -24,7 +24,7 @@ describe('nativeGhostID', () => {
 })
 
 describe('mcpTools', () => {
-  it('exposes the drafting loop: create, read back, look back, revise, edit or convert migrated HTML, add facts, FAQs and tables, illustrate, publish, check the schedule', () => {
+  it('exposes the drafting loop: create, read back, look back, revise, edit or convert migrated HTML, add facts, FAQs and tables, illustrate, publish, check the schedule, translate', () => {
     expect(mcpTools.map((tool) => tool.name)).toEqual([
       'draftArticle',
       'readArticleMarkdown',
@@ -42,6 +42,8 @@ describe('mcpTools', () => {
       'uploadMediaFromUrl',
       'publishArticle',
       'editorialStatus',
+      'saveTranslation',
+      'translationStatus',
     ])
   })
 

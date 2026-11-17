@@ -31,6 +31,7 @@ import {
 import { buildPreviewUrl } from '../lib/preview/live-preview'
 import {
   isolateLocalePublish,
+  stampDraftedAt,
   stampLocaleDates,
   stampTranslatedFrom,
 } from '../lib/i18n/publishing'
@@ -91,6 +92,7 @@ export const Posts: CollectionConfig = {
       // Last, so they see the status this write actually lands on.
       stampPublishedAt,
       stampLocaleDates,
+      stampDraftedAt,
       redirectChangedTranslationSlug,
     ],
     afterChange: [

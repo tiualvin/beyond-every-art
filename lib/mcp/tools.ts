@@ -22,11 +22,14 @@ import { z } from 'zod'
 
 import { FAQ_BLOCK, KEY_FACTS_MAX_ITEMS } from '../../blocks/schema'
 import { toArticleBody } from '../content/body'
-import { findUnpublishedWork } from '../content/editorial-status'
+import {
+  findTranslationWork,
+  findUnpublishedWork,
+} from '../content/editorial-status'
 import { isScheduled, SCHEDULE_GRANULARITY_SECONDS } from '../content/schedule'
 import { htmlToPlainText, richTextToPlainText } from '../content/plain-text'
 import { buildPreviewUrl } from '../preview/live-preview'
-import { absoluteUrl, getSiteUrl, postPath } from '../seo/site'
+import { absoluteUrl, getSiteUrl, localePostPath, postPath } from '../seo/site'
 import {
   listBlocks,
   markBlocks,
@@ -61,6 +64,23 @@ import {
 } from './markdown'
 import { decodeImageUpload, vetImageBytes } from './upload'
 import { mayPublishThrough } from './publish-guard'
+import { resolvePublishAt } from './publish-time'
+import {
+  localized,
+  publishTranslation,
+  requestLocale,
+  saveTranslationTool,
+  translationOnSite,
+  translationReaders,
+  translationStatusTool,
+  translationSummary,
+} from './translation-tools'
+import {
+  DEFAULT_LOCALE,
+  isPrefixedLocale,
+  PREFIXED_LOCALES,
+  type Locale,
+} from '../i18n/locales'
 import { MAX_AGENT_UPLOAD_BYTES } from '../security/uploads'
 import {
   fetchPublicBytes,
@@ -168,9 +188,38 @@ async function findArticle(
   })
 
   const doc = docs[0]
-  if (!doc)
-    throw new Error(`No ${collection} document with slug \`${args.slug}\`.`)
-  return doc
+  if (doc) return doc
+
+  // Working in a translated language, the English slug names the article
+  // too: an agent holding `/blue/` can ask for its Spanish version without
+  // knowing the Spanish slug. Looked up without `req`, so the English read
+  // cannot switch the request's language (Payload writes a call's locale onto
+  // the `req` it is given), then read in the request's language by id.
+  if (isPrefixedLocale(req.locale)) {
+    const english = await req.payload.find({
+      collection,
+      depth: 0,
+      draft: true,
+      limit: 1,
+      locale: DEFAULT_LOCALE,
+      overrideAccess: false,
+      select: {},
+      user: req.user,
+      where: { slug: { equals: args.slug } },
+    })
+    if (english.docs[0]) {
+      return req.payload.findByID({
+        collection,
+        id: english.docs[0].id,
+        depth: 0,
+        draft: true,
+        overrideAccess: false,
+        req,
+        user: req.user as TypedUser,
+      })
+    }
+  }
+  throw new Error(`No ${collection} document with slug \`${args.slug}\`.`)
 }
 
 /**
@@ -412,6 +461,7 @@ export const KEPT_ON_RESTORE = [
   'translatedFrom',
   'version',
   'englishModifiedAt',
+  'draftedAt',
 ] as const
 
 type RestoreScope = keyof typeof RESTORED_FIELDS
@@ -450,18 +500,22 @@ async function readLiveRowWhere(
   req: PayloadRequest,
   where: Where,
   now: Date = new Date(),
+  locale?: Locale,
 ): Promise<{
   state: LiveState
   publishedAt: string | null
   doc: Record<string, unknown> | null
 }> {
+  // With an explicit language — a link check, which may look up an English
+  // slug from a Spanish edit or the reverse — the read goes without `req`, so
+  // it cannot switch the language of the tool's own request.
   const { docs } = await req.payload.find({
     collection: COLLECTION,
     depth: 0,
     draft: false,
     limit: 1,
     overrideAccess: false,
-    req,
+    ...(locale ? { locale, fallbackLocale: false } : { req }),
     user: req.user,
     where,
   })
@@ -494,6 +548,9 @@ async function whatReadersSee(
   req: PayloadRequest,
   id: number | string,
 ): Promise<{ readers: LiveState; note?: string }> {
+  // A translation is on the site by its own switch and date, not `_status`.
+  const locale = requestLocale(req)
+  if (isPrefixedLocale(locale)) return translationReaders(req, id, locale)
   const live = await readLiveRow(req, id)
   if (live.state === 'live') {
     return {
@@ -564,10 +621,60 @@ async function checkAddedLinks(
       continue
     }
 
+    // `/es/{slug}/` is a translation's address: live by its own switch and
+    // date, in its own language. `/{slug}/` is English, whatever language the
+    // article being edited is in.
+    if (link.locale) {
+      const found = await readLiveRowWhere(
+        req,
+        { slug: { equals: link.slug } },
+        now,
+        link.locale,
+      )
+      const site = found.doc
+        ? await translationOnSite(
+            req,
+            found.doc.id as number | string,
+            link.locale,
+            now,
+          )
+        : null
+      if (!site || site.readers === 'unpublished') {
+        problems.push(
+          `Edit ${link.edit}: links to ${link.path}, which is not a published ` +
+            `${link.locale} translation — the link would answer 404.`,
+        )
+        continue
+      }
+      links.push({
+        edit: link.edit,
+        href: link.href,
+        target: 'article',
+        slug: link.slug,
+        status: site.readers,
+        title: found.doc?.title ?? null,
+        publishedAt: site.publishedAt,
+      })
+      if (site.readers === 'scheduled') {
+        warnings.push(
+          `Edit ${link.edit}: ${link.path} is scheduled for ${site.publishedAt}. ` +
+            'Until then the link answers 404 to readers.',
+        )
+      }
+      if (!link.path.endsWith('/')) {
+        warnings.push(
+          `Edit ${link.edit}: ${link.href} has no trailing slash, and the site ` +
+            `redirects it to ${localePostPath(link.slug, link.locale)}. Link to that instead.`,
+        )
+      }
+      continue
+    }
+
     const row = await readLiveRowWhere(
       req,
       { slug: { equals: link.slug } },
       now,
+      DEFAULT_LOCALE,
     )
     if (row.state === 'unpublished') {
       problems.push(
@@ -630,7 +737,17 @@ const SYSTEM_FIELDS = new Set([
 ])
 
 /** Written by the save itself; never a change a reader would see. */
-const NOT_READER_FACING = new Set(['_status', 'lastEditedBy'])
+const NOT_READER_FACING = new Set([
+  '_status',
+  'lastEditedBy',
+  // Stamped by publishing, or a translation's own bookkeeping: none is a
+  // change to what English readers see.
+  'modifiedAt',
+  'translatedFrom',
+  'translationStatus',
+  'translationPublishedAt',
+  'draftedAt',
+])
 
 /**
  * What publishing may not change on an article that is already live.
@@ -642,43 +759,12 @@ const NOT_READER_FACING = new Set(['_status', 'lastEditedBy'])
  */
 const FIXED_WHILE_LIVE = ['slug', 'canonicalURL'] as const
 
-/** An ISO 8601 time that names its offset, so "20:00" cannot mean two things. */
-const ZONED_TIME =
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$/i
+// `resolvePublishAt` lives in `publish-time.ts`, shared with the translation
+// tools; re-exported so callers keep importing it from here.
+export { resolvePublishAt } from './publish-time'
 
-/**
- * `publishAt` as a time, or undefined when the call left it out.
- *
- * Only "now" or a moment ahead. A date in the past would put an article out
- * backdated — filed below newer work in every listing and the feed — which is
- * an editorial decision about history, made in the admin panel.
- */
-export function resolvePublishAt(
-  value: string | undefined,
-  now: Date = new Date(),
-): string | undefined {
-  if (value === undefined) return undefined
-  const trimmed = value.trim()
-  if (trimmed.toLowerCase() === 'now') return now.toISOString()
-  if (!ZONED_TIME.test(trimmed)) {
-    throw new Error(
-      '`publishAt` must be "now" or an ISO 8601 time with its offset, such ' +
-        'as 2026-11-04T20:00:00Z.',
-    )
-  }
-  const at = Date.parse(trimmed)
-  if (!Number.isFinite(at))
-    throw new Error(`\`publishAt\` is not a time: ${value}`)
-  if (at <= now.getTime()) {
-    throw new Error(
-      `\`publishAt\` (${trimmed}) has passed. Pass "now" to publish today, or ` +
-        'a time ahead to schedule. Backdating is done in the admin panel.',
-    )
-  }
-  return new Date(at).toISOString()
-}
-
-export const mcpTools: McpTool[] = [
+/** The article tools, before `locale` is added to the ones that take it. */
+const articleTools: McpTool[] = [
   {
     description:
       'Create a new article as a draft, with its body written in Markdown. ' +
@@ -735,12 +821,27 @@ export const mcpTools: McpTool[] = [
         user: req.user as TypedUser,
       })
 
+      const locale = requestLocale(req)
       return text({
         id: created.id,
-        preview: buildPreviewUrl({ collection: 'posts', slug: created.slug }),
+        preview: buildPreviewUrl({
+          collection: 'posts',
+          slug: created.slug,
+          locale,
+        }),
         slug: created.slug,
         status: 'draft',
         title: created.title,
+        ...(isPrefixedLocale(locale)
+          ? {
+              locale,
+              note:
+                `This article was started in ${locale} and has no English ` +
+                'version. A translation goes live only over a published ' +
+                'English article, so it cannot be published until one exists. ' +
+                'To translate an existing article, use saveTranslation instead.',
+            }
+          : {}),
       })
     },
     name: 'draftArticle',
@@ -782,7 +883,16 @@ export const mcpTools: McpTool[] = [
         target,
       )) as unknown as Record<string, unknown>
 
-      return text({ ...articleView(req, doc), id: doc.id })
+      const locale = requestLocale(req)
+      return text({
+        ...articleView(req, doc),
+        id: doc.id,
+        // In a translated language: where the translation stands, and whether
+        // English has moved on since it was made.
+        ...(isPrefixedLocale(locale)
+          ? { translation: await translationSummary(req, doc, locale) }
+          : {}),
+      })
     },
     name: 'readArticleMarkdown',
     parameters: targetShape,
@@ -1297,7 +1407,7 @@ export const mcpTools: McpTool[] = [
         return text({
           ...described,
           dryRun: true,
-          readers: (await readLiveRow(req, id)).state,
+          readers: (await whatReadersSee(req, id)).readers,
         })
       }
 
@@ -1433,7 +1543,7 @@ export const mcpTools: McpTool[] = [
         return text({
           ...report,
           dryRun: true,
-          readers: (await readLiveRow(req, id)).state,
+          readers: (await whatReadersSee(req, id)).readers,
         })
       }
 
@@ -2090,6 +2200,12 @@ export const mcpTools: McpTool[] = [
       'publishing. Pass `dryRun: true` first: it says what would go out, when, ' +
       'and whether this key may publish, and writes nothing.',
     handler: async (args: Record<string, unknown>, req: PayloadRequest) => {
+      // A translated language publishes that language and nothing else.
+      const locale = requestLocale(req)
+      if (isPrefixedLocale(locale)) {
+        return publishTranslation(args, req, locale)
+      }
+
       const {
         dryRun = false,
         publishAt,
@@ -2258,10 +2374,44 @@ export const mcpTools: McpTool[] = [
       'schedules nothing). Use it to check a schedule went out as planned, and ' +
       'before choosing a slot with `publishArticle`.',
     handler: async (args: Record<string, unknown>, req: PayloadRequest) => {
-      const { days = 14 } = args as { days?: number }
+      const { days = 14, locale } = args as { days?: number; locale?: string }
       const now = new Date()
       const span = days * 24 * 60 * 60 * 1000
       const siteUrl = getSiteUrl()
+
+      // One translated language's schedule and pending work. Without
+      // `locale`, the English report below, exactly as before.
+      if (locale !== undefined && locale !== DEFAULT_LOCALE) {
+        if (!isPrefixedLocale(locale)) {
+          throw new Error(
+            `Unknown locale \`${locale}\`. Use one of ${PREFIXED_LOCALES.join(', ')}, or leave it out for English.`,
+          )
+        }
+        const work = await findTranslationWork(req.payload, locale, {
+          now,
+          spanDays: days,
+          user: req.user as TypedUser,
+        })
+        const withUrl = (list: typeof work.scheduled) => ({
+          articles: list.map((article) => ({
+            ...article,
+            url: absoluteUrl(localePostPath(article.slug, locale), siteUrl),
+          })),
+          total: list.length,
+        })
+        return text({
+          now: now.toISOString(),
+          days,
+          locale,
+          releaseWithinMinutes: SCHEDULE_GRANULARITY_SECONDS / 60,
+          scheduled: withUrl(work.scheduled),
+          wentLive: withUrl(work.wentLive),
+          savedButNotOut: {
+            liveWithChanges: work.liveWithChanges,
+            drafts: work.drafts,
+          },
+        })
+      }
 
       const listed = async (where: Where, sort: string) => {
         const { docs, totalDocs } = await req.payload.find({
@@ -2338,6 +2488,14 @@ export const mcpTools: McpTool[] = [
     },
     name: 'editorialStatus',
     parameters: {
+      locale: z
+        .string()
+        .optional()
+        .describe(
+          `A translated language (${PREFIXED_LOCALES.join(', ')}): report its ` +
+            'schedule and its unpublished translations instead of English. ' +
+            'Leave it out for the English report.',
+        ),
       days: z
         .number()
         .int()
@@ -2350,4 +2508,31 @@ export const mcpTools: McpTool[] = [
         ),
     },
   },
+]
+
+/**
+ * The tools that work in a language. Each takes an optional `locale` (default
+ * `en`); without it, it behaves exactly as it did before translations existed.
+ */
+export const LOCALIZED_TOOLS = new Set([
+  'draftArticle',
+  'readArticleMarkdown',
+  'updateArticleMarkdown',
+  'setFAQBlock',
+  'setTableBlock',
+  'setKeyFactsBlock',
+  'readLegacyHtml',
+  'editLegacyHtml',
+  'convertLegacyArticle',
+  'publishArticle',
+  'listArticleVersions',
+  'readArticleVersion',
+])
+
+export const mcpTools: McpTool[] = [
+  ...articleTools.map((tool) =>
+    LOCALIZED_TOOLS.has(tool.name) ? localized(tool) : tool,
+  ),
+  saveTranslationTool,
+  translationStatusTool,
 ]

@@ -74,6 +74,16 @@ export function translationFields(): Field[] {
       },
     },
     {
+      // When this language last had a draft saved, by any route. Compared with
+      // `modifiedAt` to tell a language with unpublished work from one without
+      // — which is how the dashboard and `editorialStatus` say "saved but not
+      // out" for each language without reading a single body.
+      name: 'draftedAt',
+      type: 'date',
+      localized: true,
+      admin: { hidden: true },
+    },
+    {
       name: 'translatedFrom',
       label: 'Translated from',
       type: 'group',
