@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 
-import { searchPosts } from '@/lib/content/queries'
+import { getPublishedPosts, searchPosts } from '@/lib/content/queries'
 import { dictionaryFor } from '@/lib/i18n/dictionaries'
 import { isPrefixedLocale, type Locale } from '@/lib/i18n/locales'
 import { clientKey } from '@/lib/security/rate-limit'
@@ -16,10 +16,21 @@ import { PostList } from '../../components/post-list'
 // Search within one translated language: `/{locale}/search/?q=`. Finds only
 // that language's live translations, by their translated title and standfirst.
 // A results page is noindex, as English's is.
+//
+// A 404 while the language has nothing live, like its home page: otherwise
+// `/de/search/` is an indexable, self-canonical German page on a site with no
+// German in it. `e2e/localization.spec.ts` checks every prefixed URL.
 export const dynamic = 'force-dynamic'
 
 type Params = { slug: string }
 type SearchParams = { q?: string }
+
+/** The language, when it is one with something live to search. */
+async function searchableLocale(slug: string): Promise<Locale | null> {
+  if (!isPrefixedLocale(slug)) return null
+  const live = await getPublishedPosts({ page: 1, locale: slug })
+  return live.totalPosts > 0 ? slug : null
+}
 
 export async function generateMetadata({
   params,
@@ -28,8 +39,8 @@ export async function generateMetadata({
   params: Promise<Params>
   searchParams: Promise<SearchParams>
 }): Promise<Metadata> {
-  const { slug: locale } = await params
-  if (!isPrefixedLocale(locale)) return { title: 'Not found' }
+  const locale = await searchableLocale((await params).slug)
+  if (!locale) return { title: 'Not found' }
   const t = dictionaryFor(locale).search
   const query = (await searchParams).q?.trim()
   return {
@@ -48,9 +59,8 @@ export default async function TranslatedSearchPage({
   params: Promise<Params>
   searchParams: Promise<SearchParams>
 }) {
-  const { slug } = await params
-  if (!isPrefixedLocale(slug)) notFound()
-  const locale = slug as Locale
+  const locale = await searchableLocale((await params).slug)
+  if (!locale) notFound()
   const t = dictionaryFor(locale).search
   const query = (await searchParams).q?.trim() ?? ''
   const throttled =
