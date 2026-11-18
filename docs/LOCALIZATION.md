@@ -180,16 +180,15 @@ its old rule exactly.
   node built from the translated block — on translated pages and on English
   articles that have a translation. Untranslated English pages are unchanged.
 - **Open Graph**: `og:locale` and `og:locale:alternate` under the same rule.
-- **Where the metadata lands — a pre-existing caveat.** Next.js 15.5 streams
-  metadata: when a page's `generateMetadata` resolves after its shell, the
-  title, description, canonical and hreflang are sent in the body and moved
-  into `<head>` by React on the client. Measured on 17 Nov 2026, the build
-  _before_ this work does it on warm requests for every page tested, for a
-  browser and for Googlebot alike. Google renders and sees them in the head;
-  a crawler that does not run JavaScript does not. Translations add one cached
-  read to an article's metadata, so the same applies to them. Making metadata
-  blocking for crawlers (`htmlLimitedBots` in `next.config.ts`) is the fix and
-  is a site-wide, crawler-facing change — left for the owner to decide.
+- **Where the metadata lands.** Next.js 15.5 streams metadata to browsers: on
+  a warm server the title, description, canonical and hreflang are sent at the
+  end of the body and moved into `<head>` by React on the client. Crawlers get
+  them in `<head>` — Googlebot, Bingbot, the AI crawlers and the SEO crawlers —
+  because `htmlLimitedBots` in `next.config.ts` lists them
+  (`lib/seo/metadata-bots.ts`, #238; measurements in
+  [`SEO_AND_REDIRECTS.md`](SEO_AND_REDIRECTS.md#where-the-metadata-lands)).
+  Translated pages are rendered the same way, so the same holds for their
+  hreflang.
 - **RSS**: `/rss/` is English as before; `/es/rss/` and so on exist only for
   languages with content.
 - **robots.txt**: unchanged; nothing in it blocks `/es/`, `/id/` or `/de/`.
