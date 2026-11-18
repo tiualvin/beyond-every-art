@@ -1179,6 +1179,35 @@ test.describe('MCP endpoint', () => {
     expect(await pending()).toEqual({ live: true, pending: false })
   })
 
+  // The page, not the API: the REST reads above are uncached, so they pass
+  // whether or not a publish drops the site's cached reads. This one asks for
+  // the page first so its 404 is cached, then publishes, then asks again — the
+  // order in which a reader would meet a stale page. It failed for every
+  // connector write until the MCP route waited for its tool to finish
+  // (`settled` in `app/(payload)/api/[...slug]/route.ts`).
+  test('shows a publish through the connector on the page at once', async ({
+    request,
+  }) => {
+    const slug = `e2e-mcp-purge-${Date.now()}-${Math.floor(Math.random() * 1e6)}`
+    await callToolJson(request, fixtures.mcp.editorKey, 'draftArticle', {
+      markdown: 'Published through the connector.',
+      slug,
+      title: 'E2E MCP Purge',
+    })
+
+    const before = await request.get(`/${slug}/`, { maxRedirects: 0 })
+    expect(before.status()).toBe(404)
+
+    await callToolJson(request, fixtures.mcp.adminKey, 'publishArticle', {
+      publishAt: 'now',
+      slug,
+    })
+
+    const after = await request.get(`/${slug}/`, { maxRedirects: 0 })
+    expect(after.status()).toBe(200)
+    expect(await after.text()).toContain('E2E MCP Purge')
+  })
+
   test('refuses an editor key trying to publish', async ({ request }) => {
     const slug = `e2e-mcp-guard-${Date.now()}-${Math.floor(Math.random() * 1e6)}`
 

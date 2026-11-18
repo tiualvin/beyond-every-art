@@ -70,6 +70,35 @@ function withDefaultLocale(request: Request): Request {
   return new Request(url, request)
 }
 
+/**
+ * The MCP response, read to its end before the route handler returns.
+ *
+ * Next.js applies the `revalidateTag` calls a route handler makes once, when
+ * the handler's promise resolves. The MCP transport (`mcp-handler`) resolves
+ * that promise as soon as the response headers are written, which for a
+ * streamed `tools/call` is before the tool runs. Every purge a tool's write
+ * triggers — the `afterChange` hooks in `lib/cache/purge.ts` — was therefore
+ * queued after Next had already applied the queue, and silently dropped: a
+ * publish through the connector reached readers only when `CONTENT_TTL` ran
+ * out, ten minutes later, in any language, while the same write from the admin
+ * panel showed at once.
+ *
+ * Waiting for the body here keeps the tool inside the request, so its purges
+ * land. A stateless `POST` answers one JSON-RPC message and closes, so nothing
+ * that would have been streamed is held for longer than the call takes; the
+ * long-lived event stream is a `GET` and is not touched. `e2e/mcp.spec.ts`
+ * fails if a publish through the connector stops showing on the page at once.
+ */
+async function settled(response: Response): Promise<Response> {
+  if (!response.body) return response
+  const body = await response.arrayBuffer()
+  return new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  })
+}
+
 /** Wraps a Payload route handler so it sees the un-slashed URL. */
 function normalized<Args extends unknown[]>(
   handler: (request: Request, ...args: Args) => Promise<Response>,
@@ -102,16 +131,18 @@ export async function POST(
   context: { params: Promise<{ slug: string[] }> },
 ): Promise<Response> {
   const request = withDefaultLocale(withoutTrailingSlash(incoming))
-  const response = await payloadPost(
+  const mcp = new URL(request.url).pathname === MCP_PATH
+  const answered = await payloadPost(
     request as Parameters<typeof payloadPost>[0],
     context as Parameters<typeof payloadPost>[1],
   )
+  const response = mcp ? await settled(answered) : answered
 
   if (response.status !== 401) return response
 
   const origin = issuerOrigin()
   if (!oauthEnabled() || !origin) return response
-  if (new URL(request.url).pathname !== MCP_PATH) return response
+  if (!mcp) return response
 
   const headers = new Headers(response.headers)
   headers.set('WWW-Authenticate', wwwAuthenticate(origin))

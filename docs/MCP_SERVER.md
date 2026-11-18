@@ -626,6 +626,19 @@ scheduled time; a scheduled article appears once cached pages turn over, within
 `releaseWithinMinutes` of it, and a scheduled run that wants to confirm a slot
 went out should check after that.
 
+**A publish through the connector shows at once, as one from the admin does.**
+It did not until 18 Nov 2026. Payload's `afterChange` hooks drop the site's
+cached reads (`lib/cache/purge.ts`), and Next.js applies a route handler's
+`revalidateTag` calls when the handler's promise resolves. The MCP transport
+(`mcp-handler`) resolves that promise when it writes the response headers,
+which for a streamed `tools/call` is before the tool runs — so every purge a
+tool triggered was queued too late and dropped, and a connector publish, in any
+language, reached readers only when `CONTENT_TTL_SECONDS` ran out. The REST
+route now reads an MCP `POST` to its end before returning (`settled` in
+`app/(payload)/api/[...slug]/route.ts`), and `e2e/mcp.spec.ts` checks a page
+the moment after a publish. A write that bypasses Payload — a SQL fix, a
+restore — still purges nothing and waits out the TTL.
+
 ### Version history
 
 Payload keeps a version of a post on every save — autosave included, up to
