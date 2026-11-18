@@ -3,6 +3,7 @@ import { withPayload } from '@payloadcms/next/withPayload'
 import type { NextConfig } from 'next'
 
 import { withAdminOnlyColorSchemeHint } from './lib/performance/client-hints'
+import { BLOCKING_METADATA_USER_AGENTS } from './lib/seo/metadata-bots'
 import { buildSecurityHeaders } from './lib/security/headers'
 import { buildImageConfig } from './lib/security/images'
 
@@ -42,6 +43,10 @@ const nextConfig: NextConfig = {
   // clause closes and why the block does not live in this file: a config that
   // cannot be imported is a policy that cannot be unit-tested.
   images: buildImageConfig(),
+  // Crawlers get the title, canonical and hreflang in `<head>`; browsers keep
+  // streaming them. Next's own list leaves out Googlebot, the AI crawlers and
+  // the SEO crawlers. See `lib/seo/metadata-bots.ts`.
+  htmlLimitedBots: new RegExp(BLOCKING_METADATA_USER_AGENTS, 'i'),
   reactStrictMode: true,
 }
 
