@@ -1,12 +1,35 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionConfig, ImageSize } from 'payload'
 
 import { editorsAndAdmins, publicRead } from '../access/roles'
 import { toCreditURL } from '../lib/content/attribution'
 import { ghostUrlField, migrationStatusField } from '../fields/ghost'
 import { CONTENT_TAGS } from '../lib/cache/content'
 import { purgeOnChange, purgeOnDelete } from '../lib/cache/purge'
-import { stripMediaUrlSlashes } from '../lib/media/urls'
+import { deslashedUrlFields } from '../lib/media/urls'
 import { refuseOversizedUpload } from '../lib/security/uploads'
+
+const imageSizes: ImageSize[] = [
+  // Listing thumbnails. `lib/content/media.ts` hands this to `next/image`
+  // as the source for cards, so the optimiser resizes from 768px instead of
+  // from a multi-megabyte original on every cold cache entry.
+  { name: 'card', width: 768, withoutEnlargement: true },
+  // Share cards. 1.91:1 is what Open Graph consumers crop to anyway, so
+  // producing it here is the difference between a scraper downloading a
+  // 3000px original and downloading the thing it was going to make.
+  //
+  // `withoutEnlargement` is left unset, which is not the same as leaving
+  // enlargement on: Payload's default is to omit a size entirely when the
+  // source is smaller than the target in both dimensions. So an image under
+  // 1200x630 gets no `og` derivative at all and the metadata helpers fall
+  // back to the original — which is the right answer for a small source.
+  // Upscaling it would hand a crawler the same picture, blurrier and four
+  // times the bytes, and cropped to a ratio the original never had.
+  //
+  // Derivatives are generated at upload, so media stored before this size
+  // existed has none. `pnpm backfill:media` regenerates them; the fallback
+  // means nothing is broken until it runs.
+  { name: 'og', width: 1200, height: 630 },
+]
 
 export const Media: CollectionConfig = {
   slug: 'media',
@@ -28,10 +51,9 @@ export const Media: CollectionConfig = {
   trash: true,
   hooks: {
     beforeOperation: [refuseOversizedUpload],
-    // Runs after the upload field has generated `url` and every derivative's,
-    // so this is the point a stored URL can be corrected. See lib/media/urls.ts
-    // for why a trailing slash breaks every image on the site.
-    beforeChange: [(args) => stripMediaUrlSlashes(args.data)],
+    // Stored URLs are kept free of a trailing slash by field hooks on the
+    // upload's own URL fields (end of `fields`), not here: a collection hook
+    // runs before Payload regenerates them. See lib/media/urls.ts.
     afterChange: [purgeOnChange(CONTENT_TAGS.media)],
     afterDelete: [purgeOnDelete(CONTENT_TAGS.media)],
   },
@@ -81,28 +103,7 @@ export const Media: CollectionConfig = {
     // for.
     focalPoint: true,
     crop: true,
-    imageSizes: [
-      // Listing thumbnails. `lib/content/media.ts` hands this to `next/image`
-      // as the source for cards, so the optimiser resizes from 768px instead of
-      // from a multi-megabyte original on every cold cache entry.
-      { name: 'card', width: 768, withoutEnlargement: true },
-      // Share cards. 1.91:1 is what Open Graph consumers crop to anyway, so
-      // producing it here is the difference between a scraper downloading a
-      // 3000px original and downloading the thing it was going to make.
-      //
-      // `withoutEnlargement` is left unset, which is not the same as leaving
-      // enlargement on: Payload's default is to omit a size entirely when the
-      // source is smaller than the target in both dimensions. So an image under
-      // 1200x630 gets no `og` derivative at all and the metadata helpers fall
-      // back to the original — which is the right answer for a small source.
-      // Upscaling it would hand a crawler the same picture, blurrier and four
-      // times the bytes, and cropped to a ratio the original never had.
-      //
-      // Derivatives are generated at upload, so media stored before this size
-      // existed has none. `pnpm backfill:media` regenerates them; the fallback
-      // means nothing is broken until it runs.
-      { name: 'og', width: 1200, height: 630 },
-    ],
+    imageSizes,
   },
   fields: [
     {
@@ -169,5 +170,9 @@ export const Media: CollectionConfig = {
       type: 'text',
       admin: { hidden: true, readOnly: true },
     },
+    // Payload's own `url` fields, declared only to add a hook that runs after
+    // Payload regenerates them, so no trailing slash is stored. See
+    // lib/media/urls.ts.
+    ...deslashedUrlFields(imageSizes),
   ],
 }

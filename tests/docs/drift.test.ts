@@ -245,6 +245,10 @@ describe('environment variables', () => {
     'HOME',
     // Set by Next.js inside `instrumentation.ts`, not by anyone deploying this.
     'NEXT_RUNTIME',
+    // Set by Next.js from `trailingSlash: true` in next.config.ts. Payload reads
+    // it when building upload URLs; tests/media/urls.test.ts sets it to run
+    // those hooks the way the server does.
+    'NEXT_TRAILING_SLASH',
     'NODE_ENV',
     'PATH',
     'PORT',
