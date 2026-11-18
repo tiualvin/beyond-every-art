@@ -23,12 +23,7 @@ import {
 import { collectBlockJsonLd } from '@/lib/seo/block-jsonld'
 import { robotsDirective } from '@/lib/seo/indexing'
 import { buildWebPageJsonLd, serializeJsonLd } from '@/lib/seo/jsonld'
-import {
-  absoluteUrl,
-  getSiteUrl,
-  pagePath,
-  postPath,
-} from '@/lib/seo/site'
+import { absoluteUrl, getSiteUrl, pagePath, postPath } from '@/lib/seo/site'
 
 import { FeaturedFigure } from '../components/article'
 import { ArticleBody } from '../components/body'
