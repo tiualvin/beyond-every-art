@@ -31,6 +31,7 @@ The pure, framework-free logic lives under `lib/seo/` and is unit tested:
 - `lib/seo/topic-meta.ts` — a tag archive's title, description and share image.
 - `lib/seo/body-images.ts` — the images a body renders, for structured data.
 - `lib/seo/indexnow.ts` — announcing publishes to Bing through IndexNow.
+- `lib/seo/metadata-bots.ts` — which visitors get metadata in `<head>`.
 
 ### Robots, images, and previews
 
@@ -49,6 +50,30 @@ included. `robotsDirective` in `lib/seo/indexing.ts` is the only way a page
 sets `robots`, and it never returns undefined: Next's metadata merge treats a
 page's `robots: undefined` as a value that replaces the layout's, which is how
 the empty search page came to drop staging's noindex.
+
+### Where the metadata lands
+
+Next.js 15.5 streams metadata: when a page's `generateMetadata` resolves after
+its shell — on a warm server, most requests — the title, description,
+canonical, hreflang and Open Graph tags are sent at the end of the body and
+moved into `<head>` by React on the client. A browser never notices. A client
+reading the HTML as it arrives finds no title or canonical in the head, and
+Google accepts `rel="canonical"` only in `<head>`.
+
+Next sends metadata blocking — in the head — only to user agents matching
+`htmlLimitedBots`. Its default list has Bingbot, link previews and Google's
+hyphenated crawlers but not Googlebot (which renders JavaScript), the AI
+crawlers, or the SEO crawlers a crawl comparison is run with.
+`lib/seo/metadata-bots.ts` keeps Next's list and adds those; browsers keep
+streaming.
+
+Measured on 18 Nov 2026 on local production builds of `main` and of this
+change, seven pages, three warm requests each: on `main`, Googlebot, GPTBot,
+ClaudeBot and Screaming Frog got the metadata in the body on all 21 responses
+and Bingbot in the head; with the change, every crawler gets it in the head on
+all 21, Chrome still streams on all 21, and every page sends the same tags as
+before to each. `tests/seo/metadata-bots.test.ts` pins representative user
+agents on both sides and checks `next.config.ts` passes the pattern.
 
 ### Images in the sitemap and the Article node
 
