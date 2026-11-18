@@ -107,6 +107,24 @@ A changed slug on a live translation writes a 301 into Redirects
 (`lib/i18n/slug-redirects.ts`), collapsing chains. English slugs are not
 redirected automatically — that remains a person's decision.
 
+### Taking a translation down
+
+Measured on a local production build on 17–18 Nov 2026; each takes effect on
+the next request, and English is not touched.
+
+- **In the admin**: switch to the language, set **Translation status** to
+  Draft, press Publish. The page 404s, the English page loses its hreflang and
+  its switcher entry, and the sitemap drops the URL. The text stays as that
+  language's draft, ready to publish again.
+- **Through the connector**, with an administrator's key: `updatePosts` with
+  `locale`, `translationStatus: "draft"` and `_status: "published"`. The same
+  write, the same effect.
+- **Deleting the text outright** has no button and no tool. It is that
+  language's rows in `posts_locales` and `_posts_v_locales` (and in
+  `media_locales` for its alt text). A database delete skips Payload's hooks,
+  so nothing is purged: pages keep the old state until `CONTENT_TTL_SECONDS`
+  runs out. Prefer the Draft takedown, and delete only what it leaves behind.
+
 **A trap found while building this.** Calling the Local API with both `req`
 and `locale` writes that locale onto the shared `req`. Inside a hook that runs
 during a save in another language, the rest of the save then lands in that
@@ -249,10 +267,27 @@ docker compose run --rm -e DATABASE_URI=$SCRATCH migrate \
 
 `/tmp/before.json` lives in the throwaway container; keep the steps in one
 container (`docker compose run --rm -e … migrate sh -c '…; …; …'`) or mount a
-directory if you run them separately. The last command must print `OK`. Then production, in a deploy: `pnpm backup:db`
-first, then the normal deploy (`docker compose run --rm migrate` runs the
-migration before the containers are replaced), then the counts again against
-production compared with a reading taken just before.
+directory if you run them separately. The last command must print `OK`.
+
+### Then production, in this order
+
+1. No English post or page may hold a locale code as its slug, and no redirect
+   may start with `/en/`, `/es/`, `/id/` or `/de/`. Posts were checked through
+   the connector on 18 Nov 2026 (none, live or draft); check pages and
+   Redirects in the admin.
+2. `pnpm i18n:migration-counts --out` against production, saved off the
+   container.
+3. `pnpm backup:db`, and confirm it landed off-server.
+4. The normal deploy: `docker compose run --rm migrate` applies the three
+   migrations (`add_localization`, `add_translation_tool_capabilities`,
+   `add_drafted_at`) before the containers are replaced.
+5. `pnpm i18n:migration-counts --compare` against the reading from step 2. It
+   must print `OK`; anything else, restore the step 3 backup.
+6. Spot-check that English is unchanged: a few articles, `/sitemap.xml` (no new
+   URLs, no `xhtml:link`), `/rss/`, and `/es/` answering 404.
+7. Existing MCP keys get `saveTranslation` and `translationStatus` from the
+   capabilities they already had; review them under API keys if that is not
+   wanted.
 
 ## Adding a language
 
