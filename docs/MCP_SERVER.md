@@ -142,6 +142,15 @@ the tool list.
 draft, and takes an editor exactly as `editLegacyHtml` does, so an existing
 key or grant gets it exactly where it has `editLegacyHtml`
 (`20261024_144445_add_convert_legacy_capability`).
+`saveTranslation` writes a draft body in another language and never English —
+what `updateArticleMarkdown` already does — so an existing key gets it exactly
+where it had `updateArticleMarkdown`; `translationStatus` reads what
+`editorialStatus` reads, so it follows `posts.find`
+(`20261117_131427_add_translation_tool_capabilities`). Setting alt text through
+`saveTranslation` writes `media` in a translated language, which the plugin's
+own `media` capability (find only) does not; it is limited to images the
+article shows, and media's own `update` rule (editors and administrators)
+still decides.
 
 ### Tools
 
@@ -152,24 +161,59 @@ all.
 
 Written for this project, because the generated ones cannot do the job:
 
-| Tool                    | Does                                                                                                                                                                                                                                                                                         |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `draftArticle`          | Creates a post from Markdown, always as a draft. Resolves tag and author slugs, refuses unknown ones. The `ghostID` is autofilled by the collection.                                                                                                                                         |
-| `readArticleMarkdown`   | Reads a post back as Markdown, including the draft body, with each module as a marker line and its contents in `blocks`. Says so when the page renders from `legacyHTML`.                                                                                                                    |
-| `readLegacyHtml`        | Read-only. A migrated post's Ghost HTML exactly as stored, a page at a time — or, given text as a reader sees it, each match as the stored HTML it spans, with context, its heading and whether it is unique. Refused where the page renders from the rich-text body.                        |
-| `listArticleVersions`   | Lists a post's saved versions, newest first — id, time, title, status and a 100-character snippet each, never a body.                                                                                                                                                                        |
-| `readArticleVersion`    | Reads one saved version in exactly the shape `readArticleMarkdown` returns the draft. Read-only.                                                                                                                                                                                             |
-| `restoreArticleVersion` | Reverts a post's body, or its whole article, to a saved version — as a draft, overwriting rather than merging. Has a dry run and an undo.                                                                                                                                                    |
-| `updateArticleMarkdown` | Replaces a body from Markdown, saved as a draft. Puts each marked module back as it was; reports which were kept and which removed.                                                                                                                                                          |
-| `editLegacyHtml`        | Exact find-and-replace edits to a migrated post's Ghost HTML, saved as a draft, all or none. New markup is links, `em`, `strong`, `i` and `b` only; a link to this site must name a live or scheduled article. Has a dry run. See [Editing a migrated article](#editing-a-migrated-article). |
-| `convertLegacyArticle`  | Converts one migrated post from its Ghost HTML into the rich-text body, so the module tools work on it. Dry run by default, with a report; saves a draft only when nothing is refused. See [Converting a migrated article](#converting-a-migrated-article).                                  |
-| `setKeyFactsBlock`      | Sets an article's key facts card — label and value pairs — in place, or under a named body heading. Saved as a draft; the rest of the body is untouched.                                                                                                                                     |
-| `setFAQBlock`           | Sets an article's FAQ — questions with Markdown answers — in place, under a named body heading, or in place of a Markdown FAQ section. Saved as a draft; the rest of the body is untouched.                                                                                                  |
-| `setTableBlock`         | Sets a comparison table — caption, header row, rows with inline-Markdown cells — by key, in a named section, or read from the Markdown table under a heading. Saved as a draft; the rest of the body is untouched.                                                                           |
-| `uploadMedia`           | Adds an image to the Media library from base64 and returns its id, for `updatePosts` to set as a `featuredImage`.                                                                                                                                                                            |
-| `uploadMediaFromUrl`    | The same, from an https address the server fetches itself. The only one of the two that works from a phone or a scheduled run.                                                                                                                                                               |
-| `publishArticle`        | Publishes a post as its newest version, in place, or schedules one that is not live — `"now"` or a zoned time ahead. Never moves a live article's date, slug or canonical URL; refuses to backdate. Has a dry run. Needs an administrator's key or a connector granted publishing.           |
-| `editorialStatus`       | Read-only. What is scheduled in the next days and what went live in the last, each with its address; and what is saved but not out — live or scheduled articles whose newest version is an unpublished draft, and drafts whose date has passed. The same lists as the admin dashboard.       |
+| Tool                    | Does                                                                                                                                                                                                                                                                                                                                  |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `draftArticle`          | Creates a post from Markdown, always as a draft. Resolves tag and author slugs, refuses unknown ones. The `ghostID` is autofilled by the collection.                                                                                                                                                                                  |
+| `readArticleMarkdown`   | Reads a post back as Markdown, including the draft body, with each module as a marker line and its contents in `blocks`. Says so when the page renders from `legacyHTML`.                                                                                                                                                             |
+| `readLegacyHtml`        | Read-only. A migrated post's Ghost HTML exactly as stored, a page at a time — or, given text as a reader sees it, each match as the stored HTML it spans, with context, its heading and whether it is unique. Refused where the page renders from the rich-text body.                                                                 |
+| `listArticleVersions`   | Lists a post's saved versions, newest first — id, time, title, status and a 100-character snippet each, never a body.                                                                                                                                                                                                                 |
+| `readArticleVersion`    | Reads one saved version in exactly the shape `readArticleMarkdown` returns the draft. Read-only.                                                                                                                                                                                                                                      |
+| `restoreArticleVersion` | Reverts a post's body, or its whole article, to a saved version — as a draft, overwriting rather than merging. Has a dry run and an undo.                                                                                                                                                                                             |
+| `updateArticleMarkdown` | Replaces a body from Markdown, saved as a draft. Puts each marked module back as it was; reports which were kept and which removed.                                                                                                                                                                                                   |
+| `editLegacyHtml`        | Exact find-and-replace edits to a migrated post's Ghost HTML, saved as a draft, all or none. New markup is links, `em`, `strong`, `i` and `b` only; a link to this site must name a live or scheduled article. Has a dry run. See [Editing a migrated article](#editing-a-migrated-article).                                          |
+| `convertLegacyArticle`  | Converts one migrated post from its Ghost HTML into the rich-text body, so the module tools work on it. Dry run by default, with a report; saves a draft only when nothing is refused. See [Converting a migrated article](#converting-a-migrated-article).                                                                           |
+| `setKeyFactsBlock`      | Sets an article's key facts card — label and value pairs — in place, or under a named body heading. Saved as a draft; the rest of the body is untouched.                                                                                                                                                                              |
+| `setFAQBlock`           | Sets an article's FAQ — questions with Markdown answers — in place, under a named body heading, or in place of a Markdown FAQ section. Saved as a draft; the rest of the body is untouched.                                                                                                                                           |
+| `setTableBlock`         | Sets a comparison table — caption, header row, rows with inline-Markdown cells — by key, in a named section, or read from the Markdown table under a heading. Saved as a draft; the rest of the body is untouched.                                                                                                                    |
+| `uploadMedia`           | Adds an image to the Media library from base64 and returns its id, for `updatePosts` to set as a `featuredImage`.                                                                                                                                                                                                                     |
+| `uploadMediaFromUrl`    | The same, from an https address the server fetches itself. The only one of the two that works from a phone or a scheduled run.                                                                                                                                                                                                        |
+| `publishArticle`        | Publishes a post as its newest version, in place, or schedules one that is not live — `"now"` or a zoned time ahead. Never moves a live article's date, slug or canonical URL; refuses to backdate. Has a dry run. Needs an administrator's key or a connector granted publishing.                                                    |
+| `editorialStatus`       | Read-only. What is scheduled in the next days and what went live in the last, each with its address; and what is saved but not out — live or scheduled articles whose newest version is an unpublished draft, and drafts whose date has passed. The same lists as the admin dashboard.                                                |
+| `saveTranslation`       | Writes the translation of an existing article into one language (`es`, `id`, `de`), as a draft in that language only. Refuses `en`; checks afterwards that English came back unchanged. Keeps block markers — from the translation if it has the module, else copied from English to be translated. Sets per-language image alt text. |
+| `translationStatus`     | Read-only. For each article, newest first: whether each language's translation is published, scheduled, a draft or missing, its address, and whether English was republished since the translation was made.                                                                                                                          |
+
+### Translations
+
+Twelve article tools take an optional `locale` — `draftArticle`,
+`readArticleMarkdown`, `updateArticleMarkdown`, `setFAQBlock`, `setTableBlock`,
+`setKeyFactsBlock`, `readLegacyHtml`, `editLegacyHtml`, `convertLegacyArticle`,
+`publishArticle`, `listArticleVersions`, `readArticleVersion` — and so does
+`editorialStatus`. **Without it every call is exactly the call it was**: the
+wrapper sets the request's language to English, which it already was
+(`tests/mcp/translation-tools.test.ts`). With a translated language the tool
+reads and writes that language's version; `slug` is the slug in that language,
+and the English slug finds the article too. `findPosts` takes `locale` from the
+plugin and returns that language's slugs.
+
+The loop for one article:
+
+1. `readArticleMarkdown({ id })` — the English text, with block markers.
+2. `saveTranslation({ id, locale: "es", title, slug?, excerpt, metaTitle,
+metaDescription, markdown, imageAlt? })` — the translation as a draft, markers
+   kept. It names any module still holding English (`untranslatedBlocks`) and any
+   image without alt text in that language (`imagesMissingAlt`).
+3. `setFAQBlock` / `setTableBlock` / `setKeyFactsBlock` with `locale: "es"` and the
+   same keys — the modules, translated.
+4. `publishArticle({ id, locale: "es", dryRun: true })`, then without `dryRun`,
+   or with `publishAt` to schedule. Publishes Spanish only; refuses while English
+   is unpublished, while a module is still English, or while an image has no
+   Spanish alt text. A changed slug on a live translation is redirected (301).
+5. `translationStatus({ locale: "es" })` — what is out, scheduled, drafted or
+   missing, and where English has moved on since (`englishChangedSince`).
+
+Link checks in `editLegacyHtml` accept `/es/{slug}/` as well as `/{slug}/`: a
+translated address must be a published (or scheduled) translation. See
+[`LOCALIZATION.md`](LOCALIZATION.md) for the model behind all of this.
 
 ### Modules in a body
 
@@ -581,6 +625,19 @@ rows, so a phone and the dashboard cannot disagree. Nothing wakes up at a
 scheduled time; a scheduled article appears once cached pages turn over, within
 `releaseWithinMinutes` of it, and a scheduled run that wants to confirm a slot
 went out should check after that.
+
+**A publish through the connector shows at once, as one from the admin does.**
+It did not until 18 Nov 2026. Payload's `afterChange` hooks drop the site's
+cached reads (`lib/cache/purge.ts`), and Next.js applies a route handler's
+`revalidateTag` calls when the handler's promise resolves. The MCP transport
+(`mcp-handler`) resolves that promise when it writes the response headers,
+which for a streamed `tools/call` is before the tool runs — so every purge a
+tool triggered was queued too late and dropped, and a connector publish, in any
+language, reached readers only when `CONTENT_TTL_SECONDS` ran out. The REST
+route now reads an MCP `POST` to its end before returning (`settled` in
+`app/(payload)/api/[...slug]/route.ts`), and `e2e/mcp.spec.ts` checks a page
+the moment after a publish. A write that bypasses Payload — a SQL fix, a
+restore — still purges nothing and waits out the TTL.
 
 ### Version history
 

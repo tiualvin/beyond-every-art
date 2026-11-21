@@ -11,12 +11,12 @@ import type { NavLink } from '@/lib/content/queries'
 import {
   type BillingPeriod,
   checkoutUrl,
-  FREE_BENEFITS,
-  PAID_BENEFITS,
   PRICES,
   YEARLY_SAVING,
 } from '@/lib/membership'
-import { SEARCH_PATH } from '@/lib/seo/site'
+import { dictionaryFor, type Dictionary } from '@/lib/i18n/dictionaries'
+import { DEFAULT_LOCALE, isPrefixedLocale } from '@/lib/i18n/locales'
+import { localeSearchPath, SEARCH_PATH } from '@/lib/seo/site'
 
 import { editorial, quick } from './motion/variants'
 import { SearchIcon } from './icons'
@@ -37,7 +37,17 @@ type Overlay = 'menu' | 'search' | 'subscribe' | null
  * is a containing block for `position: fixed` descendants, which would pin
  * every overlay to the header instead of the viewport.
  */
-export function SiteChrome({ links, cta }: { links: NavLink[]; cta: NavLink }) {
+export function SiteChrome({
+  links,
+  cta,
+  locale = DEFAULT_LOCALE,
+}: {
+  links: NavLink[]
+  cta: NavLink
+  /** The page's language: the overlays' words, and where search looks. */
+  locale?: string
+}) {
+  const t = dictionaryFor(locale)
   const [overlay, setOverlay] = useState<Overlay>(null)
   const [mounted, setMounted] = useState(false)
   const pathname = usePathname()
@@ -89,7 +99,7 @@ export function SiteChrome({ links, cta }: { links: NavLink[]; cta: NavLink }) {
           className="icon-button"
           // "Open search", not "Search": it opens the drawer rather than
           // running a query, and /search already has a button called Search.
-          aria-label="Open search"
+          aria-label={t.chrome.openSearch}
           onClick={() => setOverlay('search')}
         >
           <SearchIcon size={18} />
@@ -107,7 +117,7 @@ export function SiteChrome({ links, cta }: { links: NavLink[]; cta: NavLink }) {
           ref={toggleRef}
           type="button"
           className="nav-toggle"
-          aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+          aria-label={menuOpen ? t.chrome.closeMenu : t.chrome.openMenu}
           aria-expanded={menuOpen}
           aria-controls="mobile-nav"
           onClick={() => setOverlay(menuOpen ? null : 'menu')}
@@ -136,16 +146,21 @@ export function SiteChrome({ links, cta }: { links: NavLink[]; cta: NavLink }) {
               open={menuOpen}
               links={links}
               cta={cta}
+              t={t}
+              locale={locale}
               onClose={() => setOverlay(null)}
               onSubscribe={() => setOverlay('subscribe')}
             />
             <SearchDrawer
               open={overlay === 'search'}
               onClose={() => setOverlay(null)}
+              t={t}
+              locale={locale}
             />
             <SubscribeModal
               open={overlay === 'subscribe'}
               onClose={() => setOverlay(null)}
+              t={t}
             />
           </>,
           document.body,
@@ -162,12 +177,16 @@ function MobileDrawer({
   cta,
   onClose,
   onSubscribe,
+  t,
+  locale,
 }: {
   open: boolean
   links: NavLink[]
   cta: NavLink
   onClose: () => void
   onSubscribe: () => void
+  t: Dictionary
+  locale: string
 }) {
   const reduced = useReducedMotion()
   const router = useRouter()
@@ -178,7 +197,10 @@ function MobileDrawer({
     const query = term.trim()
     if (!query) return
     onClose()
-    router.push(`${SEARCH_PATH}?q=${encodeURIComponent(query)}`)
+    const path = isPrefixedLocale(locale)
+      ? localeSearchPath(locale)
+      : SEARCH_PATH
+    router.push(`${path}?q=${encodeURIComponent(query)}`)
   }
 
   return (
@@ -205,8 +227,8 @@ function MobileDrawer({
               type="search"
               value={term}
               onChange={(event) => setTerm(event.target.value)}
-              placeholder="Search the archive"
-              aria-label="Search the archive"
+              placeholder={t.chrome.searchArchive}
+              aria-label={t.chrome.searchArchive}
             />
           </motion.form>
 
@@ -256,9 +278,13 @@ type Result = {
 function SearchDrawer({
   open,
   onClose,
+  t,
+  locale,
 }: {
   open: boolean
   onClose: () => void
+  t: Dictionary
+  locale: string
 }) {
   const reduced = useReducedMotion()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -288,8 +314,11 @@ function SearchDrawer({
     const controller = new AbortController()
     const timer = setTimeout(async () => {
       try {
+        // The page's language is part of the question: a Spanish page
+        // suggests Spanish articles. English sends exactly what it always did.
+        const scope = isPrefixedLocale(locale) ? `&locale=${locale}` : ''
         const response = await fetch(
-          `${SEARCH_PATH}suggest/?q=${encodeURIComponent(query)}`,
+          `${SEARCH_PATH}suggest/?q=${encodeURIComponent(query)}${scope}`,
           { signal: controller.signal },
         )
         const data = (await response.json()) as { results: Result[] }
@@ -305,7 +334,7 @@ function SearchDrawer({
       controller.abort()
       clearTimeout(timer)
     }
-  }, [term])
+  }, [term, locale])
 
   const query = term.trim()
 
@@ -324,7 +353,7 @@ function SearchDrawer({
           <motion.div
             className="search-panel"
             role="search"
-            aria-label="Search the archive"
+            aria-label={t.chrome.searchArchive}
             initial={reduced ? false : { opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={reduced ? { opacity: 0 } : { opacity: 0, y: -10 }}
@@ -338,15 +367,15 @@ function SearchDrawer({
                   type="search"
                   value={term}
                   onChange={(event) => setTerm(event.target.value)}
-                  placeholder="Search the archive"
-                  aria-label="Search the archive"
+                  placeholder={t.chrome.searchArchive}
+                  aria-label={t.chrome.searchArchive}
                   autoComplete="off"
                   spellCheck={false}
                 />
                 <button
                   type="button"
                   className="icon-button"
-                  aria-label="Close search"
+                  aria-label={t.chrome.closeSearch}
                   onClick={onClose}
                 >
                   <svg
@@ -367,15 +396,14 @@ function SearchDrawer({
               <p className="search__meta" aria-live="polite">
                 <span>
                   {!query
-                    ? 'Type to search'
+                    ? t.chrome.typeToSearch
                     : loading
-                      ? 'Searching…'
-                      : `${results.length} ${
-                          results.length === 1 ? 'result' : 'results'
-                        }`}
+                      ? t.chrome.searching
+                      : t.chrome.results(results.length)}
                 </span>
                 <span className="search__hint">
-                  <kbd>Esc</kbd> to close
+                  <kbd>Esc</kbd>
+                  {t.chrome.toClose}
                 </span>
               </p>
 
@@ -390,7 +418,7 @@ function SearchDrawer({
                         {result.excerpt && <span>{result.excerpt}</span>}
                       </span>
                       <span className="search__result-meta">
-                        {[result.tag, `${result.readingTime} min`]
+                        {[result.tag, t.common.minutes(result.readingTime)]
                           .filter(Boolean)
                           .join(' · ')}
                       </span>
@@ -401,7 +429,9 @@ function SearchDrawer({
 
               {query && !loading && results.length === 0 && (
                 <p className="search__empty">
-                  Nothing matches <b>{query}</b> yet.
+                  {t.chrome.nothingMatches[0]}
+                  <b>{query}</b>
+                  {t.chrome.nothingMatches[1]}
                 </p>
               )}
             </div>
@@ -417,9 +447,11 @@ function SearchDrawer({
 function SubscribeModal({
   open,
   onClose,
+  t,
 }: {
   open: boolean
   onClose: () => void
+  t: Dictionary
 }) {
   const reduced = useReducedMotion()
   const dialogRef = useRef<HTMLDivElement>(null)
@@ -458,7 +490,7 @@ function SubscribeModal({
             <button
               type="button"
               className="modal__close"
-              aria-label="Close"
+              aria-label={t.chrome.close}
               onClick={onClose}
             >
               <svg
@@ -474,7 +506,7 @@ function SubscribeModal({
                 <path d="M6 6l12 12M18 6L6 18" />
               </svg>
             </button>
-            <SubscribeBody onClose={onClose} />
+            <SubscribeBody onClose={onClose} t={t.subscribe} />
           </motion.div>
         </motion.div>
       )}
@@ -482,7 +514,13 @@ function SubscribeModal({
   )
 }
 
-function SubscribeBody({ onClose }: { onClose: () => void }) {
+function SubscribeBody({
+  onClose,
+  t,
+}: {
+  onClose: () => void
+  t: Dictionary['subscribe']
+}) {
   const [status, formAction, pending] = useActionState(subscribeFromModal, null)
   const [plan, setPlan] = useState<'free' | 'paid'>('free')
   const [period, setPeriod] = useState<BillingPeriod>('monthly')
@@ -490,11 +528,8 @@ function SubscribeBody({ onClose }: { onClose: () => void }) {
   if (status === 'success') {
     return (
       <div className="modal__body modal__done">
-        <h2 id="subscribe-title">You&rsquo;re on the list</h2>
-        <p>
-          New stories on materials, technique, and meaning — delivered when
-          they&rsquo;re ready.
-        </p>
+        <h2 id="subscribe-title">{t.onTheList}</h2>
+        <p>{t.onTheListBody}</p>
         {/* "Done", not "Close": the dismiss ✕ above is already called Close,
             and two controls with one name is a genuine ambiguity, not just a
             test inconvenience. */}
@@ -503,7 +538,7 @@ function SubscribeBody({ onClose }: { onClose: () => void }) {
           className="button button--primary"
           onClick={onClose}
         >
-          Done
+          {t.done}
         </button>
       </div>
     )
@@ -514,13 +549,11 @@ function SubscribeBody({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="modal__body">
-      <h2 id="subscribe-title">Stay close to the work</h2>
-      <p className="modal__lede">
-        Read the journal, or back it — and open the pieces written for members.
-      </p>
+      <h2 id="subscribe-title">{t.title}</h2>
+      <p className="modal__lede">{t.lede}</p>
 
       <fieldset className="plans">
-        <legend className="visually-hidden">Choose a membership</legend>
+        <legend className="visually-hidden">{t.chooseMembership}</legend>
 
         <label className={`plan${paid ? '' : ' is-selected'}`}>
           <input
@@ -531,16 +564,16 @@ function SubscribeBody({ onClose }: { onClose: () => void }) {
             onChange={() => setPlan('free')}
           />
           <span className="plan__head">
-            <span className="plan__name">Free</span>
+            <span className="plan__name">{t.free}</span>
             <span className="plan__price">
               <b>$0</b>
             </span>
           </span>
-          <Benefits items={FREE_BENEFITS} />
+          <Benefits items={t.freeBenefits} />
         </label>
 
         <label className={`plan${paid ? ' is-selected' : ''}`}>
-          <span className="plan__badge">Full access</span>
+          <span className="plan__badge">{t.fullAccess}</span>
           <input
             type="radio"
             name="plan"
@@ -549,33 +582,33 @@ function SubscribeBody({ onClose }: { onClose: () => void }) {
             onChange={() => setPlan('paid')}
           />
           <span className="plan__head">
-            <span className="plan__name">Member</span>
+            <span className="plan__name">{t.member}</span>
             <span className="plan__price">
               <b>${PRICES[period]}</b>
-              {period === 'monthly' ? '/mo' : '/yr'}
+              {period === 'monthly' ? t.perMonth : t.perYear}
             </span>
           </span>
-          <Benefits items={PAID_BENEFITS} />
+          <Benefits items={t.paidBenefits} />
         </label>
       </fieldset>
 
       {paid && (
-        <div className="billing" role="group" aria-label="Billing period">
+        <div className="billing" role="group" aria-label={t.billingPeriod}>
           <button
             type="button"
             aria-pressed={period === 'monthly'}
             onClick={() => setPeriod('monthly')}
           >
-            Monthly
-            <span>${PRICES.monthly} a month</span>
+            {t.monthly}
+            <span>{t.aMonth(PRICES.monthly)}</span>
           </button>
           <button
             type="button"
             aria-pressed={period === 'yearly'}
             onClick={() => setPeriod('yearly')}
           >
-            Yearly
-            <span>Save ${YEARLY_SAVING}</span>
+            {t.yearly}
+            <span>{t.save(YEARLY_SAVING)}</span>
           </button>
         </div>
       )}
@@ -583,19 +616,16 @@ function SubscribeBody({ onClose }: { onClose: () => void }) {
       {paid ? (
         checkout ? (
           <a className="button button--primary modal__cta" href={checkout}>
-            Continue to payment
+            {t.continueToPayment}
           </a>
         ) : (
           <>
             <button className="button button--primary modal__cta" disabled>
-              Continue to payment
+              {t.continueToPayment}
             </button>
             {/* Said plainly rather than failing at the click: this site reads
                 Stripe webhooks but has no checkout of its own yet. */}
-            <p className="modal__small">
-              Paid membership isn&rsquo;t open here yet. Choose Free above and
-              we&rsquo;ll write to you when it is.
-            </p>
+            <p className="modal__small">{t.paidNotOpen}</p>
           </>
         )
       ) : null}
@@ -606,30 +636,24 @@ function SubscribeBody({ onClose }: { onClose: () => void }) {
             type="email"
             name="email"
             required
-            placeholder="you@example.com"
-            aria-label="Email address"
+            placeholder={t.emailPlaceholder}
+            aria-label={t.emailAddress}
             autoComplete="email"
           />
           {status === 'invalid' && (
-            <p className="modal__error">
-              That address doesn&rsquo;t look right — check it and try again.
-            </p>
+            <p className="modal__error">{t.invalidEmail}</p>
           )}
           {status === 'error' && (
-            <p className="modal__error">
-              Something went wrong on our end. Please try again in a moment.
-            </p>
+            <p className="modal__error">{t.serverError}</p>
           )}
           <button
             className="button button--primary"
             type="submit"
             disabled={pending}
           >
-            {pending ? 'Subscribing…' : 'Subscribe'}
+            {pending ? t.subscribing : t.subscribe}
           </button>
-          <p className="modal__small">
-            Free. Unsubscribe from any email, any time.
-          </p>
+          <p className="modal__small">{t.freeSmall}</p>
         </form>
       )}
     </div>

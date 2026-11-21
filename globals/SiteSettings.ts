@@ -9,8 +9,10 @@ export const SiteSettings: GlobalConfig = {
   access: globalPublicReadAdminUpdate,
   hooks: { afterChange: [purgeGlobalOnChange(CONTENT_TAGS.globals)] },
   fields: [
+    // The publication's name is the same in every language; its description
+    // is not.
     { name: 'title', type: 'text', required: true },
-    { name: 'description', type: 'textarea' },
+    { name: 'description', type: 'textarea', localized: true },
     { name: 'canonicalURL', label: 'Canonical URL', type: 'text' },
     {
       // The only image this global carries, and the only one on the site an

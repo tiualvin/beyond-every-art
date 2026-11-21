@@ -21,7 +21,7 @@ const body = readFileSync(
   'utf8',
 )
 const slugPage = readFileSync(
-  join(process.cwd(), 'app/(frontend)/[slug]/page.tsx'),
+  join(process.cwd(), 'app/(frontend)/post-view.tsx'),
   'utf8',
 )
 const homePage = readFileSync(
@@ -134,7 +134,9 @@ describe('an unfilled slot', () => {
   // `HouseBand`, so there is one "when no ad is shown" surface rather than a
   // second field to configure and a second migration to run.
   it('gives every billboard something to hold', () => {
-    expect(slugPage).toContain('<HouseBand fallback={settings.railFallback} />')
+    // In the article template, with the page's language spread in for a
+    // translation (nothing for English).
+    expect(slugPage).toMatch(/<HouseBand\s+fallback=\{settings\.railFallback\}/)
     expect(homePage).toContain('<HouseBand fallback={settings.railFallback} />')
     expect(archiveGroups).toContain('<HouseBand fallback={fallback} />')
   })

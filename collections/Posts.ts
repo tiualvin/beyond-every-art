@@ -17,6 +17,7 @@ import {
 import { reviewStateField } from '../fields/review'
 import { noindexField, seoFields } from '../fields/seo'
 import { slugField } from '../fields/slug'
+import { translationFields } from '../fields/translation'
 import { CONTENT_TAGS } from '../lib/cache/content'
 import { stampLastEditedBy, lastEditedByField } from '../lib/content/authorship'
 import { contentEditor } from '../lib/content/editor'
@@ -28,8 +29,15 @@ import {
   refuseMcpPublish,
 } from '../lib/mcp/publish-guard'
 import { buildPreviewUrl } from '../lib/preview/live-preview'
+import {
+  isolateLocalePublish,
+  stampDraftedAt,
+  stampLocaleDates,
+  stampTranslatedFrom,
+} from '../lib/i18n/publishing'
+import { redirectChangedTranslationSlug } from '../lib/i18n/slug-redirects'
 import { indexNowOnChange, indexNowOnDelete } from '../lib/seo/indexnow'
-import { postPath } from '../lib/seo/site'
+import { localePostPath, postPath } from '../lib/seo/site'
 
 export const Posts: CollectionConfig = {
   slug: 'posts',
@@ -37,7 +45,8 @@ export const Posts: CollectionConfig = {
     group: 'Content',
     useAsTitle: 'title',
     defaultColumns: ['title', 'publishedAt', 'visibility', '_status'],
-    preview: (doc) => buildPreviewUrl({ collection: 'posts', slug: doc?.slug }),
+    preview: (doc, { locale }) =>
+      buildPreviewUrl({ collection: 'posts', slug: doc?.slug, locale }),
   },
   // The date an editor thinks in. Postgres orders nulls first on a descending
   // sort, so drafts — which have no `publishedAt` yet — collect at the top of
@@ -63,7 +72,10 @@ export const Posts: CollectionConfig = {
     // Before anything else decides which row a write lands on: over MCP, only
     // an explicit publish may touch the live one. See the hook for the
     // unpublish this prevents.
-    beforeOperation: [keepMcpWritesInDraft],
+    //
+    // Then, for a write that does reach the live row, which languages it
+    // publishes: one, the one it was made in. See `lib/i18n/publishing.ts`.
+    beforeOperation: [keepMcpWritesInDraft, isolateLocalePublish],
     beforeChange: [
       ({ data, operation, req }) => {
         // `req.user` is a union now that the MCP plugin adds its own auth
@@ -76,15 +88,19 @@ export const Posts: CollectionConfig = {
       },
       refuseMcpPublish,
       stampLastEditedBy,
-      // Last, so it sees the status this write actually lands on.
+      stampTranslatedFrom,
+      // Last, so they see the status this write actually lands on.
       stampPublishedAt,
+      stampLocaleDates,
+      stampDraftedAt,
+      redirectChangedTranslationSlug,
     ],
     afterChange: [
       recordMcpWrite,
       purgeOnChange(CONTENT_TAGS.posts),
       // Tells Bing a published URL changed. Off unless INDEXNOW_KEY is set;
       // see lib/seo/indexnow.ts.
-      indexNowOnChange(postPath),
+      indexNowOnChange(postPath, { localizedPath: localePostPath }),
     ],
     afterDelete: [
       purgeOnDelete(CONTENT_TAGS.posts),
@@ -116,10 +132,14 @@ export const Posts: CollectionConfig = {
           label: 'Content',
           description: 'The article itself.',
           fields: [
-            { name: 'title', type: 'text', required: true },
+            // Every field a reader sees is per language (`localized`), and a
+            // language with nothing saved shows nothing: the site never falls
+            // back to English under a translated URL.
+            { name: 'title', type: 'text', required: true, localized: true },
             {
               name: 'excerpt',
               type: 'textarea',
+              localized: true,
               admin: {
                 description:
                   'The standfirst under the headline, and the line every card, feed item and share preview uses. A post without one shows a blank card in the archive.',
@@ -134,11 +154,21 @@ export const Posts: CollectionConfig = {
                   'Opens the article and fills its card in every listing.',
               },
             },
-            { name: 'content', type: 'richText', editor: contentEditor },
+            // Localized as a whole, modules included: a block's text lives
+            // inside this field's JSON, so a translated body is its own
+            // document and its FAQ, table and key facts are translated with
+            // it. Fields inside the blocks are deliberately not `localized`.
+            {
+              name: 'content',
+              type: 'richText',
+              editor: contentEditor,
+              localized: true,
+            },
             {
               name: 'legacyHTML',
               label: 'Legacy HTML',
               type: 'code',
+              localized: true,
               admin: {
                 language: 'html',
                 // Kept in this tab, beside the editor, rather than filed under
@@ -183,7 +213,7 @@ export const Posts: CollectionConfig = {
                 },
               },
             },
-            ...seoFields({ canonical: true }),
+            ...seoFields({ canonical: true, localized: true }),
           ],
         },
         {
@@ -214,7 +244,7 @@ export const Posts: CollectionConfig = {
         },
       },
     },
-    slugField({ reserved: true, sidebar: true }),
+    slugField({ reserved: true, sidebar: true, localized: true }),
     {
       name: 'publishedAt',
       label: 'Publish date',
@@ -277,6 +307,7 @@ export const Posts: CollectionConfig = {
           'The first one labels the card; all of them file the article under a tag archive.',
       },
     },
+    ...translationFields(),
     reviewStateField(),
     lastEditedByField(),
     noindexField(),

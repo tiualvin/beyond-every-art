@@ -31,6 +31,7 @@
 //   Ghost's HTML is not guaranteed clean and an edit should not be refused for
 //   a fault it did not make.
 
+import { isPrefixedLocale, type Locale } from '../i18n/locales'
 import {
   html as spec,
   parseFragment,
@@ -653,6 +654,12 @@ export type AddedLink = {
       path: string
       /** The article it names, or null when the path is not an article's. */
       slug: string | null
+      /**
+       * The language the path is in, when it is a translation's address
+       * (`/es/{slug}/`); absent for English's one-segment `/{slug}/`. `slug` is
+       * then the slug in that language.
+       */
+      locale?: Locale
     }
 )
 
@@ -699,7 +706,7 @@ function classifyHref(
 ):
   | { refused: string }
   | { site: false }
-  | { site: true; path: string; slug: string | null } {
+  | { site: true; path: string; slug: string | null; locale?: Locale } {
   if (!value) return { refused: 'an empty href' }
 
   // A browser strips or rewrites all of these before reading a URL, which is
@@ -767,15 +774,27 @@ function classifyHref(
   }
 
   const path = url.pathname
-  const segment = /^\/([^/]+)\/?$/.exec(path)?.[1]
-  let slug: string | null = null
-  if (segment) {
+  const decode = (value: string | undefined): string | null => {
+    if (!value) return null
     try {
-      slug = decodeURIComponent(segment)
+      return decodeURIComponent(value)
     } catch {
-      slug = null
+      return null
     }
   }
+  // A translated article lives one level down, under its language.
+  const translated = /^\/([a-z]{2})\/([^/]+)\/?$/.exec(path)
+  if (translated && isPrefixedLocale(translated[1])) {
+    return {
+      site: true,
+      path,
+      slug: decode(translated[2]),
+      locale: translated[1] as Locale,
+    }
+  }
+  const segment = /^\/([^/]+)\/?$/.exec(path)?.[1]
+  // `/es/` alone is a language's home page, not an article.
+  const slug = isPrefixedLocale(segment) ? null : decode(segment)
   return { site: true, path, slug }
 }
 
@@ -1009,6 +1028,7 @@ export function planLegacyEdits(
             target: 'site',
             path: kind.path,
             slug: kind.slug,
+            ...(kind.locale ? { locale: kind.locale } : {}),
           }
         : { edit: edit.number, href, target: 'external' },
     )

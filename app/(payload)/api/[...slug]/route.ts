@@ -8,6 +8,7 @@ import {
   REST_PUT,
 } from '@payloadcms/next/routes'
 
+import { DEFAULT_LOCALE } from '@/lib/i18n/locales'
 import { issuerOrigin, oauthEnabled } from '@/lib/oauth/config'
 import { MCP_PATH, wwwAuthenticate } from '@/lib/oauth/metadata'
 
@@ -43,11 +44,67 @@ function withoutTrailingSlash(request: Request): Request {
   return new Request(url, request)
 }
 
+/**
+ * The request with `?locale=en` added when it names no locale.
+ *
+ * With `localization.fallback: false` — which the site depends on, so a
+ * translated page is never filled with English — Payload 3.90.2 leaves
+ * `req.locale` null for a REST request that does not say which language it
+ * wants, instead of taking the default locale as it does when fallback is on.
+ * Its query validation then reads `req.locale.length` and answers any `where`
+ * with a 500: `GET /api/posts?where[slug][equals]=…`, anonymous or not, failed
+ * the day localization was switched on. The admin panel always sends a locale
+ * and is unaffected.
+ *
+ * English is what such a request meant before there were other languages, and
+ * what Payload itself would pick with fallback on. Only for reads and the MCP
+ * endpoint: a write may carry its locale in the body, which a query parameter
+ * would override.
+ */
+function withDefaultLocale(request: Request): Request {
+  const url = new URL(request.url)
+  if (url.searchParams.has('locale')) return request
+  const read = ['GET', 'HEAD', 'DELETE', 'OPTIONS'].includes(request.method)
+  if (!read && url.pathname !== MCP_PATH) return request
+  url.searchParams.set('locale', DEFAULT_LOCALE)
+  return new Request(url, request)
+}
+
+/**
+ * The MCP response, read to its end before the route handler returns.
+ *
+ * Next.js applies the `revalidateTag` calls a route handler makes once, when
+ * the handler's promise resolves. The MCP transport (`mcp-handler`) resolves
+ * that promise as soon as the response headers are written, which for a
+ * streamed `tools/call` is before the tool runs. Every purge a tool's write
+ * triggers — the `afterChange` hooks in `lib/cache/purge.ts` — was therefore
+ * queued after Next had already applied the queue, and silently dropped: a
+ * publish through the connector reached readers only when `CONTENT_TTL` ran
+ * out, ten minutes later, in any language, while the same write from the admin
+ * panel showed at once.
+ *
+ * Waiting for the body here keeps the tool inside the request, so its purges
+ * land. A stateless `POST` answers one JSON-RPC message and closes, so nothing
+ * that would have been streamed is held for longer than the call takes; the
+ * long-lived event stream is a `GET` and is not touched. `e2e/mcp.spec.ts`
+ * fails if a publish through the connector stops showing on the page at once.
+ */
+async function settled(response: Response): Promise<Response> {
+  if (!response.body) return response
+  const body = await response.arrayBuffer()
+  return new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  })
+}
+
 /** Wraps a Payload route handler so it sees the un-slashed URL. */
 function normalized<Args extends unknown[]>(
   handler: (request: Request, ...args: Args) => Promise<Response>,
 ): (request: Request, ...args: Args) => Promise<Response> {
-  return (request, ...args) => handler(withoutTrailingSlash(request), ...args)
+  return (request, ...args) =>
+    handler(withDefaultLocale(withoutTrailingSlash(request)), ...args)
 }
 
 /**
@@ -73,17 +130,19 @@ export async function POST(
   incoming: Request,
   context: { params: Promise<{ slug: string[] }> },
 ): Promise<Response> {
-  const request = withoutTrailingSlash(incoming)
-  const response = await payloadPost(
+  const request = withDefaultLocale(withoutTrailingSlash(incoming))
+  const mcp = new URL(request.url).pathname === MCP_PATH
+  const answered = await payloadPost(
     request as Parameters<typeof payloadPost>[0],
     context as Parameters<typeof payloadPost>[1],
   )
+  const response = mcp ? await settled(answered) : answered
 
   if (response.status !== 401) return response
 
   const origin = issuerOrigin()
   if (!oauthEnabled() || !origin) return response
-  if (new URL(request.url).pathname !== MCP_PATH) return response
+  if (!mcp) return response
 
   const headers = new Headers(response.headers)
   headers.set('WWW-Authenticate', wwwAuthenticate(origin))

@@ -10,11 +10,16 @@
 // Every entry must name a real destination: a route under `app/(frontend)`, a
 // published page, or an anchor on a page that renders it.
 
+import { dictionaryFor } from '../i18n/dictionaries'
+import { DEFAULT_LOCALE, type Locale } from '../i18n/locales'
 import {
   APPS_PATH,
   FEED_PATH,
   HOME_TOPICS_ID,
   JOURNAL_PATH,
+  localeFeedPath,
+  localeHomePath,
+  localeSearchPath,
   NEWSLETTER_PATH,
   SEARCH_PATH,
 } from '../seo/site'
@@ -61,3 +66,34 @@ export const FALLBACK_FOOTER_NAV: NavLink[] = [
   { label: 'Newsletter', url: NEWSLETTER_PATH },
   { label: 'RSS feed', url: FEED_PATH },
 ]
+
+/**
+ * The masthead and footer for a translated language whose `header` and
+ * `footer` globals have no links of their own in it.
+ *
+ * Smaller than English's on purpose: every entry has to name a page that
+ * exists in that language, and the journal, topics, apps and about pages are
+ * English-only. What a translated edition has is its home page, its search and
+ * its feed — so that is what it links to, in its own words.
+ */
+export function fallbackNavFor(locale: Locale): {
+  header: NavLink[]
+  cta: NavLink
+  footer: NavLink[]
+} {
+  if (locale === DEFAULT_LOCALE) {
+    return {
+      header: FALLBACK_NAV,
+      cta: FALLBACK_CTA,
+      footer: FALLBACK_FOOTER_NAV,
+    }
+  }
+  const t = dictionaryFor(locale).nav
+  const home = { label: t.home, url: localeHomePath(locale) }
+  const search = { label: t.search, url: localeSearchPath(locale) }
+  return {
+    header: [home, search],
+    cta: { label: t.subscribe, url: NEWSLETTER_PATH },
+    footer: [home, search, { label: t.feed, url: localeFeedPath(locale) }],
+  }
+}

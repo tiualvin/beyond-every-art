@@ -4,7 +4,9 @@ import Link from 'next/link'
 import type { PostCard } from '@/lib/content/queries'
 import { formatDate } from '@/lib/format'
 import { visibilityLabel } from '@/lib/membership'
-import { postPath } from '@/lib/seo/site'
+import { dictionaryFor } from '@/lib/i18n/dictionaries'
+import { DEFAULT_LOCALE, localeConfig, type Locale } from '@/lib/i18n/locales'
+import { localePostPath } from '@/lib/seo/site'
 
 import { Reveal } from './motion/reveal'
 import { thumbnailSrc } from '@/lib/content/media'
@@ -22,11 +24,15 @@ const PLATE_SIZES = '(max-width: 46rem) 100vw, (max-width: 64rem) 50vw, 22rem'
 export function ReadNext({
   posts,
   topic,
+  locale = DEFAULT_LOCALE,
 }: {
   posts: PostCard[]
   topic?: string | null
+  /** The page's language; its cards carry their own. */
+  locale?: Locale
 }) {
   if (posts.length === 0) return null
+  const t = dictionaryFor(locale)
 
   return (
     <section className="read-next">
@@ -34,8 +40,10 @@ export function ReadNext({
         <Reveal>
           <div className="read-next__head">
             <div>
-              <p className="eyebrow">Read next</p>
-              <h2>{topic ? `More on ${topic}` : 'More from the journal'}</h2>
+              <p className="eyebrow">{t.readNext.eyebrow}</p>
+              <h2>
+                {topic ? t.readNext.moreOn(topic) : t.readNext.moreFromJournal}
+              </h2>
             </div>
           </div>
         </Reveal>
@@ -45,7 +53,7 @@ export function ReadNext({
             {posts.map((post) => (
               <Link
                 key={post.id}
-                href={postPath(post.slug)}
+                href={localePostPath(post.slug, post.locale ?? DEFAULT_LOCALE)}
                 className="read-next__item"
               >
                 <div className="read-next__plate">
@@ -59,14 +67,19 @@ export function ReadNext({
                     />
                   )}
                 </div>
-                <p className="eyebrow">{post.tags[0]?.name ?? 'Journal'}</p>
+                <p className="eyebrow">
+                  {post.tags[0]?.name ?? t.common.journal}
+                </p>
                 <h3>{post.title}</h3>
                 <p>{post.excerpt}</p>
                 <p className="read-next__meta">
                   {[
-                    visibilityLabel(post.visibility),
-                    `${post.readingTime} min`,
-                    formatDate(post.publishedAt),
+                    visibilityLabel(post.visibility, post.locale),
+                    t.common.minutes(post.readingTime),
+                    formatDate(
+                      post.publishedAt,
+                      localeConfig(post.locale ?? DEFAULT_LOCALE).dateLocale,
+                    ),
                   ]
                     .filter(Boolean)
                     .join(' · ')}

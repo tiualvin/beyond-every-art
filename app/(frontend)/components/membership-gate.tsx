@@ -1,5 +1,7 @@
 'use client'
 
+import { dictionaryFor } from '@/lib/i18n/dictionaries'
+
 import type { PostVisibility } from '@/lib/content/queries'
 
 import { openSubscribeModal } from './subscribe-signal'
@@ -12,30 +14,35 @@ import { openSubscribeModal } from './subscribe-signal'
  * that membership is coming, and offers the one thing that works today, which
  * is the list. When memberships open, this copy is where the paywall goes.
  */
-export function MembershipGate({ visibility }: { visibility: PostVisibility }) {
-  const audience = visibility === 'paid' ? 'subscribers' : 'members'
+export function MembershipGate({
+  visibility,
+  locale,
+}: {
+  visibility: PostVisibility
+  /** The page's language. English when absent. */
+  locale?: string
+}) {
+  const t = dictionaryFor(locale).gate
+  const audience = visibility === 'paid' ? t.subscribers : t.members
 
   return (
     <aside className="gate" aria-labelledby="gate-title">
       <p className="eyebrow">
-        {visibility === 'paid' ? 'Subscribers only' : 'Members only'}
+        {visibility === 'paid' ? t.subscribersOnly : t.membersOnly}
       </p>
       <h2 id="gate-title" className="gate__title">
-        The rest of this piece is for {audience}
+        {t.restIsFor}
+        {audience}
       </h2>
-      <p className="gate__body">
-        Memberships are not open yet — the site is moving to a new home first.
-        Join the list and you will hear the moment they are, and get every
-        public piece in the meantime.
-      </p>
+      <p className="gate__body">{t.body}</p>
       <button
         type="button"
         className="button button--primary"
         onClick={openSubscribeModal}
       >
-        Join the list
+        {t.join}
       </button>
-      <p className="gate__small">No account to make, nothing to pay.</p>
+      <p className="gate__small">{t.small}</p>
     </aside>
   )
 }

@@ -55,7 +55,10 @@ export function ArticleBody({
   emptyMessage,
   adClient = null,
   inlinePromos = [],
+  locale,
 }: {
+  /** The page's language, for the words modules supply themselves. */
+  locale?: string
   body: ArticleBodyValue
   className?: string
   preview?: boolean
@@ -107,6 +110,7 @@ export function ArticleBody({
   const converters = buildConverters(
     preview,
     createAnchorAllocator(keptAnchors(body.content.root?.children)),
+    locale,
   )
 
   return (

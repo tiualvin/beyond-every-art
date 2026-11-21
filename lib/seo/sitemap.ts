@@ -1,9 +1,19 @@
 import {
+  alternatesForPath,
+  hreflangFor,
+  type LocaleIndex,
+} from '../i18n/alternates'
+import { DEFAULT_LOCALE, PREFIXED_LOCALES } from '../i18n/locales'
+import {
   absoluteUrl,
   appPath,
   APPS_PATH,
   authorPath,
   JOURNAL_PATH,
+  localeAuthorPath,
+  localeHomePath,
+  localePostPath,
+  localeTagPath,
   pagePath,
   postPath,
   tagPath,
@@ -44,6 +54,27 @@ export type SitemapEntry = {
    * outside the site, where a root-relative path names nothing.
    */
   images?: string[]
+  /**
+   * The page's other languages, as `<xhtml:link rel="alternate" hreflang>`.
+   *
+   * Only on a page published in two or more languages, and then the same set
+   * the page's own `<head>` carries — built by the same function from the same
+   * index — so the two can never disagree. Absent on every entry of a site with
+   * no translations, which is the sitemap as it was.
+   */
+  alternates?: { languages: Record<string, string> }
+}
+
+/** The entry with its languages attached, when it has more than one. */
+function withLanguages(
+  entry: SitemapEntry,
+  locales: LocaleIndex | undefined,
+  path: string,
+  siteUrl: string,
+): SitemapEntry {
+  if (!locales) return entry
+  const languages = hreflangFor(alternatesForPath(locales, path), siteUrl)
+  return languages ? { ...entry, alternates: { languages } } : entry
 }
 
 /**
@@ -129,6 +160,7 @@ export function buildSitemapEntries({
   tags = [],
   authors = [],
   apps = [],
+  locales,
 }: {
   siteUrl: string
   posts?: readonly SitemapDoc[]
@@ -136,7 +168,14 @@ export function buildSitemapEntries({
   tags?: readonly SitemapDoc[]
   authors?: readonly SitemapDoc[]
   apps?: readonly SitemapDoc[]
+  /**
+   * Which pages exist in which language. Absent — the database could not be
+   * read, or a caller that predates translations — means English only.
+   */
+  locales?: LocaleIndex
 }): SitemapEntry[] {
+  // The homepage keeps no alternates: home pages are not translations of
+  // each other, and the pages themselves declare none (see the layout).
   const entries: SitemapEntry[] = [
     { url: `${siteUrl}/`, changeFrequency: 'daily', priority: 1 },
     // The archive is a route rather than a document, so it has no lastModified
@@ -166,14 +205,19 @@ export function buildSitemapEntries({
   for (const post of posts) {
     if (!post.slug || post.noindex) continue
     entries.push(
-      withImages(
-        {
-          url: absoluteUrl(postPath(post.slug), siteUrl),
-          lastModified: toIso(post.updatedAt) ?? toIso(post.publishedAt),
-          changeFrequency: 'weekly',
-          priority: 0.7,
-        },
-        post,
+      withLanguages(
+        withImages(
+          {
+            url: absoluteUrl(postPath(post.slug), siteUrl),
+            lastModified: toIso(post.updatedAt) ?? toIso(post.publishedAt),
+            changeFrequency: 'weekly',
+            priority: 0.7,
+          },
+          post,
+          siteUrl,
+        ),
+        locales,
+        postPath(post.slug),
         siteUrl,
       ),
     )
@@ -197,22 +241,36 @@ export function buildSitemapEntries({
 
   for (const tag of tags) {
     if (!tag.slug) continue
-    entries.push({
-      url: absoluteUrl(tagPath(tag.slug), siteUrl),
-      lastModified: toIso(tag.updatedAt) ?? toIso(tag.publishedAt),
-      changeFrequency: 'weekly',
-      priority: 0.4,
-    })
+    entries.push(
+      withLanguages(
+        {
+          url: absoluteUrl(tagPath(tag.slug), siteUrl),
+          lastModified: toIso(tag.updatedAt) ?? toIso(tag.publishedAt),
+          changeFrequency: 'weekly',
+          priority: 0.4,
+        },
+        locales,
+        tagPath(tag.slug),
+        siteUrl,
+      ),
+    )
   }
 
   for (const author of authors) {
     if (!author.slug) continue
-    entries.push({
-      url: absoluteUrl(authorPath(author.slug), siteUrl),
-      lastModified: toIso(author.updatedAt) ?? toIso(author.publishedAt),
-      changeFrequency: 'monthly',
-      priority: 0.3,
-    })
+    entries.push(
+      withLanguages(
+        {
+          url: absoluteUrl(authorPath(author.slug), siteUrl),
+          lastModified: toIso(author.updatedAt) ?? toIso(author.publishedAt),
+          changeFrequency: 'monthly',
+          priority: 0.3,
+        },
+        locales,
+        authorPath(author.slug),
+        siteUrl,
+      ),
+    )
   }
 
   for (const app of apps) {
@@ -229,6 +287,106 @@ export function buildSitemapEntries({
         siteUrl,
       ),
     )
+  }
+
+  if (locales) entries.push(...translatedEntries(locales, posts, siteUrl))
+
+  return entries
+}
+
+/**
+ * Every translated page, after every English one: each language's home page,
+ * its live articles, and its tag and author archives. A language with nothing
+ * live contributes nothing — no home page, no feed, no URL at all.
+ *
+ * An article English asked to keep out of search (`noindex`) keeps every
+ * translation out too: the switch is the article's, not one language's. Its
+ * translations are dropped by English slug, which is how the English loop
+ * above already decided.
+ */
+function translatedEntries(
+  locales: LocaleIndex,
+  englishPosts: readonly SitemapDoc[],
+  siteUrl: string,
+): SitemapEntry[] {
+  const listed = new Map(
+    englishPosts
+      .filter((post) => post.slug && !post.noindex)
+      .map((post) => [post.slug, post]),
+  )
+  const entries: SitemapEntry[] = []
+
+  for (const locale of PREFIXED_LOCALES) {
+    const live = locales.posts.filter((post) => {
+      const english = post.locales[DEFAULT_LOCALE]?.slug
+      return post.locales[locale] && english && listed.has(english)
+    })
+    if (live.length === 0) continue
+
+    entries.push({
+      url: absoluteUrl(localeHomePath(locale), siteUrl),
+      changeFrequency: 'daily',
+      priority: 0.8,
+    })
+
+    for (const post of live) {
+      const entry = post.locales[locale]!
+      const english = listed.get(post.locales[DEFAULT_LOCALE]!.slug)!
+      const path = localePostPath(entry.slug, locale)
+      entries.push(
+        withLanguages(
+          withImages(
+            {
+              url: absoluteUrl(path, siteUrl),
+              lastModified: toIso(entry.modifiedAt) ?? toIso(entry.publishedAt),
+              changeFrequency: 'weekly',
+              priority: 0.7,
+            },
+            // The same picture opens every language's version.
+            english,
+            siteUrl,
+          ),
+          locales,
+          path,
+          siteUrl,
+        ),
+      )
+    }
+
+    for (const tag of locales.tags) {
+      const value = tag.locales[locale]
+      if (!value) continue
+      const path = localeTagPath(value.slug, locale)
+      entries.push(
+        withLanguages(
+          {
+            url: absoluteUrl(path, siteUrl),
+            changeFrequency: 'weekly',
+            priority: 0.4,
+          },
+          locales,
+          path,
+          siteUrl,
+        ),
+      )
+    }
+
+    for (const author of locales.authors) {
+      if (!author.locales.includes(locale)) continue
+      const path = localeAuthorPath(author.slug, locale)
+      entries.push(
+        withLanguages(
+          {
+            url: absoluteUrl(path, siteUrl),
+            changeFrequency: 'monthly',
+            priority: 0.3,
+          },
+          locales,
+          path,
+          siteUrl,
+        ),
+      )
+    }
   }
 
   return entries

@@ -24,14 +24,17 @@ export const Tags: CollectionConfig = {
     afterChange: [purgeOnChange(CONTENT_TAGS.tags)],
     afterDelete: [purgeOnDelete(CONTENT_TAGS.tags)],
   },
+  // Name, slug, description and search text are per language. A tag archive
+  // exists in a language only when the tag has a name and slug there and at
+  // least one article published in it (`/es/tag/<slug>/`); otherwise it 404s.
   fields: [
-    { name: 'name', type: 'text', required: true },
+    { name: 'name', type: 'text', required: true, localized: true },
     // `/tag/<slug>`, so an application route cannot be shadowed and the
     // reserved-slug list does not apply — see the note in `fields/slug.ts`.
-    slugField({ from: 'name' }),
-    { name: 'description', type: 'textarea' },
+    slugField({ from: 'name', localized: true }),
+    { name: 'description', type: 'textarea', localized: true },
     { name: 'featuredImage', type: 'upload', relationTo: 'media' },
-    ...seoFields(),
+    ...seoFields({ localized: true }),
     ghostIdField(),
   ],
 }

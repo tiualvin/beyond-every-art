@@ -29,7 +29,9 @@ export const Authors: CollectionConfig = {
     { name: 'name', type: 'text', required: true },
     // `/author/<slug>`; see the note on Tags.
     slugField({ from: 'name' }),
-    { name: 'bio', type: 'textarea' },
+    // The bio is per language; the name and slug are not — a byline is a
+    // person's name in every edition, and `/es/author/<slug>/` reuses it.
+    { name: 'bio', type: 'textarea', localized: true },
     { name: 'profileImage', type: 'upload', relationTo: 'media' },
     { name: 'website', type: 'text' },
     ghostIdField(),

@@ -4,7 +4,9 @@ import Link from 'next/link'
 import type { PostCard } from '@/lib/content/queries'
 import { formatDate } from '@/lib/format'
 import { visibilityLabel } from '@/lib/membership'
-import { postPath } from '@/lib/seo/site'
+import { dictionaryFor } from '@/lib/i18n/dictionaries'
+import { DEFAULT_LOCALE, localeConfig } from '@/lib/i18n/locales'
+import { localePostPath } from '@/lib/seo/site'
 import { thumbnailSrc } from '@/lib/content/media'
 
 const THUMB_SIZES_DEFAULT =
@@ -19,7 +21,9 @@ export function StoryCard({
   post: PostCard
   variant?: 'default' | 'feature' | 'horizontal'
 }) {
-  const href = postPath(post.slug)
+  const locale = post.locale ?? DEFAULT_LOCALE
+  const t = dictionaryFor(locale)
+  const href = localePostPath(post.slug, locale)
   const showExcerpt = variant === 'feature' || variant === 'horizontal'
   const thumbSizes =
     variant === 'default' ? THUMB_SIZES_DEFAULT : THUMB_SIZES_FEATURE
@@ -54,10 +58,10 @@ export function StoryCard({
       )}
       <p className="story-card__meta">
         {[
-          visibilityLabel(post.visibility),
+          visibilityLabel(post.visibility, locale),
           post.authors.map((a) => a.name).join(', '),
-          `${post.readingTime} min read`,
-          formatDate(post.publishedAt),
+          t.common.minRead(post.readingTime),
+          formatDate(post.publishedAt, localeConfig(locale).dateLocale),
         ]
           .filter(Boolean)
           .join(' · ')}

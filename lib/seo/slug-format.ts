@@ -20,6 +20,8 @@
  * the slug *is* the thing being preserved and a silent correction is a broken
  * inbound link. Refusing puts the choice in front of the person making it.
  */
+import { DEFAULT_LOCALE, localeConfig, type Locale } from '../i18n/locales'
+
 export const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
 export function isWellFormedSlug(value: string): boolean {
@@ -49,10 +51,52 @@ export function slugFormatError(value: string): string {
  * all-unicode title yields an empty string and the editor is asked for a slug
  * instead of being handed a mangled one.
  */
-export function slugFromTitle(title: string): string {
-  return title
+export function slugFromTitle(
+  title: string,
+  locale: Locale = DEFAULT_LOCALE,
+): string {
+  // English keeps the rule it has always had, so no English slug derived from
+  // here can come out differently than it did before translations existed.
+  const source =
+    locale === DEFAULT_LOCALE ? title : transliterate(title, locale)
+  return source
     .toLowerCase()
     .replace(/['’]/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
+}
+
+/**
+ * Letters that are not a base letter plus a mark, so stripping marks would
+ * drop them instead of spelling them.
+ */
+const LIGATURES: Readonly<Record<string, string>> = {
+  æ: 'ae',
+  Æ: 'Ae',
+  œ: 'oe',
+  Œ: 'Oe',
+  ø: 'o',
+  Ø: 'O',
+  ł: 'l',
+  Ł: 'L',
+  đ: 'd',
+  Đ: 'D',
+  ß: 'ss',
+}
+
+/**
+ * A translated title as plain ASCII: the language's own spellings first
+ * (German ü → ue), then every remaining accent dropped (más → mas, ñ → n).
+ *
+ * Translations are where accented titles actually occur, and dropping the
+ * letter — which is what the English rule does — turns "Pigmentos más caros"
+ * into `pigmentos-m-s-caros`.
+ */
+export function transliterate(text: string, locale: Locale): string {
+  const own = localeConfig(locale).transliterate ?? {}
+  return [...text]
+    .map((char) => own[char] ?? LIGATURES[char] ?? char)
+    .join('')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
 }

@@ -28,6 +28,9 @@ export async function GET(request: NextRequest) {
   const collection = searchParams.get('collection')
   const slug = searchParams.get('slug')
   const live = searchParams.get('live') === '1'
+  // Validated against the configured languages inside `previewTargetPath`:
+  // anything that is not one previews English, as the URL always did.
+  const locale = searchParams.get('locale') ?? undefined
 
   if (!slug || !isPreviewCollection(collection)) {
     return new Response('Invalid preview request', { status: 400 })
@@ -54,5 +57,5 @@ export async function GET(request: NextRequest) {
     jar.delete(LIVE_PREVIEW_COOKIE)
   }
 
-  redirect(previewTargetPath(collection, slug))
+  redirect(previewTargetPath(collection, slug, locale))
 }

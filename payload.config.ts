@@ -34,6 +34,7 @@ import { Homepage } from './globals/Homepage'
 import { Header } from './globals/Header'
 import { SiteSettings } from './globals/SiteSettings'
 import { resendAdapter } from './lib/email/resend'
+import { DEFAULT_LOCALE, LOCALES } from './lib/i18n/locales'
 import { mcp } from './lib/mcp/plugin'
 import { trustedOrigins } from './lib/security/origins'
 import { resolvePayloadSecret } from './lib/security/secret'
@@ -91,7 +92,7 @@ export default buildConfig({
       // promise — a global has no drafts, so the frame follows saves rather
       // than keystrokes.
       globals: [...PREVIEW_GLOBALS],
-      url: ({ collectionConfig, globalConfig, data }) =>
+      url: ({ collectionConfig, globalConfig, data, locale }) =>
         // A global has no slug of its own; it is previewed against the
         // homepage, which is the one page that carries all three at once.
         globalConfig
@@ -103,6 +104,8 @@ export default buildConfig({
               collection: collectionConfig?.slug,
               slug: data?.slug,
               live: true,
+              // The Spanish edit view previews the Spanish page.
+              locale: locale?.code,
             }),
     },
   },
@@ -116,6 +119,24 @@ export default buildConfig({
   // fetch it makes is same-origin, to /search/suggest), so there is no reason
   // to answer a cross-origin read with permission to read it.
   csrf: trustedOrigins(),
+  // The languages fields can be written in. English is the default and keeps
+  // its unprefixed URLs; the list itself lives in `lib/i18n/locales.ts`.
+  //
+  // `fallback: false` is the rule the public site depends on: a field with no
+  // value in the requested language comes back empty rather than English, so a
+  // translated page can never be filled out with English text. Every read that
+  // serves a translation also passes `fallbackLocale: false`, so the rule does
+  // not rest on this default alone.
+  //
+  // Publish isolation — one language per publish — is enforced server-side in
+  // `lib/i18n/publishing.ts` rather than with `defaultLocalePublishOption`,
+  // which would route every English publish through Payload's per-locale path
+  // and its extra draft snapshot. docs/LOCALIZATION.md.
+  localization: {
+    locales: LOCALES.map(({ code, label }) => ({ code, label })),
+    defaultLocale: DEFAULT_LOCALE,
+    fallback: false,
+  },
   collections: [
     Users,
     Authors,

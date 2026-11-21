@@ -1,5 +1,6 @@
 import Image from 'next/image'
 import Link from 'next/link'
+import { createElement } from 'react'
 
 import { adClientFor } from '@/lib/ads/eligibility'
 import { attributionHref } from '@/lib/content/attribution'
@@ -12,10 +13,19 @@ import type {
 } from '@/lib/content/queries'
 import { extractHeadings } from '@/lib/content/toc'
 import { formatDate } from '@/lib/format'
-import { authorPath, tagPath } from '@/lib/seo/site'
+import type { Alternates } from '@/lib/i18n/alternates'
+import { dictionaryFor } from '@/lib/i18n/dictionaries'
+import {
+  DEFAULT_LOCALE,
+  localeConfig,
+  localeProp,
+  type Locale,
+} from '@/lib/i18n/locales'
+import { localeAuthorPath, localeTagPath } from '@/lib/seo/site'
 
 import { ArticleRail } from './article-rail'
 import { ArticleBody } from './body'
+import { LanguageSwitcher } from './language-switcher'
 import { MembershipGate } from './membership-gate'
 import { FadeIn } from './motion/fade-in'
 import { ShareRow } from './share-row'
@@ -53,6 +63,7 @@ export function Article({
   railFallback = null,
   inlinePromos = [],
   preview = false,
+  alternates = null,
 }: {
   post: PostDetail
   /** The rail's signup picture, from `SiteSettings`. */
@@ -69,12 +80,19 @@ export function Article({
    */
   inlinePromos?: PostCard[]
   preview?: boolean
+  /**
+   * The languages this article is published in, for the switcher at the top
+   * of it. Null — every untranslated article — renders nothing.
+   */
+  alternates?: Alternates | null
 }) {
+  const locale: Locale = post.locale ?? DEFAULT_LOCALE
+  const t = dictionaryFor(locale)
   const primaryTag = post.tags[0]
   const author = post.authors[0]
   const byline = [
     post.authors.map((a) => a.name).join(', '),
-    formatDate(post.publishedAt),
+    formatDate(post.publishedAt, localeConfig(locale).dateLocale),
   ]
     .filter(Boolean)
     .join(' · ')
@@ -88,36 +106,62 @@ export function Article({
   // docs/ADVERTISING.md §4.
   const adClient = adClientFor({ restricted: post.restricted })
 
+  // The header's children exactly as they were written before translations:
+  // the same values, in the same order, absent ones included. Spread into
+  // `createElement` as separate children, so they need no keys — and must not
+  // have any: a key is serialized into the RSC payload, which would change the
+  // bytes of every untranslated page.
+  /* eslint-disable react/jsx-key */
+  const headerChildren = [
+    primaryTag && (
+      <FadeIn delay={0}>
+        <Link href={localeTagPath(primaryTag.slug, locale)} className="eyebrow">
+          {primaryTag.name}
+        </Link>
+      </FadeIn>
+    ),
+    <FadeIn delay={0.08}>
+      <h1>{post.title}</h1>
+    </FadeIn>,
+    post.excerpt && (
+      <FadeIn delay={0.15}>
+        <p className="article__dek">{post.excerpt}</p>
+      </FadeIn>
+    ),
+    byline && (
+      <FadeIn delay={0.2}>
+        <p className="article__byline">{byline}</p>
+      </FadeIn>
+    ),
+    <FadeIn delay={0.26}>
+      <ShareRow title={post.title} {...localeProp(locale)} />
+    </FadeIn>,
+  ]
+  /* eslint-enable react/jsx-key */
+
   return (
     <main>
       <article className="article">
         <div className="article__shell">
           <div className="article__hero">
-            <header className="article__header">
-              {primaryTag && (
-                <FadeIn delay={0}>
-                  <Link href={tagPath(primaryTag.slug)} className="eyebrow">
-                    {primaryTag.name}
-                  </Link>
-                </FadeIn>
-              )}
-              <FadeIn delay={0.08}>
-                <h1>{post.title}</h1>
-              </FadeIn>
-              {post.excerpt && (
-                <FadeIn delay={0.15}>
-                  <p className="article__dek">{post.excerpt}</p>
-                </FadeIn>
-              )}
-              {byline && (
-                <FadeIn delay={0.2}>
-                  <p className="article__byline">{byline}</p>
-                </FadeIn>
-              )}
-              <FadeIn delay={0.26}>
-                <ShareRow title={post.title} />
-              </FadeIn>
-            </header>
+            {/* `createElement` with spread children, so an article in one
+                language has exactly the header children it always had: a
+                switcher slot that rendered nothing would still leave a `null`
+                in the RSC payload, changing every untranslated page's bytes. */}
+            {createElement(
+              'header',
+              { className: 'article__header' },
+              ...(alternates
+                ? [
+                    <LanguageSwitcher
+                      key="languages"
+                      alternates={alternates}
+                      current={locale}
+                    />,
+                    ...headerChildren,
+                  ]
+                : headerChildren),
+            )}
 
             {/* The class is on the wrapper because that is what the grid
                 sees: `FadeIn` renders a div around the figure, and a width
@@ -137,14 +181,16 @@ export function Article({
               preview={preview}
               adClient={adClient}
               inlinePromos={inlinePromos}
-              emptyMessage={
-                post.restricted
-                  ? undefined
-                  : 'This story has no body content yet.'
-              }
+              locale={locale}
+              emptyMessage={post.restricted ? undefined : t.article.emptyBody}
             />
 
-            {post.restricted && <MembershipGate visibility={post.visibility} />}
+            {post.restricted && (
+              <MembershipGate
+                visibility={post.visibility}
+                {...localeProp(locale)}
+              />
+            )}
 
             {post.tags.length > 0 && (
               <Reveal>
@@ -152,7 +198,10 @@ export function Article({
                   <StaggerChildren className="article__tags-inner">
                     {post.tags.map((tag) => (
                       <StaggerItem key={tag.slug}>
-                        <Link href={tagPath(tag.slug)} className="tag-chip">
+                        <Link
+                          href={localeTagPath(tag.slug, locale)}
+                          className="tag-chip"
+                        >
                           {tag.name}
                         </Link>
                       </StaggerItem>
@@ -164,7 +213,7 @@ export function Article({
 
             {author && (
               <Reveal>
-                <AuthorCard author={author} />
+                <AuthorCard author={author} locale={locale} />
               </Reveal>
             )}
           </div>
@@ -174,6 +223,7 @@ export function Article({
             newsletterImage={newsletterImage}
             railFallback={railFallback}
             restricted={post.restricted}
+            locale={locale}
           />
         </div>
       </article>
@@ -188,7 +238,14 @@ export function Article({
  * the specimen card, which this content model has no fields for, and the share
  * controls it also carried already sit in the article header.
  */
-function AuthorCard({ author }: { author: AuthorSummary }) {
+function AuthorCard({
+  author,
+  locale,
+}: {
+  author: AuthorSummary
+  locale: Locale
+}) {
+  const [before, after] = dictionaryFor(locale).article.allPiecesBy
   return (
     <div className="author-card">
       {author.image && (
@@ -206,8 +263,13 @@ function AuthorCard({ author }: { author: AuthorSummary }) {
         <h3>{author.name}</h3>
         {author.bio && <p>{author.bio}</p>}
         {author.slug && (
-          <Link href={authorPath(author.slug)} className="author-card__link">
-            All pieces by {author.name.split(' ')[0]} &rarr;
+          <Link
+            href={localeAuthorPath(author.slug, locale)}
+            className="author-card__link"
+          >
+            {before}
+            {author.name.split(' ')[0]}
+            {after}
           </Link>
         )}
       </div>

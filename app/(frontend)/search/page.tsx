@@ -2,11 +2,8 @@ import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 
 import { searchPosts } from '@/lib/content/queries'
-import {
-  clientKey,
-  configuredLimit,
-  FixedWindowRateLimiter,
-} from '@/lib/security/rate-limit'
+import { clientKey } from '@/lib/security/rate-limit'
+import { searchPageLimiter as limiter } from '@/lib/security/search-limit'
 import { robotsDirective } from '@/lib/seo/indexing'
 import { absoluteUrl, getSiteUrl, SEARCH_PATH } from '@/lib/seo/site'
 
@@ -21,18 +18,8 @@ export const dynamic = 'force-dynamic'
 
 type SearchParams = { q?: string }
 
-/**
- * Lower than the suggestion drawer's allowance, because this is the deliberate
- * act of submitting a search rather than the incidental traffic of typing one.
- *
- * Going over does not fail the page: the form, the heading and the chrome all
- * render as usual and only the results are withheld, so a reader who is merely
- * quick sees a message they can act on rather than an error page.
- */
-const limiter = new FixedWindowRateLimiter(
-  configuredLimit('RATE_LIMIT_SEARCH_PER_MINUTE', 30),
-  60_000,
-)
+// The rate limit lives in `lib/security/search-limit.ts`, shared with every
+// language's search page.
 
 export async function generateMetadata({
   searchParams,

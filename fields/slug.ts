@@ -10,7 +10,11 @@
 
 import type { TextField, TextFieldSingleValidation } from 'payload'
 
-import { validateRootContentSlug } from '../lib/seo/reserved-slugs'
+import { DEFAULT_LOCALE, isPrefixedLocale } from '../lib/i18n/locales'
+import {
+  validateLocalizedContentSlug,
+  validateRootContentSlug,
+} from '../lib/seo/reserved-slugs'
 import {
   isWellFormedSlug,
   slugFormatError,
@@ -38,16 +42,24 @@ type SlugFieldOptions = {
    * instead of between the title and the excerpt.
    */
   sidebar?: boolean
+  /**
+   * One slug per language. Uniqueness then holds per locale — Postgres indexes
+   * `(slug, _locale)` — so `/impressionism/` and `/es/impressionism/` can both
+   * exist, and a translation's address is its own rather than English's.
+   */
+  localized?: boolean
 }
 
 export function slugField({
   reserved = false,
   from = 'title',
   sidebar = false,
+  localized = false,
 }: SlugFieldOptions = {}): TextField {
   return {
     name: 'slug',
     type: 'text',
+    ...(localized ? { localized: true } : {}),
     required: true,
     unique: true,
     index: true,
@@ -60,23 +72,38 @@ export function slugField({
       // changes address. It also cannot touch a value somebody supplied — the
       // importer passes Ghost's own slug, which is the whole point of the
       // migration, and this must not have an opinion about it.
+      //
+      // A translation is the exception, and the reason is the same one turned
+      // around: its slug in that language is empty until somebody sets it, so
+      // filling it from the translated title on the first save in that locale
+      // moves no address. It is transliterated (`más` → `mas`, German `ü` →
+      // `ue`) because the English rule drops what it cannot spell.
       beforeValidate: [
-        ({ data, operation, value }) => {
-          if (operation !== 'create' || (typeof value === 'string' && value)) {
-            return value
-          }
+        ({ data, operation, req, value }) => {
+          if (typeof value === 'string' && value) return value
+          const locale = req?.locale
+          const translating = localized && isPrefixedLocale(locale)
+          if (operation !== 'create' && !translating) return value
           const source = (data as Record<string, unknown> | undefined)?.[from]
           if (typeof source !== 'string' || !source) return value
-          return slugFromTitle(source) || value
+          return (
+            slugFromTitle(source, translating ? locale : DEFAULT_LOCALE) ||
+            value
+          )
         },
       ],
     },
-    validate: ((value) => {
+    validate: ((value, { req }) => {
       // `required` reports an absent value; saying so twice is noise, and a
       // draft is allowed to be incomplete.
       if (!value) return true
       if (!isWellFormedSlug(value)) return slugFormatError(value)
-      return reserved ? validateRootContentSlug(value) : true
+      if (!reserved) return true
+      // A translated slug lives under `/{locale}/`, not at the root, so the
+      // root list does not apply to it — but the routes under every prefix do.
+      return localized && isPrefixedLocale(req?.locale)
+        ? validateLocalizedContentSlug(value)
+        : validateRootContentSlug(value)
     }) as TextFieldSingleValidation,
     admin: {
       ...(sidebar ? { position: 'sidebar' as const } : {}),

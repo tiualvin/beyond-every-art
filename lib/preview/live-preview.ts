@@ -1,4 +1,11 @@
-import { appPath, pagePath, postPath, publicationPath } from '../seo/site'
+import { isPrefixedLocale } from '../i18n/locales'
+import {
+  appPath,
+  localePostPath,
+  pagePath,
+  postPath,
+  publicationPath,
+} from '../seo/site'
 
 /** Collections an editor can preview on the public site. */
 export const PREVIEW_COLLECTIONS = [
@@ -81,10 +88,15 @@ export function isPreviewRole(user: unknown): boolean {
 export function previewTargetPath(
   collection: PreviewCollection,
   slug: string,
+  locale?: string,
 ): string {
   switch (collection) {
     case 'posts':
-      return postPath(slug)
+      // A post is the one collection with translations: previewing the
+      // Spanish version opens `/es/{slug}/`, its own address, in draft mode.
+      return isPrefixedLocale(locale)
+        ? localePostPath(slug, locale)
+        : postPath(slug)
     case 'pages':
       return pagePath(slug)
     case 'apps':
@@ -99,6 +111,12 @@ type PreviewUrlArgs = {
   slug: unknown
   /** Build the URL for the admin's Live Preview iframe rather than a new tab. */
   live?: boolean
+  /**
+   * The language the editor is working in. Only a post's translated languages
+   * add anything to the URL; English, and every other collection, build the
+   * URL they always did.
+   */
+  locale?: unknown
 }
 
 /**
@@ -137,12 +155,16 @@ export function buildPreviewUrl({
   collection,
   slug,
   live = false,
+  locale,
 }: PreviewUrlArgs): string | null {
   if (!isPreviewCollection(collection)) return null
   if (typeof slug !== 'string' || !slug.trim()) return null
 
   const params = new URLSearchParams({ collection, slug })
   if (live) params.set('live', '1')
+  if (collection === 'posts' && isPrefixedLocale(locale)) {
+    params.set('locale', locale)
+  }
 
   return `${PREVIEW_PATH}?${params.toString()}`
 }

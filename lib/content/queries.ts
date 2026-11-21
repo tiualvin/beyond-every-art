@@ -4,15 +4,36 @@ import { cachedRead, CONTENT_TAGS } from '@/lib/cache/content'
 import { toMediaImage, type MediaImage } from '@/lib/content/media'
 import { htmlToPlainText, richTextToPlainText } from '@/lib/content/plain-text'
 import { rankRelated, type RelatedCandidate } from '@/lib/content/related-rank'
-import { live, publishedStatus } from '@/lib/content/schedule'
+import { live, liveIn, publishedStatus } from '@/lib/content/schedule'
 import { isSubjectTag } from '@/lib/content/topics'
 import { ARCHIVE_PAGE_SIZE } from '@/lib/content/pagination'
 import { toArticleBody, type ArticleBody } from '@/lib/content/body'
 import { withholdUnpublishedLinks } from '@/lib/content/withheld-links'
+import { translatedSlugs } from '@/lib/i18n/alternates'
+import { getLocaleIndex } from '@/lib/i18n/locale-index'
+import { localizeBodyLinks } from '@/lib/i18n/links'
 import { readingTimeMinutes } from '@/lib/format'
+import {
+  DEFAULT_LOCALE,
+  isPrefixedLocale,
+  type Locale,
+} from '@/lib/i18n/locales'
 import { getPayloadClient } from '@/lib/payload'
 import type { PreviewUser } from '@/lib/preview/session'
-import { appPath, getSiteUrl, postPath } from '@/lib/seo/site'
+import { appPath, getSiteUrl, localePostPath } from '@/lib/seo/site'
+
+/**
+ * How a read in `locale` is told to Payload. English is the default locale and
+ * the reads it makes are exactly the ones they were before translations
+ * existed; any other language never falls back, so a field with no
+ * translation comes back empty instead of English.
+ */
+function localeArgs(locale: Locale): {
+  locale?: Locale
+  fallbackLocale?: false
+} {
+  return locale === DEFAULT_LOCALE ? {} : { locale, fallbackLocale: false }
+}
 
 export type NavLink = { label: string; url: string }
 
@@ -132,6 +153,12 @@ export type PostCard = {
   image: MediaImage | null
   readingTime: number
   visibility: PostVisibility
+  /**
+   * The language the card was read in, which is the language its link, date
+   * and labels are in. Absent means English, which is every card the English
+   * templates render.
+   */
+  locale?: Locale
 }
 
 /**
@@ -271,9 +298,16 @@ function estimateWordCount(doc: RawPost): number {
   return words(doc.excerpt ?? '')
 }
 
-function toPostCard(doc: RawPost): PostCard | null {
+function toPostCard(
+  doc: RawPost,
+  locale: Locale = DEFAULT_LOCALE,
+): PostCard | null {
   if (!doc.slug) return null
+  // A translated card whose title is missing is a translation that was
+  // published half-written; it is left out rather than shown as a slug.
+  if (locale !== DEFAULT_LOCALE && !doc.title) return null
   return {
+    ...(locale === DEFAULT_LOCALE ? {} : { locale }),
     id: String(doc.id ?? doc.slug),
     slug: doc.slug,
     title: doc.title ?? doc.slug,
@@ -320,9 +354,19 @@ function isResolved(value: RawRelation): value is Record<string, unknown> {
  * in this file that has to be right about a document it did not fetch itself,
  * and every branch of it is a way for the rail to show a reader a dead link.
  */
-function toRailPromoPost(value: RawRelation): RailPromoPost | null {
+function toRailPromoPost(
+  value: RawRelation,
+  locale: Locale = DEFAULT_LOCALE,
+): RailPromoPost | null {
   if (!isResolved(value)) return null
   if (value._status !== 'published') return null
+  // In a translated language, an editor's pick is shown only where it has a
+  // live translation of its own — the box never offers English text there.
+  if (locale !== DEFAULT_LOCALE) {
+    if (value.translationStatus !== 'published') return null
+    const at = value.translationPublishedAt
+    if (typeof at !== 'string' || Date.parse(at) > Date.now()) return null
+  }
 
   const slug = typeof value.slug === 'string' ? value.slug : ''
   const title = typeof value.title === 'string' ? value.title : ''
@@ -333,14 +377,17 @@ function toRailPromoPost(value: RawRelation): RailPromoPost | null {
 
   return {
     title,
-    href: postPath(slug),
+    href: localePostPath(slug, locale),
     meta: [tag, minutes ? `${minutes} min` : null].filter(Boolean).join(' · '),
     excerpt: typeof value.excerpt === 'string' ? value.excerpt : '',
     image: toMediaImage(value.featuredImage),
   }
 }
 
-export function toRailFallback(value: unknown): RailFallback {
+export function toRailFallback(
+  value: unknown,
+  locale: Locale = DEFAULT_LOCALE,
+): RailFallback {
   const group = (value ?? {}) as {
     kind?: string
     posts?: RawRelation[] | RawRelation
@@ -350,14 +397,20 @@ export function toRailFallback(value: unknown): RailFallback {
   if (group.kind === 'post') {
     const chosen = Array.isArray(group.posts) ? group.posts : []
     const posts = chosen
-      .map(toRailPromoPost)
+      .map((post) => toRailPromoPost(post, locale))
       .filter((post): post is RailPromoPost => post !== null)
       .slice(0, RAIL_PROMO_MAX)
 
     return posts.length > 0 ? { kind: 'post', posts } : null
   }
 
-  if (group.kind === 'app' && isResolved(group.app)) {
+  // An app's name and tagline are English-only fields, so the app promotion is
+  // an English-only choice.
+  if (
+    group.kind === 'app' &&
+    locale === DEFAULT_LOCALE &&
+    isResolved(group.app)
+  ) {
     const doc = group.app
     if (doc._status !== 'published') return null
     const slug = typeof doc.slug === 'string' ? doc.slug : ''
@@ -383,28 +436,37 @@ export function toRailFallback(value: unknown): RailFallback {
  * nothing to read, so the card would silently lose its picture. One join, on a
  * global that is cached and purged on publish.
  */
-async function readSiteSettings(): Promise<SiteSettings> {
+async function readSiteSettings(
+  locale: Locale = DEFAULT_LOCALE,
+): Promise<SiteSettings> {
   try {
     const payload = await getPayloadClient()
     const settings = (await payload.findGlobal({
       slug: 'site-settings',
       overrideAccess: true,
       depth: 1,
+      ...localeArgs(locale),
     })) as Partial<SiteSettings> & {
       newsletterImage?: unknown
       railFallback?: unknown
     }
     return {
       title: settings.title || DEFAULT_SITE_SETTINGS.title,
-      description: settings.description || DEFAULT_SITE_SETTINGS.description,
+      // A translated page takes the description written in its language, or
+      // none — the English default is English text.
+      description:
+        settings.description ||
+        (locale === DEFAULT_LOCALE ? DEFAULT_SITE_SETTINGS.description : ''),
       homeTitle: settings.homeTitle || DEFAULT_SITE_SETTINGS.homeTitle,
       metaDescription:
         settings.metaDescription || DEFAULT_SITE_SETTINGS.metaDescription,
       newsletterImage: toMediaImage(settings.newsletterImage),
-      railFallback: toRailFallback(settings.railFallback),
+      railFallback: toRailFallback(settings.railFallback, locale),
     }
   } catch {
-    return DEFAULT_SITE_SETTINGS
+    return locale === DEFAULT_LOCALE
+      ? DEFAULT_SITE_SETTINGS
+      : { ...DEFAULT_SITE_SETTINGS, description: '' }
   }
 }
 
@@ -496,7 +558,10 @@ function toNavLink(value: Partial<NavLink> | undefined | null): NavLink | null {
   return label && url ? { label, url } : null
 }
 
-async function readGlobalLinks(slug: 'header' | 'footer'): Promise<{
+async function readGlobalLinks(
+  slug: 'header' | 'footer',
+  locale: Locale = DEFAULT_LOCALE,
+): Promise<{
   links: NavLink[]
   cta: NavLink | null
   copyright?: string
@@ -507,6 +572,7 @@ async function readGlobalLinks(slug: 'header' | 'footer'): Promise<{
       slug,
       overrideAccess: true,
       depth: 0,
+      ...localeArgs(locale),
     })) as { links?: NavLink[]; cta?: Partial<NavLink>; copyright?: string }
     return {
       links: (data.links ?? [])
@@ -524,15 +590,21 @@ const getGlobalLinks = cachedRead('global-links', readGlobalLinks, [
   CONTENT_TAGS.globals,
 ])
 
-export function getHeader(): Promise<{
+export function getHeader(locale: Locale = DEFAULT_LOCALE): Promise<{
   links: NavLink[]
   cta: NavLink | null
 }> {
-  return getGlobalLinks('header')
+  return locale === DEFAULT_LOCALE
+    ? getGlobalLinks('header')
+    : getGlobalLinks('header', locale)
 }
 
-export function getFooter(): Promise<{ links: NavLink[]; copyright?: string }> {
-  return getGlobalLinks('footer')
+export function getFooter(
+  locale: Locale = DEFAULT_LOCALE,
+): Promise<{ links: NavLink[]; copyright?: string }> {
+  return locale === DEFAULT_LOCALE
+    ? getGlobalLinks('footer')
+    : getGlobalLinks('footer', locale)
 }
 
 export type PostPage = {
@@ -553,7 +625,8 @@ const EMPTY_POST_PAGE: PostPage = {
 async function readPublishedPosts({
   page = 1,
   limit = ARCHIVE_PAGE_SIZE,
-}: { page?: number; limit?: number } = {}): Promise<PostPage> {
+  locale = DEFAULT_LOCALE,
+}: { page?: number; limit?: number; locale?: Locale } = {}): Promise<PostPage> {
   try {
     const payload = await getPayloadClient()
     const result = await payload.find({
@@ -562,12 +635,15 @@ async function readPublishedPosts({
       depth: 1,
       page,
       limit,
-      sort: '-publishedAt',
-      where: live(),
+      // A language's own list is ordered by when each piece came out in it.
+      sort:
+        locale === DEFAULT_LOCALE ? '-publishedAt' : '-translationPublishedAt',
+      where: locale === DEFAULT_LOCALE ? live() : liveIn(locale),
+      ...localeArgs(locale),
     })
     return {
       posts: (result.docs as RawPost[])
-        .map(toPostCard)
+        .map((doc) => toPostCard(doc, locale))
         .filter((p): p is PostCard => p !== null),
       page: result.page ?? page,
       totalPages: Math.max(1, result.totalPages ?? 1),
@@ -597,7 +673,7 @@ async function readRecentPosts(limit = 6): Promise<PostCard[]> {
       where: live(),
     })
     return (result.docs as RawPost[])
-      .map(toPostCard)
+      .map((doc) => toPostCard(doc))
       .filter((p): p is PostCard => p !== null)
   } catch {
     return []
@@ -629,7 +705,7 @@ async function readFeaturedPosts(limit: number): Promise<PostCard[]> {
       where: { and: [{ featured: { equals: true } }, live()] },
     })
     return (result.docs as RawPost[])
-      .map(toPostCard)
+      .map((doc) => toPostCard(doc))
       .filter((p): p is PostCard => p !== null)
   } catch {
     return []
@@ -667,6 +743,7 @@ export function normaliseSearchTerm(query: string): string {
 async function readSearchPosts(
   term: string,
   limit: number,
+  locale: Locale = DEFAULT_LOCALE,
 ): Promise<PostCard[]> {
   try {
     const payload = await getPayloadClient()
@@ -675,10 +752,12 @@ async function readSearchPosts(
       overrideAccess: true,
       depth: 1,
       limit,
-      sort: '-publishedAt',
+      sort:
+        locale === DEFAULT_LOCALE ? '-publishedAt' : '-translationPublishedAt',
+      ...localeArgs(locale),
       where: {
         and: [
-          live(),
+          locale === DEFAULT_LOCALE ? live() : liveIn(locale),
           {
             or: [
               { title: { contains: term } },
@@ -689,7 +768,7 @@ async function readSearchPosts(
       },
     })
     return (result.docs as RawPost[])
-      .map(toPostCard)
+      .map((doc) => toPostCard(doc, locale))
       .filter((p): p is PostCard => p !== null)
   } catch {
     return []
@@ -719,23 +798,43 @@ const cachedSearchPosts = cachedRead('search-posts', readSearchPosts, [
 export async function searchPosts(
   query: string,
   limit = 20,
+  locale: Locale = DEFAULT_LOCALE,
 ): Promise<PostCard[]> {
   const term = normaliseSearchTerm(query)
   if (!term) return []
-  return cachedSearchPosts(term, limit)
+  return locale === DEFAULT_LOCALE
+    ? cachedSearchPosts(term, limit)
+    : cachedSearchPosts(term, limit, locale)
 }
 
 // --- Detail + archive types --------------------------------------------
 
 export type PostDetail = {
+  /** The document's id — shared by every language's version of it. */
+  id: string
   slug: string
   title: string
   excerpt: string
   body: ArticleBody
+  /** When it came out in this language: the English date, or the translation's. */
   publishedAt: string | null
   updatedAt: string | null
+  /**
+   * When it last changed in this language — lastmod, `dateModified`,
+   * `og:modified_time`. `updatedAt` is one value for every language and moves
+   * on any of them, so it is the fallback only.
+   */
+  modifiedAt: string | null
+  /** The language it was read in; absent for English. */
+  locale?: Locale
   authors: AuthorSummary[]
   tags: TagRef[]
+  /**
+   * The tags' ids, every one of them — including any with no name in this
+   * language, which `tags` leaves out. Related-article ranking in a translated
+   * language compares these, since a tag's slug differs by language.
+   */
+  tagIds: string[]
   image: MediaImage | null
   metaTitle: string | null
   metaDescription: string | null
@@ -786,6 +885,9 @@ export type Archive = {
 export type SlugRef = { slug: string; updatedAt: string | null }
 
 type RawContentDoc = {
+  id?: string | number
+  modifiedAt?: string
+  translationPublishedAt?: string
   slug?: string
   title?: string
   excerpt?: string
@@ -813,23 +915,43 @@ type RawContentDoc = {
  * RSC payload, or a "view source". An editor previewing a draft reads it all:
  * that path is authenticated.
  */
-function toPostDetail(doc: RawContentDoc, preview: boolean): PostDetail {
+function toPostDetail(
+  doc: RawContentDoc,
+  preview: boolean,
+  locale: Locale = DEFAULT_LOCALE,
+): PostDetail {
   const visibility = toVisibility(doc.visibility)
   const restricted = visibility !== 'public' && !preview
+  const translated = locale !== DEFAULT_LOCALE
 
   return {
+    id: String(doc.id ?? ''),
+    ...(translated ? { locale } : {}),
     slug: doc.slug ?? '',
     title: doc.title ?? doc.slug ?? '',
     excerpt: doc.excerpt ?? '',
     body: toArticleBody(doc, { restricted, preview }),
-    publishedAt: doc.publishedAt ?? null,
+    publishedAt:
+      (translated ? doc.translationPublishedAt : doc.publishedAt) ??
+      doc.publishedAt ??
+      null,
     updatedAt: doc.updatedAt ?? null,
+    modifiedAt: doc.modifiedAt ?? doc.updatedAt ?? null,
     authors: toAuthorSummaries(doc.authors),
     tags: toTagRefs(doc.tags),
+    tagIds: (doc.tags ?? []).flatMap((tag) =>
+      typeof tag === 'object' && tag !== null && 'id' in tag
+        ? [String((tag as { id: unknown }).id)]
+        : typeof tag === 'number' || typeof tag === 'string'
+          ? [String(tag)]
+          : [],
+    ),
     image: toMediaImage(doc.featuredImage),
     metaTitle: doc.metaTitle ?? null,
     metaDescription: doc.metaDescription ?? null,
-    canonicalURL: doc.canonicalURL ?? null,
+    // A translation is always canonical to itself. The override names where
+    // the English piece was first published; it says nothing about this one.
+    canonicalURL: translated ? null : (doc.canonicalURL ?? null),
     noindex: Boolean(doc.noindex),
     visibility,
     restricted,
@@ -880,11 +1002,17 @@ async function readWithheldSlugs(): Promise<ReadonlySet<string>> {
 
 async function readPostBySlug(
   slug: string,
-  options: { draft?: boolean; user?: PreviewUser | null } = {},
+  options: {
+    draft?: boolean
+    user?: PreviewUser | null
+    locale?: Locale
+  } = {},
 ): Promise<PostDetail | null> {
+  const locale = options.locale ?? DEFAULT_LOCALE
   try {
     const payload = await getPayloadClient()
     const result = await payload.find({
+      ...localeArgs(locale),
       collection: 'posts',
       // Draft reads must retain the authenticated editor's collection access.
       // In particular, an author may preview only posts they own.
@@ -897,13 +1025,33 @@ async function readPostBySlug(
       draft: options.draft,
       where: options.draft
         ? { slug: { equals: slug } }
-        : { and: [{ slug: { equals: slug } }, live()] },
+        : { and: [{ slug: { equals: slug } }, liveIn(locale)] },
     })
     const doc = result.docs[0] as RawContentDoc | undefined
     if (!doc?.slug) return null
-    const detail = toPostDetail(doc, Boolean(options.draft))
+    // A translation saved without a title is not one a reader can be shown.
+    if (locale !== DEFAULT_LOCALE && !doc.title) return null
+    const detail = toPostDetail(doc, Boolean(options.draft), locale)
     // A preview keeps every link: the editor is deciding what goes out.
     if (options.draft) return detail
+    if (locale !== DEFAULT_LOCALE) {
+      const index = await getLocaleIndex()
+      return {
+        ...detail,
+        body: localizeBodyLinks(detail.body, {
+          locale,
+          siteUrl: getSiteUrl(),
+          translated: translatedSlugs(index, locale),
+          liveHere: new Set(
+            index.posts.flatMap((post) => {
+              const entry = post.locales[locale]
+              return entry ? [entry.slug] : []
+            }),
+          ),
+          withheldEnglish: await readWithheldSlugs(),
+        }),
+      }
+    }
     return {
       ...detail,
       body: withholdUnpublishedLinks(
@@ -919,7 +1067,8 @@ async function readPostBySlug(
 
 const getPublishedPostBySlug = cachedRead(
   'post-by-slug',
-  (slug: string) => readPostBySlug(slug),
+  (slug: string, locale?: Locale) =>
+    readPostBySlug(slug, locale ? { locale } : {}),
   [
     CONTENT_TAGS.posts,
     CONTENT_TAGS.tags,
@@ -939,10 +1088,16 @@ const getPublishedPostBySlug = cachedRead(
  */
 export function getPostBySlug(
   slug: string,
-  options: { draft?: boolean; user?: PreviewUser | null } = {},
+  options: {
+    draft?: boolean
+    user?: PreviewUser | null
+    /** A translated language; absent or `en` reads English, as always. */
+    locale?: Locale
+  } = {},
 ): Promise<PostDetail | null> {
-  return options.draft
-    ? readPostBySlug(slug, options)
+  if (options.draft) return readPostBySlug(slug, options)
+  return isPrefixedLocale(options.locale)
+    ? getPublishedPostBySlug(slug, options.locale)
     : getPublishedPostBySlug(slug)
 }
 
@@ -967,7 +1122,44 @@ export const RELATED_CANDIDATE_LIMIT = 1000
 export async function readRelatedCandidates(
   payload: Awaited<ReturnType<typeof getPayloadClient>>,
   now: Date = new Date(),
+  locale: Locale = DEFAULT_LOCALE,
 ): Promise<RelatedCandidate[]> {
+  if (locale !== DEFAULT_LOCALE) {
+    // A translated language ranks among its own live translations, on their
+    // translated titles and slugs, with tags compared by id — a tag's slug is
+    // per language and may not exist in this one.
+    const result = await payload.find({
+      collection: 'posts',
+      overrideAccess: true,
+      depth: 0,
+      limit: RELATED_CANDIDATE_LIMIT,
+      pagination: false,
+      sort: '-translationPublishedAt',
+      where: liveIn(locale, now),
+      select: {
+        slug: true,
+        title: true,
+        tags: true,
+        translationPublishedAt: true,
+      },
+      ...localeArgs(locale),
+    })
+    return (
+      result.docs as Array<RawPost & { translationPublishedAt?: string }>
+    ).flatMap((doc) =>
+      doc.slug && doc.title
+        ? [
+            {
+              slug: doc.slug,
+              title: doc.title,
+              tags: (doc.tags ?? []).map(String),
+              publishedAt: doc.translationPublishedAt ?? null,
+            },
+          ]
+        : [],
+    )
+  }
+
   const result = await payload.find({
     collection: 'posts',
     overrideAccess: true,
@@ -1014,11 +1206,12 @@ async function readRelatedPosts(
   slug: string,
   tagSlugs: string[],
   limit = 3,
+  locale: Locale = DEFAULT_LOCALE,
 ): Promise<PostCard[]> {
   try {
     const payload = await getPayloadClient()
     const now = new Date()
-    const candidates = await readRelatedCandidates(payload, now)
+    const candidates = await readRelatedCandidates(payload, now, locale)
     const chosen = rankRelated(
       { slug, tags: tagSlugs },
       candidates,
@@ -1033,11 +1226,12 @@ async function readRelatedPosts(
       depth: 1,
       limit: chosen.length,
       pagination: false,
-      where: { and: [live(now), { slug: { in: chosen } }] },
+      where: { and: [liveIn(locale, now), { slug: { in: chosen } }] },
+      ...localeArgs(locale),
     })
     const cards = new Map(
       (result.docs as RawPost[])
-        .map(toPostCard)
+        .map((doc) => toPostCard(doc, locale))
         .filter((p): p is PostCard => p !== null)
         .map((card) => [card.slug, card]),
     )
@@ -1134,6 +1328,7 @@ async function readArchive(
   collection: 'tags' | 'authors',
   slug: string,
   relationField: 'tags' | 'authors',
+  locale: Locale = DEFAULT_LOCALE,
 ): Promise<Archive | null> {
   try {
     const payload = await getPayloadClient()
@@ -1145,6 +1340,7 @@ async function readArchive(
       depth: 1,
       limit: 1,
       where: { slug: { equals: slug } },
+      ...localeArgs(locale),
     })
     const doc = owner.docs[0] as
       | {
@@ -1158,15 +1354,24 @@ async function readArchive(
         }
       | undefined
     if (!doc?.id) return null
+    // In a translated language a tag needs its own name to have a page there;
+    // an author's name is the same in every language.
+    if (locale !== DEFAULT_LOCALE && !doc.name) return null
 
     const posts = await payload.find({
       collection: 'posts',
       overrideAccess: true,
       depth: 1,
       limit: 100,
-      sort: '-publishedAt',
-      where: { and: [{ [relationField]: { in: [doc.id] } }, live()] },
+      sort:
+        locale === DEFAULT_LOCALE ? '-publishedAt' : '-translationPublishedAt',
+      where: {
+        and: [{ [relationField]: { in: [doc.id] } }, liveIn(locale)],
+      },
+      ...localeArgs(locale),
     })
+    // A translated archive with nothing live in its language does not exist.
+    if (locale !== DEFAULT_LOCALE && posts.docs.length === 0) return null
 
     return {
       name: doc.name ?? slug,
@@ -1176,7 +1381,7 @@ async function readArchive(
       metaDescription: doc.metaDescription?.trim() || null,
       image: toMediaImage(doc.featuredImage),
       posts: (posts.docs as RawPost[])
-        .map(toPostCard)
+        .map((doc) => toPostCard(doc, locale))
         .filter((p): p is PostCard => p !== null),
     }
   } catch {
@@ -1192,13 +1397,23 @@ const getArchive = cachedRead('archive', readArchive, [
 ])
 
 /** Posts filed under a tag, plus the tag's own metadata. */
-export function getPostsByTag(slug: string): Promise<Archive | null> {
-  return getArchive('tags', slug, 'tags')
+export function getPostsByTag(
+  slug: string,
+  locale: Locale = DEFAULT_LOCALE,
+): Promise<Archive | null> {
+  return locale === DEFAULT_LOCALE
+    ? getArchive('tags', slug, 'tags')
+    : getArchive('tags', slug, 'tags', locale)
 }
 
 /** Posts written by an author, plus the author's own metadata. */
-export function getPostsByAuthor(slug: string): Promise<Archive | null> {
-  return getArchive('authors', slug, 'authors')
+export function getPostsByAuthor(
+  slug: string,
+  locale: Locale = DEFAULT_LOCALE,
+): Promise<Archive | null> {
+  return locale === DEFAULT_LOCALE
+    ? getArchive('authors', slug, 'authors')
+    : getArchive('authors', slug, 'authors', locale)
 }
 
 async function readSlugRefs(

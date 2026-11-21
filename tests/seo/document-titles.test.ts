@@ -31,7 +31,10 @@ const root = resolve(import.meta.dirname, '../..')
 const read = (path: string) => readFileSync(join(root, path), 'utf8')
 
 const layout = read('app/(frontend)/layout.tsx')
-const contentRoute = read('app/(frontend)/[slug]/page.tsx')
+// The page branch lives in the route; the post one in the article template
+// both the English and the translated routes render (`post-view.tsx`).
+const contentRoute =
+  read('app/(frontend)/[slug]/page.tsx') + read('app/(frontend)/post-view.tsx')
 
 describe('document titles match what Ghost served', () => {
   it('gives posts and pages a title no template can extend', () => {

@@ -40,6 +40,12 @@ export type ArticleJsonLdInput = {
    * cloaking — serving a crawler more than a reader gets.
    */
   isAccessibleForFree?: boolean
+  /**
+   * The page's language, as a BCP 47 code. Set on every translated page and on
+   * an English article that has translations; left out of an English-only
+   * article, whose structured data stays exactly what it was.
+   */
+  inLanguage?: string
 }
 
 /**
@@ -63,6 +69,7 @@ export function buildArticleJsonLd(
   }
 
   if (input.isAccessibleForFree === false) jsonLd.isAccessibleForFree = false
+  if (input.inLanguage) jsonLd.inLanguage = input.inLanguage
   if (input.description) jsonLd.description = input.description
   if (input.datePublished) jsonLd.datePublished = input.datePublished
   if (input.dateModified) jsonLd.dateModified = input.dateModified

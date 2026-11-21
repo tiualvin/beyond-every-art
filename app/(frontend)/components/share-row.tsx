@@ -1,5 +1,7 @@
 'use client'
 
+import { dictionaryFor } from '@/lib/i18n/dictionaries'
+
 import { useEffect, useState } from 'react'
 
 /**
@@ -11,7 +13,15 @@ import { useEffect, useState } from 'react'
  * the button only appears once the client has confirmed support; rendering it
  * server-side would flash a control that then vanishes.
  */
-export function ShareRow({ title }: { title: string }) {
+export function ShareRow({
+  title,
+  locale,
+}: {
+  title: string
+  /** The page's language, for the button labels. English when absent. */
+  locale?: string
+}) {
+  const t = dictionaryFor(locale).share
   const [canShare, setCanShare] = useState(false)
   const [said, setSaid] = useState<string | null>(null)
   // Read after mount rather than during render: the server has no location,
@@ -32,10 +42,10 @@ export function ShareRow({ title }: { title: string }) {
   async function copy() {
     try {
       await navigator.clipboard.writeText(window.location.href)
-      setSaid('Link copied')
+      setSaid(t.copied)
     } catch {
       // Clipboard access is refused on insecure origins and by some settings.
-      setSaid('Press ⌘C to copy')
+      setSaid(t.pressToCopy)
     }
   }
 
@@ -54,14 +64,14 @@ export function ShareRow({ title }: { title: string }) {
   return (
     <div className="share">
       <button type="button" onClick={copy}>
-        Copy link
+        {t.copyLink}
       </button>
       <a className="share__link" href={mailto}>
-        Email
+        {t.email}
       </a>
       {canShare && (
         <button type="button" onClick={share}>
-          Share
+          {t.share}
         </button>
       )}
       {/* Announced rather than only shown: the confirmation is the entire
